@@ -15,18 +15,21 @@
 @end
 
 #define kLabelTag 23452
+static NSString * kAnimationName = @"scroller";
 
 @implementation TPTrialModeController
 
 - (id)init {
     if ( !(self = [super init]) ) return nil;
     
-    _timeout = [NSTimer scheduledTimerWithTimeInterval:10 target:self selector:@selector(initialTimeoutFired:) userInfo:nil repeats:NO];
+    _timeout = [NSTimer scheduledTimerWithTimeInterval:20 target:self selector:@selector(initialTimeoutFired:) userInfo:nil repeats:NO];
     
     return self;
 }
 
 - (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    
     if ( _display ) {
         [_display removeFromSuperview];
         [_display release];
@@ -58,15 +61,25 @@
     [_display addSubview:label];
     [topView addSubview:_display];
     
-    [UIView beginAnimations:nil context:NULL];
-    [UIView setAnimationCurve:UIViewAnimationCurveLinear];
-    [UIView setAnimationDuration:8.0];
-    [UIView setAnimationRepeatCount:9999];
-    label.frame = CGRectMake(-label.frame.size.width, 0, label.frame.size.width, label.frame.size.height);
-    [UIView commitAnimations];
-    
+    [UIView animateWithDuration:8.0 delay:0.0 options:UIViewAnimationOptionRepeat|UIViewAnimationOptionCurveLinear animations:^{ label.frame = CGRectMake(-label.frame.size.width, 0, label.frame.size.width, label.frame.size.height); } completion:NULL];
     [UIView animateWithDuration:0.3 animations:^ { _display.frame = CGRectOffset(_display.frame, 0, 20); }];
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(appDidResume:) name:UIApplicationDidBecomeActiveNotification object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(statusBarChanged:) name:UIApplicationDidChangeStatusBarOrientationNotification object:nil];
 }
 
+- (void)appDidResume:(NSNotification*)notification {
+    UILabel *label = (UILabel*)[_display viewWithTag:kLabelTag];
+    label.frame = CGRectMake(_display.bounds.size.width, 0, label.frame.size.width, label.frame.size.height);
+    [UIView animateWithDuration:8.0 delay:0.0 options:UIViewAnimationOptionRepeat|UIViewAnimationOptionCurveLinear animations:^{ label.frame = CGRectMake(-label.frame.size.width, 0, label.frame.size.width, label.frame.size.height); } completion:NULL];
+}
+
+- (void)statusBarChanged:(NSNotification*)notification {
+    if ( [[UIApplication sharedApplication] statusBarOrientation] == UIInterfaceOrientationPortrait ) {
+        _display.frame = CGRectMake(0, [[UIApplication sharedApplication] statusBarFrame].size.height, _display.frame.size.width, 20);
+    } else {
+        _display.frame = CGRectMake(0, 0, _display.frame.size.width, 20);
+    }
+}
 
 @end
