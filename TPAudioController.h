@@ -4,6 +4,7 @@
 //  Created by Michael Tyson on 25/11/2011.
 //  Copyright (c) 2011 A Tasty Pixel. All rights reserved.
 //
+//  http://atastypixel.com/code/TPAudioController
 
 #import <AudioToolbox/AudioToolbox.h>
 #import <AudioUnit/AudioUnit.h>
@@ -12,18 +13,7 @@
 @protocol TPAudioRecordDelegate;
 @protocol TPAudioPlaybackDelegate;
 
-@interface TPAudioController : NSObject {
-    AUGraph     _audioGraph;
-    AUNode      _mixerNode;
-    AudioUnit   _mixerAudioUnit;
-    AUNode      _ioNode;
-    AudioUnit   _ioAudioUnit;
-    BOOL        _initialised;
-    BOOL        _audioSessionSetup;
-    BOOL        _running;
-    BOOL        _runningPriorToInterruption;
-    BOOL        _setRenderNotify;
-}
+@interface TPAudioController : NSObject
 
 + (AudioStreamBasicDescription)audioDescription;
 

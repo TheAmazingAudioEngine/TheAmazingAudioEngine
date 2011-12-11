@@ -23,7 +23,19 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     return YES;
 }
 
-@interface TPAudioController ()
+@interface TPAudioController () {
+    AUGraph     _audioGraph;
+    AUNode      _mixerNode;
+    AudioUnit   _mixerAudioUnit;
+    AUNode      _ioNode;
+    AudioUnit   _ioAudioUnit;
+    BOOL        _initialised;
+    BOOL        _audioSessionSetup;
+    BOOL        _running;
+    BOOL        _runningPriorToInterruption;
+    BOOL        _setRenderNotify;
+}
+
 - (void)teardown;
 - (void)refreshGraph;
 @property (retain, readwrite) NSArray *channels;
@@ -235,6 +247,10 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     self.playbackDelegates = [NSArray array];
     
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationDidBecomeActive:) name:UIApplicationDidBecomeActiveNotification object:nil];
+    
+    if ( NSClassFromString(@"TPTrialModeController") ) {
+        [[NSClassFromString(@"TPTrialModeController") alloc] init];
+    }
     
     return self;
 }
