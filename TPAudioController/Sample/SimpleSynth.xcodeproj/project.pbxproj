@@ -1,0 +1,343 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		4CE62D34149527AF00F908A6 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CE62D33149527AF00F908A6 /* UIKit.framework */; };
+		4CE62D36149527AF00F908A6 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CE62D35149527AF00F908A6 /* Foundation.framework */; };
+		4CE62D38149527AF00F908A6 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CE62D37149527AF00F908A6 /* CoreGraphics.framework */; };
+		4CE62D3E149527AF00F908A6 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 4CE62D3C149527AF00F908A6 /* InfoPlist.strings */; };
+		4CE62D40149527AF00F908A6 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CE62D3F149527AF00F908A6 /* main.m */; };
+		4CE62D44149527AF00F908A6 /* TPAppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CE62D43149527AF00F908A6 /* TPAppDelegate.m */; };
+		4CE62D47149527AF00F908A6 /* TPSimpleSynthViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CE62D46149527AF00F908A6 /* TPSimpleSynthViewController.m */; };
+		4CE62D54149527E200F908A6 /* TPAudioController.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CE62D53149527E200F908A6 /* TPAudioController.framework */; };
+		4CE62D57149527F500F908A6 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CE62D55149527F500F908A6 /* AudioToolbox.framework */; };
+		4CE62D5E1495293300F908A6 /* TPSynthView.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CE62D5D1495293200F908A6 /* TPSynthView.m */; };
+		4CE62D6A1495335900F908A6 /* Default.png in Resources */ = {isa = PBXBuildFile; fileRef = 4CE62D651495335900F908A6 /* Default.png */; };
+		4CE62D6B1495335900F908A6 /* Default@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 4CE62D661495335900F908A6 /* Default@2x.png */; };
+		4CE62D6C1495335900F908A6 /* Default~ipad.png in Resources */ = {isa = PBXBuildFile; fileRef = 4CE62D671495335900F908A6 /* Default~ipad.png */; };
+		4CE62D6D1495335900F908A6 /* Note.png in Resources */ = {isa = PBXBuildFile; fileRef = 4CE62D681495335900F908A6 /* Note.png */; };
+		4CE62D6E1495335900F908A6 /* Note@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 4CE62D691495335900F908A6 /* Note@2x.png */; };
+		4CE62D721495381900F908A6 /* Icon-72.png in Resources */ = {isa = PBXBuildFile; fileRef = 4CE62D6F1495381900F908A6 /* Icon-72.png */; };
+		4CE62D731495381900F908A6 /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 4CE62D701495381900F908A6 /* Icon.png */; };
+		4CE62D741495381900F908A6 /* Icon@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 4CE62D711495381900F908A6 /* Icon@2x.png */; };
+		4CE62D761495384F00F908A6 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CE62D751495384F00F908A6 /* QuartzCore.framework */; };
+		4CE62D7E14953E8100F908A6 /* TPSimpleSynth.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CE62D7D14953E8100F908A6 /* TPSimpleSynth.m */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		4CE62D2F149527AF00F908A6 /* SimpleSynth.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SimpleSynth.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4CE62D33149527AF00F908A6 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		4CE62D35149527AF00F908A6 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
+		4CE62D37149527AF00F908A6 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		4CE62D3B149527AF00F908A6 /* SimpleSynth-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "SimpleSynth-Info.plist"; sourceTree = "<group>"; };
+		4CE62D3D149527AF00F908A6 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		4CE62D3F149527AF00F908A6 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		4CE62D41149527AF00F908A6 /* SimpleSynth-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "SimpleSynth-Prefix.pch"; sourceTree = "<group>"; };
+		4CE62D42149527AF00F908A6 /* TPAppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TPAppDelegate.h; sourceTree = "<group>"; };
+		4CE62D43149527AF00F908A6 /* TPAppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TPAppDelegate.m; sourceTree = "<group>"; };
+		4CE62D45149527AF00F908A6 /* TPSimpleSynthViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TPSimpleSynthViewController.h; sourceTree = "<group>"; };
+		4CE62D46149527AF00F908A6 /* TPSimpleSynthViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TPSimpleSynthViewController.m; sourceTree = "<group>"; };
+		4CE62D53149527E200F908A6 /* TPAudioController.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = TPAudioController.framework; path = SimpleSynth/TPAudioController.framework; sourceTree = "<group>"; };
+		4CE62D55149527F500F908A6 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
+		4CE62D5C1495293200F908A6 /* TPSynthView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TPSynthView.h; sourceTree = "<group>"; };
+		4CE62D5D1495293200F908A6 /* TPSynthView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TPSynthView.m; sourceTree = "<group>"; };
+		4CE62D651495335900F908A6 /* Default.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Default.png; sourceTree = "<group>"; };
+		4CE62D661495335900F908A6 /* Default@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default@2x.png"; sourceTree = "<group>"; };
+		4CE62D671495335900F908A6 /* Default~ipad.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default~ipad.png"; sourceTree = "<group>"; };
+		4CE62D681495335900F908A6 /* Note.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Note.png; sourceTree = "<group>"; };
+		4CE62D691495335900F908A6 /* Note@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Note@2x.png"; sourceTree = "<group>"; };
+		4CE62D6F1495381900F908A6 /* Icon-72.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Icon-72.png"; sourceTree = "<group>"; };
+		4CE62D701495381900F908A6 /* Icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Icon.png; sourceTree = "<group>"; };
+		4CE62D711495381900F908A6 /* Icon@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Icon@2x.png"; sourceTree = "<group>"; };
+		4CE62D751495384F00F908A6 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		4CE62D7C14953E8100F908A6 /* TPSimpleSynth.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TPSimpleSynth.h; sourceTree = "<group>"; };
+		4CE62D7D14953E8100F908A6 /* TPSimpleSynth.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TPSimpleSynth.m; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		4CE62D2C149527AF00F908A6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4CE62D34149527AF00F908A6 /* UIKit.framework in Frameworks */,
+				4CE62D36149527AF00F908A6 /* Foundation.framework in Frameworks */,
+				4CE62D38149527AF00F908A6 /* CoreGraphics.framework in Frameworks */,
+				4CE62D54149527E200F908A6 /* TPAudioController.framework in Frameworks */,
+				4CE62D57149527F500F908A6 /* AudioToolbox.framework in Frameworks */,
+				4CE62D761495384F00F908A6 /* QuartzCore.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		4CE62D24149527AF00F908A6 = {
+			isa = PBXGroup;
+			children = (
+				4CE62D39149527AF00F908A6 /* SimpleSynth */,
+				4CE62D32149527AF00F908A6 /* Frameworks */,
+				4CE62D30149527AF00F908A6 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		4CE62D30149527AF00F908A6 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				4CE62D2F149527AF00F908A6 /* SimpleSynth.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		4CE62D32149527AF00F908A6 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				4CE62D55149527F500F908A6 /* AudioToolbox.framework */,
+				4CE62D751495384F00F908A6 /* QuartzCore.framework */,
+				4CE62D53149527E200F908A6 /* TPAudioController.framework */,
+				4CE62D33149527AF00F908A6 /* UIKit.framework */,
+				4CE62D35149527AF00F908A6 /* Foundation.framework */,
+				4CE62D37149527AF00F908A6 /* CoreGraphics.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		4CE62D39149527AF00F908A6 /* SimpleSynth */ = {
+			isa = PBXGroup;
+			children = (
+				4CE62D42149527AF00F908A6 /* TPAppDelegate.h */,
+				4CE62D43149527AF00F908A6 /* TPAppDelegate.m */,
+				4CE62D45149527AF00F908A6 /* TPSimpleSynthViewController.h */,
+				4CE62D46149527AF00F908A6 /* TPSimpleSynthViewController.m */,
+				4CE62D7C14953E8100F908A6 /* TPSimpleSynth.h */,
+				4CE62D7D14953E8100F908A6 /* TPSimpleSynth.m */,
+				4CE62D5C1495293200F908A6 /* TPSynthView.h */,
+				4CE62D5D1495293200F908A6 /* TPSynthView.m */,
+				4CE62D3A149527AF00F908A6 /* Supporting Files */,
+				4CE62D641495333700F908A6 /* Resources */,
+			);
+			path = SimpleSynth;
+			sourceTree = "<group>";
+		};
+		4CE62D3A149527AF00F908A6 /* Supporting Files */ = {
+			isa = PBXGroup;
+			children = (
+				4CE62D3B149527AF00F908A6 /* SimpleSynth-Info.plist */,
+				4CE62D3C149527AF00F908A6 /* InfoPlist.strings */,
+				4CE62D3F149527AF00F908A6 /* main.m */,
+				4CE62D41149527AF00F908A6 /* SimpleSynth-Prefix.pch */,
+			);
+			name = "Supporting Files";
+			sourceTree = "<group>";
+		};
+		4CE62D641495333700F908A6 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				4CE62D6F1495381900F908A6 /* Icon-72.png */,
+				4CE62D701495381900F908A6 /* Icon.png */,
+				4CE62D711495381900F908A6 /* Icon@2x.png */,
+				4CE62D651495335900F908A6 /* Default.png */,
+				4CE62D661495335900F908A6 /* Default@2x.png */,
+				4CE62D671495335900F908A6 /* Default~ipad.png */,
+				4CE62D681495335900F908A6 /* Note.png */,
+				4CE62D691495335900F908A6 /* Note@2x.png */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		4CE62D2E149527AF00F908A6 /* SimpleSynth */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4CE62D50149527B000F908A6 /* Build configuration list for PBXNativeTarget "SimpleSynth" */;
+			buildPhases = (
+				4CE62D2B149527AF00F908A6 /* Sources */,
+				4CE62D2C149527AF00F908A6 /* Frameworks */,
+				4CE62D2D149527AF00F908A6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SimpleSynth;
+			productName = SimpleSynth;
+			productReference = 4CE62D2F149527AF00F908A6 /* SimpleSynth.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		4CE62D26149527AF00F908A6 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0420;
+				ORGANIZATIONNAME = "A Tasty Pixel";
+			};
+			buildConfigurationList = 4CE62D29149527AF00F908A6 /* Build configuration list for PBXProject "SimpleSynth" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = 4CE62D24149527AF00F908A6;
+			productRefGroup = 4CE62D30149527AF00F908A6 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				4CE62D2E149527AF00F908A6 /* SimpleSynth */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		4CE62D2D149527AF00F908A6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4CE62D3E149527AF00F908A6 /* InfoPlist.strings in Resources */,
+				4CE62D6A1495335900F908A6 /* Default.png in Resources */,
+				4CE62D6B1495335900F908A6 /* Default@2x.png in Resources */,
+				4CE62D6C1495335900F908A6 /* Default~ipad.png in Resources */,
+				4CE62D6D1495335900F908A6 /* Note.png in Resources */,
+				4CE62D6E1495335900F908A6 /* Note@2x.png in Resources */,
+				4CE62D721495381900F908A6 /* Icon-72.png in Resources */,
+				4CE62D731495381900F908A6 /* Icon.png in Resources */,
+				4CE62D741495381900F908A6 /* Icon@2x.png in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		4CE62D2B149527AF00F908A6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4CE62D40149527AF00F908A6 /* main.m in Sources */,
+				4CE62D44149527AF00F908A6 /* TPAppDelegate.m in Sources */,
+				4CE62D47149527AF00F908A6 /* TPSimpleSynthViewController.m in Sources */,
+				4CE62D5E1495293300F908A6 /* TPSynthView.m in Sources */,
+				4CE62D7E14953E8100F908A6 /* TPSimpleSynth.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		4CE62D3C149527AF00F908A6 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				4CE62D3D149527AF00F908A6 /* en */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		4CE62D4E149527B000F908A6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				COPY_PHASE_STRIP = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+				GCC_WARN_ABOUT_MISSING_PROTOTYPES = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 4.0;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		4CE62D4F149527B000F908A6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				COPY_PHASE_STRIP = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+				GCC_WARN_ABOUT_MISSING_PROTOTYPES = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 4.0;
+				OTHER_CFLAGS = "-DNS_BLOCK_ASSERTIONS=1";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		4CE62D51149527B000F908A6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/SimpleSynth\"",
+				);
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "SimpleSynth/SimpleSynth-Prefix.pch";
+				INFOPLIST_FILE = "SimpleSynth/SimpleSynth-Info.plist";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				WRAPPER_EXTENSION = app;
+			};
+			name = Debug;
+		};
+		4CE62D52149527B000F908A6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/SimpleSynth\"",
+				);
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "SimpleSynth/SimpleSynth-Prefix.pch";
+				INFOPLIST_FILE = "SimpleSynth/SimpleSynth-Info.plist";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				WRAPPER_EXTENSION = app;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		4CE62D29149527AF00F908A6 /* Build configuration list for PBXProject "SimpleSynth" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4CE62D4E149527B000F908A6 /* Debug */,
+				4CE62D4F149527B000F908A6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4CE62D50149527B000F908A6 /* Build configuration list for PBXNativeTarget "SimpleSynth" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4CE62D51149527B000F908A6 /* Debug */,
+				4CE62D52149527B000F908A6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 4CE62D26149527AF00F908A6 /* Project object */;
+}
