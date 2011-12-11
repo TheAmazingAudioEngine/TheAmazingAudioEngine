@@ -46,6 +46,7 @@ static NSString * kAnimationName = @"scroller";
     UIView *topView = [[[UIApplication sharedApplication] windows] lastObject];
     
     _display = [[UIView alloc] initWithFrame:CGRectMake(0, [[UIApplication sharedApplication] statusBarFrame].size.height - 20, topView.frame.size.width, 20)];
+    _display.userInteractionEnabled = NO; 
     _display.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     _display.backgroundColor = [UIColor blackColor];
     
@@ -61,7 +62,7 @@ static NSString * kAnimationName = @"scroller";
     [_display addSubview:label];
     [topView addSubview:_display];
     
-    [UIView animateWithDuration:8.0 delay:0.0 options:UIViewAnimationOptionRepeat|UIViewAnimationOptionCurveLinear animations:^{ label.frame = CGRectMake(-label.frame.size.width, 0, label.frame.size.width, label.frame.size.height); } completion:NULL];
+    [UIView animateWithDuration:8.0 delay:0.0 options:UIViewAnimationOptionRepeat|UIViewAnimationOptionCurveLinear|UIViewAnimationOptionAllowUserInteraction animations:^{ label.frame = CGRectMake(-label.frame.size.width, 0, label.frame.size.width, label.frame.size.height); } completion:NULL];
     [UIView animateWithDuration:0.3 animations:^ { _display.frame = CGRectOffset(_display.frame, 0, 20); }];
     
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(appDidResume:) name:UIApplicationDidBecomeActiveNotification object:nil];
@@ -71,7 +72,7 @@ static NSString * kAnimationName = @"scroller";
 - (void)appDidResume:(NSNotification*)notification {
     UILabel *label = (UILabel*)[_display viewWithTag:kLabelTag];
     label.frame = CGRectMake(_display.bounds.size.width, 0, label.frame.size.width, label.frame.size.height);
-    [UIView animateWithDuration:8.0 delay:0.0 options:UIViewAnimationOptionRepeat|UIViewAnimationOptionCurveLinear animations:^{ label.frame = CGRectMake(-label.frame.size.width, 0, label.frame.size.width, label.frame.size.height); } completion:NULL];
+    [UIView animateWithDuration:8.0 delay:0.0 options:UIViewAnimationOptionRepeat|UIViewAnimationOptionCurveLinear|UIViewAnimationOptionAllowUserInteraction animations:^{ label.frame = CGRectMake(-label.frame.size.width, 0, label.frame.size.width, label.frame.size.height); } completion:NULL];
 }
 
 - (void)statusBarChanged:(NSNotification*)notification {
