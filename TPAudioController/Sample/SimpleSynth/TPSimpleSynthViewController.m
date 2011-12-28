@@ -7,7 +7,7 @@
 //
 
 #import "TPSimpleSynthViewController.h"
-#import "TPSimpleSynth.h"
+#import "TPSynthGenerator.h"
 #import "TPSynthView.h"
 #import <QuartzCore/QuartzCore.h>
 

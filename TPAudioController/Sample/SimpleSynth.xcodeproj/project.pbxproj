@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4CAA260514ABB22500F7CC81 /* TPSynthGenerator.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CAA260414ABB22500F7CC81 /* TPSynthGenerator.m */; };
+		4CAA260914ABB2A400F7CC81 /* TPCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4CAA260714ABB2A400F7CC81 /* TPCircularBuffer.c */; };
 		4CE62D34149527AF00F908A6 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CE62D33149527AF00F908A6 /* UIKit.framework */; };
 		4CE62D36149527AF00F908A6 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CE62D35149527AF00F908A6 /* Foundation.framework */; };
 		4CE62D38149527AF00F908A6 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CE62D37149527AF00F908A6 /* CoreGraphics.framework */; };
@@ -26,10 +28,13 @@
 		4CE62D731495381900F908A6 /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 4CE62D701495381900F908A6 /* Icon.png */; };
 		4CE62D741495381900F908A6 /* Icon@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 4CE62D711495381900F908A6 /* Icon@2x.png */; };
 		4CE62D761495384F00F908A6 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CE62D751495384F00F908A6 /* QuartzCore.framework */; };
-		4CE62D7E14953E8100F908A6 /* TPSimpleSynth.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CE62D7D14953E8100F908A6 /* TPSimpleSynth.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		4CAA260314ABB22500F7CC81 /* TPSynthGenerator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TPSynthGenerator.h; sourceTree = "<group>"; };
+		4CAA260414ABB22500F7CC81 /* TPSynthGenerator.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TPSynthGenerator.m; sourceTree = "<group>"; };
+		4CAA260714ABB2A400F7CC81 /* TPCircularBuffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = TPCircularBuffer.c; sourceTree = "<group>"; };
+		4CAA260814ABB2A400F7CC81 /* TPCircularBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TPCircularBuffer.h; sourceTree = "<group>"; };
 		4CE62D2F149527AF00F908A6 /* SimpleSynth.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SimpleSynth.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4CE62D33149527AF00F908A6 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		4CE62D35149527AF00F908A6 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
@@ -55,8 +60,6 @@
 		4CE62D701495381900F908A6 /* Icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Icon.png; sourceTree = "<group>"; };
 		4CE62D711495381900F908A6 /* Icon@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Icon@2x.png"; sourceTree = "<group>"; };
 		4CE62D751495384F00F908A6 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
-		4CE62D7C14953E8100F908A6 /* TPSimpleSynth.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TPSimpleSynth.h; sourceTree = "<group>"; };
-		4CE62D7D14953E8100F908A6 /* TPSimpleSynth.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TPSimpleSynth.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -113,10 +116,12 @@
 				4CE62D43149527AF00F908A6 /* TPAppDelegate.m */,
 				4CE62D45149527AF00F908A6 /* TPSimpleSynthViewController.h */,
 				4CE62D46149527AF00F908A6 /* TPSimpleSynthViewController.m */,
-				4CE62D7C14953E8100F908A6 /* TPSimpleSynth.h */,
-				4CE62D7D14953E8100F908A6 /* TPSimpleSynth.m */,
+				4CAA260314ABB22500F7CC81 /* TPSynthGenerator.h */,
+				4CAA260414ABB22500F7CC81 /* TPSynthGenerator.m */,
 				4CE62D5C1495293200F908A6 /* TPSynthView.h */,
 				4CE62D5D1495293200F908A6 /* TPSynthView.m */,
+				4CAA260714ABB2A400F7CC81 /* TPCircularBuffer.c */,
+				4CAA260814ABB2A400F7CC81 /* TPCircularBuffer.h */,
 				4CE62D3A149527AF00F908A6 /* Supporting Files */,
 				4CE62D641495333700F908A6 /* Resources */,
 			);
@@ -223,7 +228,8 @@
 				4CE62D44149527AF00F908A6 /* TPAppDelegate.m in Sources */,
 				4CE62D47149527AF00F908A6 /* TPSimpleSynthViewController.m in Sources */,
 				4CE62D5E1495293300F908A6 /* TPSynthView.m in Sources */,
-				4CE62D7E14953E8100F908A6 /* TPSimpleSynth.m in Sources */,
+				4CAA260514ABB22500F7CC81 /* TPSynthGenerator.m in Sources */,
+				4CAA260914ABB2A400F7CC81 /* TPCircularBuffer.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

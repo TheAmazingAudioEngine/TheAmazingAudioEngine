@@ -10,12 +10,12 @@
 
 @class TPSimpleSynthViewController;
 @class TPAudioController;
-@class TPSimpleSynth;
+@class TPSynthGenerator;
 
 @interface TPAppDelegate : UIResponder <UIApplicationDelegate>
 
 @property (retain, nonatomic) UIWindow *window;
 @property (retain, nonatomic) TPSimpleSynthViewController *viewController;
 @property (retain, nonatomic) TPAudioController *audioController;
-@property (retain, nonatomic) TPSimpleSynth *sampleSynth;
+@property (retain, nonatomic) TPSynthGenerator *sampleSynth;
 @end

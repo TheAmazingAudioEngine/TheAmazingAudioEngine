@@ -8,7 +8,7 @@
 
 #import <UIKit/UIKit.h>
 
-@class TPSimpleSynth;
+@class TPSynthGenerator;
 @interface TPSimpleSynthViewController : UIViewController
-@property (nonatomic, retain) TPSimpleSynth *sampleSynth;
+@property (nonatomic, retain) TPSynthGenerator *sampleSynth;
 @end

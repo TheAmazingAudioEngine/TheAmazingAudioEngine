@@ -45,7 +45,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 
 @implementation TPAudioController
 @synthesize channels=_channels, recordDelegates=_recordDelegates, playbackDelegates=_playbackDelegates, audioInputAvailable=_audioInputAvailable, 
-            numberOfInputChannels=_numberOfInputChannels, enableInput=_enableInput, muteOutput=_muteOutput;
+            numberOfInputChannels=_numberOfInputChannels, enableInput=_enableInput, muteOutput=_muteOutput, preferredBufferDuration=_preferredBufferDuration;
 @dynamic running;
 
 #pragma mark Audio session callbacks
@@ -141,12 +141,14 @@ static OSStatus playbackCallback(void *inRefCon, AudioUnitRenderActionFlags *ioA
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     
     TPAudioController *THIS = (TPAudioController *)inRefCon;
-    NSArray *channels = THIS.channels;
+    NSArray *channels = [THIS->_channels retain];
     
     memset(ioData->mBuffers[0].mData, 0, ioData->mBuffers[0].mDataByteSize);
-    id<TPAudioPlayable> channel = ([channels count] > inBusNumber ? [channels objectAtIndex:inBusNumber] : nil);
+    id<TPAudioPlayable> channel = [([channels count] > inBusNumber ? [channels objectAtIndex:inBusNumber] : nil) retain];
     [channel audioController:THIS needsBuffer:(SInt16*)ioData->mBuffers[0].mData ofLength:inNumberFrames time:inTimeStamp];
-
+    [channel release];
+    [channels release];
+    
     [pool release];
 	return noErr;
 }
@@ -180,13 +182,15 @@ static OSStatus recordingCallback(void *inRefCon, AudioUnitRenderActionFlags *io
     int frameCount = sampleCount / THIS->_numberOfInputChannels;
         
     // Pass audio to record delegates
-    for ( id<TPAudioRecordDelegate> recordDelegate in THIS.recordDelegates ) {
+    NSArray *recordDelegates = [THIS->_recordDelegates retain];
+    for ( id<TPAudioRecordDelegate> recordDelegate in recordDelegates ) {
         [recordDelegate audioController:THIS 
                           incomingAudio:buffer
                                ofLength:frameCount
                        numberOfChannels:THIS->_numberOfInputChannels
                                    time:inTimeStamp];
     }
+    [recordDelegates release];
      
     [pool release];
     
@@ -208,12 +212,14 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     int sampleCount = ioData->mBuffers[0].mDataByteSize / sizeof(SInt16);
     
     // Pass audio to playback delegates
-    for ( id<TPAudioPlaybackDelegate> playbackDelegate in THIS.playbackDelegates ) {
+    NSArray *playbackDelegates = [THIS->_playbackDelegates retain];
+    for ( id<TPAudioPlaybackDelegate> playbackDelegate in playbackDelegates ) {
         [playbackDelegate audioController:THIS 
                             outgoingAudio:buffer
                                  ofLength:sampleCount / 2
                                      time:inTimeStamp];
     }
+    [playbackDelegates release];
     
     if ( THIS->_muteOutput ) {
         memset(ioData->mBuffers[0].mData, 0, ioData->mBuffers[0].mDataByteSize);
@@ -245,6 +251,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     self.channels = [NSArray array];
     self.recordDelegates = [NSArray array];
     self.playbackDelegates = [NSArray array];
+    _preferredBufferDuration = 0.005;
     
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationDidBecomeActive:) name:UIApplicationDidBecomeActiveNotification object:nil];
     
@@ -329,7 +336,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     result = AudioSessionAddPropertyListener(kAudioSessionProperty_AudioInputAvailable, inputAvailablePropertyListener, self);
     checkResult(result, "AudioSessionAddPropertyListener");
     
-    Float32 preferredBufferSize = 0.005;
+    Float32 preferredBufferSize = _preferredBufferDuration;
     result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
     checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
     
@@ -469,7 +476,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     AudioUnitSetProperty(_mixerAudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFPS, sizeof(maxFPS));
     
     // set latency
-    Float32 preferredBufferSize = 0.005;
+    Float32 preferredBufferSize = _preferredBufferDuration;
     result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
     checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
     
@@ -702,6 +709,15 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     OSStatus result = AudioUnitGetParameter(_mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, channelIndex, &value);
     checkResult(result, "AudioUnitGetParameter(kMultiChannelMixerParam_Pan)");
     return (float)value;
+}
+
+-(void)setPreferredBufferDuration:(float)preferredBufferDuration {
+    _preferredBufferDuration = preferredBufferDuration;
+    if ( _initialised ) {
+        Float32 preferredBufferSize = _preferredBufferDuration;
+        OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
+        checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
+    }
 }
 
 -(void) observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {

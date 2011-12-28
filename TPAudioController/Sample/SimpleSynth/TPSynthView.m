@@ -7,7 +7,7 @@
 //
 
 #import "TPSynthView.h"
-#import "TPSimpleSynth.h"
+#import "TPSynthGenerator.h"
 #import <QuartzCore/QuartzCore.h>
 
 @implementation TPSynthView
@@ -26,7 +26,7 @@
     return self;
 }
 
--(void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
+-(void)triggerNotesWithTouches:(NSSet *)touches {
     for ( UITouch *touch in touches ) {
         CGPoint point = [touch locationInView:self];
         
@@ -34,8 +34,9 @@
         vol = vol*vol;
         
         // Trigger the note
-        [_sampleSynth triggerNoteWithPitch:200 + 2000*(point.x / self.bounds.size.width) 
-                                    volume:vol];
+        if ( ![_sampleSynth triggerNoteWithPitch:100 + 1000*(point.x / self.bounds.size.width) 
+                                          volume:vol] ) return;
+        
         
         // Some visual feedback
         UIImage *note = [UIImage imageNamed:@"Note.png"];
@@ -68,8 +69,12 @@
     }
 }
 
+-(void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
+    [self triggerNotesWithTouches:touches];
+}
+
 -(void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
-    
+    [self triggerNotesWithTouches:touches];
 }
 
 -(void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {

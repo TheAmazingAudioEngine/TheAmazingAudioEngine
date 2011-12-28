@@ -9,7 +9,7 @@
 #import "TPAppDelegate.h"
 #import "TPSimpleSynthViewController.h"
 #import <TPAudioController/TPAudioController.h>
-#import "TPSimpleSynth.h"
+#import "TPSynthGenerator.h"
 
 @implementation TPAppDelegate
 
@@ -35,7 +35,7 @@
     [_audioController start];
     
     // Create an instance of our synth, and add it as a channel to the audio controller
-    self.sampleSynth = [[[TPSimpleSynth alloc] init] autorelease];
+    self.sampleSynth = [[[TPSynthGenerator alloc] init] autorelease];
     [_audioController addChannels:[NSArray arrayWithObject:_sampleSynth]];
 
     // Create and display view controller

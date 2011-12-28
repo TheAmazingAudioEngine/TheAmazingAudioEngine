@@ -8,8 +8,8 @@
 
 #import <Foundation/Foundation.h>
 
-@class TPSimpleSynth;
+@class TPSynthGenerator;
 @interface TPSynthView : UIView
 
-@property (nonatomic, retain) TPSimpleSynth *sampleSynth;
+@property (nonatomic, retain) TPSynthGenerator *sampleSynth;
 @end

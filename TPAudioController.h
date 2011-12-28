@@ -33,6 +33,7 @@
 
 @property (nonatomic, assign) BOOL enableInput;
 @property (nonatomic, assign) BOOL muteOutput;
+@property (nonatomic, assign) float preferredBufferDuration;
 @property (retain, readonly) NSArray *channels;
 @property (retain, readonly) NSArray *recordDelegates;
 @property (retain, readonly) NSArray *playbackDelegates;
