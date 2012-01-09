@@ -12,7 +12,7 @@
 
 #define kMaxSimultaneousNotes 10
 #define kNoteMicrofadeInFrames 1024
-#define kNoteDecayTime 44100
+#define kNoteDurationInFrames 44100
 
 typedef struct {
     float pitch;
@@ -64,14 +64,17 @@ static double timeBaseRatio;
     
     for ( int i=0; i<noteCount; i++, note++ ) {
         // Render the audio (a sin wave with a simple amplitude envelope to mimic decay)
-        for ( int i=0, sample=0; i<frames && note->position<kNoteDecayTime; i++, note->position++ ) {
-            float amplitude = note->position <= kNoteMicrofadeInFrames ? (float)note->position / kNoteMicrofadeInFrames : 1.0 - ((float)(note->position-kNoteMicrofadeInFrames)/(kNoteDecayTime-kNoteMicrofadeInFrames));
-            SInt16 value = INT16_MAX * note->volume * amplitude * sin(note->pitch * (note->position/44100.0) * 2*M_PI);
+        float multiplier = INT16_MAX * note->volume;
+        float position = ((float)note->position / kNoteDurationInFrames) * note->pitch * 2*M_PI;
+        float increment = (1.0 / kNoteDurationInFrames) * note->pitch * 2*M_PI;
+        for ( int i=0, sample=0; i<frames && note->position<kNoteDurationInFrames; i++, position += increment, note->position++ ) {
+            float amplitude = note->position <= kNoteMicrofadeInFrames ? (float)note->position / kNoteMicrofadeInFrames : 1.0 - ((float)(note->position-kNoteMicrofadeInFrames)/(kNoteDurationInFrames-kNoteMicrofadeInFrames));
+            SInt16 value = multiplier * amplitude * sin(position);
             buffer[sample++] += value;
             buffer[sample++] += value; // Stereo
         }
         
-        if ( note->position+frames >= kNoteDecayTime ) {
+        if ( note->position+frames >= kNoteDurationInFrames ) {
             TPCircularBufferConsume(&_notes, sizeof(note_t));
         }
     }
