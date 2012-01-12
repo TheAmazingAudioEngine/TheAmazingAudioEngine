@@ -12,6 +12,7 @@
 @protocol TPAudioPlayable;
 @protocol TPAudioRecordDelegate;
 @protocol TPAudioPlaybackDelegate;
+@protocol TPAudioTimingDelegate;
 
 @interface TPAudioController : NSObject
 
@@ -31,12 +32,16 @@
 - (void)addPlaybackDelegate:(id<TPAudioPlaybackDelegate>)delegate;
 - (void)removePlaybackDelegate:(id<TPAudioPlaybackDelegate>)delegate;
 
+- (void)addTimingDelegate:(id<TPAudioTimingDelegate>)delegate;
+- (void)removeTimingDelegate:(id<TPAudioTimingDelegate>)delegate;
+
 @property (nonatomic, assign) BOOL enableInput;
 @property (nonatomic, assign) BOOL muteOutput;
 @property (nonatomic, assign) float preferredBufferDuration;
 @property (retain, readonly) NSArray *channels;
 @property (retain, readonly) NSArray *recordDelegates;
 @property (retain, readonly) NSArray *playbackDelegates;
+@property (retain, readonly) NSArray *timingDelegates;
 @property (nonatomic, readonly) BOOL running;
 @property (nonatomic, readonly) BOOL audioInputAvailable;
 @property (nonatomic, readonly) NSUInteger numberOfInputChannels;
@@ -55,4 +60,13 @@
 
 @protocol TPAudioPlaybackDelegate <NSObject>
 - (void)audioController:(TPAudioController*)controller outgoingAudio:(SInt16*)audio ofLength:(NSUInteger)frames time:(const AudioTimeStamp*)time;
+@end
+
+typedef enum {
+    TPAudioTimingContextInput,
+    TPAudioTimingContextOutput
+} TPAudioTimingContext;
+
+@protocol TPAudioTimingDelegate <NSObject>
+- (void)audioController:(TPAudioController*)controller didAdvanceTime:(const AudioTimeStamp*)time timingContext:(TPAudioTimingContext)timingContext;
 @end

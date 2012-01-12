@@ -41,10 +41,11 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 @property (retain, readwrite) NSArray *channels;
 @property (retain, readwrite) NSArray *recordDelegates;
 @property (retain, readwrite) NSArray *playbackDelegates;
+@property (retain, readwrite) NSArray *timingDelegates;
 @end
 
 @implementation TPAudioController
-@synthesize channels=_channels, recordDelegates=_recordDelegates, playbackDelegates=_playbackDelegates, audioInputAvailable=_audioInputAvailable, 
+@synthesize channels=_channels, recordDelegates=_recordDelegates, playbackDelegates=_playbackDelegates, timingDelegates=_timingDelegates, audioInputAvailable=_audioInputAvailable, 
             numberOfInputChannels=_numberOfInputChannels, enableInput=_enableInput, muteOutput=_muteOutput, preferredBufferDuration=_preferredBufferDuration;
 @dynamic running;
 
@@ -158,6 +159,12 @@ static OSStatus recordingCallback(void *inRefCon, AudioUnitRenderActionFlags *io
     
     TPAudioController *THIS = (TPAudioController *)inRefCon;
     
+    NSArray *timingDelegates = [THIS->_timingDelegates retain];
+    for ( id<TPAudioTimingDelegate> timingDelegate in timingDelegates ) {
+        [timingDelegate audioController:THIS didAdvanceTime:inTimeStamp timingContext:TPAudioTimingContextInput];
+    }
+    [timingDelegates release];
+    
     int sampleCount = inNumberFrames * 2;
     
     // Render audio into buffer
@@ -202,7 +209,15 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     TPAudioController *THIS = (TPAudioController *)inRefCon;
         
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        
+    
+    if ( *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
+        NSArray *timingDelegates = [THIS->_timingDelegates retain];
+        for ( id<TPAudioTimingDelegate> timingDelegate in timingDelegates ) {
+            [timingDelegate audioController:THIS didAdvanceTime:inTimeStamp timingContext:TPAudioTimingContextOutput];
+        }
+        [timingDelegates release];
+    }
+    
     if ( !(*ioActionFlags & kAudioUnitRenderAction_PostRender) ) {
         [pool release];
         return noErr;
@@ -276,6 +291,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     self.channels = nil;
     self.recordDelegates = nil;
     self.playbackDelegates = nil;
+    self.timingDelegates = nil;
     
     [super dealloc];
 }
@@ -634,7 +650,33 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     [mutableDelegates removeObject:delegate];
     self.playbackDelegates = mutableDelegates;
     
-    if ( _initialised && [_playbackDelegates count] == 0 && _setRenderNotify ) {
+    if ( _initialised && [_playbackDelegates count] == 0 && [_timingDelegates count] == 0 && _setRenderNotify ) {
+        // Unregister callback
+        _setRenderNotify = NO;
+        checkResult(AudioUnitRemoveRenderNotify(_mixerAudioUnit, &outputCallback, self), "AudioUnitRemoveRenderNotify");
+    }
+}
+
+- (void)addTimingDelegate:(id<TPAudioRecordDelegate>)delegate {
+    self.timingDelegates = [(_timingDelegates ? _timingDelegates : [NSArray array]) arrayByAddingObject:delegate];
+    
+    if ( _initialised && !_setRenderNotify ) {
+        // Register a callback to receive outgoing audio
+        _setRenderNotify = YES;
+        checkResult(AudioUnitAddRenderNotify(_mixerAudioUnit, &outputCallback, self), "AudioUnitAddRenderNotify");
+    }
+}
+
+- (void)removeTimingDelegate:(id<TPAudioRecordDelegate>)delegate {
+    NSMutableArray *mutableDelegates = [[_timingDelegates mutableCopy] autorelease];
+    [mutableDelegates removeObject:delegate];
+    if ( [mutableDelegates count] > 0 ) {
+        self.timingDelegates = mutableDelegates;
+    } else {
+        self.timingDelegates = nil;
+    }
+    
+    if ( _initialised && [_playbackDelegates count] == 0 && [_timingDelegates count] == 0 && _setRenderNotify ) {
         // Unregister callback
         _setRenderNotify = NO;
         checkResult(AudioUnitRemoveRenderNotify(_mixerAudioUnit, &outputCallback, self), "AudioUnitRemoveRenderNotify");

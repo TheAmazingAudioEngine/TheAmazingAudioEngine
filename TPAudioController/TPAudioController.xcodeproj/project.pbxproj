@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		4CE5019F1493F84300F23607 /* TPAudioController.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CE5019D1493F84300F23607 /* TPAudioController.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4CE501A01493F84300F23607 /* TPAudioController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CE5019E1493F84300F23607 /* TPAudioController.m */; };
-		4CE62D101494B7B000F908A6 /* TPTrialModeController.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CE62D0E1494B7B000F908A6 /* TPTrialModeController.h */; };
 		4CE62D111494B7B000F908A6 /* TPTrialModeController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CE62D0F1494B7B000F908A6 /* TPTrialModeController.m */; };
 /* End PBXBuildFile section */
 
@@ -79,7 +78,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				4CE5019F1493F84300F23607 /* TPAudioController.h in Headers */,
-				4CE62D101494B7B000F908A6 /* TPTrialModeController.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
