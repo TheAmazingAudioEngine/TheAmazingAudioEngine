@@ -137,10 +137,8 @@ static void inputAvailablePropertyListener (void *inClientData, AudioSessionProp
 #pragma mark -
 #pragma mark Input and render callbacks
 
-static OSStatus playbackCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData)
-{
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    
+static OSStatus playbackCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
+
     TPAudioController *THIS = (TPAudioController *)inRefCon;
     NSArray *channels = [THIS->_channels retain];
     
@@ -150,13 +148,11 @@ static OSStatus playbackCallback(void *inRefCon, AudioUnitRenderActionFlags *ioA
     [channel release];
     [channels release];
     
-    [pool release];
 	return noErr;
 }
 
 static OSStatus recordingCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    
+   
     TPAudioController *THIS = (TPAudioController *)inRefCon;
     
     NSArray *timingDelegates = [THIS->_timingDelegates retain];
@@ -174,7 +170,7 @@ static OSStatus recordingCallback(void *inRefCon, AudioUnitRenderActionFlags *io
     bufferList.mBuffers[0].mData = NULL;
     bufferList.mBuffers[0].mDataByteSize = inNumberFrames * sizeof(SInt16) * 2; // Always provides 2 channels, even if mono (right channel is silent)
     OSStatus err = AudioUnitRender(THIS->_ioAudioUnit, ioActionFlags, inTimeStamp, kInputBus, inNumberFrames, &bufferList);
-    if ( !checkResult(err, "AudioUnitRender") ) { [pool release]; return err; }
+    if ( !checkResult(err, "AudioUnitRender") ) { return err; }
         
     SInt16 *buffer = (SInt16*)bufferList.mBuffers[0].mData;
     
@@ -198,8 +194,6 @@ static OSStatus recordingCallback(void *inRefCon, AudioUnitRenderActionFlags *io
                                    time:inTimeStamp];
     }
     [recordDelegates release];
-     
-    [pool release];
     
     return noErr;
 }
@@ -208,8 +202,6 @@ static OSStatus recordingCallback(void *inRefCon, AudioUnitRenderActionFlags *io
 static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
     TPAudioController *THIS = (TPAudioController *)inRefCon;
         
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    
     if ( *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
         NSArray *timingDelegates = [THIS->_timingDelegates retain];
         for ( id<TPAudioTimingDelegate> timingDelegate in timingDelegates ) {
@@ -219,7 +211,6 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     }
     
     if ( !(*ioActionFlags & kAudioUnitRenderAction_PostRender) ) {
-        [pool release];
         return noErr;
     }
     
