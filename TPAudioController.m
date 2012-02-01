@@ -46,7 +46,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 
 @implementation TPAudioController
 @synthesize channels=_channels, recordDelegates=_recordDelegates, playbackDelegates=_playbackDelegates, timingDelegates=_timingDelegates, audioInputAvailable=_audioInputAvailable, 
-            numberOfInputChannels=_numberOfInputChannels, enableInput=_enableInput, muteOutput=_muteOutput, preferredBufferDuration=_preferredBufferDuration;
+            numberOfInputChannels=_numberOfInputChannels, enableInput=_enableInput, muteOutput=_muteOutput, preferredBufferDuration=_preferredBufferDuration, audioUnit=_ioAudioUnit;
 @dynamic running;
 
 #pragma mark Audio session callbacks
@@ -89,6 +89,8 @@ static void audioRouteChangePropertyListener(void *inClientData, AudioSessionPro
             
             checkResult(AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audioRouteChangePropertyListener, THIS), "AudioSessionAddPropertyListener");
         }
+
+        CFRelease(route);
                 
         // Check channels on input
         AudioStreamBasicDescription inDesc;
@@ -200,6 +202,9 @@ static OSStatus recordingCallback(void *inRefCon, AudioUnitRenderActionFlags *io
 
 
 static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
+    
+    if ( inBusNumber != kOutputBus ) return noErr;
+
     TPAudioController *THIS = (TPAudioController *)inRefCon;
         
     if ( *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
@@ -237,7 +242,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
 #pragma mark -
 
 + (AudioStreamBasicDescription)audioDescription {
-    // Linear PCM, stereo, noninterleaved stream at the hardware sample rate.
+    // Linear PCM, stereo, interleaved stream at the hardware sample rate.
     AudioStreamBasicDescription audioDescription;
     memset(&audioDescription, 0, sizeof(audioDescription));
     audioDescription.mFormatID          = kAudioFormatLinearPCM;
@@ -335,6 +340,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
             checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute)");
         }
     }
+    CFRelease(route);
 #endif
     
     result = AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audioRouteChangePropertyListener, self);
@@ -490,7 +496,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     if ( [_playbackDelegates count] > 0 ) {
         // Register a callback to receive outgoing audio
         _setRenderNotify = YES;
-        checkResult(AudioUnitAddRenderNotify(_mixerAudioUnit, &outputCallback, self), "AudioUnitAddRenderNotify");
+        checkResult(AudioUnitAddRenderNotify(_ioAudioUnit, &outputCallback, self), "AudioUnitAddRenderNotify");
     } else {
         _setRenderNotify = NO;
     }
@@ -632,7 +638,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     if ( _initialised && !_setRenderNotify ) {
         // Register a callback to receive outgoing audio
         _setRenderNotify = YES;
-        checkResult(AudioUnitAddRenderNotify(_mixerAudioUnit, &outputCallback, self), "AudioUnitAddRenderNotify");
+        checkResult(AudioUnitAddRenderNotify(_ioAudioUnit, &outputCallback, self), "AudioUnitAddRenderNotify");
     }
 }
 
@@ -644,7 +650,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     if ( _initialised && [_playbackDelegates count] == 0 && [_timingDelegates count] == 0 && _setRenderNotify ) {
         // Unregister callback
         _setRenderNotify = NO;
-        checkResult(AudioUnitRemoveRenderNotify(_mixerAudioUnit, &outputCallback, self), "AudioUnitRemoveRenderNotify");
+        checkResult(AudioUnitRemoveRenderNotify(_ioAudioUnit, &outputCallback, self), "AudioUnitRemoveRenderNotify");
     }
 }
 
@@ -654,7 +660,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     if ( _initialised && !_setRenderNotify ) {
         // Register a callback to receive outgoing audio
         _setRenderNotify = YES;
-        checkResult(AudioUnitAddRenderNotify(_mixerAudioUnit, &outputCallback, self), "AudioUnitAddRenderNotify");
+        checkResult(AudioUnitAddRenderNotify(_ioAudioUnit, &outputCallback, self), "AudioUnitAddRenderNotify");
     }
 }
 
@@ -670,7 +676,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     if ( _initialised && [_playbackDelegates count] == 0 && [_timingDelegates count] == 0 && _setRenderNotify ) {
         // Unregister callback
         _setRenderNotify = NO;
-        checkResult(AudioUnitRemoveRenderNotify(_mixerAudioUnit, &outputCallback, self), "AudioUnitRemoveRenderNotify");
+        checkResult(AudioUnitRemoveRenderNotify(_ioAudioUnit, &outputCallback, self), "AudioUnitRemoveRenderNotify");
     }
 }
 

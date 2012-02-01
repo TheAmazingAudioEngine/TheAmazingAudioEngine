@@ -45,6 +45,7 @@
 @property (nonatomic, readonly) BOOL running;
 @property (nonatomic, readonly) BOOL audioInputAvailable;
 @property (nonatomic, readonly) NSUInteger numberOfInputChannels;
+@property (nonatomic, readonly) AudioUnit audioUnit;
 @end
 
 @protocol TPAudioPlayable <NSObject>
