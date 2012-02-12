@@ -128,7 +128,7 @@ extern const NSString *kTPAudioControllerCallbackKey;
  */
 extern const NSString *kTPAudioControllerUserInfoKey;
 
-#pragma mark - The goods
+#pragma mark -
 
 /*!
  *  Main controller class
@@ -185,6 +185,8 @@ extern const NSString *kTPAudioControllerUserInfoKey;
  * Stop audio engine
  */
 - (void)stop;
+
+#pragma mark - Channels and delegates
 
 /*!
  * Add channels
@@ -270,17 +272,24 @@ extern const NSString *kTPAudioControllerUserInfoKey;
  */
 - (void)removeTimingDelegate:(TPAudioControllerTimingCallback)callback userInfo:(void*)userInfo;
 
+#pragma mark - Properties
+
 /*!
  * Enable audio input
- *      Set to YES to enable recording from an input device.  Default is NO.
+ *
+ *      Set to YES to enable recording from an input device.
+ *
  *      Setting this parameter after calling setupWithAudioDescription: will cause
  *      the entire audio system to be shut down and restarted with the new setting,
  *      which will result in a break in audio playback.
+ *
+ *      Default is NO.
  */
 @property (nonatomic, assign) BOOL enableInput;
 
 /*! 
- * Mute output 
+ * Mute output
+ *
  *      Set to YES to mute all system output. Note that even if this is YES, playback
  *      delegates will still receive audio, as the silencing happens after playback delegate
  *      callbacks are called.
@@ -289,6 +298,7 @@ extern const NSString *kTPAudioControllerUserInfoKey;
 
 /*!
  * Whether to use the built-in voice processing system
+ *
  *      This can be useful for removing echo/feedback when playing through the speaker
  *      while simultaneously recording through the microphone.  Not suitable for music,
  *      but works adequately well for speech.
@@ -299,39 +309,43 @@ extern const NSString *kTPAudioControllerUserInfoKey;
  *
  *      Enabling voice processing in short buffer duration environments (< 0.01s) may cause
  *      stuttering.
+ *
+ *      Default is NO.
  */
 @property (nonatomic, assign) BOOL voiceProcessingEnabled;
 
 /*!
  * Whether to only perform voice processing for the SpeakerAndMicrophone route
+ *
  *      This causes voice processing to only be enabled in the classic echo removal
  *      scenario, when audio is being played through the device speaker and recorded
  *      by the device microphone.
+ *
+ *      Default is YES.
  */
 @property (nonatomic, assign) BOOL voiceProcessingOnlyForSpeakerAndMicrophone;
 
-/*!
- * Determine whether audio is currently being played through the device's speaker
- *      This property is observable
- */
-@property (nonatomic, readonly) BOOL playingThroughDeviceSpeaker;
-
 /*! 
- * Whether to receive audio input from mono devices as bridged stereo.
+ * Whether to receive audio input from mono devices as bridged stereo
+ *
  *      If you are using a stereo audio format, setting this to YES causes audio input
  *      from mono input devices to be received by record delegates as bridged stereo audio.
  *      Otherwise, audio will be received as mono audio.
+ *
  *      See also discussion of @link addRecordDelegate:userInfo: @/link.
- *      Default: YES
+ *
+ *      Default is YES.
  */
 @property (nonatomic, assign) BOOL receiveMonoInputAsBridgedStereo;
 
 /*!
- * Preferred buffer duration (in milliseconds)
+ * Preferred buffer duration (in seconds)
+ *
  *      Set this to low values for better latency, but more processing overhead, or higher
  *      values for greater latency with lower processing overhead.  This parameter affects
  *      the length of the audio buffers received by the various callbacks and delegates.
- *      Default: 0.005
+ *
+ *      Default is 0.005.
  */
 @property (nonatomic, assign) float preferredBufferDuration;
 
@@ -342,6 +356,7 @@ extern const NSString *kTPAudioControllerUserInfoKey;
 
 /*!
  * Obtain a list of all record delegates
+ *
  *      This yields an NSArray of NSDictionary elements, each containing a filter callback
  *      (kTPAudioControllerCallbackKey) and the corresponding userinfo (kTPAudioControllerUserInfoKey).
  */
@@ -349,6 +364,7 @@ extern const NSString *kTPAudioControllerUserInfoKey;
 
 /*!
  * Obtain a list of all playback delegates
+ *
  *      This yields an NSArray of NSDictionary elements, each containing a filter callback
  *      (kTPAudioControllerCallbackKey) and the corresponding userinfo (kTPAudioControllerUserInfoKey).
  */
@@ -356,6 +372,7 @@ extern const NSString *kTPAudioControllerUserInfoKey;
 
 /*!
  * Obtain a list of all timing delegates
+ *
  *      This yields an NSArray of NSDictionary elements, each containing a filter callback
  *      (TPAudioControllerTimingCallback) and the corresponding userinfo (kTPAudioControllerUserInfoKey).
  */
@@ -363,18 +380,28 @@ extern const NSString *kTPAudioControllerUserInfoKey;
 
 /*!
  * Determine whether the audio engine is running
+ *
  *      This is affected by calling start and stop on the audio controller.
  */
 @property (nonatomic, readonly) BOOL running;
 
 /*!
+ * Determine whether audio is currently being played through the device's speaker
+ *
+ *      This property is observable
+ */
+@property (nonatomic, readonly) BOOL playingThroughDeviceSpeaker;
+
+/*!
  * Whether audio input is currently available
+ *
  *      Note: This property is observable
  */
 @property (nonatomic, readonly) BOOL audioInputAvailable;
 
 /*!
  * The number of audio channels than the current audio input device provides
+ *
  *      Note: This property is observable
  */
 @property (nonatomic, readonly) NSUInteger numberOfInputChannels;
@@ -388,5 +415,6 @@ extern const NSString *kTPAudioControllerUserInfoKey;
  * The Remote IO audio unit used for input and output
  */
 @property (nonatomic, readonly) AudioUnit audioUnit;
+
 @end
 

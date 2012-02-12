@@ -391,6 +391,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     
     _preferredBufferDuration = 0.005;
     _receiveMonoInputAsBridgedStereo = YES;
+    _voiceProcessingOnlyForSpeakerAndMicrophone = YES;
     
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationDidBecomeActive:) name:UIApplicationDidBecomeActiveNotification object:nil];
     
@@ -414,6 +415,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
         for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", nil] ) {
             [(NSObject*)_channels[i].userInfo removeObserver:self forKeyPath:property];
         }
+        [(NSObject*)_channels[i].userInfo release];
     }
     
     TPACCircularBufferCleanup(&_messageBuffer);
