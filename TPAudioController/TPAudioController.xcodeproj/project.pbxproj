@@ -7,12 +7,15 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4CC62FC014E7F7A300B5A2DB /* TPACCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4CC62FBE14E7F7A300B5A2DB /* TPACCircularBuffer.c */; };
 		4CE5019F1493F84300F23607 /* TPAudioController.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CE5019D1493F84300F23607 /* TPAudioController.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4CE501A01493F84300F23607 /* TPAudioController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CE5019E1493F84300F23607 /* TPAudioController.m */; };
 		4CE62D111494B7B000F908A6 /* TPTrialModeController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CE62D0F1494B7B000F908A6 /* TPTrialModeController.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		4CC62FBE14E7F7A300B5A2DB /* TPACCircularBuffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = TPACCircularBuffer.c; path = ../../TPACCircularBuffer.c; sourceTree = "<group>"; };
+		4CC62FBF14E7F7A300B5A2DB /* TPACCircularBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TPACCircularBuffer.h; path = ../../TPACCircularBuffer.h; sourceTree = "<group>"; };
 		4CE5018F1493F82600F23607 /* TPAudioController.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TPAudioController.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		4CE501931493F82600F23607 /* TPAudioController-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "TPAudioController-Info.plist"; sourceTree = "<group>"; };
 		4CE501971493F82600F23607 /* TPAudioController-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TPAudioController-Prefix.pch"; sourceTree = "<group>"; };
@@ -54,6 +57,8 @@
 			children = (
 				4CE5019D1493F84300F23607 /* TPAudioController.h */,
 				4CE5019E1493F84300F23607 /* TPAudioController.m */,
+				4CC62FBE14E7F7A300B5A2DB /* TPACCircularBuffer.c */,
+				4CC62FBF14E7F7A300B5A2DB /* TPACCircularBuffer.h */,
 				4CE62D0E1494B7B000F908A6 /* TPTrialModeController.h */,
 				4CE62D0F1494B7B000F908A6 /* TPTrialModeController.m */,
 				4CE501921493F82600F23607 /* Supporting Files */,
@@ -176,6 +181,7 @@
 			files = (
 				4CE501A01493F84300F23607 /* TPAudioController.m in Sources */,
 				4CE62D111494B7B000F908A6 /* TPTrialModeController.m in Sources */,
+				4CC62FC014E7F7A300B5A2DB /* TPACCircularBuffer.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

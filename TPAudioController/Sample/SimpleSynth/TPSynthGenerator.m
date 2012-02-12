@@ -7,28 +7,19 @@
 //
 
 #import "TPSynthGenerator.h"
-#import <mach/mach_time.h>
-#import <libkern/OSAtomic.h>
 
 #define kMaxSimultaneousNotes 10
 #define kNoteMicrofadeInFrames 1024
 #define kNoteDurationInFrames 44100
 
 typedef struct {
-    float pitch;
+    float rate;
     float volume;
-    int position;
+    float position;
+    int time;
 } note_t;
 
-static double timeBaseRatio;
-
 @implementation TPSynthGenerator
-
-+(void)initialize {
-    mach_timebase_info_data_t tinfo;
-    mach_timebase_info(&tinfo);
-    timeBaseRatio = ((double)tinfo.numer / tinfo.denom) * 1.0e-9;
-}
 
 - (id)init {
     if ( !(self = [super init]) ) return nil;
@@ -49,35 +40,73 @@ static double timeBaseRatio;
     
     if ( availableBytes == 0 ) return NO;
     
-    note->pitch = pitch;
+    note->rate = pitch / 44100.0;
     note->volume = volume;
     note->position = 0;
+    note->time = 0;
     
     TPCircularBufferProduce(&_notes, sizeof(note_t));
     return YES;
 }
 
--(void)audioController:(TPAudioController *)controller needsBuffer:(SInt16 *)buffer ofLength:(NSUInteger)frames time:(const AudioTimeStamp *)time {
+/*!
+ * Playback callback
+ *
+ *      This is called when audio for the channel is required. As this is called from Core Audio's
+ *      realtime thread, you should not wait on locks, allocate memory, or call any Objective-C or BSD
+ *      code from this callback.
+ *      The channel object is passed through as a parameter.  You should not send it Objective-C
+ *      messages, but if you implement the callback within your channel's \@implementation block, you 
+ *      can gain direct access to the instance variables of the channel ("channel->myInstanceVariable").
+ *
+ * @param channel   The channel object
+ * @param time      The time the buffer will be played
+ * @param frames    The number of frames required
+ * @param audio     The audio buffer list - audio should be copied into the provided buffers
+ */
+static OSStatus playbackCallback (TPSynthGenerator         *THIS,
+                                  const AudioTimeStamp     *time,
+                                  UInt32                    frames,
+                                  AudioBufferList          *audio) {
+
+    memset(audio->mBuffers[0].mData, 0, audio->mBuffers[0].mDataByteSize);
+    
     int32_t noteCount;
-    note_t *note = TPCircularBufferTail(&_notes, &noteCount);
+    note_t *note = TPCircularBufferTail(&THIS->_notes, &noteCount);
     noteCount /= sizeof(note_t);
+    
+    SInt16 *bufferEnd = (SInt16*)audio->mBuffers[0].mData + frames*2;
     
     for ( int i=0; i<noteCount; i++, note++ ) {
         // Render the audio (a sin wave with a simple amplitude envelope to mimic decay)
+        SInt16 *buffer = (SInt16*)audio->mBuffers[0].mData;
         float multiplier = INT16_MAX * note->volume;
-        float position = ((float)note->position / kNoteDurationInFrames) * note->pitch * 2*M_PI;
-        float increment = (1.0 / kNoteDurationInFrames) * note->pitch * 2*M_PI;
-        for ( int i=0, sample=0; i<frames && note->position<kNoteDurationInFrames; i++, position += increment, note->position++ ) {
-            float amplitude = note->position <= kNoteMicrofadeInFrames ? (float)note->position / kNoteMicrofadeInFrames : 1.0 - ((float)(note->position-kNoteMicrofadeInFrames)/(kNoteDurationInFrames-kNoteMicrofadeInFrames));
-            SInt16 value = multiplier * amplitude * sin(position);
-            buffer[sample++] += value;
-            buffer[sample++] += value; // Stereo
+        for ( ; buffer<bufferEnd && note->time < kNoteDurationInFrames; note->time++ ) {
+            // Quick sin-esque oscillator
+            float x = note->position;
+            x *= x; x -= 1.0; x *= x; x *= 2.0; x -= 1.0; // x now in the range -1...1
+            note->position += note->rate;
+            if ( note->position > 1.0 ) note->position -= 2.0;
+            
+            float amplitude = note->time <= kNoteMicrofadeInFrames 
+                                    ? (float)note->time / (float)kNoteMicrofadeInFrames 
+                                    : 1.0 - ((float)(note->time-kNoteMicrofadeInFrames) / (float)(kNoteDurationInFrames-kNoteMicrofadeInFrames));
+            SInt16 value = multiplier * amplitude * x;
+            *buffer++ += value;
+            *buffer++ += value; // Stereo
         }
         
-        if ( note->position+frames >= kNoteDurationInFrames ) {
-            TPCircularBufferConsume(&_notes, sizeof(note_t));
+        if ( note->time >= kNoteDurationInFrames ) {
+            TPCircularBufferConsume(&THIS->_notes, sizeof(note_t));
         }
     }
+    
+    return noErr;
 }
+
+-(TPAudioControllerPlaybackCallback)playbackCallback {
+    return &playbackCallback;
+}
+
 
 @end

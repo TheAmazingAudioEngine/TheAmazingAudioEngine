@@ -7,14 +7,23 @@
 
 #import "TPAudioController.h"
 #import <libkern/OSAtomic.h>
+#import "TPACCircularBuffer.h"
+#include <sys/types.h>
+#include <sys/sysctl.h>
 
-#define checkResult(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/'),__LINE__))
+#define kMaximumChannels 100
+#define kMaximumDelegates 50
+#define kMessageBufferLength 50
 
 #define kInputBus 1
 #define kOutputBus 0
 
+const NSString *kTPAudioControllerCallbackKey = @"callback";
+const NSString *kTPAudioControllerUserInfoKey = @"userinfo";
+
 static inline int min(int a, int b) { return a>b ? b : a; }
 
+#define checkResult(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/'),__LINE__))
 static inline BOOL _checkResult(OSStatus result, const char *operation, const char* file, int line) {
     if ( result != noErr ) {
         NSLog(@"%s:%d: %s result %d %08X %4.4s\n", file, line, operation, (int)result, (int)result, (char*)&result); 
@@ -23,36 +32,98 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     return YES;
 }
 
+typedef struct {
+    void *callback;
+    void *userInfo;
+} callback_t;
+
+typedef struct _message_t {
+    int action;
+    int  kind;
+    long parameter1;
+    long parameter2;
+    void *response_ptr;
+    void (^response_block)(struct _message_t message, long response);
+} message_t;
+
+typedef struct {
+    message_t message;
+    long response;
+} message_response_t;
+
+enum {
+    kMessageAdd,
+    kMessageRemove,
+    kMessageGet,
+    kMessageFindIndexWithMatchingUserInfo
+};
+
+enum {
+    kKindChannel,
+    kKindRecordDelegate,
+    kKindPlaybackDelegate,
+    kKindTimingDelegate,
+    kKindFilter
+};
+
 @interface TPAudioController () {
-    AUGraph     _audioGraph;
-    AUNode      _mixerNode;
-    AudioUnit   _mixerAudioUnit;
-    AUNode      _ioNode;
-    AudioUnit   _ioAudioUnit;
-    BOOL        _initialised;
-    BOOL        _audioSessionSetup;
-    BOOL        _running;
-    BOOL        _runningPriorToInterruption;
-    BOOL        _setRenderNotify;
+    AUGraph             _audioGraph;
+    AUNode              _mixerNode;
+    AudioUnit           _mixerAudioUnit;
+    AUNode              _ioNode;
+    AudioUnit           _ioAudioUnit;
+    BOOL                _initialised;
+    BOOL                _running;
+    BOOL                _runningPriorToInterruption;
+    int                 _channelCount;
+    int                 _recordDelegateCount;
+    int                 _playbackDelegateCount;
+    int                 _timingDelegateCount;
+    callback_t          _channels[kMaximumChannels];
+    callback_t          _recordDelegates[kMaximumChannels];
+    callback_t          _playbackDelegates[kMaximumChannels];
+    callback_t          _timingDelegates[kMaximumChannels];
+    TPACCircularBuffer  _messageBuffer;
+    TPACCircularBuffer  _responseBuffer;
+    NSTimer            *_responsePollTimer;
+    int                 _pendingResponses;
 }
 
+- (void)setVolume:(float)volume forChannel:(id<TPAudioPlayable>)channel;
+- (void)setPan:(float)pan forChannel:(id<TPAudioPlayable>)channel;
 - (void)teardown;
 - (void)refreshGraph;
-@property (retain, readwrite) NSArray *channels;
-@property (retain, readwrite) NSArray *recordDelegates;
-@property (retain, readwrite) NSArray *playbackDelegates;
-@property (retain, readwrite) NSArray *timingDelegates;
+- (void)setupAudioSession;
+- (void)updateVoiceProcessingSettings;
+- (NSArray *)getDelegatesOfKind:(int)kind;
+- (void)performAsynchronousMessageExchange:(message_t)message responseBlock:(void (^)(struct _message_t message, long response))responseBlock;
+- (void)performSynchronousMessageExchange:(message_t)message response:(message_response_t*)response;
+- (void)pollMessageResponses;
+static void processPendingMessages(TPAudioController *THIS);
 @end
 
 @implementation TPAudioController
-@synthesize channels=_channels, recordDelegates=_recordDelegates, playbackDelegates=_playbackDelegates, timingDelegates=_timingDelegates, audioInputAvailable=_audioInputAvailable, 
-            numberOfInputChannels=_numberOfInputChannels, enableInput=_enableInput, muteOutput=_muteOutput, preferredBufferDuration=_preferredBufferDuration, audioUnit=_ioAudioUnit;
-@dynamic running;
+@synthesize audioInputAvailable         = _audioInputAvailable, 
+            numberOfInputChannels       = _numberOfInputChannels, 
+            enableInput                 = _enableInput, 
+            muteOutput                  = _muteOutput, 
+            voiceProcessingEnabled      = _voiceProcessingEnabled,
+            voiceProcessingOnlyForSpeakerAndMicrophone = _voiceProcessingOnlyForSpeakerAndMicrophone,
+            playingThroughDeviceSpeaker = _playingThroughDeviceSpeaker,
+            preferredBufferDuration     = _preferredBufferDuration, 
+            receiveMonoInputAsBridgedStereo = _receiveMonoInputAsBridgedStereo, 
+            audioDescription            = _audioDescription, 
+            audioUnit                   = _ioAudioUnit;
+
+@dynamic    channels,
+            recordDelegates,
+            playbackDelegates,
+            timingDelegates,
+            running;
 
 #pragma mark Audio session callbacks
 
-static void interruptionListener(void *inClientData, UInt32 inInterruption)
-{
+static void interruptionListener(void *inClientData, UInt32 inInterruption) {
 	TPAudioController *THIS = (TPAudioController *)inClientData;
     
 	if (inInterruption == kAudioSessionEndInterruption) {
@@ -80,6 +151,7 @@ static void audioRouteChangePropertyListener(void *inClientData, AudioSessionPro
         UInt32 size = sizeof(route);
         if ( !checkResult(AudioSessionGetProperty(kAudioSessionProperty_AudioRoute, &size, &route), "AudioSessionGetProperty(kAudioSessionProperty_AudioRoute)") ) return;
         
+        BOOL playingThroughSpeaker;
         if ( [(NSString*)route isEqualToString:@"ReceiverAndMicrophone"] ) {
             checkResult(AudioSessionRemovePropertyListenerWithUserData(kAudioSessionProperty_AudioRouteChange, audioRouteChangePropertyListener, THIS), "AudioSessionRemovePropertyListenerWithUserData");
             
@@ -88,17 +160,35 @@ static void audioRouteChangePropertyListener(void *inClientData, AudioSessionPro
             checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute,  sizeof(route), &newRoute), "AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute)");
             
             checkResult(AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audioRouteChangePropertyListener, THIS), "AudioSessionAddPropertyListener");
+            
+            playingThroughSpeaker = YES;
+        } else if ( [(NSString*)route isEqualToString:@"SpeakerAndMicrophone"] || [(NSString*)route isEqualToString:@"Speaker"] ) {
+            playingThroughSpeaker = YES;
+        } else {
+            playingThroughSpeaker = NO;
         }
-
+        
         CFRelease(route);
-                
+
+        if ( THIS->_playingThroughDeviceSpeaker != playingThroughSpeaker ) {
+            [THIS willChangeValueForKey:@"playingThroughDeviceSpeaker"];
+            THIS->_playingThroughDeviceSpeaker = playingThroughSpeaker;
+            [THIS didChangeValueForKey:@"playingThroughDeviceSpeaker"];
+            
+            if ( THIS->_voiceProcessingEnabled && THIS->_voiceProcessingOnlyForSpeakerAndMicrophone ) {
+                [THIS updateVoiceProcessingSettings];
+            }
+        }
+        
         // Check channels on input
         AudioStreamBasicDescription inDesc;
         UInt32 inDescSize = sizeof(inDesc);
         OSStatus result = AudioUnitGetProperty(THIS->_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, kInputBus, &inDesc, &inDescSize);
         if ( checkResult(result, "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)") && inDesc.mChannelsPerFrame != 0 ) {
             if ( THIS->_numberOfInputChannels != inDesc.mChannelsPerFrame ) {
+                [THIS willChangeValueForKey:@"numberOfInputChannels"];
                 THIS->_numberOfInputChannels = inDesc.mChannelsPerFrame;
+                [THIS didChangeValueForKey:@"numberOfInputChannels"];
             }
         }
     }
@@ -118,6 +208,8 @@ static void inputAvailablePropertyListener (void *inClientData, AudioSessionProp
         }
         
         checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof (sessionCategory), &sessionCategory), "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory");
+        UInt32 allowMixing = YES;
+        checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing), "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
         
         if ( *inputAvailable ) {
             AudioStreamBasicDescription inDesc;
@@ -125,8 +217,16 @@ static void inputAvailablePropertyListener (void *inClientData, AudioSessionProp
             OSStatus result = AudioUnitGetProperty(THIS->_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, kInputBus, &inDesc, &inDescSize);
             if ( checkResult(result, "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)") && inDesc.mChannelsPerFrame != 0 ) {
                 if ( THIS->_numberOfInputChannels != inDesc.mChannelsPerFrame ) {
+                    [THIS willChangeValueForKey:@"numberOfInputChannels"];
                     THIS->_numberOfInputChannels = inDesc.mChannelsPerFrame;
+                    [THIS didChangeValueForKey:@"numberOfInputChannels"];
                 }
+            }
+        } else {
+            if ( THIS->_numberOfInputChannels != 0 ) {
+                [THIS willChangeValueForKey:@"numberOfInputChannels"];
+                THIS->_numberOfInputChannels = 0;
+                [THIS didChangeValueForKey:@"numberOfInputChannels"];
             }
         }
         
@@ -140,100 +240,112 @@ static void inputAvailablePropertyListener (void *inClientData, AudioSessionProp
 #pragma mark Input and render callbacks
 
 static OSStatus playbackCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
-
+    
     TPAudioController *THIS = (TPAudioController *)inRefCon;
-    NSArray *channels = [THIS->_channels retain];
     
-    memset(ioData->mBuffers[0].mData, 0, ioData->mBuffers[0].mDataByteSize);
-    id<TPAudioPlayable> channel = [([channels count] > inBusNumber ? [channels objectAtIndex:inBusNumber] : nil) retain];
-    [channel audioController:THIS needsBuffer:(SInt16*)ioData->mBuffers[0].mData ofLength:inNumberFrames time:inTimeStamp];
-    [channel release];
-    [channels release];
+    if ( inBusNumber >= THIS->_channelCount ) return noErr;
     
-	return noErr;
+    callback_t callback = THIS->_channels[inBusNumber];
+    return ((TPAudioControllerAudioDelegateCallback)callback.callback)((id<TPAudioPlayable>)callback.userInfo, inTimeStamp, inNumberFrames, ioData);
 }
 
-static OSStatus recordingCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
+static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
    
     TPAudioController *THIS = (TPAudioController *)inRefCon;
+
+    processPendingMessages(THIS);
     
-    NSArray *timingDelegates = [THIS->_timingDelegates retain];
-    for ( id<TPAudioTimingDelegate> timingDelegate in timingDelegates ) {
-        [timingDelegate audioController:THIS didAdvanceTime:inTimeStamp timingContext:TPAudioTimingContextInput];
+    for ( int i=0; i<THIS->_timingDelegateCount; i++ ) {
+        callback_t *callback = &THIS->_timingDelegates[i];
+        ((TPAudioControllerTimingCallback)callback->callback)(callback->userInfo, inTimeStamp, TPAudioTimingContextInput);
     }
-    [timingDelegates release];
     
-    int sampleCount = inNumberFrames * 2;
+    int sampleCount = inNumberFrames * THIS->_audioDescription.mChannelsPerFrame;
     
     // Render audio into buffer
-    AudioBufferList bufferList;
-    bufferList.mNumberBuffers = 1;
-    bufferList.mBuffers[0].mNumberChannels = 2;
-    bufferList.mBuffers[0].mData = NULL;
-    bufferList.mBuffers[0].mDataByteSize = inNumberFrames * sizeof(SInt16) * 2; // Always provides 2 channels, even if mono (right channel is silent)
-    OSStatus err = AudioUnitRender(THIS->_ioAudioUnit, ioActionFlags, inTimeStamp, kInputBus, inNumberFrames, &bufferList);
-    if ( !checkResult(err, "AudioUnitRender") ) { return err; }
-        
-    SInt16 *buffer = (SInt16*)bufferList.mBuffers[0].mData;
+    struct bufferlist_t { AudioBufferList bufferList; AudioBuffer nextBuffer; } buffers;
     
-    if ( THIS->_numberOfInputChannels == 1 ) {
-        // Convert audio from stereo with only channel 0 provided, to proper mono
-        sampleCount /= 2;
-        for ( UInt32 i = 0, j = 0; i < sampleCount; i++, j+=2 ) {
-            buffer[i] = buffer[j];
+    AudioStreamBasicDescription asbd = THIS->_audioDescription;
+    
+    buffers.bufferList.mNumberBuffers = asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? asbd.mChannelsPerFrame : 1;
+    
+    buffers.bufferList.mBuffers[0].mNumberChannels = asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? 1 : asbd.mChannelsPerFrame;
+    buffers.bufferList.mBuffers[0].mData = NULL;
+    buffers.bufferList.mBuffers[0].mDataByteSize = inNumberFrames * asbd.mBytesPerFrame;
+    
+    if ( asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved && asbd.mChannelsPerFrame == 2 ) {
+        buffers.bufferList.mBuffers[1].mNumberChannels = asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? 1 : asbd.mChannelsPerFrame;
+        buffers.bufferList.mBuffers[1].mData = NULL;
+        buffers.bufferList.mBuffers[1].mDataByteSize = inNumberFrames * asbd.mBytesPerFrame;
+    }
+    
+    OSStatus err = AudioUnitRender(THIS->_ioAudioUnit, ioActionFlags, inTimeStamp, kInputBus, inNumberFrames, &buffers.bufferList);
+    if ( !checkResult(err, "AudioUnitRender") ) { 
+        return err; 
+    }
+    
+    if ( THIS->_numberOfInputChannels == 1 && asbd.mChannelsPerFrame == 2 && !THIS->_receiveMonoInputAsBridgedStereo ) {
+        // Convert audio from stereo with only one channel provided, to proper mono
+        if ( asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved ) {
+            buffers.bufferList.mNumberBuffers = 1;
+        } else {
+            // Need to replaced interleaved stereo audio with just mono audio
+            sampleCount /= 2;
+            buffers.bufferList.mBuffers[0].mDataByteSize /= 2;
+            
+            // We support doing this for a couple of different audio formats
+            if ( asbd.mBitsPerChannel == sizeof(SInt16)*8 ) {
+                SInt16 *buffer = buffers.bufferList.mBuffers[0].mData;
+                for ( UInt32 i = 0, j = 0; i < sampleCount; i++, j+=2 ) {
+                    buffer[i] = buffer[j];
+                }
+            } else if ( asbd.mBitsPerChannel == sizeof(SInt32)*8 ) {
+                SInt32 *buffer = buffers.bufferList.mBuffers[0].mData;
+                for ( UInt32 i = 0, j = 0; i < sampleCount; i++, j+=2 ) {
+                    buffer[i] = buffer[j];
+                }
+            } else {
+                printf("Unsupported audio format (%lu bits per channel) for conversion of bridged stereo to mono input\n", asbd.mBitsPerChannel);
+                assert(0);
+            }
         }
     }
         
-    int frameCount = sampleCount / THIS->_numberOfInputChannels;
-        
     // Pass audio to record delegates
-    NSArray *recordDelegates = [THIS->_recordDelegates retain];
-    for ( id<TPAudioRecordDelegate> recordDelegate in recordDelegates ) {
-        [recordDelegate audioController:THIS 
-                          incomingAudio:buffer
-                               ofLength:frameCount
-                       numberOfChannels:THIS->_numberOfInputChannels
-                                   time:inTimeStamp];
+    for ( int i=0; i<THIS->_recordDelegateCount; i++ ) {
+        callback_t *callback = &THIS->_recordDelegates[i];
+        ((TPAudioControllerAudioDelegateCallback)callback->callback)(callback->userInfo, inTimeStamp, inNumberFrames, &buffers.bufferList);
     }
-    [recordDelegates release];
     
     return noErr;
 }
 
-
 static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
     
-    if ( inBusNumber != kOutputBus ) return noErr;
-
     TPAudioController *THIS = (TPAudioController *)inRefCon;
         
     if ( *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
-        NSArray *timingDelegates = [THIS->_timingDelegates retain];
-        for ( id<TPAudioTimingDelegate> timingDelegate in timingDelegates ) {
-            [timingDelegate audioController:THIS didAdvanceTime:inTimeStamp timingContext:TPAudioTimingContextOutput];
+        processPendingMessages(THIS);
+        
+        for ( int i=0; i<THIS->_timingDelegateCount; i++ ) {
+            callback_t *callback = &THIS->_timingDelegates[i];
+            ((TPAudioControllerTimingCallback)callback->callback)(callback->userInfo, inTimeStamp, TPAudioTimingContextOutput);
         }
-        [timingDelegates release];
     }
     
     if ( !(*ioActionFlags & kAudioUnitRenderAction_PostRender) ) {
         return noErr;
     }
     
-    SInt16 *buffer = ioData->mBuffers[0].mData;
-    int sampleCount = ioData->mBuffers[0].mDataByteSize / sizeof(SInt16);
-    
-    // Pass audio to playback delegates
-    NSArray *playbackDelegates = [THIS->_playbackDelegates retain];
-    for ( id<TPAudioPlaybackDelegate> playbackDelegate in playbackDelegates ) {
-        [playbackDelegate audioController:THIS 
-                            outgoingAudio:buffer
-                                 ofLength:sampleCount / 2
-                                     time:inTimeStamp];
+    for ( int i=0; i<THIS->_playbackDelegateCount; i++ ) {
+        callback_t *callback = &THIS->_playbackDelegates[i];
+        ((TPAudioControllerAudioDelegateCallback)callback->callback)(callback->userInfo, inTimeStamp, inNumberFrames, ioData);
     }
-    [playbackDelegates release];
     
     if ( THIS->_muteOutput ) {
-        memset(ioData->mBuffers[0].mData, 0, ioData->mBuffers[0].mDataByteSize);
+        for ( int i=0; i<ioData->mNumberBuffers; i++ ) {
+            memset(ioData->mBuffers[i].mData, 0, ioData->mBuffers[i].mDataByteSize);
+        }
     }
     
     return noErr;
@@ -241,8 +353,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
 
 #pragma mark -
 
-+ (AudioStreamBasicDescription)audioDescription {
-    // Linear PCM, stereo, interleaved stream at the hardware sample rate.
++ (AudioStreamBasicDescription)defaultAudioDescription {
     AudioStreamBasicDescription audioDescription;
     memset(&audioDescription, 0, sizeof(audioDescription));
     audioDescription.mFormatID          = kAudioFormatLinearPCM;
@@ -256,13 +367,30 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     return audioDescription;
 }
 
++ (BOOL)voiceProcessingAvailable {
+    // Determine platform name
+    static NSString *platform = nil;
+    if ( !platform ) {
+        size_t size;
+        sysctlbyname("hw.machine", NULL, &size, NULL, 0);
+        char *machine = malloc(size);
+        sysctlbyname("hw.machine", machine, &size, NULL, 0);
+        platform = [[NSString stringWithCString:machine encoding:NSUTF8StringEncoding] retain];
+        free(machine);
+    }
+    
+    // These devices aren't fast enough to do low latency audio
+    NSArray *badDevices = [NSArray arrayWithObjects:@"iPhone1,2", @"iPod1,1", @"iPod2,1", @"iPod3,1", nil];
+    return ![badDevices containsObject:platform];
+}
+
+#pragma mark Setup and start/stop
+
 - (id)init {
     if ( !(self = [super init]) ) return nil;
     
-    self.channels = [NSArray array];
-    self.recordDelegates = [NSArray array];
-    self.playbackDelegates = [NSArray array];
     _preferredBufferDuration = 0.005;
+    _receiveMonoInputAsBridgedStereo = YES;
     
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationDidBecomeActive:) name:UIApplicationDidBecomeActiveNotification object:nil];
     
@@ -270,104 +398,36 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
         [[NSClassFromString(@"TPTrialModeController") alloc] init];
     }
     
+    TPACCircularBufferInit(&_messageBuffer, kMessageBufferLength * sizeof(message_t));
+    TPACCircularBufferInit(&_responseBuffer, kMessageBufferLength * sizeof(message_response_t));
+    
     return self;
 }
 
 - (void)dealloc {
+    if ( _responsePollTimer ) [_responsePollTimer invalidate];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [self stop];
     [self teardown];
     
-    for ( id<TPAudioPlayable> channel in _channels ) {
+    for ( int i=0; i<_channelCount; i++ ) {
         for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", nil] ) {
-            [(NSObject*)channel removeObserver:self forKeyPath:property];
+            [(NSObject*)_channels[i].userInfo removeObserver:self forKeyPath:property];
         }
     }
     
-    self.channels = nil;
-    self.recordDelegates = nil;
-    self.playbackDelegates = nil;
-    self.timingDelegates = nil;
+    TPACCircularBufferCleanup(&_messageBuffer);
+    TPACCircularBufferCleanup(&_responseBuffer);
     
     [super dealloc];
 }
 
-- (void)setupAudioSession {
-    // Initialize and configure the audio session
-    OSStatus result;
+- (void)setupWithAudioDescription:(AudioStreamBasicDescription)audioDescription {
+    [self setupAudioSession];
     
-    result = AudioSessionInitialize(NULL, NULL, interruptionListener, self);
-    if ( !checkResult(result, "AudioSessionInitialize") ) return;
-        
-    UInt32 inputAvailable=0;
-    UInt32 size = sizeof(inputAvailable);
-    result = AudioSessionGetProperty(kAudioSessionProperty_AudioInputAvailable, &size, &inputAvailable);
-    checkResult(result, "AudioSessionGetProperty");
-    
-    if ( _audioInputAvailable != inputAvailable ) {
-        [self willChangeValueForKey:@"audioInputAvailable"];
-        _audioInputAvailable = inputAvailable;
-        [self didChangeValueForKey:@"audioInputAvailable"];
-    }
-    
-    UInt32 audioCategory;
-    if ( inputAvailable && _enableInput ) {
-        // Set the audio session category for simultaneous play and record
-        audioCategory = kAudioSessionCategory_PlayAndRecord;
-    } else {
-        // Just playback
-        audioCategory = kAudioSessionCategory_MediaPlayback;
-    }
-    
-    result = AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof(audioCategory), &audioCategory);
-    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory)");
-
-    UInt32 allowMixing = true;
-    result = AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing);
-    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
-
-    
-    
-#if !TARGET_IPHONE_SIMULATOR
-    CFStringRef route;
-    size = sizeof(route);
-    result = AudioSessionGetProperty(kAudioSessionProperty_AudioRoute, &size, &route);
-    if ( checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_AudioRoute)") ) {
-        if ( [(NSString*)route isEqualToString:@"ReceiverAndMicrophone"] ) {
-            // Re-route audio to the speaker (not the receiver)
-            UInt32 newRoute = kAudioSessionOverrideAudioRoute_Speaker;
-            result = AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute,  sizeof(route), &newRoute);
-            checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute)");
-        }
-    }
-    CFRelease(route);
-#endif
-    
-    result = AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audioRouteChangePropertyListener, self);
-    checkResult(result, "AudioSessionAddPropertyListener");
-    
-    result = AudioSessionAddPropertyListener(kAudioSessionProperty_AudioInputAvailable, inputAvailablePropertyListener, self);
-    checkResult(result, "AudioSessionAddPropertyListener");
-    
-    Float32 preferredBufferSize = _preferredBufferDuration;
-    result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
-    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
-    
-    Float64 hwSampleRate = 44100.0;
-    result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareSampleRate, sizeof(hwSampleRate), &hwSampleRate);
-    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareSampleRate)");
-    
-    if ( !checkResult(AudioSessionSetActive(true), "AudioSessionSetActive") ) return;
-    
-    _audioSessionSetup = YES;
-}
-
-- (void)setup {
-    if ( !_audioSessionSetup ) [self setupAudioSession];
+    _audioDescription = audioDescription;
     
 	OSStatus result = noErr;
-    
-    AudioStreamBasicDescription audioDescription = [TPAudioController audioDescription];
     
     // create a new AUGraph
 	result = NewAUGraph(&_audioGraph);
@@ -377,7 +437,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     // input/output unit
     AudioComponentDescription io_desc = {
         .componentType = kAudioUnitType_Output,
-        .componentSubType = kAudioUnitSubType_RemoteIO,
+        .componentSubType = (_voiceProcessingEnabled && _enableInput ? kAudioUnitSubType_VoiceProcessingIO : kAudioUnitSubType_RemoteIO),
         .componentManufacturer = kAudioUnitManufacturer_Apple,
         .componentFlags = 0,
         .componentFlagsMask = 0
@@ -415,7 +475,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)") ) return;
     
     // set bus count
-	UInt32 numbuses = [_channels count];
+	UInt32 numbuses = _channelCount;
     result = AudioUnitSetProperty(_mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &numbuses, sizeof(numbuses));
     if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) return;
     
@@ -447,14 +507,20 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
             
         // also register a callback to receive audio
         AURenderCallbackStruct inRenderProc;
-        inRenderProc.inputProc = &recordingCallback;
+        inRenderProc.inputProc = &inputAvailableCallback;
         inRenderProc.inputProcRefCon = self;
         result = AudioUnitSetProperty(_ioAudioUnit, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, kInputBus, &inRenderProc, sizeof(inRenderProc));
         if ( !checkResult(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_SetInputCallback)") ) return;
+        
+        if ( _voiceProcessingEnabled && _enableInput ) {
+            UInt32 quality = 127;
+            result = AudioUnitSetProperty(_ioAudioUnit, kAUVoiceIOProperty_VoiceProcessingQuality, kAudioUnitScope_Global, 1, &quality, sizeof(quality));
+            checkResult(result, "AudioUnitSetProperty(kAUVoiceIOProperty_VoiceProcessingQuality)");
+        }
     }
     
-	for (int i = 0; i < [_channels count]; i++) {
-        id<TPAudioPlayable> channel = [_channels objectAtIndex:i];
+	for (int i = 0; i < _channelCount; i++) {
+        id<TPAudioPlayable> channel = (id<TPAudioPlayable>)_channels[i].userInfo;
         
         // setup render callback struct
         AURenderCallbackStruct rcbs;
@@ -493,13 +559,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
     checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
     
-    if ( [_playbackDelegates count] > 0 ) {
-        // Register a callback to receive outgoing audio
-        _setRenderNotify = YES;
-        checkResult(AudioUnitAddRenderNotify(_ioAudioUnit, &outputCallback, self), "AudioUnitAddRenderNotify");
-    } else {
-        _setRenderNotify = NO;
-    }
+    checkResult(AudioUnitAddRenderNotify(_mixerAudioUnit, &outputCallback, self), "AudioUnitAddRenderNotify");
     
     // now that we've set everything up we can initialize the graph, this will also validate the connections
 	result = AUGraphInitialize(_audioGraph);
@@ -531,16 +591,18 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     }
 }
 
+#pragma mark - Channel/delegate management
+
 - (void)addChannels:(NSArray*)channels {
     if ( _initialised ) {
         // set bus count
-        UInt32 numbuses = [_channels count] + [channels count];
+        UInt32 numbuses = _channelCount + [channels count];
         OSStatus result = AudioUnitSetProperty(_mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &numbuses, sizeof(numbuses));
         if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) {
             return;
         }
     
-        NSInteger i = [_channels count];
+        NSInteger i = _channelCount;
         
         for ( id<TPAudioPlayable> channel in channels ) {
             // setup render callback struct
@@ -553,8 +615,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
             if ( !checkResult(result, "AUGraphSetNodeInputCallback") ) return;
             
             // set input stream format to what we want
-            AudioStreamBasicDescription audioDescription = [TPAudioController audioDescription];
-            result = AudioUnitSetProperty(_mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, i, &audioDescription, sizeof(audioDescription));
+            result = AudioUnitSetProperty(_mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, i, &_audioDescription, sizeof(_audioDescription));
             if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)") ) return;
             
             // set volume
@@ -575,9 +636,10 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
         for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", nil] ) {
             [(NSObject*)channel addObserver:self forKeyPath:property options:0 context:NULL];
         }
+        
+        [channel retain];
+        [self performAsynchronousMessageExchange:(message_t){ .action = kMessageAdd, .kind = kKindChannel, .parameter1 = (long)channel.playbackCallback, .parameter2 = (long)channel } responseBlock:nil];
     }
-    
-    self.channels = [_channels arrayByAddingObjectsFromArray:channels];
     
     if ( _initialised ) {
         [self performSelector:@selector(refreshGraph) withObject:nil afterDelay:0];
@@ -585,100 +647,101 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
 }
 
 - (void)removeChannels:(NSArray *)channels {
-    NSMutableArray *newChannels = [[_channels mutableCopy] autorelease];
-
+    id<TPAudioPlayable> lastChannel = [channels lastObject];
+    callback_t final_channels_array[kMaximumChannels];
+    
     for ( id<TPAudioPlayable> channel in channels ) {
         for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", nil] ) {
             [(NSObject*)channel removeObserver:self forKeyPath:property];
         }
-    }
-
-    if ( _initialised ) {
-        // set bus count
-        UInt32 numbuses = [newChannels count];
-        OSStatus result = AudioUnitSetProperty(_mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &numbuses, sizeof(numbuses));
-        if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) {
-            return;
-        }
         
-        // reassign channel parameters
-        for ( NSInteger i=0; i<[newChannels count]; i++ ) {
-            id<TPAudioPlayable> channel = [newChannels objectAtIndex:i];
-            
-            // set volume
-            AudioUnitParameterValue volumeValue = (AudioUnitParameterValue)([channel respondsToSelector:@selector(volume)] ? channel.volume : 1.0);
-            result = AudioUnitSetParameter(_mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, i, volumeValue, 0);
-            if ( !checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)") ) return;
-            
-            // set pan
-            AudioUnitParameterValue panValue = (AudioUnitParameterValue)([channel respondsToSelector:@selector(pan)] ? channel.pan : 0.0);
-            result = AudioUnitSetParameter(_mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, i, panValue, 0);
-            if ( !checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)") ) return;
-        }
-    }
-    
-    self.channels = newChannels;
-    
-    [self performSelector:@selector(refreshGraph) withObject:nil afterDelay:0];
-}
-
-- (void)addRecordDelegate:(id<TPAudioRecordDelegate>)delegate {
-    self.recordDelegates = [_recordDelegates arrayByAddingObject:delegate];
-}
-
-- (void)removeRecordDelegate:(id<TPAudioRecordDelegate>)delegate {
-    NSMutableArray *mutableDelegates = [[_recordDelegates mutableCopy] autorelease];
-    [mutableDelegates removeObject:delegate];
-    self.recordDelegates = mutableDelegates;
-}
-
-- (void)addPlaybackDelegate:(id<TPAudioPlaybackDelegate>)delegate {
-    self.playbackDelegates = [_playbackDelegates arrayByAddingObject:delegate];
-    
-    if ( _initialised && !_setRenderNotify ) {
-        // Register a callback to receive outgoing audio
-        _setRenderNotify = YES;
-        checkResult(AudioUnitAddRenderNotify(_ioAudioUnit, &outputCallback, self), "AudioUnitAddRenderNotify");
-    }
-}
-
-- (void)removePlaybackDelegate:(id<TPAudioPlaybackDelegate>)delegate {
-    NSMutableArray *mutableDelegates = [[_playbackDelegates mutableCopy] autorelease];
-    [mutableDelegates removeObject:delegate];
-    self.playbackDelegates = mutableDelegates;
-    
-    if ( _initialised && [_playbackDelegates count] == 0 && [_timingDelegates count] == 0 && _setRenderNotify ) {
-        // Unregister callback
-        _setRenderNotify = NO;
-        checkResult(AudioUnitRemoveRenderNotify(_ioAudioUnit, &outputCallback, self), "AudioUnitRemoveRenderNotify");
+        [self performAsynchronousMessageExchange:(message_t){ 
+                            .action = kMessageRemove, 
+                            .kind = kKindChannel, 
+                            .parameter1 = (long)channel.playbackCallback, 
+                            .parameter2 = (long)channel,
+                            .response_ptr = &final_channels_array }
+             responseBlock:channel != lastChannel ? nil : ^(message_t message, long response){
+                 // After channel removal is complete, update the graph, and release the channels
+                 int newChannelCount = response;
+                 if ( _initialised ) {
+                     // set bus count
+                     UInt32 numbuses = newChannelCount;
+                     OSStatus result = AudioUnitSetProperty(_mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &numbuses, sizeof(numbuses));
+                     if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) {
+                         return;
+                     }
+                     
+                     // reassign channel parameters
+                     callback_t *array = (callback_t*)message.response_ptr;
+                     for ( NSInteger i=0; i<newChannelCount; i++ ) {
+                         id<TPAudioPlayable> channel = (id<TPAudioPlayable>)(array[i].userInfo);
+                         
+                         // set volume
+                         AudioUnitParameterValue volumeValue = (AudioUnitParameterValue)([channel respondsToSelector:@selector(volume)] ? channel.volume : 1.0);
+                         result = AudioUnitSetParameter(_mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, i, volumeValue, 0);
+                         if ( !checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)") ) return;
+                         
+                         // set pan
+                         AudioUnitParameterValue panValue = (AudioUnitParameterValue)([channel respondsToSelector:@selector(pan)] ? channel.pan : 0.0);
+                         result = AudioUnitSetParameter(_mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, i, panValue, 0);
+                         if ( !checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)") ) return;
+                     }
+                 }
+                 
+                 [self refreshGraph];
+                 
+                 [channels makeObjectsPerformSelector:@selector(release)];
+             }];
     }
 }
 
-- (void)addTimingDelegate:(id<TPAudioRecordDelegate>)delegate {
-    self.timingDelegates = [(_timingDelegates ? _timingDelegates : [NSArray array]) arrayByAddingObject:delegate];
-    
-    if ( _initialised && !_setRenderNotify ) {
-        // Register a callback to receive outgoing audio
-        _setRenderNotify = YES;
-        checkResult(AudioUnitAddRenderNotify(_ioAudioUnit, &outputCallback, self), "AudioUnitAddRenderNotify");
+-(NSArray *)channels {
+    NSArray *callbacks = [self getDelegatesOfKind:kKindChannel];
+    NSMutableArray *channels = [NSMutableArray array];
+    for ( NSDictionary *callback in callbacks ) {
+        [channels addObject:(id)[[callback objectForKey:kTPAudioControllerUserInfoKey] pointerValue]];
     }
+    return channels;
 }
 
-- (void)removeTimingDelegate:(id<TPAudioRecordDelegate>)delegate {
-    NSMutableArray *mutableDelegates = [[_timingDelegates mutableCopy] autorelease];
-    [mutableDelegates removeObject:delegate];
-    if ( [mutableDelegates count] > 0 ) {
-        self.timingDelegates = mutableDelegates;
-    } else {
-        self.timingDelegates = nil;
-    }
-    
-    if ( _initialised && [_playbackDelegates count] == 0 && [_timingDelegates count] == 0 && _setRenderNotify ) {
-        // Unregister callback
-        _setRenderNotify = NO;
-        checkResult(AudioUnitRemoveRenderNotify(_ioAudioUnit, &outputCallback, self), "AudioUnitRemoveRenderNotify");
-    }
+- (void)addRecordDelegate:(TPAudioControllerAudioDelegateCallback)callback userInfo:(void*)userInfo {
+    [self performAsynchronousMessageExchange:(message_t){ .action = kMessageAdd, .kind = kKindRecordDelegate, .parameter1 = (long)callback, .parameter2 = (long)userInfo } responseBlock:nil];
 }
+
+- (void)removeRecordDelegate:(TPAudioControllerAudioDelegateCallback)callback userInfo:(void*)userInfo {
+    [self performAsynchronousMessageExchange:(message_t){ .action = kMessageRemove, .kind = kKindRecordDelegate, .parameter1 = (long)callback, .parameter2 = (long)userInfo } responseBlock:nil];
+}
+
+-(NSArray *)recordDelegates {
+    return [self getDelegatesOfKind:kKindRecordDelegate];
+}
+
+- (void)addPlaybackDelegate:(TPAudioControllerAudioDelegateCallback)callback userInfo:(void*)userInfo {
+    [self performAsynchronousMessageExchange:(message_t){ .action = kMessageAdd, .kind = kKindPlaybackDelegate, .parameter1 = (long)callback, .parameter2 = (long)userInfo } responseBlock:nil];
+}
+
+- (void)removePlaybackDelegate:(TPAudioControllerAudioDelegateCallback)callback userInfo:(void*)userInfo {
+    [self performAsynchronousMessageExchange:(message_t){ .action = kMessageRemove, .kind = kKindPlaybackDelegate, .parameter1 = (long)callback, .parameter2 = (long)userInfo } responseBlock:nil];
+}
+
+-(NSArray *)playbackDelegates {
+    return [self getDelegatesOfKind:kKindPlaybackDelegate];
+}
+
+- (void)addTimingDelegate:(TPAudioControllerTimingCallback)callback userInfo:(void *)userInfo {
+    [self performAsynchronousMessageExchange:(message_t){ .action = kMessageAdd, .kind = kKindTimingDelegate, .parameter1 = (long)callback, .parameter2 = (long)userInfo } responseBlock:nil];
+}
+
+- (void)removeTimingDelegate:(TPAudioControllerTimingCallback)callback userInfo:(void *)userInfo {
+    [self performAsynchronousMessageExchange:(message_t){ .action = kMessageRemove, .kind = kKindTimingDelegate, .parameter1 = (long)callback, .parameter2 = (long)userInfo } responseBlock:nil];
+}
+
+-(NSArray *)timingDelegates {
+    return [self getDelegatesOfKind:kKindTimingDelegate];
+}
+
+#pragma mark - Setters, getters
 
 - (BOOL)running {
     Boolean isRunning = false;
@@ -689,6 +752,93 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     }
     
     return isRunning;
+}
+
+-(void)setEnableInput:(BOOL)enableInput {
+    if ( _enableInput == enableInput ) return;
+    _enableInput = enableInput;
+    
+    if ( _initialised ) {
+        [self stop];
+        [self teardown];
+        
+        UInt32 audioCategory;
+        if ( _audioInputAvailable && _enableInput ) {
+            // Set the audio session category for simultaneous play and record
+            audioCategory = kAudioSessionCategory_PlayAndRecord;
+        } else {
+            // Just playback
+            audioCategory = kAudioSessionCategory_MediaPlayback;
+        }
+        
+        OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof(audioCategory), &audioCategory);
+        checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory)");
+        
+        UInt32 allowMixing = true;
+        result = AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing);
+        checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
+
+        [self setupWithAudioDescription:_audioDescription];
+        [self start];
+    }
+}
+
+-(void)setPreferredBufferDuration:(float)preferredBufferDuration {
+    _preferredBufferDuration = preferredBufferDuration;
+    if ( _initialised ) {
+        Float32 preferredBufferSize = _preferredBufferDuration;
+        OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
+        checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
+    }
+}
+
+-(void)setVoiceProcessingEnabled:(BOOL)voiceProcessingEnabled {
+    if ( _voiceProcessingEnabled == voiceProcessingEnabled ) return;
+    
+    _voiceProcessingEnabled = voiceProcessingEnabled;
+    if ( _initialised ) [self updateVoiceProcessingSettings];
+}
+
+#pragma mark - Events
+
+-(void) observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
+    if ( [keyPath isEqualToString:@"volume"] ) {
+        [self setVolume:((id<TPAudioPlayable>)object).volume forChannel:object];
+    } else if ( [keyPath isEqualToString:@"pan"] ) {
+        [self setPan:((id<TPAudioPlayable>)object).pan forChannel:object];
+    }
+}
+
+- (void)applicationDidBecomeActive:(NSNotification*)notification {
+    OSStatus status = AudioSessionSetActive(true);
+    checkResult(status, "AudioSessionSetActive");
+}
+
+#pragma mark - Helpers
+
+- (void)setVolume:(float)volume forChannel:(id<TPAudioPlayable>)channel {
+    AudioUnitParameterValue value = (AudioUnitParameterValue)volume;
+    [self performAsynchronousMessageExchange:(message_t) { .action = kMessageFindIndexWithMatchingUserInfo, .kind = kKindChannel, .parameter1 = (long)channel }
+         responseBlock:^(message_t message, long response) {
+             UInt32 channelIndex = response;
+             assert(channelIndex != NSNotFound);
+             OSStatus result = AudioUnitSetParameter(_mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, channelIndex, value, 0);
+             checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
+         }];
+}
+
+- (void)setPan:(float)pan forChannel:(id<TPAudioPlayable>)channel {
+    AudioUnitParameterValue value = (AudioUnitParameterValue)pan;
+    if ( value == -1.0 ) value = -0.999; // Workaround for pan limits bug
+    if ( value == 1.0 ) value = 0.999;
+    
+    [self performAsynchronousMessageExchange:(message_t) { .action = kMessageFindIndexWithMatchingUserInfo, .kind = kKindChannel, .parameter1 = (long)channel }
+         responseBlock:^(message_t message, long response) {
+             UInt32 channelIndex = response;
+             assert(channelIndex != NSNotFound);
+             OSStatus result = AudioUnitSetParameter(_mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, channelIndex, value, 0);
+             checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)");
+         }];
 }
 
 - (void)teardown {
@@ -714,62 +864,278 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     }
 }
 
-- (void)setVolume:(float)volume forChannel:(id<TPAudioPlayable>)channel {
-    AudioUnitParameterValue value = (AudioUnitParameterValue)volume;
-    UInt32 channelIndex = [_channels indexOfObject:channel];
-    assert(channelIndex != NSNotFound);
-    OSStatus result = AudioUnitSetParameter(_mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, channelIndex, value, 0);
-    checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
+- (void)setupAudioSession {
+    // Initialize and configure the audio session
+    OSStatus result;
+    
+    result = AudioSessionInitialize(NULL, NULL, interruptionListener, self);
+    if ( !checkResult(result, "AudioSessionInitialize") ) return;
+    
+    UInt32 inputAvailable=0;
+    UInt32 size = sizeof(inputAvailable);
+    result = AudioSessionGetProperty(kAudioSessionProperty_AudioInputAvailable, &size, &inputAvailable);
+    checkResult(result, "AudioSessionGetProperty");
+    
+    if ( _audioInputAvailable != inputAvailable ) {
+        [self willChangeValueForKey:@"audioInputAvailable"];
+        _audioInputAvailable = inputAvailable;
+        [self didChangeValueForKey:@"audioInputAvailable"];
+    }
+    
+    UInt32 audioCategory;
+    if ( inputAvailable && _enableInput ) {
+        // Set the audio session category for simultaneous play and record
+        audioCategory = kAudioSessionCategory_PlayAndRecord;
+    } else {
+        // Just playback
+        audioCategory = kAudioSessionCategory_MediaPlayback;
+    }
+    
+    result = AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof(audioCategory), &audioCategory);
+    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory)");
+    
+    UInt32 allowMixing = true;
+    result = AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing);
+    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
+    
+    
+    
+#if !TARGET_IPHONE_SIMULATOR
+    CFStringRef route;
+    size = sizeof(route);
+    result = AudioSessionGetProperty(kAudioSessionProperty_AudioRoute, &size, &route);
+    if ( checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_AudioRoute)") ) {
+        if ( [(NSString*)route isEqualToString:@"ReceiverAndMicrophone"] ) {
+            // Re-route audio to the speaker (not the receiver)
+            UInt32 newRoute = kAudioSessionOverrideAudioRoute_Speaker;
+            result = AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute,  sizeof(route), &newRoute);
+            checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute)");
+        }
+    }
+    CFRelease(route);
+#endif
+    
+    result = AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audioRouteChangePropertyListener, self);
+    checkResult(result, "AudioSessionAddPropertyListener");
+    
+    result = AudioSessionAddPropertyListener(kAudioSessionProperty_AudioInputAvailable, inputAvailablePropertyListener, self);
+    checkResult(result, "AudioSessionAddPropertyListener");
+    
+    Float32 preferredBufferSize = _preferredBufferDuration;
+    result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
+    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
+    
+    Float64 hwSampleRate = 44100.0;
+    result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareSampleRate, sizeof(hwSampleRate), &hwSampleRate);
+    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareSampleRate)");
+    
+    if ( !checkResult(AudioSessionSetActive(true), "AudioSessionSetActive") ) return;
 }
 
-- (float)volumeForChannel:(id<TPAudioPlayable>)channel {
-    AudioUnitParameterValue value;
-    UInt32 channelIndex = [_channels indexOfObject:channel];
-    assert(channelIndex != NSNotFound);
-    OSStatus result = AudioUnitGetParameter(_mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, channelIndex, &value);
-    checkResult(result, "AudioUnitGetParameter(kMultiChannelMixerParam_Volume)");
-    return (float)value;
-}
 
-- (void)setPan:(float)pan forChannel:(id<TPAudioPlayable>)channel {
-    AudioUnitParameterValue value = (AudioUnitParameterValue)pan;
-    if ( value == -1.0 ) value = -0.999; // Workaround for pan limits bug
-    if ( value == 1.0 ) value = 0.999;
-    UInt32 channelIndex = [_channels indexOfObject:channel];
-    assert(channelIndex != NSNotFound);
-    OSStatus result = AudioUnitSetParameter(_mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, channelIndex, value, 0);
-    checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)");
-}
-
-- (float)panForChannel:(id<TPAudioPlayable>)channel {
-    AudioUnitParameterValue value;
-    UInt32 channelIndex = [_channels indexOfObject:channel];
-    assert(channelIndex != NSNotFound);
-    OSStatus result = AudioUnitGetParameter(_mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, channelIndex, &value);
-    checkResult(result, "AudioUnitGetParameter(kMultiChannelMixerParam_Pan)");
-    return (float)value;
-}
-
--(void)setPreferredBufferDuration:(float)preferredBufferDuration {
-    _preferredBufferDuration = preferredBufferDuration;
-    if ( _initialised ) {
-        Float32 preferredBufferSize = _preferredBufferDuration;
-        OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
-        checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
+- (void)updateVoiceProcessingSettings {
+    
+    BOOL useVoiceProcessing = (_voiceProcessingEnabled && _enableInput && (!_voiceProcessingOnlyForSpeakerAndMicrophone || _playingThroughDeviceSpeaker));
+    
+    AudioComponentDescription target_io_desc = {
+        .componentType = kAudioUnitType_Output,
+        .componentSubType = useVoiceProcessing ? kAudioUnitSubType_VoiceProcessingIO : kAudioUnitSubType_RemoteIO,
+        .componentManufacturer = kAudioUnitManufacturer_Apple,
+        .componentFlags = 0,
+        .componentFlagsMask = 0
+    };
+    
+    AudioComponentDescription io_desc;
+    if ( !checkResult(AUGraphNodeInfo(_audioGraph, _ioNode, &io_desc, NULL), "AUGraphNodeInfo(ioNode)") )
+        return;
+    
+    if ( io_desc.componentSubType != target_io_desc.componentSubType ) {
+        // Replace audio unit
+        [self stop];
+        [self teardown];
+        [self setupWithAudioDescription:_audioDescription];
+        [self start];
     }
 }
 
--(void) observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
-    if ( [keyPath isEqualToString:@"volume"] ) {
-        [self setVolume:((id<TPAudioPlayable>)object).volume forChannel:object];
-    } else if ( [keyPath isEqualToString:@"pan"] ) {
-        [self setPan:((id<TPAudioPlayable>)object).pan forChannel:object];
+-(NSArray *)getDelegatesOfKind:(int)kind {
+    // Request copy of channels array from realtime thread
+    callback_t array[kMaximumChannels];
+    message_response_t response;
+    [self performSynchronousMessageExchange:(message_t) { .action = kMessageGet, .kind = kind, .response_ptr = &array } response:&response];
+    
+    // Construct NSArray response
+    int count = response.response;
+    NSMutableArray *result = [NSMutableArray array];
+    for ( int i=0; i<count; i++ ) {
+        [result addObject:[NSDictionary dictionaryWithObjectsAndKeys:
+                           [NSValue valueWithPointer:array[i].callback], kTPAudioControllerCallbackKey,
+                           [NSValue valueWithPointer:array[i].userInfo], kTPAudioControllerUserInfoKey, nil]];
+    }
+    
+    return result;
+}
+
+#pragma mark - Main thread-realtime thread message sending
+
+static void processPendingMessages(TPAudioController *THIS) {
+    // Only call this from the Core Audio thread, or the main thread if audio system is not yet running
+    
+    int32_t availableBytes;
+    message_t *messages = TPACCircularBufferTail(&THIS->_messageBuffer, &availableBytes);
+    int messageCount = availableBytes / sizeof(message_t);
+    for ( int i=0; i<messageCount; i++ ) {
+        message_t* message = &messages[i];
+        long response = 0;
+        
+        int *counter;
+        callback_t* array;
+        if ( message->action == kMessageAdd || message->action == kMessageRemove || message->action == kMessageGet || message->action == kMessageFindIndexWithMatchingUserInfo ) {
+            switch ( message->kind ) {
+                case kKindChannel:
+                    counter = &THIS->_channelCount;
+                    array   = THIS->_channels;
+                    break;
+                case kKindRecordDelegate:
+                    counter = &THIS->_recordDelegateCount;
+                    array   = THIS->_recordDelegates;
+                    break;
+                case kKindPlaybackDelegate:
+                    counter = &THIS->_playbackDelegateCount;
+                    array   = THIS->_playbackDelegates;
+                    break;
+                case kKindTimingDelegate:
+                    counter = &THIS->_timingDelegateCount;
+                    array   = THIS->_timingDelegates;
+                    break;
+                case kKindFilter:
+                    // TODO
+                    break;
+            };
+        }
+        
+        switch ( message->action ) {
+            case kMessageAdd: {
+                array[*counter].callback = (void*)message->parameter1;
+                array[*counter].userInfo = (void*)message->parameter2;
+                (*counter)++;
+                break;
+            }
+            case kMessageRemove: {
+                // Find the item in our fixed array
+                int index = 0;
+                for ( index=0; index<*counter; index++ ) {
+                    if ( array[*counter].callback == (void*)message->parameter1 && array[*counter].userInfo == (void*)message->parameter2 ) {
+                        break;
+                    }
+                }
+                if ( index < *counter ) {
+                    // Now overwrite the channel's entry with the later elements
+                    (*counter)--;
+                    for ( int i=index; i<*counter; i++ ) {
+                        array[i] = array[i+1];
+                    }
+                }
+                break;
+            }
+            case kMessageGet: {
+                // Nothing to do
+                break;
+            }
+            case kMessageFindIndexWithMatchingUserInfo: {
+                int index = 0;
+                for ( index=0; index<*counter; index++ ) {
+                    if ( array[*counter].userInfo == (void*)message->parameter1 ) {
+                        break;
+                    }
+                }
+                if ( index < *counter ) {
+                    response = index;
+                } else {
+                    response = NSNotFound;
+                }
+            }
+        }
+        
+        if ( (message->action == kMessageAdd || message->action == kMessageRemove || message->action == kMessageGet) && message->response_block ) {
+            response = *counter;
+            
+            if ( message->response_ptr ) {
+                // Parameter 4, if non-NULL, is a pointer to an array to copy the array to
+                memcpy(message->response_ptr, array, *counter * sizeof(callback_t));
+            }
+        }
+        
+        if ( message->response_block ) {
+            message_response_t message_response = { .message = *message, .response = response };
+            TPACCircularBufferProduceBytes(&THIS->_responseBuffer, &message_response, sizeof(message_response_t));
+        }
+    }
+    
+    TPACCircularBufferConsume(&THIS->_messageBuffer, availableBytes);
+}
+
+-(void)pollMessageResponses {
+    int32_t availableBytes;
+    message_response_t *responses = TPACCircularBufferTail(&_responseBuffer, &availableBytes);
+    int responseCount = availableBytes / sizeof(message_response_t);
+    for ( int i=0; i<responseCount; i++ ) {
+        message_response_t *response = &responses[i];
+        response->message.response_block(response->message, response->response);
+        [response->message.response_block release];
+        _pendingResponses--;
+    }
+    
+    if ( _pendingResponses == 0 && _responsePollTimer ) {
+        [_responsePollTimer invalidate];
+        _responsePollTimer = nil;
     }
 }
 
-- (void)applicationDidBecomeActive:(NSNotification*)notification {
-    OSStatus status = AudioSessionSetActive(true);
-    checkResult(status, "AudioSessionSetActive");
+- (void)performAsynchronousMessageExchange:(message_t)message responseBlock:(void (^)(struct _message_t message, long response))responseBlock {
+    // Only perform on main thread
+    if ( !_initialised && responseBlock ) {
+        [responseBlock retain];
+        _pendingResponses++;
+        
+        if ( !_responsePollTimer ) {
+            _responsePollTimer = [NSTimer scheduledTimerWithTimeInterval:_preferredBufferDuration target:self selector:@selector(pollMessageResponses) userInfo:nil repeats:YES];
+        }
+    }
+    
+    message.response_block = responseBlock;
+    TPACCircularBufferProduceBytes(&_messageBuffer, &message, sizeof(message_t));
+    
+    if ( !_initialised ) {
+        processPendingMessages(self);
+        [self pollMessageResponses];
+    }
 }
+
+- (void)performSynchronousMessageExchange:(message_t)message response:(message_response_t *)response {
+    // Only perform on main thread
+    __block message_t returned_message;
+    __block long returned_response;
+    __block BOOL finished = NO;
+    
+    [self performAsynchronousMessageExchange:message responseBlock:^(message_t message, long response) {
+        returned_message = message;
+        returned_response = response;
+        finished = YES;
+    }];
+    
+    // Wait for response
+    while ( !finished ) {
+        [self pollMessageResponses];
+        if ( finished ) break;
+        [NSThread sleepForTimeInterval:_preferredBufferDuration];
+    }
+    
+    response->message = returned_message;
+    response->response = returned_response;
+    
+    return;
+}
+
 
 @end

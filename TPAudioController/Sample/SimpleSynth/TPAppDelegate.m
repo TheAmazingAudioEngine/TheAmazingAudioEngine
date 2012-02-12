@@ -31,7 +31,7 @@
     
     // Create an instance of the audio controller, set it up and start it running
     self.audioController = [[[TPAudioController alloc] init] autorelease];
-    [_audioController setup];
+    [_audioController setupWithAudioDescription:[TPAudioController defaultAudioDescription]];
     [_audioController start];
     
     // Create an instance of our synth, and add it as a channel to the audio controller
