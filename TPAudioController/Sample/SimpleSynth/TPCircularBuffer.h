@@ -34,7 +34,12 @@
 //  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <libkern/OSAtomic.h>
+#include <string.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+    
 typedef struct {
     void             *buffer;
     int32_t           length;
@@ -48,10 +53,38 @@ void  TPCircularBufferCleanup(TPCircularBuffer *buffer);
 void  TPCircularBufferClear(TPCircularBuffer *buffer);
 
 // Reading (consuming)
-void* TPCircularBufferTail(TPCircularBuffer *buffer, int32_t* availableBytes);
-void  TPCircularBufferConsume(TPCircularBuffer *buffer, int32_t amount);
 
+static inline void* TPCircularBufferTail(TPCircularBuffer *buffer, int32_t* availableBytes) {
+    *availableBytes = buffer->fillCount;
+    return (void*)((char*)buffer->buffer + buffer->tail);
+}
+
+static inline void TPCircularBufferConsume(TPCircularBuffer *buffer, int32_t amount) {
+    buffer->tail = (buffer->tail + amount) % buffer->length;
+    OSAtomicAdd32Barrier(-amount, &buffer->fillCount);
+}
+
+static inline void* TPCircularBufferHead(TPCircularBuffer *buffer, int32_t* availableBytes) {
+    *availableBytes = (buffer->length - buffer->fillCount);
+    return (void*)((char*)buffer->buffer + buffer->head);
+}
+    
 // Writing (producing)
-void* TPCircularBufferHead(TPCircularBuffer *buffer, int32_t* availableBytes);
-void  TPCircularBufferProduce(TPCircularBuffer *buffer, int32_t amount);
-int   TPCircularBufferProduceBytes(TPCircularBuffer *buffer, const void* src, int32_t len);
+
+static inline void TPCircularBufferProduce(TPCircularBuffer *buffer, int amount) {
+    buffer->head = (buffer->head + amount) % buffer->length;
+    OSAtomicAdd32Barrier(amount, &buffer->fillCount);
+}
+
+static inline int TPCircularBufferProduceBytes(TPCircularBuffer *buffer, const void* src, int32_t len) {
+    int32_t space;
+    void *ptr = TPCircularBufferHead(buffer, &space);
+    int copied = len > space ? space : len;
+    memcpy(ptr, src, copied);
+    TPCircularBufferProduce(buffer, copied);
+    return copied;
+}
+
+#ifdef __cplusplus
+}
+#endif

@@ -23,7 +23,6 @@
 //  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "TPACCircularBuffer.h"
-#include <string.h>
 #include <mach/mach.h>
 #include <stdio.h>
 
@@ -34,10 +33,6 @@ static inline bool _checkResult(kern_return_t result, const char *operation, con
         return false;
     }
     return true;
-}
-
-static inline int min(int a, int b) {
-    return (a>b ? b : a);
 }
 
 bool TPACCircularBufferInit(TPACCircularBuffer *buffer, int length) {
@@ -93,33 +88,4 @@ void TPACCircularBufferCleanup(TPACCircularBuffer *buffer) {
 void TPACCircularBufferClear(TPACCircularBuffer *buffer) {
     buffer->head = buffer->tail = 0;
     buffer->fillCount = 0;
-}
-
-void* TPACCircularBufferTail(TPACCircularBuffer *buffer, int32_t* availableBytes) {
-    *availableBytes = buffer->fillCount;
-    return (void*)((char*)buffer->buffer + buffer->tail);
-}
-
-void TPACCircularBufferConsume(TPACCircularBuffer *buffer, int32_t amount) {
-    buffer->tail = (buffer->tail + amount) % buffer->length;
-    OSAtomicAdd32(-amount, &buffer->fillCount);
-}
-
-void* TPACCircularBufferHead(TPACCircularBuffer *buffer, int32_t* availableBytes) {
-    *availableBytes = (buffer->length - buffer->fillCount);
-    return (void*)((char*)buffer->buffer + buffer->head);
-}
-
-void TPACCircularBufferProduce(TPACCircularBuffer *buffer, int amount) {
-    buffer->head = (buffer->head + amount) % buffer->length;
-    OSAtomicAdd32(amount, &buffer->fillCount);
-}
-
-int TPACCircularBufferProduceBytes(TPACCircularBuffer *buffer, const void* src, int32_t len) {
-    int32_t space;
-    void *ptr = TPACCircularBufferHead(buffer, &space);
-    int copied = min(len, space);
-    memcpy(ptr, src, copied);
-    TPACCircularBufferProduce(buffer, copied);
-    return copied;
 }

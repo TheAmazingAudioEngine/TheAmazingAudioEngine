@@ -34,6 +34,7 @@
 //  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <libkern/OSAtomic.h>
+#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,13 +53,37 @@ void  TPACCircularBufferCleanup(TPACCircularBuffer *buffer);
 void  TPACCircularBufferClear(TPACCircularBuffer *buffer);
 
 // Reading (consuming)
-void* TPACCircularBufferTail(TPACCircularBuffer *buffer, int32_t* availableBytes);
-void  TPACCircularBufferConsume(TPACCircularBuffer *buffer, int32_t amount);
 
+static inline void* TPACCircularBufferTail(TPACCircularBuffer *buffer, int32_t* availableBytes) {
+    *availableBytes = buffer->fillCount;
+    return (void*)((char*)buffer->buffer + buffer->tail);
+}
+
+static inline void TPACCircularBufferConsume(TPACCircularBuffer *buffer, int32_t amount) {
+    buffer->tail = (buffer->tail + amount) % buffer->length;
+    OSAtomicAdd32Barrier(-amount, &buffer->fillCount);
+}
+
+static inline void* TPACCircularBufferHead(TPACCircularBuffer *buffer, int32_t* availableBytes) {
+    *availableBytes = (buffer->length - buffer->fillCount);
+    return (void*)((char*)buffer->buffer + buffer->head);
+}
+    
 // Writing (producing)
-void* TPACCircularBufferHead(TPACCircularBuffer *buffer, int32_t* availableBytes);
-void  TPACCircularBufferProduce(TPACCircularBuffer *buffer, int32_t amount);
-int   TPACCircularBufferProduceBytes(TPACCircularBuffer *buffer, const void* src, int32_t len);
+
+static inline void TPACCircularBufferProduce(TPACCircularBuffer *buffer, int amount) {
+    buffer->head = (buffer->head + amount) % buffer->length;
+    OSAtomicAdd32Barrier(amount, &buffer->fillCount);
+}
+
+static inline int TPACCircularBufferProduceBytes(TPACCircularBuffer *buffer, const void* src, int32_t len) {
+    int32_t space;
+    void *ptr = TPACCircularBufferHead(buffer, &space);
+    int copied = len > space ? space : len;
+    memcpy(ptr, src, copied);
+    TPACCircularBufferProduce(buffer, copied);
+    return copied;
+}
 
 #ifdef __cplusplus
 }
