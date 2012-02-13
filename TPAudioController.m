@@ -97,7 +97,7 @@ enum {
 - (void)updateVoiceProcessingSettings;
 - (NSArray *)getDelegatesOfKind:(int)kind;
 - (void)performAsynchronousMessageExchange:(message_t)message responseBlock:(void (^)(struct _message_t message, long response))responseBlock;
-- (void)performSynchronousMessageExchange:(message_t)message response:(message_response_t*)response;
+- (long)performSynchronousMessageExchange:(message_t)message;
 - (void)pollMessageResponses;
 static void processPendingMessages(TPAudioController *THIS);
 @end
@@ -121,7 +121,7 @@ static void processPendingMessages(TPAudioController *THIS);
             timingDelegates,
             running;
 
-#pragma mark Audio session callbacks
+#pragma mark - Audio session callbacks
 
 static void interruptionListener(void *inClientData, UInt32 inInterruption) {
 	TPAudioController *THIS = (TPAudioController *)inClientData;
@@ -384,7 +384,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     return ![badDevices containsObject:platform];
 }
 
-#pragma mark Setup and start/stop
+#pragma mark - Setup and start/stop
 
 - (id)init {
     if ( !(self = [super init]) ) return nil;
@@ -596,55 +596,56 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
 #pragma mark - Channel/delegate management
 
 - (void)addChannels:(NSArray*)channels {
-    if ( _initialised ) {
-        // set bus count
-        UInt32 numbuses = _channelCount + [channels count];
-        OSStatus result = AudioUnitSetProperty(_mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &numbuses, sizeof(numbuses));
-        if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) {
-            return;
-        }
-    
-        NSInteger i = _channelCount;
-        
-        for ( id<TPAudioPlayable> channel in channels ) {
-            // setup render callback struct
-            AURenderCallbackStruct rcbs;
-            rcbs.inputProc = &playbackCallback;
-            rcbs.inputProcRefCon = self;
-            
-            // Set a callback for the specified node's specified input
-            result = AUGraphSetNodeInputCallback(_audioGraph, _mixerNode, i, &rcbs);
-            if ( !checkResult(result, "AUGraphSetNodeInputCallback") ) return;
-            
-            // set input stream format to what we want
-            result = AudioUnitSetProperty(_mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, i, &_audioDescription, sizeof(_audioDescription));
-            if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)") ) return;
-            
-            // set volume
-            AudioUnitParameterValue volumeValue = (AudioUnitParameterValue)([channel respondsToSelector:@selector(volume)] ? channel.volume : 1.0);
-            result = AudioUnitSetParameter(_mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, i, volumeValue, 0);
-            if ( !checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)") ) return;
-            
-            // set pan
-            AudioUnitParameterValue panValue = (AudioUnitParameterValue)([channel respondsToSelector:@selector(pan)] ? channel.pan : 0.0);
-            result = AudioUnitSetParameter(_mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, i, panValue, 0);
-            if ( !checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)") ) return;
-            
-            i++;
-        }
-    }
-    
+    id<TPAudioPlayable> lastChannel = [channels lastObject];
     for ( id<TPAudioPlayable> channel in channels ) {
         for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", nil] ) {
             [(NSObject*)channel addObserver:self forKeyPath:property options:0 context:NULL];
         }
         
         [channel retain];
-        [self performAsynchronousMessageExchange:(message_t){ .action = kMessageAdd, .kind = kKindChannel, .parameter1 = (long)channel.playbackCallback, .parameter2 = (long)channel } responseBlock:nil];
-    }
-    
-    if ( _initialised ) {
-        [self performSelector:@selector(refreshGraph) withObject:nil afterDelay:0];
+        [self performAsynchronousMessageExchange:(message_t){ .action = kMessageAdd, .kind = kKindChannel, .parameter1 = (long)channel.playbackCallback, .parameter2 = (long)channel } 
+                                   responseBlock:channel != lastChannel ? nil : ^(message_t message, long channelCount) {
+                                       // After last channel has been added...
+                                       if ( _initialised ) {
+                                           // set bus count
+                                           UInt32 numbuses = channelCount + [channels count];
+                                           OSStatus result = AudioUnitSetProperty(_mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &numbuses, sizeof(numbuses));
+                                           if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) {
+                                               return;
+                                           }
+                                           
+                                           NSInteger i = channelCount - [channels count];
+                                           
+                                           for ( id<TPAudioPlayable> channel in channels ) {
+                                               // setup render callback struct
+                                               AURenderCallbackStruct rcbs;
+                                               rcbs.inputProc = &playbackCallback;
+                                               rcbs.inputProcRefCon = self;
+                                               
+                                               // Set a callback for the specified node's specified input
+                                               result = AUGraphSetNodeInputCallback(_audioGraph, _mixerNode, i, &rcbs);
+                                               if ( !checkResult(result, "AUGraphSetNodeInputCallback") ) return;
+                                               
+                                               // set input stream format to what we want
+                                               result = AudioUnitSetProperty(_mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, i, &_audioDescription, sizeof(_audioDescription));
+                                               if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)") ) return;
+                                               
+                                               // set volume
+                                               AudioUnitParameterValue volumeValue = (AudioUnitParameterValue)([channel respondsToSelector:@selector(volume)] ? channel.volume : 1.0);
+                                               result = AudioUnitSetParameter(_mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, i, volumeValue, 0);
+                                               if ( !checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)") ) return;
+                                               
+                                               // set pan
+                                               AudioUnitParameterValue panValue = (AudioUnitParameterValue)([channel respondsToSelector:@selector(pan)] ? channel.pan : 0.0);
+                                               result = AudioUnitSetParameter(_mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, i, panValue, 0);
+                                               if ( !checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)") ) return;
+                                               
+                                               i++;
+                                           }
+                                           
+                                           [self refreshGraph];
+                                       }
+                                   }];
     }
 }
 
@@ -663,9 +664,8 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
                             .parameter1 = (long)channel.playbackCallback, 
                             .parameter2 = (long)channel,
                             .response_ptr = &final_channels_array }
-             responseBlock:channel != lastChannel ? nil : ^(message_t message, long response){
+             responseBlock:channel != lastChannel ? nil : ^(message_t message, long newChannelCount){
                  // After channel removal is complete, update the graph, and release the channels
-                 int newChannelCount = response;
                  if ( _initialised ) {
                      // set bus count
                      UInt32 numbuses = newChannelCount;
@@ -689,9 +689,9 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
                          result = AudioUnitSetParameter(_mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, i, panValue, 0);
                          if ( !checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)") ) return;
                      }
+                     
+                     [self refreshGraph];
                  }
-                 
-                 [self refreshGraph];
                  
                  [channels makeObjectsPerformSelector:@selector(release)];
              }];
@@ -963,11 +963,9 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
 -(NSArray *)getDelegatesOfKind:(int)kind {
     // Request copy of channels array from realtime thread
     callback_t array[kMaximumChannels];
-    message_response_t response;
-    [self performSynchronousMessageExchange:(message_t) { .action = kMessageGet, .kind = kind, .response_ptr = &array } response:&response];
+    long count = [self performSynchronousMessageExchange:(message_t) { .action = kMessageGet, .kind = kind, .response_ptr = &array }];
     
     // Construct NSArray response
-    int count = response.response;
     NSMutableArray *result = [NSMutableArray array];
     for ( int i=0; i<count; i++ ) {
         [result addObject:[NSDictionary dictionaryWithObjectsAndKeys:
@@ -1114,14 +1112,12 @@ static void processPendingMessages(TPAudioController *THIS) {
     }
 }
 
-- (void)performSynchronousMessageExchange:(message_t)message response:(message_response_t *)response {
+- (long)performSynchronousMessageExchange:(message_t)message {
     // Only perform on main thread
-    __block message_t returned_message;
     __block long returned_response;
     __block BOOL finished = NO;
     
     [self performAsynchronousMessageExchange:message responseBlock:^(message_t message, long response) {
-        returned_message = message;
         returned_response = response;
         finished = YES;
     }];
@@ -1133,10 +1129,7 @@ static void processPendingMessages(TPAudioController *THIS) {
         [NSThread sleepForTimeInterval:_preferredBufferDuration];
     }
     
-    response->message = returned_message;
-    response->response = returned_response;
-    
-    return;
+    return returned_response;
 }
 
 
