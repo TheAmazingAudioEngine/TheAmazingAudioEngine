@@ -9,8 +9,8 @@
 #import <UIKit/UIKit.h>
 
 @class TPAudioController;
-
 @interface TPViewController : UITableViewController
 
-@property (nonatomic, retain) TPAudioController *audioController;
+- (id)initWithAudioController:(TPAudioController*)audioController;
+
 @end

@@ -28,12 +28,11 @@
     self.window = [[[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]] autorelease];
     
     // Create an instance of the audio controller, set it up and start it running
-    self.audioController = [[[TPAudioController alloc] initWithAudioDescription:[TPAudioController defaultAudioDescription]] autorelease];
+    self.audioController = [[[TPAudioController alloc] initWithAudioDescription:[TPAudioController defaultAudioDescription] inputEnabled:YES useVoiceProcessing:NO] autorelease];
     [_audioController start];
     
     // Create and display view controller
-    self.viewController = [[[TPViewController alloc] init] autorelease];
-    _viewController.audioController = _audioController;
+    self.viewController = [[[TPViewController alloc] initWithAudioController:_audioController] autorelease];
     self.window.rootViewController = self.viewController;
     [self.window makeKeyAndVisible];
     

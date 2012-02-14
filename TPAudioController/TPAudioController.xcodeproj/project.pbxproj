@@ -20,7 +20,9 @@
 		4C5C510B14EA9A1D0012D39E /* TPAudioController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CE5019E1493F84300F23607 /* TPAudioController.m */; };
 		4C5C510C14EA9A1D0012D39E /* TPACCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4CC62FBE14E7F7A300B5A2DB /* TPACCircularBuffer.c */; };
 		4C5C510D14EA9A210012D39E /* TPAudioController.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CE5019D1493F84300F23607 /* TPAudioController.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		4C5C511014EA9A410012D39E /* TPAudioController.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C5C50F714EA98F30012D39E /* TPAudioController.framework */; };
+		4C5C511714EA9CC50012D39E /* TPAudioController.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C5C50E314EA98E90012D39E /* TPAudioController.framework */; };
+		4C5C511C14EA9D790012D39E /* TPOscilloscopeLayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C5C511914EA9D790012D39E /* TPOscilloscopeLayer.m */; };
+		4C5C511F14EAA39D0012D39E /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C5C511E14EAA39D0012D39E /* QuartzCore.framework */; };
 		4CAD2F7014E9A3BF00656553 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD2F6F14E9A3BF00656553 /* UIKit.framework */; };
 		4CAD2F7214E9A3BF00656553 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD2F7114E9A3BF00656553 /* Foundation.framework */; };
 		4CAD2F7414E9A3BF00656553 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD2F7314E9A3BF00656553 /* CoreGraphics.framework */; };
@@ -30,12 +32,12 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		4C5C510E14EA9A390012D39E /* PBXContainerItemProxy */ = {
+		4C5C511514EA9CC00012D39E /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 4CE501831493F82600F23607 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 4C5C50F614EA98F30012D39E;
-			remoteInfo = TPAudioControllerTrial;
+			remoteGlobalIDString = 4C5C50E214EA98E90012D39E;
+			remoteInfo = TPAudioController;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -51,6 +53,9 @@
 		4C34877A14EA841000301A09 /* lead.aif */ = {isa = PBXFileReference; lastKnownFileType = file; name = lead.aif; path = "TPAudioController/Test Suite/lead.aif"; sourceTree = SOURCE_ROOT; };
 		4C5C50E314EA98E90012D39E /* TPAudioController.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework.static; includeInIndex = 0; path = TPAudioController.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C5C50F714EA98F30012D39E /* TPAudioController.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework.static; includeInIndex = 0; path = TPAudioController.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		4C5C511814EA9D790012D39E /* TPOscilloscopeLayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TPOscilloscopeLayer.h; path = "TPAudioController/Test Suite/TPOscilloscopeLayer.h"; sourceTree = SOURCE_ROOT; };
+		4C5C511914EA9D790012D39E /* TPOscilloscopeLayer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = TPOscilloscopeLayer.m; path = "TPAudioController/Test Suite/TPOscilloscopeLayer.m"; sourceTree = SOURCE_ROOT; };
+		4C5C511E14EAA39D0012D39E /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
 		4CAD2F6C14E9A3BF00656553 /* Audio Controller Test Suite.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Audio Controller Test Suite.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		4CAD2F6F14E9A3BF00656553 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		4CAD2F7114E9A3BF00656553 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
@@ -91,7 +96,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				4C5C511014EA9A410012D39E /* TPAudioController.framework in Frameworks */,
+				4C5C511F14EAA39D0012D39E /* QuartzCore.framework in Frameworks */,
+				4C5C511714EA9CC50012D39E /* TPAudioController.framework in Frameworks */,
 				4C34874D14E9A7EB00301A09 /* AudioToolbox.framework in Frameworks */,
 				4CAD2F7014E9A3BF00656553 /* UIKit.framework in Frameworks */,
 				4CAD2F7214E9A3BF00656553 /* Foundation.framework in Frameworks */,
@@ -116,12 +122,14 @@
 		4CAD2F6E14E9A3BF00656553 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				4C5C511E14EAA39D0012D39E /* QuartzCore.framework */,
 				4C34874C14E9A7EB00301A09 /* AudioToolbox.framework */,
 				4CAD2F6F14E9A3BF00656553 /* UIKit.framework */,
 				4CAD2F7114E9A3BF00656553 /* Foundation.framework */,
 				4CAD2F7314E9A3BF00656553 /* CoreGraphics.framework */,
 			);
 			name = Frameworks;
+			path = ..;
 			sourceTree = "<group>";
 		};
 		4CAD2F7514E9A3BF00656553 /* Audio Controller Test Suite */ = {
@@ -133,8 +141,11 @@
 				4CAD2F9114E9A40000656553 /* TPViewController.m */,
 				4C34877514E9B8CA00301A09 /* TPAudioFilePlayer.h */,
 				4C34877614E9B8CA00301A09 /* TPAudioFilePlayer.m */,
+				4C5C511814EA9D790012D39E /* TPOscilloscopeLayer.h */,
+				4C5C511914EA9D790012D39E /* TPOscilloscopeLayer.m */,
 				4C34877014E9B79300301A09 /* Resources */,
 				4CAD2F7614E9A3BF00656553 /* Supporting Files */,
+				4CAD2F6E14E9A3BF00656553 /* Frameworks */,
 			);
 			path = "Audio Controller Test Suite";
 			sourceTree = "<group>";
@@ -154,7 +165,6 @@
 			children = (
 				4CE501911493F82600F23607 /* TPAudioController */,
 				4CAD2F7514E9A3BF00656553 /* Audio Controller Test Suite */,
-				4CAD2F6E14E9A3BF00656553 /* Frameworks */,
 				4CE501901493F82600F23607 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -269,7 +279,7 @@
 			buildRules = (
 			);
 			dependencies = (
-				4C5C510F14EA9A390012D39E /* PBXTargetDependency */,
+				4C5C511614EA9CC00012D39E /* PBXTargetDependency */,
 			);
 			name = "Audio Controller Test Suite";
 			productName = "Audio Controller Test Suite";
@@ -441,16 +451,17 @@
 				4CAD2F9314E9A40000656553 /* TPViewController.m in Sources */,
 				4CAD2F9814E9A41200656553 /* main.m in Sources */,
 				4C34877714E9B8CA00301A09 /* TPAudioFilePlayer.m in Sources */,
+				4C5C511C14EA9D790012D39E /* TPOscilloscopeLayer.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		4C5C510F14EA9A390012D39E /* PBXTargetDependency */ = {
+		4C5C511614EA9CC00012D39E /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 4C5C50F614EA98F30012D39E /* TPAudioControllerTrial */;
-			targetProxy = 4C5C510E14EA9A390012D39E /* PBXContainerItemProxy */;
+			target = 4C5C50E214EA98E90012D39E /* TPAudioController */;
+			targetProxy = 4C5C511514EA9CC00012D39E /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 

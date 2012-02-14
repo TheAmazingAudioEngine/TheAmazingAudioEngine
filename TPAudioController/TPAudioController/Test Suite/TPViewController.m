@@ -9,14 +9,22 @@
 #import "TPViewController.h"
 #import <TPAudioController/TPAudioController.h>
 #import "TPAudioFilePlayer.h"
+#import "TPOscilloscopeLayer.h"
+#import <QuartzCore/QuartzCore.h>
 
 #define kAuxiliaryViewTag 251
 
-@interface TPViewController ()
+@interface TPViewController () {
+    TPChannelGroup _loopsGroup;
+}
+
+@property (nonatomic, retain) TPAudioController *audioController;
 @property (nonatomic, retain) TPAudioFilePlayer *loop1;
 @property (nonatomic, retain) TPAudioFilePlayer *loop2;
 @property (nonatomic, retain) TPAudioFilePlayer *loop3;
 @property (nonatomic, retain) TPAudioFilePlayer *sample1;
+@property (nonatomic, retain) TPOscilloscopeLayer *outputOscilloscope;
+@property (nonatomic, retain) TPOscilloscopeLayer *inputOscilloscope;
 @end
 
 @implementation TPViewController
@@ -24,45 +32,14 @@
             loop1=_loop1,
             loop2=_loop2,
             loop3=_loop3,
-            sample1=_sample1;
+            sample1=_sample1,
+            outputOscilloscope=_outputOscilloscope,
+            inputOscilloscope=_inputOscilloscope;
 
-- (id)init {
+- (id)initWithAudioController:(TPAudioController*)audioController {
     if ( !(self = [super initWithStyle:UITableViewStyleGrouped]) ) return nil;
     
-    return self;
-}
-
--(void)dealloc {
-    NSMutableArray *channelsToRemove = [NSMutableArray array];
-    if ( _loop1 ) {
-        [channelsToRemove addObject:_loop1];
-        self.loop1 = nil;
-    }
-    if ( _loop2 ) {
-        [channelsToRemove addObject:_loop2];
-        self.loop2 = nil;
-    }
-    if ( _loop3 ) {
-        [channelsToRemove addObject:_loop3];
-        self.loop3 = nil;
-    }
-    if ( _sample1 ) {
-        [channelsToRemove addObject:_sample1];
-        [_sample1 removeObserver:self forKeyPath:@"playing"];
-        self.sample1 = nil;
-    }
-    
-    if ( [channelsToRemove count] > 0 ) {
-        [_audioController removeChannels:channelsToRemove];
-    }
-    
-    self.audioController = nil;
-
-    [super dealloc];
-}
-
--(void)viewWillAppear:(BOOL)animated {
-    [super viewWillAppear:animated];
+    self.audioController = audioController;
     
     self.loop1 = [TPAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"caitlin" withExtension:@"caf"]
                                            audioController:_audioController
@@ -85,7 +62,64 @@
     _loop3.muted = YES;
     _loop3.loop = YES;
     
-    [_audioController addChannels:[NSArray arrayWithObjects:_loop1, _loop2, _loop3, nil]];
+    _loopsGroup = [_audioController createChannelGroup];
+    [_audioController addChannels:[NSArray arrayWithObjects:_loop1, _loop2, _loop3, nil] toChannelGroup:_loopsGroup];
+    
+    return self;
+}
+
+-(void)dealloc {
+    NSMutableArray *channelsToRemove = [NSMutableArray array];
+
+    [channelsToRemove addObject:_loop1];
+    self.loop1 = nil;
+
+    [channelsToRemove addObject:_loop2];
+    self.loop2 = nil;
+
+    [channelsToRemove addObject:_loop3];
+    self.loop3 = nil;
+    
+    if ( _sample1 ) {
+        [channelsToRemove addObject:_sample1];
+        [_sample1 removeObserver:self forKeyPath:@"playing"];
+        self.sample1 = nil;
+    }
+    
+    if ( [channelsToRemove count] > 0 ) {
+        [_audioController removeChannels:channelsToRemove];
+    }
+    
+    [_audioController removeChannelGroup:_loopsGroup];
+    
+    self.outputOscilloscope = nil;
+    self.inputOscilloscope = nil;
+    
+    self.audioController = nil;
+
+    [super dealloc];
+}
+
+-(void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    
+    UIView *oscilloscopeHostView = [[[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 100)] autorelease];
+    oscilloscopeHostView.backgroundColor = [UIColor groupTableViewBackgroundColor];
+    
+    self.outputOscilloscope = [[[TPOscilloscopeLayer alloc] init] autorelease];
+    _outputOscilloscope.frame = oscilloscopeHostView.bounds;
+    [oscilloscopeHostView.layer addSublayer:_outputOscilloscope];
+    [_audioController addPlaybackCallback:_outputOscilloscope.callback userInfo:_outputOscilloscope];
+    [_outputOscilloscope start];
+    
+    self.inputOscilloscope = [[[TPOscilloscopeLayer alloc] init] autorelease];
+    _inputOscilloscope.frame = oscilloscopeHostView.bounds;
+    _inputOscilloscope.lineColor = [UIColor colorWithWhite:0.0 alpha:0.3];
+    [oscilloscopeHostView.layer addSublayer:_inputOscilloscope];
+    [_audioController addRecordCallback:_inputOscilloscope.callback userInfo:_inputOscilloscope];
+    [_inputOscilloscope start];
+    
+    self.tableView.tableHeaderView = oscilloscopeHostView;
 }
 
 -(NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
