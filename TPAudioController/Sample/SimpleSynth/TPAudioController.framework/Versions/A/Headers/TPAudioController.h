@@ -106,9 +106,10 @@ typedef OSStatus (*TPAudioControllerRenderCallback) (id<TPAudioPlayable>       c
 /*!
  * Audio callback callback
  *
- *      This callback is used both for notifying you of incoming audio (either from 
+ *      This callback is used for notifying you of incoming audio (either from 
  *      the built-in microphone, or another input device), and outgoing audio that
- *      is about to be played by the system.  
+ *      is about to be played by the system.  It's also used for audio filtering.
+ *
  *      Do not wait on locks, allocate memory, or call any Objective-C or BSD code.
  *
  * @param userInfo  The opaque pointer you provided when you registered this callback
@@ -116,10 +117,10 @@ typedef OSStatus (*TPAudioControllerRenderCallback) (id<TPAudioPlayable>       c
  * @param frames    The length of the audio, in frames
  * @param audio     The audio buffer list
  */
-typedef OSStatus (*TPAudioControllerAudioCallback) (void                     *userInfo,
-                                                    const AudioTimeStamp     *time,
-                                                    UInt32                    frames,
-                                                    AudioBufferList          *audio);
+typedef void (*TPAudioControllerAudioCallback) (void                     *userInfo,
+                                                const AudioTimeStamp     *time,
+                                                UInt32                    frames,
+                                                AudioBufferList          *audio);
 
 /*!
  * Timing contexts
@@ -156,24 +157,6 @@ typedef OSStatus (*TPAudioControllerTimingCallback) (void                     *u
                                                      const AudioTimeStamp     *time,
                                                      TPAudioTimingContext      context);
 
-
-
-/*!
- * Audio filter callback
- *
- *      This is called when audio is ready to be filtered. You should modify the audio data
- *      with the buffers provided.
- *      Do not wait on locks, allocate memory, or call any Objective-C or BSD code.
- *
- * @param userInfo  The opaque pointer you provided when you registered this callback
- * @param time      The time the buffer will be played
- * @param frames    The number of frames of audio provided
- * @param audio     The audio buffer list - audio should be altered in place
- */
-typedef OSStatus (*TPAudioControllerFilterCallback) (void                     *userInfo,
-                                                     const AudioTimeStamp     *time,
-                                                     UInt32                    frames,
-                                                     AudioBufferList          *audio);
 
 /*! 
  * Callback key
@@ -224,12 +207,31 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
 /*! @methodgroup Setup and start/stop */
 
 /*!
- * Default audio description
+ * Canonical Audio Unit audio description
+ *
+ *      This is the non-interleaved audio description associated with the kAudioFormatFlagsAudioUnitCanonical flag,
+ *      at 44.1kHz that can be used with @link initWithAudioDescription: @/link.
+ *
+ *      This is the 8.24 fixed-point audio format recommended by Apple, although it is relatively 
+ *      inconvenient to work with individual samples without converting.
+ */
++ (AudioStreamBasicDescription)audioUnitCanonicalAudioDescription;
+
+/*!
+ * 16-bit stereo audio description, interleaved
  *
  *      This is a 16-bit signed PCM, stereo, interleaved format at 44.1kHz that can be used
  *      with @link initWithAudioDescription: @/link.
  */
-+ (AudioStreamBasicDescription)defaultAudioDescription;
++ (AudioStreamBasicDescription)interleaved16BitStereoAudioDescription;
+
+/*!
+ * 16-bit stereo audio description, non-interleaved
+ *
+ *      This is a 16-bit signed PCM, stereo, non-interleaved format at 44.1kHz that can be used
+ *      with @link initWithAudioDescription: @/link.
+ */
++ (AudioStreamBasicDescription)nonInterleaved16BitStereoAudioDescription;
 
 /*!
  * Determine whether voice processing is available on this device
@@ -397,11 +399,11 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  *      be performed on the audio in the order in which the filters were added using this
  *      method.
  *
- * @param callback A @link TPAudioControllerFilterCallback @/link callback to process audio
+ * @param callback A @link TPAudioControllerAudioCallback @/link callback to process audio
  * @param userInfo An opaque pointer to be passed to the callback
  * @param channel  The channel on which to perform audio processing
  */
-- (void)addFilter:(TPAudioControllerFilterCallback)filter userInfo:(void*)userInfo toChannel:(id<TPAudioPlayable>)channel;
+- (void)addFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo toChannel:(id<TPAudioPlayable>)channel;
 
 /*!
  * Remove a filter from a channel
@@ -410,7 +412,7 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  * @param userInfo The opaque pointer that was passed when the callback was added
  * @param channel  The channel to stop filtering
  */
-- (void)removeFilter:(TPAudioControllerFilterCallback)filter userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channel;
+- (void)removeFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channel;
 
 /*!
  * Get a list of all filters currently operating on the channel
@@ -431,11 +433,11 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  *      Create and add filters to a channel group to process multiple channels with one filter,
  *      without the performance hit of processing each channel individually.
  *
- * @param callback A @link TPAudioControllerFilterCallback @/link callback to process audio
+ * @param callback A @link TPAudioControllerAudioCallback @/link callback to process audio
  * @param userInfo An opaque pointer to be passed to the callback
  * @param group    The channel group on which to perform audio processing
  */
-- (void)addFilter:(TPAudioControllerFilterCallback)filter userInfo:(void*)userInfo toChannelGroup:(TPChannelGroup)group;
+- (void)addFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo toChannelGroup:(TPChannelGroup)group;
 
 /*!
  * Remove a filter from a channel group
@@ -444,7 +446,7 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  * @param userInfo The opaque pointer that was passed when the callback was added
  * @param group    The group to stop filtering
  */
-- (void)removeFilter:(TPAudioControllerFilterCallback)filter userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group;
+- (void)removeFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group;
 
 /*!
  * Get a list of all filters currently operating on the channel group

@@ -30,7 +30,7 @@
     self.window = [[[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]] autorelease];
     
     // Create an instance of the audio controller, set it up and start it running
-    self.audioController = [[[TPAudioController alloc] initWithAudioDescription:[TPAudioController defaultAudioDescription]] autorelease];
+    self.audioController = [[[TPAudioController alloc] initWithAudioDescription:[TPAudioController interleaved16BitStereoAudioDescription]] autorelease];
     [_audioController start];
     
     // Create an instance of our synth, and add it as a channel to the audio controller

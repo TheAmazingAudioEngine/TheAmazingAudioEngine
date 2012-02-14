@@ -248,7 +248,7 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
         return noErr;
     }
     
-    TPAudioControllerAudioCallback callback = (TPAudioControllerAudioCallback) channel->ptr;
+    TPAudioControllerRenderCallback callback = (TPAudioControllerRenderCallback) channel->ptr;
     id<TPAudioPlayable> channelObj = (id<TPAudioPlayable>) channel->userInfo;
     
     return callback(channelObj, inTimeStamp, inNumberFrames, ioData);
@@ -708,7 +708,7 @@ static long removeChannelsFromGroup(TPAudioController *THIS, long *matchingPtrAr
         channelElement->filterCount = 0;
         channelElement->ptr = channel.renderCallback;
         channelElement->userInfo = channel;
-        channelElement->playing = channel.playing;
+        channelElement->playing = [channel respondsToSelector:@selector(playing)] ? channel.playing : YES;
     }
     
     // Set bus count
@@ -779,11 +779,11 @@ static long removeChannelsFromGroup(TPAudioController *THIS, long *matchingPtrAr
 
 #pragma mark - Filter management
 
-- (void)addFilter:(TPAudioControllerFilterCallback)filter userInfo:(void*)userInfo toChannel:(id<TPAudioPlayable>)channel {
+- (void)addFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo toChannel:(id<TPAudioPlayable>)channel {
     
 }
 
-- (void)removeFilter:(TPAudioControllerFilterCallback)filter userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channel {
+- (void)removeFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channel {
     
 }
 
@@ -791,11 +791,11 @@ static long removeChannelsFromGroup(TPAudioController *THIS, long *matchingPtrAr
     return nil;
 }
 
-- (void)addFilter:(TPAudioControllerFilterCallback)filter userInfo:(void*)userInfo toChannelGroup:(TPChannelGroup)group {
+- (void)addFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo toChannelGroup:(TPChannelGroup)group {
     
 }
 
-- (void)removeFilter:(TPAudioControllerFilterCallback)filter userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group {
+- (void)removeFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group {
     
 }
 

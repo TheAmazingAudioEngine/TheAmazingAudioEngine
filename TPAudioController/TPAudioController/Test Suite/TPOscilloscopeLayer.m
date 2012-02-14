@@ -18,7 +18,7 @@
 }
 @end
 
-static OSStatus audioCallback(void *THIS, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio);
+static void audioCallback(void *THIS, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio);
 
 @implementation TPOscilloscopeLayer
 @synthesize lineColor=_lineColor;
@@ -87,7 +87,7 @@ static OSStatus audioCallback(void *THIS, const AudioTimeStamp *time, UInt32 fra
 
 #pragma mark - Callback
 
-static OSStatus audioCallback(void *THISptr, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
+static void audioCallback(void *THISptr, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
     TPOscilloscopeLayer *THIS = (TPOscilloscopeLayer*)THISptr;
     
     // Get a pointer to the audio buffer that we can advance
@@ -116,8 +116,6 @@ static OSStatus audioCallback(void *THISptr, const AudioTimeStamp *time, UInt32 
         if (  THIS->_buffer_head == kBufferLength ) THIS->_buffer_head = 0;
         remainingFrames -= framesToCopy;
     }
-    
-    return noErr;
 }
 
 @end
