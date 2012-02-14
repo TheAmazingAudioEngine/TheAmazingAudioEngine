@@ -7,6 +7,7 @@
 //
 
 #import "TPTrialModeController.h"
+#import <UIKit/UIKit.h>
 
 @interface TPTrialModeController () {
     NSTimer *_timeout;

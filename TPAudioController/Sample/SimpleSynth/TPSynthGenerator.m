@@ -50,7 +50,7 @@ typedef struct {
 }
 
 /*!
- * Playback callback
+ * Render callback
  *
  *      This is called when audio for the channel is required. As this is called from Core Audio's
  *      realtime thread, you should not wait on locks, allocate memory, or call any Objective-C or BSD
@@ -64,7 +64,7 @@ typedef struct {
  * @param frames    The number of frames required
  * @param audio     The audio buffer list - audio should be copied into the provided buffers
  */
-static OSStatus playbackCallback (TPSynthGenerator         *THIS,
+static OSStatus renderCallback (TPSynthGenerator         *THIS,
                                   const AudioTimeStamp     *time,
                                   UInt32                    frames,
                                   AudioBufferList          *audio) {
@@ -104,9 +104,9 @@ static OSStatus playbackCallback (TPSynthGenerator         *THIS,
     return noErr;
 }
 
--(TPAudioControllerPlaybackCallback)playbackCallback {
-    return &playbackCallback;
-}
 
+-(TPAudioControllerRenderCallback)renderCallback {
+    return &renderCallback;
+}
 
 @end
