@@ -224,12 +224,31 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
 /*! @methodgroup Setup and start/stop */
 
 /*!
- * Default audio description
+ * Canonical Audio Unit audio description
+ *
+ *      This is the non-interleaved audio description associated with the kAudioFormatFlagsAudioUnitCanonical flag,
+ *      at 44.1kHz that can be used with @link initWithAudioDescription: @/link.
+ *
+ *      This is the 8.24 fixed-point audio format recommended by Apple, although it is relatively 
+ *      inconvenient to work with individual samples without converting.
+ */
++ (AudioStreamBasicDescription)audioUnitCanonicalAudioDescription;
+
+/*!
+ * 16-bit stereo audio description, interleaved
  *
  *      This is a 16-bit signed PCM, stereo, interleaved format at 44.1kHz that can be used
  *      with @link initWithAudioDescription: @/link.
  */
-+ (AudioStreamBasicDescription)defaultAudioDescription;
++ (AudioStreamBasicDescription)interleaved16BitStereoAudioDescription;
+
+/*!
+ * 16-bit stereo audio description, non-interleaved
+ *
+ *      This is a 16-bit signed PCM, stereo, non-interleaved format at 44.1kHz that can be used
+ *      with @link initWithAudioDescription: @/link.
+ */
++ (AudioStreamBasicDescription)nonInterleaved16BitStereoAudioDescription;
 
 /*!
  * Determine whether voice processing is available on this device

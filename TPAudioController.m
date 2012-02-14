@@ -81,10 +81,10 @@ typedef struct {
  * Channel group
  */
 typedef struct _channel_group_t {
-    AUNode      mixerNode;
-    AudioUnit   mixerAudioUnit;
-    channel_t   channels[kMaximumChannelsPerGroup];
-    int         channelCount;
+    AUNode              mixerNode;
+    AudioUnit           mixerAudioUnit;
+    channel_t           channels[kMaximumChannelsPerGroup];
+    int                 channelCount;
 } channel_group_t;
 
 #pragma mark Messaging
@@ -108,7 +108,7 @@ typedef struct _message_t {
     AUGraph             _audioGraph;
     AUNode              _ioNode;
     AudioUnit           _ioAudioUnit;
-    BOOL                _audioSessionInitialised;
+    BOOL                _audioSessionSetup;
     BOOL                _runningPriorToInterruption;
     
     channel_group_t     _channels;
@@ -330,26 +330,24 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     TPAudioController *THIS = (TPAudioController *)inRefCon;
         
     if ( *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
+        // Before render
         processPendingMessagesOnRealtimeThread(THIS);
         
         for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
             callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
             ((TPAudioControllerTimingCallback)callback->callback)(callback->userInfo, inTimeStamp, TPAudioTimingContextOutput);
         }
-    }
-    
-    if ( !(*ioActionFlags & kAudioUnitRenderAction_PostRender) ) {
-        return noErr;
-    }
-    
-    for ( int i=0; i<THIS->_outputCallbacks.count; i++ ) {
-        callback_t *callback = &THIS->_outputCallbacks.callbacks[i];
-        ((TPAudioControllerAudioCallback)callback->callback)(callback->userInfo, inTimeStamp, inNumberFrames, ioData);
-    }
-    
-    if ( THIS->_muteOutput ) {
-        for ( int i=0; i<ioData->mNumberBuffers; i++ ) {
-            memset(ioData->mBuffers[i].mData, 0, ioData->mBuffers[i].mDataByteSize);
+    } else if ( (*ioActionFlags & kAudioUnitRenderAction_PostRender) ) {
+        // After render
+        for ( int i=0; i<THIS->_outputCallbacks.count; i++ ) {
+            callback_t *callback = &THIS->_outputCallbacks.callbacks[i];
+            ((TPAudioControllerAudioCallback)callback->callback)(callback->userInfo, inTimeStamp, inNumberFrames, ioData);
+        }
+        
+        if ( THIS->_muteOutput ) {
+            for ( int i=0; i<ioData->mNumberBuffers; i++ ) {
+                memset(ioData->mBuffers[i].mData, 0, ioData->mBuffers[i].mDataByteSize);
+            }
         }
     }
     
@@ -358,7 +356,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
 
 #pragma mark - Setup and start/stop
 
-+ (AudioStreamBasicDescription)defaultAudioDescription {
++ (AudioStreamBasicDescription)interleaved16BitStereoAudioDescription {
     AudioStreamBasicDescription audioDescription;
     memset(&audioDescription, 0, sizeof(audioDescription));
     audioDescription.mFormatID          = kAudioFormatLinearPCM;
@@ -368,6 +366,34 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     audioDescription.mFramesPerPacket   = 1;
     audioDescription.mBytesPerFrame     = sizeof(SInt16)*audioDescription.mChannelsPerFrame;
     audioDescription.mBitsPerChannel    = 8 * sizeof(SInt16);
+    audioDescription.mSampleRate        = 44100.0;
+    return audioDescription;
+}
+
++ (AudioStreamBasicDescription)nonInterleaved16BitStereoAudioDescription {
+    AudioStreamBasicDescription audioDescription;
+    memset(&audioDescription, 0, sizeof(audioDescription));
+    audioDescription.mFormatID          = kAudioFormatLinearPCM;
+    audioDescription.mFormatFlags       = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked | kAudioFormatFlagsNativeEndian | kAudioFormatFlagIsNonInterleaved;
+    audioDescription.mChannelsPerFrame  = 2;
+    audioDescription.mBytesPerPacket    = sizeof(SInt16);
+    audioDescription.mFramesPerPacket   = 1;
+    audioDescription.mBytesPerFrame     = sizeof(SInt16);
+    audioDescription.mBitsPerChannel    = 8 * sizeof(SInt16);
+    audioDescription.mSampleRate        = 44100.0;
+    return audioDescription;
+}
+
++ (AudioStreamBasicDescription)audioUnitCanonicalAudioDescription {
+    AudioStreamBasicDescription audioDescription;
+    memset(&audioDescription, 0, sizeof(audioDescription));
+    audioDescription.mFormatID          = kAudioFormatLinearPCM;
+    audioDescription.mFormatFlags       = kAudioFormatFlagsAudioUnitCanonical;
+    audioDescription.mChannelsPerFrame  = 2;
+    audioDescription.mBytesPerPacket    = sizeof(AudioUnitSampleType);
+    audioDescription.mFramesPerPacket   = 1;
+    audioDescription.mBytesPerFrame     = sizeof(AudioUnitSampleType);
+    audioDescription.mBitsPerChannel    = 8 * sizeof(AudioUnitSampleType);
     audioDescription.mSampleRate        = 44100.0;
     return audioDescription;
 }
@@ -443,7 +469,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
 - (void)start {
     OSStatus result;
     
-    if ( !_audioSessionInitialised ) {
+    if ( !_audioSessionSetup ) {
         // Initialise the audio session
         result = AudioSessionInitialize(NULL, NULL, interruptionListener, self);
         if ( !checkResult(result, "AudioSessionInitialize") ) return;
@@ -465,7 +491,7 @@ static OSStatus outputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
         result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareSampleRate, sizeof(sampleRate), &sampleRate);
         checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareSampleRate)");
         
-        _audioSessionInitialised = YES;
+        _audioSessionSetup = YES;
     }
     
     // Determine if audio input is available, and the number of input channels available
@@ -1138,11 +1164,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
     // Get reference to input audio unit
     result = AUGraphNodeInfo(_audioGraph, _ioNode, NULL, &_ioAudioUnit);
     if ( !checkResult(result, "AUGraphNodeInfo") ) return NO;
-    
-    // Set stream format for outgoing audio
-    result = AudioUnitSetProperty(_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, kInputBus, &_audioDescription, sizeof(_audioDescription));
-    if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)") ) return NO;
-    
+
     if ( _enableInput ) {
         // Determine number of input channels
         AudioStreamBasicDescription inDesc;
@@ -1157,7 +1179,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
         }
         
         // Set input stream format
-        result = AudioUnitSetProperty(_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, kOutputBus, &_audioDescription, sizeof(_audioDescription));
+        result = AudioUnitSetProperty(_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, kInputBus, &_audioDescription, sizeof(_audioDescription));
         if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)") ) return NO;
         
         // Enable input
@@ -1179,11 +1201,14 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
             checkResult(result, "AudioUnitSetProperty(kAUVoiceIOProperty_VoiceProcessingQuality)");
         }
     }
-    
-    // Initialise and hook in the first mixer
+
+    // Initialise and hook in the main mixer
     [self initialiseChannelGroup:&_channels];
     result = AUGraphConnectNodeInput(_audioGraph, _channels.mixerNode, 0, _ioNode, 0);
     if ( !checkResult(result, "AUGraphConnectNodeInput") ) return NO;
+
+    // Register a callback to be notified when the main mixer unit renders
+    checkResult(AudioUnitAddRenderNotify(_channels.mixerAudioUnit, &outputCallback, self), "AudioUnitAddRenderNotify");
     
     // Initialize the graph
 	result = AUGraphInitialize(_audioGraph);
@@ -1238,7 +1263,14 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
     
 	// Set mixer's output stream format
     result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &_audioDescription, sizeof(_audioDescription));
-    if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)") ) return NO;
+    if ( result == kAudioUnitErr_FormatNotSupported ) {
+        // The mixer only supports a subset of formats. If it doesn't support this one, then we'll convert manually
+#if DEBUG
+        NSLog(@"Note: The AudioStreamBasicDescription you have provided is not natively supported by the iOS mixer unit. Use of filters and playback callbacks will result in use of audio converters.");
+#endif
+    } else {
+        checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
+    }
     
     // Set mixer's input stream format
     result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &_audioDescription, sizeof(_audioDescription));
@@ -1247,9 +1279,6 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
     // Set the mixer unit to handle up to 4096 samples per slice to keep rendering during screen lock
     UInt32 maxFPS = 4096;
     AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFPS, sizeof(maxFPS));
-    
-    // Register a callback to be notified when the mixer renders
-    checkResult(AudioUnitAddRenderNotify(group->mixerAudioUnit, &outputCallback, self), "AudioUnitAddRenderNotify");
 
     // Set bus count
 	UInt32 busCount = group->channelCount;

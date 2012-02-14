@@ -98,7 +98,7 @@
     UInt64 remainingFrames = fileLengthInFrames;
     char* audioDataPtr[bufferCount];
     audioDataPtr[0] = audioSamples;
-    for ( int i=1; i<bufferCount-1; i++ ) {
+    for ( int i=1; i<bufferCount; i++ ) {
         audioDataPtr[i] = audioDataPtr[i-1] + (fileLengthInFrames * audioDescription.mBytesPerFrame);
     }
     
@@ -108,6 +108,7 @@
     // Perform read in multiple small chunks (otherwise ExtAudioFileRead crashes when performing sample rate conversion)
     while ( remainingFrames > 0 ) {
         for ( int i=0; i<buffers.bufferList.mNumberBuffers; i++ ) {
+            buffers.bufferList.mBuffers[i].mNumberChannels = (audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? 1 : audioDescription.mChannelsPerFrame;
             buffers.bufferList.mBuffers[i].mData = audioDataPtr[i];
             buffers.bufferList.mBuffers[i].mDataByteSize = MIN(16384, remainingFrames * audioDescription.mBytesPerFrame);
         }
