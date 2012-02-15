@@ -65,6 +65,8 @@
     _loopsGroup = [_audioController createChannelGroup];
     [_audioController addChannels:[NSArray arrayWithObjects:_loop1, _loop2, _loop3, nil] toChannelGroup:_loopsGroup];
     
+    self.tableView.scrollEnabled = NO;
+    
     return self;
 }
 

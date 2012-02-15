@@ -54,29 +54,29 @@ void  TPACCircularBufferClear(TPACCircularBuffer *buffer);
 
 // Reading (consuming)
 
-static inline void* TPACCircularBufferTail(TPACCircularBuffer *buffer, int32_t* availableBytes) {
+static __inline__ __attribute__((always_inline)) void* TPACCircularBufferTail(TPACCircularBuffer *buffer, int32_t* availableBytes) {
     *availableBytes = buffer->fillCount;
     return (void*)((char*)buffer->buffer + buffer->tail);
 }
 
-static inline void TPACCircularBufferConsume(TPACCircularBuffer *buffer, int32_t amount) {
+static __inline__ __attribute__((always_inline)) void TPACCircularBufferConsume(TPACCircularBuffer *buffer, int32_t amount) {
     buffer->tail = (buffer->tail + amount) % buffer->length;
     OSAtomicAdd32Barrier(-amount, &buffer->fillCount);
 }
 
-static inline void* TPACCircularBufferHead(TPACCircularBuffer *buffer, int32_t* availableBytes) {
+static __inline__ __attribute__((always_inline)) void* TPACCircularBufferHead(TPACCircularBuffer *buffer, int32_t* availableBytes) {
     *availableBytes = (buffer->length - buffer->fillCount);
     return (void*)((char*)buffer->buffer + buffer->head);
 }
     
 // Writing (producing)
 
-static inline void TPACCircularBufferProduce(TPACCircularBuffer *buffer, int amount) {
+static __inline__ __attribute__((always_inline)) void TPACCircularBufferProduce(TPACCircularBuffer *buffer, int amount) {
     buffer->head = (buffer->head + amount) % buffer->length;
     OSAtomicAdd32Barrier(amount, &buffer->fillCount);
 }
 
-static inline int TPACCircularBufferProduceBytes(TPACCircularBuffer *buffer, const void* src, int32_t len) {
+static __inline__ __attribute__((always_inline)) int TPACCircularBufferProduceBytes(TPACCircularBuffer *buffer, const void* src, int32_t len) {
     int32_t space;
     void *ptr = TPACCircularBufferHead(buffer, &space);
     int copied = len > space ? space : len;

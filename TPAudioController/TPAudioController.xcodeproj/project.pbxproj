@@ -616,6 +616,7 @@
 				4C5C50EE14EA98EA0012D39E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		4C5C510014EA98F30012D39E /* Build configuration list for PBXNativeTarget "TPAudioControllerTrial" */ = {
 			isa = XCConfigurationList;
@@ -624,6 +625,7 @@
 				4C5C510214EA98F30012D39E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		4CAD2F8C14E9A3BF00656553 /* Build configuration list for PBXNativeTarget "Audio Controller Test Suite" */ = {
 			isa = XCConfigurationList;

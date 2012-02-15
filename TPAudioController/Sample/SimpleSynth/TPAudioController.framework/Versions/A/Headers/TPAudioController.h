@@ -302,6 +302,11 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
 - (void)removeChannels:(NSArray*)channels;
 
 /*!
+ * Obtain a list of all channels, across all channel groups
+ */
+- (NSArray*)channels;
+
+/*!
  * Create a channel group
  *
  *      Channel groups cause the channels within the group to be pre-mixed together, so that one filter
@@ -380,11 +385,43 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  */
 - (NSArray*)channelsInChannelGroup:(TPChannelGroup)group;
 
+/*!
+ * Set the volume level of a channel group
+ *
+ * @param volume    Group volume (0 - 1)
+ * @param group     Group identifier
+ */
+- (void)setVolume:(float)volume forChannelGroup:(TPChannelGroup)group;
+
+/*!
+ * Set the pan of a channel group
+ *
+ * @param pan       Group pan (-1.0, left to 1.0, right)
+ * @param group     Group identifier
+ */
+- (void)setPan:(float)pan forChannelGroup:(TPChannelGroup)group;
+
+/*!
+ * Set the mute status of a channel group
+ *
+ * @param muted     Whether group is muted
+ * @param group     Group identifier
+ */
+- (void)setMuted:(BOOL)muted forChannelGroup:(TPChannelGroup)group;
 
 #pragma mark - Filters
 
 /*! @methodgroup Filters */
 
+/*!
+ * Add an audio filter to the system output
+ *
+ *      Audio filters are used to process live audio before playback.
+ *
+ * @param callback A @link TPAudioControllerAudioCallback @/link callback to process audio
+ * @param userInfo An opaque pointer to be passed to the callback
+ */
+- (void)addFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo;
 
 /*!
  * Add an audio filter to a channel
@@ -406,26 +443,6 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
 - (void)addFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo toChannel:(id<TPAudioPlayable>)channel;
 
 /*!
- * Remove a filter from a channel
- *
- * @param callback The callback to remove
- * @param userInfo The opaque pointer that was passed when the callback was added
- * @param channel  The channel to stop filtering
- */
-- (void)removeFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channel;
-
-/*!
- * Get a list of all filters currently operating on the channel
- *
- *      This method returns an NSArray of NSDictionary elements, each containing
- *      a filter callback (kTPAudioControllerCallbackKey) and the corresponding userinfo
- *      (kTPAudioControllerUserInfoKey).
- *
- * @param channel Channel to get filters for
- */
-- (NSArray*)filtersForChannel:(id<TPAudioPlayable>)channel;
-
-/*!
  * Add an audio filter to a channel group
  *
  *      Audio filters are used to process live audio before playback.
@@ -440,6 +457,23 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
 - (void)addFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo toChannelGroup:(TPChannelGroup)group;
 
 /*!
+ * Remove a filter from system output
+ *
+ * @param callback The callback to remove
+ * @param userInfo The opaque pointer that was passed when the callback was added
+ */
+- (void)removeFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo;
+
+/*!
+ * Remove a filter from a channel
+ *
+ * @param callback The callback to remove
+ * @param userInfo The opaque pointer that was passed when the callback was added
+ * @param channel  The channel to stop filtering
+ */
+- (void)removeFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channel;
+
+/*!
  * Remove a filter from a channel group
  *
  * @param callback The callback to remove
@@ -447,6 +481,26 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  * @param group    The group to stop filtering
  */
 - (void)removeFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group;
+
+/*!
+ * Get a list of all top-level filters
+ *
+ *      This method returns an NSArray of NSDictionary elements, each containing
+ *      a filter callback (kTPAudioControllerCallbackKey) and the corresponding userinfo
+ *      (kTPAudioControllerUserInfoKey).
+ */
+- (NSArray*)filters;
+
+/*!
+ * Get a list of all filters currently operating on the channel
+ *
+ *      This method returns an NSArray of NSDictionary elements, each containing
+ *      a filter callback (kTPAudioControllerCallbackKey) and the corresponding userinfo
+ *      (kTPAudioControllerUserInfoKey).
+ *
+ * @param channel Channel to get filters for
+ */
+- (NSArray*)filtersForChannel:(id<TPAudioPlayable>)channel;
 
 /*!
  * Get a list of all filters currently operating on the channel group
@@ -459,9 +513,103 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  */
 - (NSArray*)filtersForChannelGroup:(TPChannelGroup)group;
 
-#pragma mark - Callbacks
+#pragma mark - Playback callbacks
 
-/*! @methodgroup Callbacks */
+/*! @methodgroup Playback callbacks */
+
+/*!
+ * Add a playback callback
+ *
+ *      Playback callbacks receive audio that is being played by the system.  Use this
+ *      method to add a callback to receive audio that consists of all the playing channels
+ *      mixed together.
+ *
+ * @param callback A @link TPAudioControllerAudioCallback @/link callback to receive audio
+ * @param userInfo An opaque pointer to be passed to the callback
+ */
+- (void)addPlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo;
+
+/*!
+ * Add a playback callback
+ *
+ *      Playback callbacks receive audio that is being played by the system.  Use this
+ *      method to add a callback to receive audio from a particular channel.
+ *
+ * @param callback A @link TPAudioControllerAudioCallback @/link callback to receive audio
+ * @param userInfo An opaque pointer to be passed to the callback
+ * @param channel  A channel
+ */
+- (void)addPlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo forChannel:(id<TPAudioPlayable>)channel;
+
+/*!
+ * Add a playback callback for a particular channel group
+ *
+ *      Playback callbacks receive audio that is being played by the system.  By registering
+ *      a callback for a particular channel group, you can receive the mixed audio of only that
+ *      group.
+ *
+ * @param callback A @link TPAudioControllerAudioCallback @/link callback to receive audio
+ * @param userInfo An opaque pointer to be passed to the callback
+ * @param group    A channel group identifier
+ */
+- (void)addPlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo forChannelGroup:(TPChannelGroup)group;
+
+/*!
+ * Remove a playback callback
+ *
+ * @param callback The callback to remove
+ * @param userInfo The opaque pointer that was passed when the callback was added
+ */
+- (void)removePlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo;
+
+/*!
+ * Remove a playback callback
+ *
+ * @param callback The callback to remove
+ * @param userInfo The opaque pointer that was passed when the callback was added
+ */
+- (void)removePlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channel;
+
+/*!
+ * Remove a playback callback from a particular channel group
+ *
+ * @param callback The callback to remove
+ * @param userInfo The opaque pointer that was passed when the callback was added
+ * @param group    A channel group identifier
+ */
+- (void)removePlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group;
+
+/*!
+ * Obtain a list of all top-level playback callbacks
+ *
+ *      This yields an NSArray of NSDictionary elements, each containing a callback
+ *      (kTPAudioControllerCallbackKey) and the corresponding userinfo (kTPAudioControllerUserInfoKey).
+ */
+- (NSArray*)playbackCallbacks;
+
+/*!
+ * Obtain a list of all playback callbacks for the specified channel
+ *
+ *      This yields an NSArray of NSDictionary elements, each containing a callback
+ *      (kTPAudioControllerCallbackKey) and the corresponding userinfo (kTPAudioControllerUserInfoKey).
+ *
+ * @param channel A channel
+ */
+- (NSArray*)playbackCallbacksForChannel:(id<TPAudioPlayable>)channel;
+
+/*!
+ * Obtain a list of all playback callbacks for the specified group
+ *
+ *      This yields an NSArray of NSDictionary elements, each containing a callback
+ *      (kTPAudioControllerCallbackKey) and the corresponding userinfo (kTPAudioControllerUserInfoKey).
+ *
+ * @param group A channel group identifier
+ */
+- (NSArray*)playbackCallbacksForChannelGroup:(TPChannelGroup)group;
+
+#pragma mark - Other callbacks
+
+/*! @methodgroup Other callbacks */
 
 /*!
  * Add a record callback
@@ -488,23 +636,12 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
 - (void)removeRecordCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo;
 
 /*!
- * Add a playback callback
+ * Obtain a list of all record callbacks
  *
- *      Playback callbacks receive audio that is being played by the system.  This is the outgoing
- *      audio that consists of all the playing channels mixed together.
- *
- * @param callback A @link TPAudioControllerAudioCallback @/link callback to receive audio
- * @param userInfo An opaque pointer to be passed to the callback
+ *      This yields an NSArray of NSDictionary elements, each containing a callback
+ *      (kTPAudioControllerCallbackKey) and the corresponding userinfo (kTPAudioControllerUserInfoKey).
  */
-- (void)addPlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo;
-
-/*!
- * Remove a playback callback
- *
- * @param callback The callback to remove
- * @param userInfo The opaque pointer that was passed when the callback was added
- */
-- (void)removePlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo;
+- (NSArray*)recordCallbacks;
 
 /*!
  * Add a timing callback
@@ -528,6 +665,14 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  * @param userInfo The opaque pointer that was passed when the callback was added
  */
 - (void)removeTimingCallback:(TPAudioControllerTimingCallback)callback userInfo:(void*)userInfo;
+
+/*!
+ * Obtain a list of all timing callbacks
+ *
+ *      This yields an NSArray of NSDictionary elements, each containing a callback
+ *      (TPAudioControllerTimingCallback) and the corresponding userinfo (kTPAudioControllerUserInfoKey).
+ */
+- (NSArray*)timingCallbacks;
 
 #pragma mark - Realtime/Main thread messaging system
 
@@ -681,35 +826,6 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
  *      Default is 0.005.
  */
 @property (nonatomic, assign) float preferredBufferDuration;
-
-/*!
- * Obtain a list of all current channels
- */
-@property (retain, readonly) NSArray *channels;
-
-/*!
- * Obtain a list of all record callbacks
- *
- *      This yields an NSArray of NSDictionary elements, each containing a filter callback
- *      (kTPAudioControllerCallbackKey) and the corresponding userinfo (kTPAudioControllerUserInfoKey).
- */
-@property (retain, readonly) NSArray *recordCallbacks;
-
-/*!
- * Obtain a list of all playback callbacks
- *
- *      This yields an NSArray of NSDictionary elements, each containing a filter callback
- *      (kTPAudioControllerCallbackKey) and the corresponding userinfo (kTPAudioControllerUserInfoKey).
- */
-@property (retain, readonly) NSArray *renderCallbacks;
-
-/*!
- * Obtain a list of all timing callbacks
- *
- *      This yields an NSArray of NSDictionary elements, each containing a filter callback
- *      (TPAudioControllerTimingCallback) and the corresponding userinfo (kTPAudioControllerUserInfoKey).
- */
-@property (retain, readonly) NSArray *timingCallbacks;
 
 /*!
  * Determine whether the audio engine is running
