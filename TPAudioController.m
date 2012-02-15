@@ -102,7 +102,6 @@ typedef struct _channel_group_t {
     char               *audioConverterScratchBuffer;
     AudioStreamBasicDescription audioConverterTargetFormat;
     AudioStreamBasicDescription audioConverterSourceFormat;
-    int                 filterCount;
     int                 graphState;
     float               volume;
     float               pan;
@@ -155,7 +154,7 @@ typedef struct _message_t {
 static void processPendingMessagesOnRealtimeThread(TPAudioController *THIS);
 
 - (BOOL)initialiseGroupChannel:(channel_t*)channel parentGroup:(TPChannelGroup)parentGroup indexInParent:(int)index;
-- (void)configureGraphStateOfGroupChannel:(channel_t*)channel usingCallbacks:(BOOL)callbacks filtering:(BOOL)filtering parentGroup:(TPChannelGroup)parentGroup indexInParent:(int)index;
+- (void)configureGraphStateOfGroupChannel:(channel_t*)channel parentGroup:(TPChannelGroup)parentGroup indexInParent:(int)index;
 - (void)configureChannelsInRange:(NSRange)range forGroup:(TPChannelGroup)group;
 - (TPChannelGroup)searchForGroupContainingChannelMatchingPtr:(void*)ptr userInfo:(void*)userInfo index:(int*)index;
 
@@ -165,9 +164,18 @@ static void updateInputDeviceStatus(TPAudioController *THIS);
 static long addCallbackToTable(TPAudioController *THIS, long *callbackTablePtr, long *callbackPtr, long *userInfoPtr, void* outPtr);
 static long removeCallbackFromTable(TPAudioController *THIS, long *callbackTablePtr, long *callbackPtr, long *userInfoPtr, void* outPtr);
 - (NSArray *)callbacksFromTable:(callback_table_t*)table matchingFlag:(uint8_t)flag;
+- (void)addCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannel:(id<TPAudioPlayable>)channelObj;
+- (void)addCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannelGroup:(TPChannelGroup)group;
+- (void)removeCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channelObj;
+- (void)removeCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group;
+- (NSArray*)callbacksWithFlags:(uint8_t)flags;
+- (NSArray*)callbacksWithFlags:(uint8_t)flags forChannel:(id<TPAudioPlayable>)channelObj;
+- (NSArray*)callbacksWithFlags:(uint8_t)flags forChannelGroup:(TPChannelGroup)group;
 
 - (void)releaseGroupResources:(TPChannelGroup)group freeGroupMemory:(BOOL)freeGroup;
 - (void)teardownGroup:(TPChannelGroup)group;
+
+static void handleCallbacksForChannel(channel_t *channel, const AudioTimeStamp *inTimeStamp, UInt32 inNumberFrames, AudioBufferList *ioData);
 @end
 
 @implementation TPAudioController
@@ -279,7 +287,11 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     TPAudioControllerRenderCallback callback = (TPAudioControllerRenderCallback) channel->ptr;
     id<TPAudioPlayable> channelObj = (id<TPAudioPlayable>) channel->userInfo;
     
-    return callback(channelObj, inTimeStamp, inNumberFrames, ioData);
+    OSStatus result = callback(channelObj, inTimeStamp, inNumberFrames, ioData);
+    
+    handleCallbacksForChannel(channel, inTimeStamp, inNumberFrames, ioData);
+    
+    return result;
 }
 
 static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
@@ -383,11 +395,7 @@ static OSStatus groupRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionF
             bufferList = ioData;
         }
         
-        // Now pass audio to callbacks
-        for ( int i=0; i<channel->callbacks.count; i++ ) {
-            callback_t *callback = &channel->callbacks.callbacks[i];
-            ((TPAudioControllerAudioCallback)callback->callback)(callback->userInfo, inTimeStamp, inNumberFrames, bufferList);
-        }
+        handleCallbacksForChannel(channel, inTimeStamp, inNumberFrames, bufferList);
     }
     
     return noErr;
@@ -421,7 +429,6 @@ static OSStatus groupRenderCallback(void *inRefCon, AudioUnitRenderActionFlags *
     OSStatus status = AudioUnitRender(group->mixerAudioUnit, ioActionFlags, inTimeStamp, 0, inNumberFrames, bufferList);
     
     if ( group->converterRequired ) {
-        
         // Perform conversion
         status = AudioConverterConvertComplexBuffer(group->audioConverter, inNumberFrames, bufferList, ioData);
         if ( !checkResult(status, "AudioConverterConvertComplexBuffer") ) {
@@ -429,12 +436,8 @@ static OSStatus groupRenderCallback(void *inRefCon, AudioUnitRenderActionFlags *
         }
     }
     
-    // Now pass audio to callbacks
-    for ( int i=0; i<channel->callbacks.count; i++ ) {
-        callback_t *callback = &channel->callbacks.callbacks[i];
-        ((TPAudioControllerAudioCallback)callback->callback)(callback->userInfo, inTimeStamp, inNumberFrames, ioData);
-    }
-    
+    handleCallbacksForChannel(channel, inTimeStamp, inNumberFrames, ioData);
+        
     return noErr;
 }
 
@@ -934,16 +937,15 @@ static long removeChannelsFromGroup(TPAudioController *THIS, long *matchingPtrAr
 #pragma mark - Filters
 
 - (void)addFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo {
-    [self addFilter:filter userInfo:userInfo toChannelGroup:&_channels];
+    [self addCallback:filter userInfo:userInfo flags:kCallbackIsFilterFlag forChannelGroup:&_channels];
 }
 
 - (void)addFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo toChannel:(id<TPAudioPlayable>)channel {
-    [self addPlaybackCallback:filter userInfo:userInfo forChannel:channel];
+    [self addCallback:filter userInfo:userInfo flags:kCallbackIsFilterFlag forChannel:channel];
 }
 
 - (void)addFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo toChannelGroup:(TPChannelGroup)group {
-    group->filterCount++;
-    [self addPlaybackCallback:filter userInfo:userInfo forChannelGroup:group];
+    [self addCallback:filter userInfo:userInfo flags:kCallbackIsFilterFlag forChannelGroup:group];
 }
 
 - (void)removeFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo {
@@ -951,145 +953,61 @@ static long removeChannelsFromGroup(TPAudioController *THIS, long *matchingPtrAr
 }
 
 - (void)removeFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channel {
-    [self removePlaybackCallback:filter userInfo:userInfo fromChannel:channel];
+    [self removeCallback:filter userInfo:userInfo fromChannel:channel];
 }
 
 - (void)removeFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group {
-    NSAssert(group->filterCount > 0, @"Removing filter that wasn't added");
-    group->filterCount--;
-    [self removePlaybackCallback:filter userInfo:userInfo fromChannelGroup:group];
+    [self removeCallback:filter userInfo:userInfo fromChannelGroup:group];
 }
 
 - (NSArray*)filters {
-    return [self callbacksFromTable:&_topLevelChannel.callbacks matchingFlag:kCallbackIsFilterFlag];
+    return [self callbacksWithFlags:kCallbackIsFilterFlag];
 }
 
-- (NSArray*)filtersForChannel:(id<TPAudioPlayable>)channelObj {
-    int index=0;
-    TPChannelGroup parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:channelObj index:&index];
-    NSAssert(parentGroup != NULL, @"Channel not found");
-    
-    channel_t *channel = &parentGroup->channels[index];
-    
-    return [self callbacksFromTable:&channel->callbacks matchingFlag:kCallbackIsFilterFlag];
+- (NSArray*)filtersForChannel:(id<TPAudioPlayable>)channel {
+    return [self callbacksWithFlags:kCallbackIsFilterFlag forChannel:channel];
 }
 
 - (NSArray*)filtersForChannelGroup:(TPChannelGroup)group {
-    channel_t *channel = NULL;
-    TPChannelGroup parentGroup = NULL;
-    int index = 0;
-    
-    if ( group == &_channels ) {
-        channel = &_topLevelChannel;
-    } else {
-        parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
-        NSAssert(parentGroup != NULL, @"Channel group not found");
-        channel = &parentGroup->channels[index];
-    }
-
-    return [self callbacksFromTable:&channel->callbacks matchingFlag:kCallbackIsFilterFlag];
+    return [self callbacksWithFlags:kCallbackIsFilterFlag forChannelGroup:group];
 }
 
 #pragma mark - Playback callbacks
 
 - (void)addPlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo {
-    [self addPlaybackCallback:callback userInfo:userInfo forChannelGroup:&_channels];
+    [self addCallback:callback userInfo:userInfo flags:kCallbackIsPlaybackCallbackFlag forChannelGroup:&_channels];
 }
 
-- (void)addPlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo forChannel:(id<TPAudioPlayable>)channelObj {
-    int index=0;
-    TPChannelGroup parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:channelObj index:&index];
-    NSAssert(parentGroup != NULL, @"Channel not found");
-    
-    channel_t *channel = &parentGroup->channels[index];
-    
-    [self performSynchronousMessageExchangeWithHandler:&addCallbackToTable parameter1:(long)callback parameter2:(long)userInfo parameter3:kCallbackIsPlaybackCallbackFlag ioOpaquePtr:&channel->callbacks];
+- (void)addPlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo forChannel:(id<TPAudioPlayable>)channel {
+    [self addCallback:callback userInfo:userInfo flags:kCallbackIsPlaybackCallbackFlag forChannel:channel];
 }
 
 - (void)addPlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo forChannelGroup:(TPChannelGroup)group {
-    channel_t *channel = NULL;
-    TPChannelGroup parentGroup = NULL;
-    int index=0;
-    
-    if ( group == &_channels ) {
-        channel = &_topLevelChannel;
-    } else {
-        parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
-        NSAssert(parentGroup != NULL, @"Channel group not found");
-        channel = &parentGroup->channels[index];
-    }
-    
-    if ( channel->callbacks.count == kMaximumCallbacksPerSource ) {
-        NSLog(@"Warning: Maximum number of callbacks reached");
-        return;
-    }
-    
-    [self performSynchronousMessageExchangeWithHandler:&addCallbackToTable parameter1:(long)callback parameter2:(long)userInfo parameter3:kCallbackIsPlaybackCallbackFlag ioOpaquePtr:&channel->callbacks];
-    
-    [self configureGraphStateOfGroupChannel:channel usingCallbacks:channel->callbacks.count > 0 filtering:group->filterCount > 0 parentGroup:parentGroup indexInParent:index];
+    [self addCallback:callback userInfo:userInfo flags:kCallbackIsPlaybackCallbackFlag forChannelGroup:group];
 }
 
 - (void)removePlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo {
-    [self removePlaybackCallback:callback userInfo:userInfo fromChannelGroup:&_channels];
+    [self removeCallback:callback userInfo:userInfo fromChannelGroup:&_channels];
 }
 
-- (void)removePlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channelObj {
-    int index=0;
-    TPChannelGroup parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:channelObj index:&index];
-    NSAssert(parentGroup != NULL, @"Channel not found");
-    
-    channel_t *channel = &parentGroup->channels[index];
-    
-    [self performSynchronousMessageExchangeWithHandler:&removeCallbackFromTable parameter1:(long)callback parameter2:(long)userInfo parameter3:0 ioOpaquePtr:&channel->callbacks];
+- (void)removePlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channel {
+    [self removeCallback:callback userInfo:userInfo fromChannel:channel];
 }
 
 - (void)removePlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group {
-    channel_t *channel = NULL;
-    TPChannelGroup parentGroup = NULL;
-    int index = 0;
-    
-    if ( group == &_channels ) {
-        channel = &_topLevelChannel;
-    } else {
-        parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
-        NSAssert(parentGroup != NULL, @"Channel group not found");
-        channel = &parentGroup->channels[index];
-    }
-    
-    [self performSynchronousMessageExchangeWithHandler:&removeCallbackFromTable parameter1:(long)callback parameter2:(long)userInfo parameter3:0 ioOpaquePtr:&channel->callbacks];
-    
-    [self configureGraphStateOfGroupChannel:channel usingCallbacks:channel->callbacks.count > 0 filtering:group->filterCount > 0 parentGroup:parentGroup indexInParent:index];
+    [self removeCallback:callback userInfo:userInfo fromChannelGroup:group];
 }
-
 
 - (NSArray*)playbackCallbacks {
-    return [self callbacksFromTable:&_topLevelChannel.callbacks matchingFlag:kCallbackIsPlaybackCallbackFlag];
+    return [self callbacksWithFlags:kCallbackIsPlaybackCallbackFlag];
 }
 
-- (NSArray*)playbackCallbacksForChannel:(id<TPAudioPlayable>)channelObj {
-    int index=0;
-    TPChannelGroup parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:channelObj index:&index];
-    NSAssert(parentGroup != NULL, @"Channel not found");
-    
-    channel_t *channel = &parentGroup->channels[index];
-    
-    return [self callbacksFromTable:&channel->callbacks matchingFlag:kCallbackIsPlaybackCallbackFlag];
+- (NSArray*)playbackCallbacksForChannel:(id<TPAudioPlayable>)channel {
+    return [self callbacksWithFlags:kCallbackIsPlaybackCallbackFlag forChannel:channel];
 }
 
 - (NSArray*)playbackCallbacksForChannelGroup:(TPChannelGroup)group {
-    channel_t *channel = NULL;
-    TPChannelGroup parentGroup = NULL;
-    int index = 0;
-    
-    if ( group == &_channels ) {
-        channel = &_topLevelChannel;
-    } else {
-        parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
-        NSAssert(parentGroup != NULL, @"Channel group not found");
-        channel = &parentGroup->channels[index];
-    }
-    
-    return [self callbacksFromTable:&channel->callbacks matchingFlag:kCallbackIsPlaybackCallbackFlag];
+    return [self callbacksWithFlags:kCallbackIsPlaybackCallbackFlag forChannelGroup:group];
 }
 
 #pragma mark - Other callbacks
@@ -1348,7 +1266,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
         group->channels[index].playing = value;
         
     }  else if ( [keyPath isEqualToString:@"muted"] ) {
-        AudioUnitParameterValue value = channel.playing && !channel.muted;
+        AudioUnitParameterValue value = ([channel respondsToSelector:@selector(playing)] ? channel.playing : YES) && !channel.muted;
         OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
         checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
         
@@ -1535,7 +1453,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
     if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) return NO;
     
     // Configure graph state
-    [self configureGraphStateOfGroupChannel:channel usingCallbacks:channel->callbacks.count > 0 filtering:group->filterCount > 0 parentGroup:parentGroup indexInParent:index];
+    [self configureGraphStateOfGroupChannel:channel parentGroup:parentGroup indexInParent:index];
     
     // Configure inputs
     [self configureChannelsInRange:NSMakeRange(0, busCount) forGroup:group];
@@ -1543,12 +1461,21 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
     return YES;
 }
 
-- (void)configureGraphStateOfGroupChannel:(channel_t*)channel usingCallbacks:(BOOL)callbacks filtering:(BOOL)filtering parentGroup:(TPChannelGroup)parentGroup indexInParent:(int)index {
+- (void)configureGraphStateOfGroupChannel:(channel_t*)channel parentGroup:(TPChannelGroup)parentGroup indexInParent:(int)index {
     TPChannelGroup group = (TPChannelGroup)channel->ptr;
+    
+    BOOL playbackCallbacks=NO, filters=NO;
+    for ( int i=0; i<channel->callbacks.count && (!playbackCallbacks || !filters); i++ ) {
+        if ( channel->callbacks.callbacks[i].flags & kCallbackIsFilterFlag ) {
+            filters = YES;
+        } else if ( channel->callbacks.callbacks[i].flags & kCallbackIsPlaybackCallbackFlag ) {
+            playbackCallbacks = YES;
+        }
+    }
     
     BOOL updateGraph = NO;
     
-    if ( (callbacks || filtering) && group->converterRequired && !group->audioConverter ) {
+    if ( (playbackCallbacks || filters) && group->converterRequired && !group->audioConverter ) {
         // Initialise audio converter if necessary
         
         // Get mixer's output stream format
@@ -1575,7 +1502,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
         group->audioConverterScratchBuffer = _renderConversionScratchBuffer;
     }
     
-    if ( filtering ) {
+    if ( filters ) {
         // We need to use our own render callback, because the audio will be being converted and modified
         if ( group->graphState & kGroupGraphStateNodeConnected ) {
             // Remove the node connection
@@ -1627,7 +1554,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
             }
         }
         
-        if ( callbacks ) {
+        if ( playbackCallbacks ) {
             // We need to register a callback to be notified when the mixer renders, to pass on the audio
             if ( !(group->graphState & kGroupGraphStateRenderNotificationSet) ) {
                 // Remove render notification callback
@@ -1647,7 +1574,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
     
     if ( updateGraph ) [self updateGraph];
     
-    if ( !callbacks && !filtering && group->audioConverter ) {
+    if ( !playbackCallbacks && !filters && group->audioConverter ) {
         // Cleanup audio converter
         
         // Sync first, to wait until end of the current render, whereupon any changes we just made will be applied
@@ -1821,6 +1748,7 @@ static long addCallbackToTable(TPAudioController *THIS, long *callbackPtr, long 
     
     table->callbacks[table->count].callback = (void*)*callbackPtr;
     table->callbacks[table->count].userInfo = (void*)*userInfoPtr;
+    table->callbacks[table->count].flags = (uint8_t)*flags;
     table->count++;
     
     return table->count;
@@ -1861,6 +1789,98 @@ static long removeCallbackFromTable(TPAudioController *THIS, long *callbackPtr, 
     return result;
 }
 
+- (void)addCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannel:(id<TPAudioPlayable>)channelObj {
+    int index=0;
+    TPChannelGroup parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:channelObj index:&index];
+    NSAssert(parentGroup != NULL, @"Channel not found");
+    
+    channel_t *channel = &parentGroup->channels[index];
+    
+    [self performSynchronousMessageExchangeWithHandler:&addCallbackToTable parameter1:(long)callback parameter2:(long)userInfo parameter3:flags ioOpaquePtr:&channel->callbacks];
+}
+
+- (void)addCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannelGroup:(TPChannelGroup)group {
+    channel_t *channel = NULL;
+    TPChannelGroup parentGroup = NULL;
+    int index=0;
+    
+    if ( group == &_channels ) {
+        channel = &_topLevelChannel;
+    } else {
+        parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
+        NSAssert(parentGroup != NULL, @"Channel group not found");
+        channel = &parentGroup->channels[index];
+    }
+    
+    if ( channel->callbacks.count == kMaximumCallbacksPerSource ) {
+        NSLog(@"Warning: Maximum number of callbacks reached");
+        return;
+    }
+    
+    [self performSynchronousMessageExchangeWithHandler:&addCallbackToTable parameter1:(long)callback parameter2:(long)userInfo parameter3:flags ioOpaquePtr:&channel->callbacks];
+    
+    [self configureGraphStateOfGroupChannel:channel parentGroup:parentGroup indexInParent:index];
+}
+
+- (void)removeCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channelObj {
+    int index=0;
+    TPChannelGroup parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:channelObj index:&index];
+    NSAssert(parentGroup != NULL, @"Channel not found");
+    
+    channel_t *channel = &parentGroup->channels[index];
+    
+    [self performSynchronousMessageExchangeWithHandler:&removeCallbackFromTable parameter1:(long)callback parameter2:(long)userInfo parameter3:0 ioOpaquePtr:&channel->callbacks];
+}
+
+- (void)removeCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group {
+    channel_t *channel = NULL;
+    TPChannelGroup parentGroup = NULL;
+    int index = 0;
+    
+    if ( group == &_channels ) {
+        channel = &_topLevelChannel;
+    } else {
+        parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
+        NSAssert(parentGroup != NULL, @"Channel group not found");
+        channel = &parentGroup->channels[index];
+    }
+    
+    [self performSynchronousMessageExchangeWithHandler:&removeCallbackFromTable parameter1:(long)callback parameter2:(long)userInfo parameter3:0 ioOpaquePtr:&channel->callbacks];
+    
+    [self configureGraphStateOfGroupChannel:channel parentGroup:parentGroup indexInParent:index];
+}
+
+- (NSArray*)callbacksWithFlags:(uint8_t)flags {
+    return [self callbacksFromTable:&_topLevelChannel.callbacks matchingFlag:flags];
+}
+
+- (NSArray*)callbacksWithFlags:(uint8_t)flags forChannel:(id<TPAudioPlayable>)channelObj {
+    int index=0;
+    TPChannelGroup parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:channelObj index:&index];
+    NSAssert(parentGroup != NULL, @"Channel not found");
+    
+    channel_t *channel = &parentGroup->channels[index];
+    
+    return [self callbacksFromTable:&channel->callbacks matchingFlag:flags];
+}
+
+- (NSArray*)callbacksWithFlags:(uint8_t)flags forChannelGroup:(TPChannelGroup)group {
+    channel_t *channel = NULL;
+    TPChannelGroup parentGroup = NULL;
+    int index = 0;
+    
+    if ( group == &_channels ) {
+        channel = &_topLevelChannel;
+    } else {
+        parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
+        NSAssert(parentGroup != NULL, @"Channel group not found");
+        channel = &parentGroup->channels[index];
+    }
+    
+    return [self callbacksFromTable:&channel->callbacks matchingFlag:flags];
+}
+
+
 - (void)releaseGroupResources:(TPChannelGroup)group freeGroupMemory:(BOOL)freeGroup {
     if ( group->audioConverter ) {
         checkResult(AudioConverterDispose(group->audioConverter), "AudioConverterDispose");
@@ -1885,6 +1905,25 @@ static long removeCallbackFromTable(TPAudioController *THIS, long *callbackPtr, 
         channel_t* channel = &group->channels[i];
         if ( channel->type == kChannelTypeGroup ) {
             [self teardownGroup:(TPChannelGroup)channel->ptr];
+        }
+    }
+}
+
+static void handleCallbacksForChannel(channel_t *channel, const AudioTimeStamp *inTimeStamp, UInt32 inNumberFrames, AudioBufferList *ioData) {
+    
+    // Pass audio to filters
+    for ( int i=0; i<channel->callbacks.count; i++ ) {
+        callback_t *callback = &channel->callbacks.callbacks[i];
+        if ( callback->flags & kCallbackIsFilterFlag ) {
+            ((TPAudioControllerAudioCallback)callback->callback)(callback->userInfo, inTimeStamp, inNumberFrames, ioData);
+        }
+    }
+    
+    // And finally pass to playback callbacks
+    for ( int i=0; i<channel->callbacks.count; i++ ) {
+        callback_t *callback = &channel->callbacks.callbacks[i];
+        if ( callback->flags & kCallbackIsPlaybackCallbackFlag ) {
+            ((TPAudioControllerAudioCallback)callback->callback)(callback->userInfo, inTimeStamp, inNumberFrames, ioData);
         }
     }
 }
