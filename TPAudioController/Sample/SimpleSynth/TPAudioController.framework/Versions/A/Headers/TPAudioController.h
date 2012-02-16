@@ -821,7 +821,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
  *
  *      Set this to low values for better latency, but more processing overhead, or higher
  *      values for greater latency with lower processing overhead.  This parameter affects
- *      the length of the audio buffers received by the various callbacks and callbacks.
+ *      the length of the audio buffers received by the various callbacks.
  *
  *      Default is 0.005.
  */
@@ -849,7 +849,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
 @property (nonatomic, readonly) BOOL audioInputAvailable;
 
 /*!
- * The number of audio channels than the current audio input device provides
+ * The number of audio channels that the current audio input device provides
  *
  *      Note: This property is observable
  */

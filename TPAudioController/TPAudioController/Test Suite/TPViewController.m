@@ -274,7 +274,8 @@
 
 - (void)filterSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
-        self.filter = [[[TPConvolutionFilter alloc] initWithAudioController:_audioController filter:[TPConvolutionFilter filterFromAudioFile:[[NSBundle mainBundle] URLForResource:@"Factory Hall" withExtension:@"wav"] scale:15.0 error:NULL]] autorelease];
+        self.filter = [[[TPConvolutionFilter alloc] initWithAudioController:_audioController filter:[TPConvolutionFilter filterFromAudioFile:[[NSBundle mainBundle] URLForResource:@"Factory Hall" withExtension:@"wav"] scale:5.0 error:NULL]] autorelease];
+        _filter.stereo = NO;
         [_audioController addFilter:_filter.callback userInfo:_filter];
     } else {
         [_audioController removeFilter:_filter.callback userInfo:_filter];

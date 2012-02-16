@@ -11,7 +11,7 @@
 
 #define kTwoChannelsPerFrame 2
 #define kProcessingBlockSize 1024
-#define kMaxFilterLength 12000
+#define kMaxFilterLength 2048
 
 
 #define checkStatus(status) \

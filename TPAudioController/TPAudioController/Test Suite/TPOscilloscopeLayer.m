@@ -8,12 +8,14 @@
 
 #import "TPOscilloscopeLayer.h"
 #import <TPAudioController/TPAudioController.h>
+#import <Accelerate/Accelerate.h>
 
-#define kBufferLength 256 // In frames; higher values mean oscilloscope spans more time
+#define kBufferLength 128 // In frames; higher values mean oscilloscope spans more time
 
 @interface TPOscilloscopeLayer () {
     id           _timer;
     SInt16      *_buffer;
+    float       *_scratchBuffer;
     NSUInteger   _buffer_head;
 }
 @end
@@ -27,6 +29,7 @@ static void audioCallback(void *THIS, const AudioTimeStamp *time, UInt32 frames,
     if ( !(self = [super init]) ) return nil;
 
     _buffer = (SInt16*)calloc(kBufferLength, sizeof(SInt16));
+    _scratchBuffer = (float*)malloc(kBufferLength * sizeof(float) * 2);
     self.contentsScale = [[UIScreen mainScreen] scale];
     self.lineColor = [UIColor blackColor];
     
@@ -71,17 +74,33 @@ static void audioCallback(void *THIS, const AudioTimeStamp *time, UInt32 frames,
     CGContextSetLineWidth(ctx, 2);
     CGContextSetStrokeColorWithColor(ctx, [_lineColor CGColor]);
 
-    CGFloat multiplier = self.bounds.size.height / (INT16_MAX-INT16_MIN);
-    CGFloat midpoint = self.bounds.size.height / 2.0;
-    CGFloat xIncrement = self.bounds.size.width / kBufferLength;
-    CGFloat x = 0;
-
-    // Draw each point, evenly spaced along the x axis, and offset from the midpoint along the y axis by each sample
+    float multiplier = self.bounds.size.height / (INT16_MAX-INT16_MIN);
+    float midpoint = self.bounds.size.height / 2.0;
+    float xIncrement = self.bounds.size.width / kBufferLength;
+    
+    // Render in contiguous segments, wrapping around if necessary
+    int remainingFrames = kBufferLength-1;
+    int tail = (_buffer_head+1) % kBufferLength;
+    float x = 0;
+    
     CGContextBeginPath(ctx);
-    CGContextMoveToPoint(ctx, 0, midpoint + multiplier * _buffer[_buffer_head]);
-    for ( int i=1, j=(_buffer_head+1)%kBufferLength; i<kBufferLength; i++, j=(j+1)%kBufferLength, x += xIncrement ) {
-        CGContextAddLineToPoint(ctx, x, midpoint + multiplier*_buffer[j]);
+
+    while ( remainingFrames > 0 ) {
+        int framesToRender = MIN(remainingFrames, kBufferLength - _buffer_head);
+        
+        vDSP_vramp(&x, &xIncrement, _scratchBuffer, 2, framesToRender);
+        vDSP_vflt16(&_buffer[tail], 1, _scratchBuffer+1, 2, framesToRender);
+        vDSP_vsmul(_scratchBuffer+1, 2, &multiplier, _scratchBuffer+1, 2, framesToRender);
+        vDSP_vsadd(_scratchBuffer+1, 2, &midpoint, _scratchBuffer+1, 2, framesToRender);
+        
+        CGContextAddLines(ctx, (CGPoint*)_scratchBuffer, framesToRender);
+        
+        x += framesToRender*xIncrement;
+        tail += framesToRender;
+        if ( tail == kBufferLength ) tail = 0;
+        remainingFrames -= framesToRender;
     }
+    
     CGContextStrokePath(ctx);
 }
 
