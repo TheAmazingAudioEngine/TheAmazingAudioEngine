@@ -145,7 +145,7 @@ typedef enum {
  *
  *      This callback used to notify you when the system time advances.  When called
  *      from an input context, it occurs before any input callback calls are performed.
- *      When called from an output context, it occurs before any playback callbacks are
+ *      When called from an output context, it occurs before any output callbacks are
  *      performed.
  *      Do not wait on locks, allocate memory, or call any Objective-C or BSD code.
  *
@@ -161,7 +161,7 @@ typedef OSStatus (*TPAudioControllerTimingCallback) (void                     *u
 /*! 
  * Callback key
  *
- *      Used when returning lists of callbacks (see for example @link recordCallbacks @/link). 
+ *      Used when returning lists of callbacks (see for example @link inputCallbacks @/link). 
  *      This is an NSValue containing a pointer.
  */
 extern const NSString *kTPAudioControllerCallbackKey;
@@ -169,7 +169,7 @@ extern const NSString *kTPAudioControllerCallbackKey;
 /*! 
  * User info key
  *
- *      Used when returning lists of callbacks (see for example @link recordCallbacks @/link). 
+ *      Used when returning lists of callbacks (see for example @link inputCallbacks @/link). 
  *      This is an NSValue containing a pointer.
  */
 extern const NSString *kTPAudioControllerUserInfoKey;
@@ -195,7 +195,7 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  *
  *      1. Initialise, with the desired audio format
  *      2. Set required parameters
- *      3. Add channels, record callbacks, playback callbacks, timing callbacks and filters, as required.
+ *      3. Add channels, input callbacks, output callbacks, timing callbacks and filters, as required.
  *         Note that all these can be added/removed during operation as well.
  *      4. Call @link start @/link to begin processing audio.
  *      
@@ -513,38 +513,38 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  */
 - (NSArray*)filtersForChannelGroup:(TPChannelGroup)group;
 
-#pragma mark - Playback callbacks
+#pragma mark - Output callbacks
 
-/*! @methodgroup Playback callbacks */
+/*! @methodgroup Output callbacks */
 
 /*!
- * Add a playback callback
+ * Add a output callback
  *
- *      Playback callbacks receive audio that is being played by the system.  Use this
+ *      Output callbacks receive audio that is being played by the system.  Use this
  *      method to add a callback to receive audio that consists of all the playing channels
  *      mixed together.
  *
  * @param callback A @link TPAudioControllerAudioCallback @/link callback to receive audio
  * @param userInfo An opaque pointer to be passed to the callback
  */
-- (void)addPlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo;
+- (void)addOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo;
 
 /*!
- * Add a playback callback
+ * Add a output callback
  *
- *      Playback callbacks receive audio that is being played by the system.  Use this
+ *      Output callbacks receive audio that is being played by the system.  Use this
  *      method to add a callback to receive audio from a particular channel.
  *
  * @param callback A @link TPAudioControllerAudioCallback @/link callback to receive audio
  * @param userInfo An opaque pointer to be passed to the callback
  * @param channel  A channel
  */
-- (void)addPlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo forChannel:(id<TPAudioPlayable>)channel;
+- (void)addOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo forChannel:(id<TPAudioPlayable>)channel;
 
 /*!
- * Add a playback callback for a particular channel group
+ * Add a output callback for a particular channel group
  *
- *      Playback callbacks receive audio that is being played by the system.  By registering
+ *      Output callbacks receive audio that is being played by the system.  By registering
  *      a callback for a particular channel group, you can receive the mixed audio of only that
  *      group.
  *
@@ -552,69 +552,69 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  * @param userInfo An opaque pointer to be passed to the callback
  * @param group    A channel group identifier
  */
-- (void)addPlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo forChannelGroup:(TPChannelGroup)group;
+- (void)addOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo forChannelGroup:(TPChannelGroup)group;
 
 /*!
- * Remove a playback callback
+ * Remove a output callback
  *
  * @param callback The callback to remove
  * @param userInfo The opaque pointer that was passed when the callback was added
  */
-- (void)removePlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo;
+- (void)removeOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo;
 
 /*!
- * Remove a playback callback
+ * Remove a output callback
  *
  * @param callback The callback to remove
  * @param userInfo The opaque pointer that was passed when the callback was added
  */
-- (void)removePlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channel;
+- (void)removeOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channel;
 
 /*!
- * Remove a playback callback from a particular channel group
+ * Remove a output callback from a particular channel group
  *
  * @param callback The callback to remove
  * @param userInfo The opaque pointer that was passed when the callback was added
  * @param group    A channel group identifier
  */
-- (void)removePlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group;
+- (void)removeOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group;
 
 /*!
- * Obtain a list of all top-level playback callbacks
+ * Obtain a list of all top-level output callbacks
  *
  *      This yields an NSArray of NSDictionary elements, each containing a callback
  *      (kTPAudioControllerCallbackKey) and the corresponding userinfo (kTPAudioControllerUserInfoKey).
  */
-- (NSArray*)playbackCallbacks;
+- (NSArray*)outputCallbacks;
 
 /*!
- * Obtain a list of all playback callbacks for the specified channel
+ * Obtain a list of all output callbacks for the specified channel
  *
  *      This yields an NSArray of NSDictionary elements, each containing a callback
  *      (kTPAudioControllerCallbackKey) and the corresponding userinfo (kTPAudioControllerUserInfoKey).
  *
  * @param channel A channel
  */
-- (NSArray*)playbackCallbacksForChannel:(id<TPAudioPlayable>)channel;
+- (NSArray*)outputCallbacksForChannel:(id<TPAudioPlayable>)channel;
 
 /*!
- * Obtain a list of all playback callbacks for the specified group
+ * Obtain a list of all output callbacks for the specified group
  *
  *      This yields an NSArray of NSDictionary elements, each containing a callback
  *      (kTPAudioControllerCallbackKey) and the corresponding userinfo (kTPAudioControllerUserInfoKey).
  *
  * @param group A channel group identifier
  */
-- (NSArray*)playbackCallbacksForChannelGroup:(TPChannelGroup)group;
+- (NSArray*)outputCallbacksForChannelGroup:(TPChannelGroup)group;
 
 #pragma mark - Other callbacks
 
 /*! @methodgroup Other callbacks */
 
 /*!
- * Add a record callback
+ * Add a input callback
  *
- *      Record callbacks receive audio that is being received by the microphone or another input device.
+ *      Input callbacks receive audio that is being received by the microphone or another input device.
  *
  *      Note that if the @link receiveMonoInputAsBridgedStereo @/link property is set to YES, then incoming
  *      audio may be mono. Check the audio buffer list parameters to determine the kind of audio you are
@@ -625,30 +625,30 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  * @param userInfo An opaque pointer to be passed to the callback
  */
 
-- (void)addRecordCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo;
+- (void)addInputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo;
 
 /*!
- * Remove a record callback
+ * Remove a input callback
  *
  * @param callback The callback to remove
  * @param userInfo The opaque pointer that was passed when the callback was added
  */
-- (void)removeRecordCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo;
+- (void)removeInputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo;
 
 /*!
- * Obtain a list of all record callbacks
+ * Obtain a list of all input callbacks
  *
  *      This yields an NSArray of NSDictionary elements, each containing a callback
  *      (kTPAudioControllerCallbackKey) and the corresponding userinfo (kTPAudioControllerUserInfoKey).
  */
-- (NSArray*)recordCallbacks;
+- (NSArray*)inputCallbacks;
 
 /*!
  * Add a timing callback
  *
  *      Timing callbacks receive notifications for when time has advanced.  When called
  *      from an input context, the call occurs before any input callback calls are performed.
- *      When called from an output context, it occurs before any playback callbacks are
+ *      When called from an output context, it occurs before any output callbacks are
  *      performed.
  *
  *      This mechanism can be used to trigger time-dependent events.
@@ -770,7 +770,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
  * Mute output
  *
  *      Set to YES to mute all system output. Note that even if this is YES, playback
- *      callbacks will still receive audio, as the silencing happens after playback callback
+ *      callbacks will still receive audio, as the silencing happens after output callback
  *      callbacks are called.
  */
 @property (nonatomic, assign) BOOL muteOutput;
@@ -807,10 +807,10 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
  * Whether to receive audio input from mono devices as bridged stereo
  *
  *      If you are using a stereo audio format, setting this to YES causes audio input
- *      from mono input devices to be received by record callbacks as bridged stereo audio.
+ *      from mono input devices to be received by input callbacks as bridged stereo audio.
  *      Otherwise, audio will be received as mono audio.
  *
- *      See also discussion of @link addRecordCallback:userInfo: @/link.
+ *      See also discussion of @link addInputCallback:userInfo: @/link.
  *
  *      Default is YES.
  */

@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4C12E4D614ED0822002BF07A /* Factory Hall.wav in Resources */ = {isa = PBXBuildFile; fileRef = 4C12E4D514ED0822002BF07A /* Factory Hall.wav */; };
+		4C12E4DC14ED082D002BF07A /* TPBlockLevelFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C12E4D914ED082D002BF07A /* TPBlockLevelFilter.m */; };
+		4C12E4DD14ED082D002BF07A /* TPConvolutionFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C12E4DB14ED082D002BF07A /* TPConvolutionFilter.m */; };
+		4C12E4E014ED094B002BF07A /* TPCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C12E4DE14ED094B002BF07A /* TPCircularBuffer.c */; };
+		4C12E4E214ED0962002BF07A /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C12E4E114ED0962002BF07A /* Accelerate.framework */; };
 		4C34874D14E9A7EB00301A09 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C34874C14E9A7EB00301A09 /* AudioToolbox.framework */; };
 		4C34877314E9B7A400301A09 /* caitlin.caf in Resources */ = {isa = PBXBuildFile; fileRef = 4C34877114E9B7A400301A09 /* caitlin.caf */; };
 		4C34877414E9B7A400301A09 /* congaloop.caf in Resources */ = {isa = PBXBuildFile; fileRef = 4C34877214E9B7A400301A09 /* congaloop.caf */; };
@@ -42,6 +47,14 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		4C12E4D514ED0822002BF07A /* Factory Hall.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = "Factory Hall.wav"; path = "TPAudioController/Test Suite/Factory Hall.wav"; sourceTree = SOURCE_ROOT; };
+		4C12E4D814ED082D002BF07A /* TPBlockLevelFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TPBlockLevelFilter.h; path = "TPAudioController/Test Suite/TPBlockLevelFilter.h"; sourceTree = SOURCE_ROOT; };
+		4C12E4D914ED082D002BF07A /* TPBlockLevelFilter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = TPBlockLevelFilter.m; path = "TPAudioController/Test Suite/TPBlockLevelFilter.m"; sourceTree = SOURCE_ROOT; };
+		4C12E4DA14ED082D002BF07A /* TPConvolutionFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TPConvolutionFilter.h; path = "TPAudioController/Test Suite/TPConvolutionFilter.h"; sourceTree = SOURCE_ROOT; };
+		4C12E4DB14ED082D002BF07A /* TPConvolutionFilter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = TPConvolutionFilter.m; path = "TPAudioController/Test Suite/TPConvolutionFilter.m"; sourceTree = SOURCE_ROOT; };
+		4C12E4DE14ED094B002BF07A /* TPCircularBuffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = TPCircularBuffer.c; path = "TPAudioController/Test Suite/TPCircularBuffer.c"; sourceTree = SOURCE_ROOT; };
+		4C12E4DF14ED094B002BF07A /* TPCircularBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TPCircularBuffer.h; path = "TPAudioController/Test Suite/TPCircularBuffer.h"; sourceTree = SOURCE_ROOT; };
+		4C12E4E114ED0962002BF07A /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
 		4C34874714E9A71700301A09 /* TPAudioControllerTrial-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "TPAudioControllerTrial-Info.plist"; sourceTree = "<group>"; };
 		4C34874814E9A71700301A09 /* TPAudioControllerTrial-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TPAudioControllerTrial-Prefix.pch"; sourceTree = "<group>"; };
 		4C34874C14E9A7EB00301A09 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
@@ -96,6 +109,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4C12E4E214ED0962002BF07A /* Accelerate.framework in Frameworks */,
 				4C5C511F14EAA39D0012D39E /* QuartzCore.framework in Frameworks */,
 				4C5C511714EA9CC50012D39E /* TPAudioController.framework in Frameworks */,
 				4C34874D14E9A7EB00301A09 /* AudioToolbox.framework in Frameworks */,
@@ -115,6 +129,7 @@
 				4C34877114E9B7A400301A09 /* caitlin.caf */,
 				4C34877214E9B7A400301A09 /* congaloop.caf */,
 				4C34877A14EA841000301A09 /* lead.aif */,
+				4C12E4D514ED0822002BF07A /* Factory Hall.wav */,
 			);
 			name = Resources;
 			sourceTree = "<group>";
@@ -122,6 +137,7 @@
 		4CAD2F6E14E9A3BF00656553 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				4C12E4E114ED0962002BF07A /* Accelerate.framework */,
 				4C5C511E14EAA39D0012D39E /* QuartzCore.framework */,
 				4C34874C14E9A7EB00301A09 /* AudioToolbox.framework */,
 				4CAD2F6F14E9A3BF00656553 /* UIKit.framework */,
@@ -143,6 +159,12 @@
 				4C34877614E9B8CA00301A09 /* TPAudioFilePlayer.m */,
 				4C5C511814EA9D790012D39E /* TPOscilloscopeLayer.h */,
 				4C5C511914EA9D790012D39E /* TPOscilloscopeLayer.m */,
+				4C12E4D814ED082D002BF07A /* TPBlockLevelFilter.h */,
+				4C12E4D914ED082D002BF07A /* TPBlockLevelFilter.m */,
+				4C12E4DA14ED082D002BF07A /* TPConvolutionFilter.h */,
+				4C12E4DB14ED082D002BF07A /* TPConvolutionFilter.m */,
+				4C12E4DE14ED094B002BF07A /* TPCircularBuffer.c */,
+				4C12E4DF14ED094B002BF07A /* TPCircularBuffer.h */,
 				4C34877014E9B79300301A09 /* Resources */,
 				4CAD2F7614E9A3BF00656553 /* Supporting Files */,
 				4CAD2F6E14E9A3BF00656553 /* Frameworks */,
@@ -337,6 +359,7 @@
 				4C34877414E9B7A400301A09 /* congaloop.caf in Resources */,
 				4C34877914EA699300301A09 /* dmxbeat.aiff in Resources */,
 				4C34877B14EA841000301A09 /* lead.aif in Resources */,
+				4C12E4D614ED0822002BF07A /* Factory Hall.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -452,6 +475,9 @@
 				4CAD2F9814E9A41200656553 /* main.m in Sources */,
 				4C34877714E9B8CA00301A09 /* TPAudioFilePlayer.m in Sources */,
 				4C5C511C14EA9D790012D39E /* TPOscilloscopeLayer.m in Sources */,
+				4C12E4DC14ED082D002BF07A /* TPBlockLevelFilter.m in Sources */,
+				4C12E4DD14ED082D002BF07A /* TPConvolutionFilter.m in Sources */,
+				4C12E4E014ED094B002BF07A /* TPCircularBuffer.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

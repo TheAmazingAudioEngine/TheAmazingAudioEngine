@@ -10,6 +10,7 @@
 #import <TPAudioController/TPAudioController.h>
 #import "TPAudioFilePlayer.h"
 #import "TPOscilloscopeLayer.h"
+#import "TPConvolutionFilter.h"
 #import <QuartzCore/QuartzCore.h>
 
 #define kAuxiliaryViewTag 251
@@ -23,6 +24,7 @@
 @property (nonatomic, retain) TPAudioFilePlayer *loop2;
 @property (nonatomic, retain) TPAudioFilePlayer *loop3;
 @property (nonatomic, retain) TPAudioFilePlayer *sample1;
+@property (nonatomic, retain) TPConvolutionFilter *filter;
 @property (nonatomic, retain) TPOscilloscopeLayer *outputOscilloscope;
 @property (nonatomic, retain) TPOscilloscopeLayer *inputOscilloscope;
 @end
@@ -33,6 +35,7 @@
             loop2=_loop2,
             loop3=_loop3,
             sample1=_sample1,
+            filter=_filter,
             outputOscilloscope=_outputOscilloscope,
             inputOscilloscope=_inputOscilloscope;
 
@@ -71,15 +74,10 @@
 }
 
 -(void)dealloc {
-    NSMutableArray *channelsToRemove = [NSMutableArray array];
+    NSMutableArray *channelsToRemove = [NSMutableArray arrayWithObjects:_loop1, _loop2, _loop3, nil];
 
-    [channelsToRemove addObject:_loop1];
     self.loop1 = nil;
-
-    [channelsToRemove addObject:_loop2];
     self.loop2 = nil;
-
-    [channelsToRemove addObject:_loop3];
     self.loop3 = nil;
     
     if ( _sample1 ) {
@@ -93,6 +91,11 @@
     }
     
     [_audioController removeChannelGroup:_loopsGroup];
+    
+    if ( _filter ) {
+        [_audioController removeFilter:_filter.callback userInfo:_filter];
+        self.filter = nil;
+    }
     
     self.outputOscilloscope = nil;
     self.inputOscilloscope = nil;
@@ -111,21 +114,21 @@
     self.outputOscilloscope = [[[TPOscilloscopeLayer alloc] init] autorelease];
     _outputOscilloscope.frame = oscilloscopeHostView.bounds;
     [oscilloscopeHostView.layer addSublayer:_outputOscilloscope];
-    [_audioController addPlaybackCallback:_outputOscilloscope.callback userInfo:_outputOscilloscope];
+    [_audioController addOutputCallback:_outputOscilloscope.callback userInfo:_outputOscilloscope];
     [_outputOscilloscope start];
     
     self.inputOscilloscope = [[[TPOscilloscopeLayer alloc] init] autorelease];
     _inputOscilloscope.frame = oscilloscopeHostView.bounds;
     _inputOscilloscope.lineColor = [UIColor colorWithWhite:0.0 alpha:0.3];
     [oscilloscopeHostView.layer addSublayer:_inputOscilloscope];
-    [_audioController addRecordCallback:_inputOscilloscope.callback userInfo:_inputOscilloscope];
+    [_audioController addInputCallback:_inputOscilloscope.callback userInfo:_inputOscilloscope];
     [_inputOscilloscope start];
     
     self.tableView.tableHeaderView = oscilloscopeHostView;
 }
 
 -(NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 2;
+    return 3;
 }
 
 -(NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
@@ -135,6 +138,9 @@
             break;
             
         case 1:
+            return 1;
+            
+        case 2:
             return 1;
     }
     return 0;
@@ -204,6 +210,18 @@
             }
             break;
         }
+        case 2: {
+            cell.accessoryView = [[[UISwitch alloc] initWithFrame:CGRectZero] autorelease];
+            
+            switch ( indexPath.row ) {
+                case 0: {
+                    cell.textLabel.text = @"Reverb";
+                    ((UISwitch*)cell.accessoryView).on = _filter != nil;
+                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(filterSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                }
+            }
+            break;
+        }
             
     }
     
@@ -251,6 +269,16 @@
         [_sample1 addObserver:self forKeyPath:@"playing" options:0 context:sender];
         [_audioController addChannels:[NSArray arrayWithObject:_sample1]];
         [sender setSelected:YES];
+    }
+}
+
+- (void)filterSwitchChanged:(UISwitch*)sender {
+    if ( sender.isOn ) {
+        self.filter = [[[TPConvolutionFilter alloc] initWithAudioController:_audioController filter:[TPConvolutionFilter filterFromAudioFile:[[NSBundle mainBundle] URLForResource:@"Factory Hall" withExtension:@"wav"] scale:15.0 error:NULL]] autorelease];
+        [_audioController addFilter:_filter.callback userInfo:_filter];
+    } else {
+        [_audioController removeFilter:_filter.callback userInfo:_filter];
+        self.filter = nil;
     }
 }
 

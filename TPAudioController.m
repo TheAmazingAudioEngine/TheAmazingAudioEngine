@@ -40,7 +40,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 
 enum {
     kCallbackIsFilterFlag = 1<<0,
-    kCallbackIsPlaybackCallbackFlag = 1<<1
+    kCallbackIsOutputCallbackFlag = 1<<1
 };
 
 /*!
@@ -135,7 +135,7 @@ typedef struct _message_t {
     channel_group_t     _channels;
     channel_t           _topLevelChannel;
     
-    callback_table_t    _recordCallbacks;
+    callback_table_t    _inputCallbacks;
     callback_table_t    _timingCallbacks;
     
     TPACCircularBuffer  _realtimeThreadMessageBuffer;
@@ -354,9 +354,9 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
         }
     }
         
-    // Pass audio to record delegates
-    for ( int i=0; i<THIS->_recordCallbacks.count; i++ ) {
-        callback_t *callback = &THIS->_recordCallbacks.callbacks[i];
+    // Pass audio to input callbacks
+    for ( int i=0; i<THIS->_inputCallbacks.count; i++ ) {
+        callback_t *callback = &THIS->_inputCallbacks.callbacks[i];
         ((TPAudioControllerAudioCallback)callback->callback)(callback->userInfo, inTimeStamp, inNumberFrames, &buffers.bufferList);
     }
     
@@ -427,6 +427,7 @@ static OSStatus groupRenderCallback(void *inRefCon, AudioUnitRenderActionFlags *
     
     // Tell mixer to render into bufferList
     OSStatus status = AudioUnitRender(group->mixerAudioUnit, ioActionFlags, inTimeStamp, 0, inNumberFrames, bufferList);
+    if ( !checkResult(status, "AudioUnitRender") ) return status;
     
     if ( group->converterRequired ) {
         // Perform conversion
@@ -438,7 +439,7 @@ static OSStatus groupRenderCallback(void *inRefCon, AudioUnitRenderActionFlags *
     
     handleCallbacksForChannel(channel, inTimeStamp, inNumberFrames, ioData);
         
-    return noErr;
+    return status;
 }
 
 static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
@@ -972,61 +973,61 @@ static long removeChannelsFromGroup(TPAudioController *THIS, long *matchingPtrAr
     return [self callbacksWithFlags:kCallbackIsFilterFlag forChannelGroup:group];
 }
 
-#pragma mark - Playback callbacks
+#pragma mark - Output callbacks
 
-- (void)addPlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo {
-    [self addCallback:callback userInfo:userInfo flags:kCallbackIsPlaybackCallbackFlag forChannelGroup:&_channels];
+- (void)addOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo {
+    [self addCallback:callback userInfo:userInfo flags:kCallbackIsOutputCallbackFlag forChannelGroup:&_channels];
 }
 
-- (void)addPlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo forChannel:(id<TPAudioPlayable>)channel {
-    [self addCallback:callback userInfo:userInfo flags:kCallbackIsPlaybackCallbackFlag forChannel:channel];
+- (void)addOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo forChannel:(id<TPAudioPlayable>)channel {
+    [self addCallback:callback userInfo:userInfo flags:kCallbackIsOutputCallbackFlag forChannel:channel];
 }
 
-- (void)addPlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo forChannelGroup:(TPChannelGroup)group {
-    [self addCallback:callback userInfo:userInfo flags:kCallbackIsPlaybackCallbackFlag forChannelGroup:group];
+- (void)addOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo forChannelGroup:(TPChannelGroup)group {
+    [self addCallback:callback userInfo:userInfo flags:kCallbackIsOutputCallbackFlag forChannelGroup:group];
 }
 
-- (void)removePlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo {
+- (void)removeOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo {
     [self removeCallback:callback userInfo:userInfo fromChannelGroup:&_channels];
 }
 
-- (void)removePlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channel {
+- (void)removeOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channel {
     [self removeCallback:callback userInfo:userInfo fromChannel:channel];
 }
 
-- (void)removePlaybackCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group {
+- (void)removeOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group {
     [self removeCallback:callback userInfo:userInfo fromChannelGroup:group];
 }
 
-- (NSArray*)playbackCallbacks {
-    return [self callbacksWithFlags:kCallbackIsPlaybackCallbackFlag];
+- (NSArray*)outputCallbacks {
+    return [self callbacksWithFlags:kCallbackIsOutputCallbackFlag];
 }
 
-- (NSArray*)playbackCallbacksForChannel:(id<TPAudioPlayable>)channel {
-    return [self callbacksWithFlags:kCallbackIsPlaybackCallbackFlag forChannel:channel];
+- (NSArray*)outputCallbacksForChannel:(id<TPAudioPlayable>)channel {
+    return [self callbacksWithFlags:kCallbackIsOutputCallbackFlag forChannel:channel];
 }
 
-- (NSArray*)playbackCallbacksForChannelGroup:(TPChannelGroup)group {
-    return [self callbacksWithFlags:kCallbackIsPlaybackCallbackFlag forChannelGroup:group];
+- (NSArray*)outputCallbacksForChannelGroup:(TPChannelGroup)group {
+    return [self callbacksWithFlags:kCallbackIsOutputCallbackFlag forChannelGroup:group];
 }
 
 #pragma mark - Other callbacks
 
-- (void)addRecordCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo {
-    if ( _recordCallbacks.count == kMaximumCallbacksPerSource ) {
+- (void)addInputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo {
+    if ( _inputCallbacks.count == kMaximumCallbacksPerSource ) {
         NSLog(@"Warning: Maximum number of callbacks reached");
         return;
     }
     
-    [self performAsynchronousMessageExchangeWithHandler:&addCallbackToTable parameter1:(long)callback parameter2:(long)userInfo parameter3:0 ioOpaquePtr:&_recordCallbacks responseBlock:nil];
+    [self performAsynchronousMessageExchangeWithHandler:&addCallbackToTable parameter1:(long)callback parameter2:(long)userInfo parameter3:0 ioOpaquePtr:&_inputCallbacks responseBlock:nil];
 }
 
-- (void)removeRecordCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo {
-    [self performAsynchronousMessageExchangeWithHandler:&removeCallbackFromTable parameter1:(long)callback parameter2:(long)userInfo parameter3:0 ioOpaquePtr:&_recordCallbacks responseBlock:nil];
+- (void)removeInputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo {
+    [self performAsynchronousMessageExchangeWithHandler:&removeCallbackFromTable parameter1:(long)callback parameter2:(long)userInfo parameter3:0 ioOpaquePtr:&_inputCallbacks responseBlock:nil];
 }
 
--(NSArray *)recordCallbacks {
-    return [self callbacksFromTable:&_recordCallbacks matchingFlag:0];
+-(NSArray *)inputCallbacks {
+    return [self callbacksFromTable:&_inputCallbacks matchingFlag:0];
 }
 
 - (void)addTimingCallback:(TPAudioControllerTimingCallback)callback userInfo:(void *)userInfo {
@@ -1417,7 +1418,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
             // The mixer only supports a subset of formats. If it doesn't support this one, then we'll convert manually
             #if DEBUG
             if ( parentGroup == NULL ) {
-                NSLog(@"Note: The AudioStreamBasicDescription you have provided is not natively supported by the iOS mixer unit. Use of filters and playback callbacks will result in use of audio converters.");
+                NSLog(@"Note: The AudioStreamBasicDescription you have provided is not natively supported by the iOS mixer unit. Use of filters and output callbacks will result in use of audio converters.");
             }
             #endif
             
@@ -1464,18 +1465,24 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
 - (void)configureGraphStateOfGroupChannel:(channel_t*)channel parentGroup:(TPChannelGroup)parentGroup indexInParent:(int)index {
     TPChannelGroup group = (TPChannelGroup)channel->ptr;
     
-    BOOL playbackCallbacks=NO, filters=NO;
-    for ( int i=0; i<channel->callbacks.count && (!playbackCallbacks || !filters); i++ ) {
+    BOOL outputCallbacks=NO, filters=NO;
+    for ( int i=0; i<channel->callbacks.count && (!outputCallbacks || !filters); i++ ) {
         if ( channel->callbacks.callbacks[i].flags & kCallbackIsFilterFlag ) {
             filters = YES;
-        } else if ( channel->callbacks.callbacks[i].flags & kCallbackIsPlaybackCallbackFlag ) {
-            playbackCallbacks = YES;
+        } else if ( channel->callbacks.callbacks[i].flags & kCallbackIsOutputCallbackFlag ) {
+            outputCallbacks = YES;
         }
     }
     
-    BOOL updateGraph = NO;
     
-    if ( (playbackCallbacks || filters) && group->converterRequired && !group->audioConverter ) {
+    Boolean wasRunning = false;
+    OSStatus result = AUGraphIsRunning(_audioGraph, &wasRunning);
+    checkResult(result, "AUGraphIsRunning");
+
+    BOOL updateGraph = NO;
+    BOOL graphStopped = !wasRunning;
+    
+    if ( (outputCallbacks || filters) && group->converterRequired && !group->audioConverter ) {
         // Initialise audio converter if necessary
         
         // Get mixer's output stream format
@@ -1505,6 +1512,12 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
     if ( filters ) {
         // We need to use our own render callback, because the audio will be being converted and modified
         if ( group->graphState & kGroupGraphStateNodeConnected ) {
+            if ( !parentGroup && !graphStopped ) {
+                // Stop the graph first, because we're going to modify the root
+                if ( checkResult(AUGraphStop(_audioGraph), "AUGraphStop") ) {
+                    graphStopped = YES;
+                }
+            }
             // Remove the node connection
             if ( checkResult(AUGraphDisconnectNodeInput(_audioGraph, parentGroup ? parentGroup->mixerNode : _ioNode, parentGroup ? index : 0), "AUGraphDisconnectNodeInput") ) {
                 group->graphState &= ~kGroupGraphStateNodeConnected;
@@ -1532,20 +1545,10 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
             updateGraph = YES;
         }
         
+    } else if ( group->graphState & kGroupGraphStateRenderCallbackSet ) {
+        // Expermentation reveals that once the render callback has been set, no further connections or render callbacks can be established.
+        // So, we leave the node in this state, regardless of whether we have callbacks or not
     } else {
-        // Just use a graph connection
-        
-        if ( group->graphState & kGroupGraphStateRenderCallbackSet ) {
-            // Unset render callback
-            AURenderCallbackStruct rcbs;
-            rcbs.inputProc = NULL;
-            rcbs.inputProcRefCon = NULL;
-            if ( checkResult(AUGraphSetNodeInputCallback(_audioGraph, parentGroup ? parentGroup->mixerNode : _ioNode, parentGroup ? index : 0, &rcbs), "AUGraphSetNodeInputCallback") ) {
-                group->graphState &= ~kGroupGraphStateRenderCallbackSet;
-                updateGraph = YES;
-            }
-        }
-        
         if ( !(group->graphState & kGroupGraphStateNodeConnected) ) {
             // Connect output of mixer directly to the parent mixer
             if ( checkResult(AUGraphConnectNodeInput(_audioGraph, group->mixerNode, 0, parentGroup ? parentGroup->mixerNode : _ioNode, parentGroup ? index : 0), "AUGraphConnectNodeInput") ) {
@@ -1554,10 +1557,10 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
             }
         }
         
-        if ( playbackCallbacks ) {
+        if ( outputCallbacks ) {
             // We need to register a callback to be notified when the mixer renders, to pass on the audio
             if ( !(group->graphState & kGroupGraphStateRenderNotificationSet) ) {
-                // Remove render notification callback
+                // Add render notification callback
                 if ( checkResult(AudioUnitAddRenderNotify(group->mixerAudioUnit, &groupRenderNotifyCallback, channel), "AudioUnitRemoveRenderNotify") ) {
                     group->graphState |= kGroupGraphStateRenderNotificationSet;
                 }
@@ -1572,9 +1575,15 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
         }
     }
     
-    if ( updateGraph ) [self updateGraph];
+    if ( updateGraph ) {
+        [self updateGraph];
+    }
     
-    if ( !playbackCallbacks && !filters && group->audioConverter ) {
+    if ( graphStopped && wasRunning ) {
+        checkResult(AUGraphStart(_audioGraph), "AUGraphStart");
+    }
+    
+    if ( !outputCallbacks && !filters && group->audioConverter && !(group->graphState & kGroupGraphStateRenderCallbackSet) ) {
         // Cleanup audio converter
         
         // Sync first, to wait until end of the current render, whereupon any changes we just made will be applied
@@ -1760,7 +1769,7 @@ static long removeCallbackFromTable(TPAudioController *THIS, long *callbackPtr, 
     // Find the item in our fixed array
     int index = 0;
     for ( index=0; index<table->count; index++ ) {
-        if ( table->callbacks[table->count].callback == (void*)*callbackPtr && table->callbacks[table->count].userInfo == (void*)*userInfoPtr ) {
+        if ( table->callbacks[index].callback == (void*)*callbackPtr && table->callbacks[index].userInfo == (void*)*userInfoPtr ) {
             break;
         }
     }
@@ -1919,10 +1928,10 @@ static void handleCallbacksForChannel(channel_t *channel, const AudioTimeStamp *
         }
     }
     
-    // And finally pass to playback callbacks
+    // And finally pass to output callbacks
     for ( int i=0; i<channel->callbacks.count; i++ ) {
         callback_t *callback = &channel->callbacks.callbacks[i];
-        if ( callback->flags & kCallbackIsPlaybackCallbackFlag ) {
+        if ( callback->flags & kCallbackIsOutputCallbackFlag ) {
             ((TPAudioControllerAudioCallback)callback->callback)(callback->userInfo, inTimeStamp, inNumberFrames, ioData);
         }
     }
