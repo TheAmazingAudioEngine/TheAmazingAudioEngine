@@ -1,13 +1,13 @@
 SimpleSynth
 ===========
 
-This is a very simple synthesizer app that demonstrates the use of TPAudioPipeline.
+This is a very simple synthesizer app that demonstrates the use of TPAudioController.
 
-TPSimpleSynth is an object that implements TPAudioPlayable, and generates a series of
-sine waves with a simple amplitude envelope to mimic acoustic decay.  A view responds
-to touches and triggers notes to be rendered by TPSimpleSynth.
+TPSynthGenerator is an object that implements the TPAudioPlayable protocol, and 
+generates a series of sine waves with a simple amplitude envelope to mimic acoustic decay.
 
+TPSynthView responds to touches and triggers notes to be rendered by TPSynthGenerator.
 
 Code for demonstrative purposes only - not to be used elsewhere.
 
-Copyright (C) 2011 Michael Tyson, A Tasty Pixel, All Rights Reserved.
+Copyright (C) 2012 Michael Tyson, A Tasty Pixel, All Rights Reserved.

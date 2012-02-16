@@ -65,9 +65,9 @@ typedef struct {
  * @param audio     The audio buffer list - audio should be copied into the provided buffers
  */
 static OSStatus renderCallback (TPSynthGenerator         *THIS,
-                                  const AudioTimeStamp     *time,
-                                  UInt32                    frames,
-                                  AudioBufferList          *audio) {
+                                const AudioTimeStamp     *time,
+                                UInt32                    frames,
+                                AudioBufferList          *audio) {
 
     memset(audio->mBuffers[0].mData, 0, audio->mBuffers[0].mDataByteSize);
     
