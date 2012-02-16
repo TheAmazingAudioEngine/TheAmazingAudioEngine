@@ -618,7 +618,7 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  *
  *      Note that if the @link receiveMonoInputAsBridgedStereo @/link property is set to YES, then incoming
  *      audio may be mono. Check the audio buffer list parameters to determine the kind of audio you are
- *      receiving (for example, if you are using the @link defaultAudioDescription default audio description @/link
+ *      receiving (for example, if you are using the @link interleaved16BitStereoAudioDescription @/link
  *      then the audio->mBuffers[0].mNumberOfChannels field will be 1 for mono, and 2 for stereo audio).
  *
  * @param callback A @link TPAudioControllerAudioCallback @/link callback to receive audio
