@@ -17,4 +17,5 @@
 @property (nonatomic, readwrite) float pan;
 @property (nonatomic, readwrite) BOOL playing;
 @property (nonatomic, readwrite) BOOL muted;
+@property (nonatomic, readwrite) BOOL removeUponFinish;
 @end

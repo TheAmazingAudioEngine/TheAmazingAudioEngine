@@ -153,9 +153,9 @@ typedef enum {
  * @param time      The time the audio was received (for input), or the time it will be played (for output)
  * @param context   The timing context - either input, or output
  */
-typedef OSStatus (*TPAudioControllerTimingCallback) (void                     *userInfo,
-                                                     const AudioTimeStamp     *time,
-                                                     TPAudioTimingContext      context);
+typedef void (*TPAudioControllerTimingCallback) (void                     *userInfo,
+                                                 const AudioTimeStamp     *time,
+                                                 TPAudioTimingContext      context);
 
 
 /*! 

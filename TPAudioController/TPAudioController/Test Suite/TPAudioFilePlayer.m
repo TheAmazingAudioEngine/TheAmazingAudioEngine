@@ -23,7 +23,7 @@
 @end
 
 @implementation TPAudioFilePlayer
-@synthesize loop=_loop, volume=_volume, pan=_pan, playing=_playing, muted=_muted;
+@synthesize loop=_loop, volume=_volume, pan=_pan, playing=_playing, muted=_muted, removeUponFinish=_removeUponFinish;
 
 + (id)audioFilePlayerWithURL:(NSURL*)url audioController:(TPAudioController *)audioController error:(NSError **)error {
     
@@ -156,6 +156,11 @@
 static long notifyPlaybackStopped(TPAudioController *audioController, long *ioParameter1, long *ioParameter2, long *ioParameter3, void *ioOpaquePtr) {
     TPAudioFilePlayer *THIS = ioOpaquePtr;
     THIS.playing = NO;
+    
+    if ( THIS->_removeUponFinish ) {
+        [audioController removeChannels:[NSArray arrayWithObject:THIS]];
+    }
+    
     return 0;
 }
 

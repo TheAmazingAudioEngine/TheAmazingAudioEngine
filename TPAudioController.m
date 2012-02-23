@@ -1222,9 +1222,11 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
 -(void)setPreferredBufferDuration:(float)preferredBufferDuration {
     _preferredBufferDuration = preferredBufferDuration;
 
-    Float32 preferredBufferSize = _preferredBufferDuration;
-    OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
-    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
+    if ( _audioSessionSetup ) {
+        Float32 preferredBufferSize = _preferredBufferDuration;
+        OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
+        checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
+    }
 }
 
 -(void)setVoiceProcessingEnabled:(BOOL)voiceProcessingEnabled {
