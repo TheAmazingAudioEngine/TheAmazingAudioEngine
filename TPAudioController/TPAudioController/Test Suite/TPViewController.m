@@ -15,9 +15,21 @@
 
 #define kAuxiliaryViewTag 251
 
+#define kDoubleSpeedFilterBufferLength 2048 // samples
+
 @interface TPViewController () {
-    TPChannelGroup _loopsGroup;
+    TPChannelGroup  _loopsGroup;
+    SInt16         *_doubleSpeedFilterBuffer[2];
+    BOOL            _useDoubleSpeedFilter;
 }
+
+
+static void doubleSpeedFilter(void                     *userInfo,
+                              TPAudioControllerVariableSpeedFilterProducer producer,
+                              void                     *producerToken,
+                              const AudioTimeStamp     *time,
+                              UInt32                    frames,
+                              AudioBufferList          *audio);
 
 @property (nonatomic, retain) TPAudioController *audioController;
 @property (nonatomic, retain) TPAudioFilePlayer *loop1;
@@ -91,6 +103,12 @@
     }
     
     [_audioController removeChannelGroup:_loopsGroup];
+
+    if ( _useDoubleSpeedFilter ) {
+        [_audioController setVariableSpeedFilter:NULL userInfo:NULL];
+        free(_doubleSpeedFilterBuffer[0]);
+        free(_doubleSpeedFilterBuffer[1]);
+    }
     
     if ( _filter ) {
         [_audioController removeFilter:_filter.callback userInfo:_filter];
@@ -141,7 +159,7 @@
             return 1;
             
         case 2:
-            return 1;
+            return 2;
     }
     return 0;
 }
@@ -218,6 +236,13 @@
                     cell.textLabel.text = @"Reverb";
                     ((UISwitch*)cell.accessoryView).on = _filter != nil;
                     [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(filterSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                    break;
+                }
+                case 1: {
+                    cell.textLabel.text = @"Double Speed";
+                    ((UISwitch*)cell.accessoryView).on = _useDoubleSpeedFilter;
+                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(useDoubleSpeedFilterSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                    break;
                 }
             }
             break;
@@ -283,12 +308,51 @@
     }
 }
 
+- (void)useDoubleSpeedFilterSwitchChanged:(UISwitch*)sender {
+    _useDoubleSpeedFilter = sender.isOn;
+    if ( _useDoubleSpeedFilter ) {
+        _doubleSpeedFilterBuffer[0] = malloc(sizeof(SInt16) * kDoubleSpeedFilterBufferLength);
+        _doubleSpeedFilterBuffer[1] = malloc(sizeof(SInt16) * kDoubleSpeedFilterBufferLength);
+        [_audioController setVariableSpeedFilter:&doubleSpeedFilter userInfo:(void*)self];
+    } else {
+        [_audioController setVariableSpeedFilter:NULL userInfo:NULL];
+        free(_doubleSpeedFilterBuffer[0]);
+        free(_doubleSpeedFilterBuffer[1]);
+    }
+}
+
 -(void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
     if ( object == _sample1 ) {
         [_audioController removeChannels:[NSArray arrayWithObject:_sample1]];
         [_sample1 removeObserver:self forKeyPath:@"playing"];
         self.sample1 = nil;
         [(UIButton*)context setSelected:NO];
+    }
+}
+
+static void doubleSpeedFilter(void                     *userInfo,
+                              TPAudioControllerVariableSpeedFilterProducer producer,
+                              void                     *producerToken,
+                              const AudioTimeStamp     *time,
+                              UInt32                    frames,
+                              AudioBufferList          *audio) {
+    TPViewController *THIS = (TPViewController*)userInfo;
+    
+    int framesToGet = frames * 2;
+    
+    struct { AudioBufferList bufferList; AudioBuffer nextBuffer; } inputBuffer;
+    inputBuffer.bufferList.mNumberBuffers = 2;
+    for ( int i=0; i<inputBuffer.bufferList.mNumberBuffers; i++ ) {
+        inputBuffer.bufferList.mBuffers[i].mData = THIS->_doubleSpeedFilterBuffer[i];
+        inputBuffer.bufferList.mBuffers[i].mDataByteSize = sizeof(SInt16) * framesToGet * 2;
+        inputBuffer.bufferList.mBuffers[i].mNumberChannels = 1;
+    }
+    
+    producer(producerToken, &inputBuffer.bufferList, framesToGet);
+    
+    for ( int i=0; i<frames; i++ ) {
+        ((SInt16*)audio->mBuffers[0].mData)[i] = THIS->_doubleSpeedFilterBuffer[0][2*i];
+        ((SInt16*)audio->mBuffers[1].mData)[i] = THIS->_doubleSpeedFilterBuffer[1][2*i];
     }
 }
 

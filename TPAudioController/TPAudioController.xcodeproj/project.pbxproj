@@ -314,7 +314,7 @@
 		4CE501831493F82600F23607 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 0420;
+				LastUpgradeCheck = 0430;
 				ORGANIZATIONNAME = "A Tasty Pixel";
 			};
 			buildConfigurationList = 4CE501861493F82600F23607 /* Build configuration list for PBXProject "TPAudioController" */;
@@ -500,6 +500,7 @@
 				FRAMEWORK_VERSION = A;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "TPAudioController/TPAudioController-Prefix.pch";
+				GCC_THUMB_SUPPORT = NO;
 				INFOPLIST_FILE = "TPAudioController/TPAudioController-Info.plist";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -515,6 +516,7 @@
 				FRAMEWORK_VERSION = A;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "TPAudioController/TPAudioController-Prefix.pch";
+				GCC_THUMB_SUPPORT = NO;
 				INFOPLIST_FILE = "TPAudioController/TPAudioController-Info.plist";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -534,6 +536,7 @@
 					"TRIAL=1",
 					"$(inherited)",
 				);
+				GCC_THUMB_SUPPORT = NO;
 				INFOPLIST_FILE = "TPAudioController/TPAudioControllerTrial-Info.plist";
 				PRODUCT_NAME = TPAudioController;
 				SKIP_INSTALL = YES;
@@ -550,6 +553,7 @@
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "TPAudioController/TPAudioControllerTrial-Prefix.pch";
 				GCC_PREPROCESSOR_DEFINITIONS = "TRIAL=1";
+				GCC_THUMB_SUPPORT = NO;
 				INFOPLIST_FILE = "TPAudioController/TPAudioControllerTrial-Info.plist";
 				PRODUCT_NAME = TPAudioController;
 				SKIP_INSTALL = YES;
@@ -603,6 +607,7 @@
 					"$(inherited)",
 				);
 				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_THUMB_SUPPORT = NO;
 				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
 				GCC_WARN_ABOUT_MISSING_PROTOTYPES = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES;
@@ -622,6 +627,7 @@
 				);
 				COPY_PHASE_STRIP = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_THUMB_SUPPORT = NO;
 				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
 				GCC_WARN_ABOUT_MISSING_PROTOTYPES = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES;

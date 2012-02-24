@@ -39,8 +39,9 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 #pragma mark - Core types
 
 enum {
-    kCallbackIsFilterFlag = 1<<0,
-    kCallbackIsOutputCallbackFlag = 1<<1
+    kCallbackIsFilterFlag               = 1<<0,
+    kCallbackIsOutputCallbackFlag       = 1<<1,
+    kCallbackIsVariableSpeedFilterFlag  = 1<<2
 };
 
 /*!
@@ -108,6 +109,15 @@ typedef struct _channel_group_t {
     BOOL                muted;
 } channel_group_t;
 
+/*!
+ * Channel producer argument
+ */
+typedef struct {
+    channel_t *channel;
+    const AudioTimeStamp *inTimeStamp;
+    AudioUnitRenderActionFlags *ioActionFlags;
+} channel_producer_arg_t;
+
 #pragma mark Messaging
 
 /*!
@@ -171,11 +181,12 @@ static long removeCallbackFromTable(TPAudioController *THIS, long *callbackTable
 - (NSArray*)callbacksWithFlags:(uint8_t)flags;
 - (NSArray*)callbacksWithFlags:(uint8_t)flags forChannel:(id<TPAudioPlayable>)channelObj;
 - (NSArray*)callbacksWithFlags:(uint8_t)flags forChannelGroup:(TPChannelGroup)group;
-
+- (void)setVariableSpeedFilter:(TPAudioControllerVariableSpeedFilterCallback)filter userInfo:(void *)userInfo forChannelStruct:(channel_t*)channel;
 - (void)releaseGroupResources:(TPChannelGroup)group freeGroupMemory:(BOOL)freeGroup;
 - (void)teardownGroup:(TPChannelGroup)group;
 
 static void handleCallbacksForChannel(channel_t *channel, const AudioTimeStamp *inTimeStamp, UInt32 inNumberFrames, AudioBufferList *ioData);
+static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UInt32 frames);
 @end
 
 @implementation TPAudioController
@@ -284,10 +295,27 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
         return noErr;
     }
     
-    TPAudioControllerRenderCallback callback = (TPAudioControllerRenderCallback) channel->ptr;
-    id<TPAudioPlayable> channelObj = (id<TPAudioPlayable>) channel->userInfo;
+    channel_producer_arg_t arg = { .channel = channel, .inTimeStamp = inTimeStamp, .ioActionFlags = ioActionFlags };
     
-    OSStatus result = callback(channelObj, inTimeStamp, inNumberFrames, ioData);
+    // Use variable speed filter, if there is one
+    TPAudioControllerVariableSpeedFilterCallback varispeedFilter = NULL;
+    void * varispeedFilterUserinfo = NULL;
+    for ( int i=0; i<channel->callbacks.count; i++ ) {
+        callback_t *callback = &channel->callbacks.callbacks[i];
+        if ( callback->flags & kCallbackIsVariableSpeedFilterFlag ) {
+            varispeedFilter = callback->callback;
+            varispeedFilterUserinfo = callback->userInfo;
+        }
+    }
+    
+    OSStatus result = noErr;
+    if ( varispeedFilter ) {
+        // Run variable speed filter
+        varispeedFilter(varispeedFilterUserinfo, &channelAudioProducer, (void*)&arg, inTimeStamp, inNumberFrames, ioData);
+    } else {
+        // Take audio directly from channel
+        result = channelAudioProducer((void*)&arg, ioData, inNumberFrames);
+    }
     
     handleCallbacksForChannel(channel, inTimeStamp, inNumberFrames, ioData);
     
@@ -399,47 +427,6 @@ static OSStatus groupRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionF
     }
     
     return noErr;
-}
-
-static OSStatus groupRenderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
-    channel_t *channel = (channel_t*)inRefCon;
-    TPChannelGroup group = (TPChannelGroup)channel->ptr;
-    
-    AudioBufferList *bufferList;
-    
-    if ( group->converterRequired ) {
-        // Initialise output buffer
-        struct { AudioBufferList bufferList; AudioBuffer nextBuffer; } buffers;
-        bufferList = &buffers.bufferList;
-        bufferList->mNumberBuffers = (group->audioConverterSourceFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? group->audioConverterSourceFormat.mChannelsPerFrame : 1;
-        char *dataPtr = group->audioConverterScratchBuffer;
-        for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
-            bufferList->mBuffers[i].mNumberChannels = (group->audioConverterSourceFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? 1 : group->audioConverterSourceFormat.mChannelsPerFrame;
-            bufferList->mBuffers[i].mData           = dataPtr;
-            bufferList->mBuffers[i].mDataByteSize   = group->audioConverterSourceFormat.mBytesPerFrame * inNumberFrames;
-            dataPtr += bufferList->mBuffers[i].mDataByteSize;
-        }
-                
-    } else {
-        // We can render straight to ioData, as audio format is the same
-        bufferList = ioData;
-    }
-    
-    // Tell mixer to render into bufferList
-    OSStatus status = AudioUnitRender(group->mixerAudioUnit, ioActionFlags, inTimeStamp, 0, inNumberFrames, bufferList);
-    if ( !checkResult(status, "AudioUnitRender") ) return status;
-    
-    if ( group->converterRequired ) {
-        // Perform conversion
-        status = AudioConverterConvertComplexBuffer(group->audioConverter, inNumberFrames, bufferList, ioData);
-        if ( !checkResult(status, "AudioConverterConvertComplexBuffer") ) {
-            return status;
-        }
-    }
-    
-    handleCallbacksForChannel(channel, inTimeStamp, inNumberFrames, ioData);
-        
-    return status;
 }
 
 static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
@@ -973,6 +960,40 @@ static long removeChannelsFromGroup(TPAudioController *THIS, long *matchingPtrAr
     return [self callbacksWithFlags:kCallbackIsFilterFlag forChannelGroup:group];
 }
 
+#pragma mark - Variable speed filters
+
+- (void)setVariableSpeedFilter:(TPAudioControllerVariableSpeedFilterCallback)filter userInfo:(void*)userInfo {
+    [self setVariableSpeedFilter:filter userInfo:userInfo forChannelGroup:&_channels];
+}
+
+- (void)setVariableSpeedFilter:(TPAudioControllerVariableSpeedFilterCallback)filter userInfo:(void*)userInfo forChannel:(id<TPAudioPlayable>)channelObj {
+    int index=0;
+    TPChannelGroup parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:channelObj index:&index];
+    NSAssert(parentGroup != NULL, @"Channel not found");
+    
+    channel_t *channel = &parentGroup->channels[index];
+    
+    [self setVariableSpeedFilter:filter userInfo:userInfo forChannelStruct:channel];
+}
+
+- (void)setVariableSpeedFilter:(TPAudioControllerVariableSpeedFilterCallback)filter userInfo:(void*)userInfo forChannelGroup:(TPChannelGroup)group {
+    channel_t *channel = NULL;
+    TPChannelGroup parentGroup = NULL;
+    int index=0;
+    
+    if ( group == &_channels ) {
+        channel = &_topLevelChannel;
+    } else {
+        parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
+        NSAssert(parentGroup != NULL, @"Channel group not found");
+        channel = &parentGroup->channels[index];
+    }
+    
+    [self setVariableSpeedFilter:filter userInfo:userInfo forChannelStruct:channel];
+    
+    [self configureGraphStateOfGroupChannel:channel parentGroup:parentGroup indexInParent:index];
+}
+
 #pragma mark - Output callbacks
 
 - (void)addOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo {
@@ -1350,6 +1371,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
     // Initialise and hook in the main mixer
     _topLevelChannel.type = kChannelTypeGroup;
     _topLevelChannel.ptr  = &_channels;
+    _topLevelChannel.playing = YES;
     [self initialiseGroupChannel:&_topLevelChannel parentGroup:NULL indexInParent:0];
     
     // Register a callback to be notified when the main mixer unit renders
@@ -1469,7 +1491,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
     
     BOOL outputCallbacks=NO, filters=NO;
     for ( int i=0; i<channel->callbacks.count && (!outputCallbacks || !filters); i++ ) {
-        if ( channel->callbacks.callbacks[i].flags & kCallbackIsFilterFlag ) {
+        if ( channel->callbacks.callbacks[i].flags & (kCallbackIsFilterFlag | kCallbackIsVariableSpeedFilterFlag) ) {
             filters = YES;
         } else if ( channel->callbacks.callbacks[i].flags & kCallbackIsOutputCallbackFlag ) {
             outputCallbacks = YES;
@@ -1540,7 +1562,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
         
         // Add the render callback
         AURenderCallbackStruct rcbs;
-        rcbs.inputProc = &groupRenderCallback;
+        rcbs.inputProc = &renderCallback;
         rcbs.inputProcRefCon = channel;
         if ( checkResult(AUGraphSetNodeInputCallback(_audioGraph, parentGroup ? parentGroup->mixerNode : _ioNode, parentGroup ? index : 0, &rcbs), "AUGraphSetNodeInputCallback") ) {
             group->graphState |= kGroupGraphStateRenderCallbackSet;
@@ -1891,7 +1913,6 @@ static long removeCallbackFromTable(TPAudioController *THIS, long *callbackPtr, 
     return [self callbacksFromTable:&channel->callbacks matchingFlag:flags];
 }
 
-
 - (void)releaseGroupResources:(TPChannelGroup)group freeGroupMemory:(BOOL)freeGroup {
     if ( group->audioConverter ) {
         checkResult(AudioConverterDispose(group->audioConverter), "AudioConverterDispose");
@@ -1908,6 +1929,27 @@ static long removeCallbackFromTable(TPAudioController *THIS, long *callbackPtr, 
     checkResult(AUGraphRemoveNode(_audioGraph, group->mixerNode), "AUGraphRemoveNode");
 
     if ( freeGroup ) free(group);
+}
+
+- (void)setVariableSpeedFilter:(TPAudioControllerVariableSpeedFilterCallback)filter userInfo:(void *)userInfo forChannelStruct:(channel_t*)channel {
+    for ( int i=0; i<channel->callbacks.count; i++ ) {
+        if ( (channel->callbacks.callbacks[i].flags & kCallbackIsVariableSpeedFilterFlag ) ) {
+            // Remove the old callback
+            [self performSynchronousMessageExchangeWithHandler:&removeCallbackFromTable
+                                                    parameter1:(long)channel->callbacks.callbacks[i].callback
+                                                    parameter2:(long)channel->callbacks.callbacks[i].userInfo
+                                                    parameter3:0
+                                                   ioOpaquePtr:&channel->callbacks];
+        }
+    }
+    
+    if ( filter ) {
+        [self performSynchronousMessageExchangeWithHandler:&addCallbackToTable 
+                                                parameter1:(long)filter
+                                                parameter2:(long)userInfo 
+                                                parameter3:kCallbackIsVariableSpeedFilterFlag 
+                                               ioOpaquePtr:&channel->callbacks];
+    }
 }
 
 - (void)teardownGroup:(TPChannelGroup)group {
@@ -1937,6 +1979,55 @@ static void handleCallbacksForChannel(channel_t *channel, const AudioTimeStamp *
             ((TPAudioControllerAudioCallback)callback->callback)(callback->userInfo, inTimeStamp, inNumberFrames, ioData);
         }
     }
+}
+
+static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UInt32 frames) {
+    channel_producer_arg_t *arg = (channel_producer_arg_t*)userInfo;
+    channel_t *channel = arg->channel;
+    
+    OSStatus status = noErr;
+    
+    if ( channel->type == kChannelTypeChannel ) {
+        TPAudioControllerRenderCallback callback = (TPAudioControllerRenderCallback) channel->ptr;
+        id<TPAudioPlayable> channelObj = (id<TPAudioPlayable>) channel->userInfo;
+        
+        status = callback(channelObj, arg->inTimeStamp, frames, audio);
+        
+    } else if ( channel->type == kChannelTypeGroup ) {
+        TPChannelGroup group = (TPChannelGroup)channel->ptr;
+        
+        AudioBufferList *bufferList;
+        
+        if ( group->converterRequired ) {
+            // Initialise output buffer
+            struct { AudioBufferList bufferList; AudioBuffer nextBuffer; } buffers;
+            bufferList = &buffers.bufferList;
+            bufferList->mNumberBuffers = (group->audioConverterSourceFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? group->audioConverterSourceFormat.mChannelsPerFrame : 1;
+            char *dataPtr = group->audioConverterScratchBuffer;
+            for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
+                bufferList->mBuffers[i].mNumberChannels = (group->audioConverterSourceFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? 1 : group->audioConverterSourceFormat.mChannelsPerFrame;
+                bufferList->mBuffers[i].mData           = dataPtr;
+                bufferList->mBuffers[i].mDataByteSize   = group->audioConverterSourceFormat.mBytesPerFrame * frames;
+                dataPtr += bufferList->mBuffers[i].mDataByteSize;
+            }
+            
+        } else {
+            // We can render straight to the buffer, as audio format is the same
+            bufferList = audio;
+        }
+        
+        // Tell mixer to render into bufferList
+        OSStatus status = AudioUnitRender(group->mixerAudioUnit, arg->ioActionFlags, arg->inTimeStamp, 0, frames, bufferList);
+        if ( !checkResult(status, "AudioUnitRender") ) return status;
+        
+        if ( group->converterRequired ) {
+            // Perform conversion
+            status = AudioConverterConvertComplexBuffer(group->audioConverter, frames, bufferList, audio);
+            checkResult(status, "AudioConverterConvertComplexBuffer");
+        }
+    }
+    
+    return status;
 }
 
 @end

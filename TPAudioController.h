@@ -104,7 +104,7 @@ typedef OSStatus (*TPAudioControllerRenderCallback) (id<TPAudioPlayable>       c
 
 
 /*!
- * Audio callback callback
+ * Audio callback
  *
  *      This callback is used for notifying you of incoming audio (either from 
  *      the built-in microphone, or another input device), and outgoing audio that
@@ -121,6 +121,45 @@ typedef void (*TPAudioControllerAudioCallback) (void                     *userIn
                                                 const AudioTimeStamp     *time,
                                                 UInt32                    frames,
                                                 AudioBufferList          *audio);
+
+
+/*!
+ * Variable speed filter producer
+ *
+ *      This defines the function passed to a TPAudioControllerVariableSpeedFilterCallback,
+ *      which is used to produce input audio to be processed by the filter.
+ *
+ * @param producerToken    An opaque pointer to be passed to the function
+ * @param audio            Audio buffer list to be written to
+ * @param frames           Number of frames to produce
+ * @return A status code
+ */
+typedef OSStatus (*TPAudioControllerVariableSpeedFilterProducer)(void            *producerToken, 
+                                                                 AudioBufferList *audio, 
+                                                                 UInt32           frames);
+
+/*!
+ * Variable speed filter callback
+ *
+ *      This callback is used for variable speed audio filters - that is, filters that
+ *      have a playback rate that is not 1:1.  The system provides an an argument
+ *      a function pointer that is used to produce input audio.
+ *
+ *      Do not wait on locks, allocate memory, or call any Objective-C or BSD code.
+ *
+ * @param userInfo  The opaque pointer you provided when you registered this callback
+ * @param producer  A function pointer to be used to produce input audio
+ * @param producerToken An opaque pointer to be passed to the producer as the first argument
+ * @param time      The time the output audio will be played
+ * @param frames    The length of the required audio, in frames
+ * @param audio     The audio buffer list to write output audio to
+ */
+typedef void (*TPAudioControllerVariableSpeedFilterCallback) (void                     *userInfo,
+                                                              TPAudioControllerVariableSpeedFilterProducer producer,
+                                                              void                     *producerToken,
+                                                              const AudioTimeStamp     *time,
+                                                              UInt32                    frames,
+                                                              AudioBufferList          *audio);
 
 /*!
  * Timing contexts
@@ -512,6 +551,57 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  * @param group Channel group to get filters for
  */
 - (NSArray*)filtersForChannelGroup:(TPChannelGroup)group;
+
+#pragma mark - Variable speed filters
+
+/*! @methodgroup Variable speed filters */
+
+/*!
+ * Set variable speed audio filter for the system output
+ *
+ *      Variable audio filters are used to process live audio before playback, at a
+ *      playback rate other than 1:1. You can provide one variable audio filter per
+ *      node (channel, group, the root system node).
+ *
+ *      See @link TPAudioControllerVariableSpeedFilterCallback @/link for more info.
+ *
+ * @param callback A @link TPAudioControllerVariableSpeedFilterCallback @/link callback to process audio, 
+ *                 or NULL to unset the filter.
+ * @param userInfo An opaque pointer to be passed to the callback
+ */
+- (void)setVariableSpeedFilter:(TPAudioControllerVariableSpeedFilterCallback)filter userInfo:(void*)userInfo;
+
+/*!
+ * Set variable speed audio filter for the system output
+ *
+ *      Variable audio filters are used to process live audio before playback, at a
+ *      playback rate other than 1:1. You can provide one variable audio filter per
+ *      node (channel, group, the root system node).
+ *
+ *      See @link TPAudioControllerVariableSpeedFilterCallback @/link for more info.
+ *
+ * @param callback A @link TPAudioControllerVariableSpeedFilterCallback @/link callback to process audio, 
+ *                 or NULL to unset the filter.
+ * @param userInfo An opaque pointer to be passed to the callback
+ * @param channel  Channel to assign filter to
+ */
+- (void)setVariableSpeedFilter:(TPAudioControllerVariableSpeedFilterCallback)filter userInfo:(void*)userInfo forChannel:(id<TPAudioPlayable>)channel;
+
+/*!
+ * Set variable speed audio filter for the system output
+ *
+ *      Variable audio filters are used to process live audio before playback, at a
+ *      playback rate other than 1:1. You can provide one variable audio filter per
+ *      node (channel, group, the root system node).
+ *
+ *      See @link TPAudioControllerVariableSpeedFilterCallback @/link for more info.
+ *
+ * @param callback A @link TPAudioControllerVariableSpeedFilterCallback @/link callback to process audio, 
+ *                 or NULL to unset the filter.
+ * @param userInfo An opaque pointer to be passed to the callback
+ * @param group    Group to assign filter to
+ */
+- (void)setVariableSpeedFilter:(TPAudioControllerVariableSpeedFilterCallback)filter userInfo:(void*)userInfo forChannelGroup:(TPChannelGroup)group;
 
 #pragma mark - Output callbacks
 
