@@ -114,7 +114,7 @@ typedef struct _channel_group_t {
  */
 typedef struct {
     channel_t *channel;
-    const AudioTimeStamp *inTimeStamp;
+    AudioTimeStamp inTimeStamp;
     AudioUnitRenderActionFlags *ioActionFlags;
 } channel_producer_arg_t;
 
@@ -295,7 +295,7 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
         return noErr;
     }
     
-    channel_producer_arg_t arg = { .channel = channel, .inTimeStamp = inTimeStamp, .ioActionFlags = ioActionFlags };
+    channel_producer_arg_t arg = { .channel = channel, .inTimeStamp = *inTimeStamp, .ioActionFlags = ioActionFlags };
     
     // Use variable speed filter, if there is one
     TPAudioControllerVariableSpeedFilterCallback varispeedFilter = NULL;
@@ -1997,7 +1997,7 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
         TPAudioControllerRenderCallback callback = (TPAudioControllerRenderCallback) channel->ptr;
         id<TPAudioPlayable> channelObj = (id<TPAudioPlayable>) channel->userInfo;
         
-        status = callback(channelObj, arg->inTimeStamp, frames, audio);
+        status = callback(channelObj, &arg->inTimeStamp, frames, audio);
         
     } else if ( channel->type == kChannelTypeGroup ) {
         TPChannelGroup group = (TPChannelGroup)channel->ptr;
@@ -2023,7 +2023,7 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
         }
         
         // Tell mixer to render into bufferList
-        OSStatus status = AudioUnitRender(group->mixerAudioUnit, arg->ioActionFlags, arg->inTimeStamp, 0, frames, bufferList);
+        OSStatus status = AudioUnitRender(group->mixerAudioUnit, arg->ioActionFlags, &arg->inTimeStamp, 0, frames, bufferList);
         if ( !checkResult(status, "AudioUnitRender") ) return status;
         
         if ( group->converterRequired ) {
@@ -2032,6 +2032,9 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
             checkResult(status, "AudioConverterConvertComplexBuffer");
         }
     }
+    
+    // Advance the sample time, to make sure we continue to render if we're called again with the same arguments
+    arg->inTimeStamp.mSampleTime += frames;
     
     return status;
 }

@@ -142,7 +142,7 @@ typedef OSStatus (*TPAudioControllerVariableSpeedFilterProducer)(void           
  * Variable speed filter callback
  *
  *      This callback is used for variable speed audio filters - that is, filters that
- *      have a playback rate that is not 1:1.  The system provides an an argument
+ *      have a playback rate that is not 1:1.  The system provides as an argument
  *      a function pointer that is used to produce input audio.
  *
  *      Do not wait on locks, allocate memory, or call any Objective-C or BSD code.
