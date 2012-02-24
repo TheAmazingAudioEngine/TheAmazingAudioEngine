@@ -180,7 +180,7 @@
 		4CE62D26149527AF00F908A6 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 0420;
+				LastUpgradeCheck = 0430;
 				ORGANIZATIONNAME = "A Tasty Pixel";
 			};
 			buildConfigurationList = 4CE62D29149527AF00F908A6 /* Build configuration list for PBXProject "SimpleSynth" */;
