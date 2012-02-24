@@ -9,6 +9,7 @@
 #import "TPOscilloscopeLayer.h"
 #import <TPAudioController/TPAudioController.h>
 #import <Accelerate/Accelerate.h>
+#include <libkern/OSAtomic.h>
 
 #define kBufferLength 128 // In frames; higher values mean oscilloscope spans more time
 
@@ -16,7 +17,7 @@
     id           _timer;
     SInt16      *_buffer;
     float       *_scratchBuffer;
-    NSUInteger   _buffer_head;
+    int          _buffer_head;
 }
 @end
 
@@ -86,7 +87,7 @@ static void audioCallback(void *THIS, const AudioTimeStamp *time, UInt32 frames,
     CGContextBeginPath(ctx);
 
     while ( remainingFrames > 0 ) {
-        int framesToRender = MIN(remainingFrames, kBufferLength - _buffer_head);
+        int framesToRender = MIN(remainingFrames, kBufferLength - tail);
         
         vDSP_vramp(&x, &xIncrement, _scratchBuffer, 2, framesToRender);
         vDSP_vflt16(&_buffer[tail], 1, _scratchBuffer+1, 2, framesToRender);
@@ -95,7 +96,7 @@ static void audioCallback(void *THIS, const AudioTimeStamp *time, UInt32 frames,
         
         CGContextAddLines(ctx, (CGPoint*)_scratchBuffer, framesToRender);
         
-        x += framesToRender*xIncrement;
+        x += (framesToRender-1)*xIncrement;
         tail += framesToRender;
         if ( tail == kBufferLength ) tail = 0;
         remainingFrames -= framesToRender;
@@ -131,8 +132,10 @@ static void audioCallback(void *THISptr, const AudioTimeStamp *time, UInt32 fram
             }
         }
         
-        THIS->_buffer_head += framesToCopy;
-        if (  THIS->_buffer_head == kBufferLength ) THIS->_buffer_head = 0;
+        int buffer_head = THIS->_buffer_head + framesToCopy;
+        if ( buffer_head == kBufferLength ) buffer_head = 0;
+        OSMemoryBarrier();
+        THIS->_buffer_head = buffer_head;
         remainingFrames -= framesToCopy;
     }
 }
