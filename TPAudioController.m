@@ -549,7 +549,10 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 - (void)dealloc {
-    if ( _responsePollTimer ) [_responsePollTimer invalidate];
+    if ( _responsePollTimer ) {
+        [_responsePollTimer invalidate];
+        [_responsePollTimer release];
+    }
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [self stop];
     [self teardown];
@@ -622,7 +625,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 #endif
     
     // Start messaging poll timer
-    _responsePollTimer = [NSTimer scheduledTimerWithTimeInterval:kIdleMessagingPollDuration target:self selector:@selector(pollForMainThreadMessages) userInfo:nil repeats:YES];
+    _responsePollTimer = [[NSTimer scheduledTimerWithTimeInterval:kIdleMessagingPollDuration target:self selector:@selector(pollForMainThreadMessages) userInfo:nil repeats:YES] retain];
     
     // Start things up
     checkResult(AudioSessionSetActive(true), "AudioSessionSetActive");
@@ -1114,7 +1117,8 @@ static void processPendingMessagesOnRealtimeThread(TPAudioController *THIS) {
     if ( _pendingResponses == 0 ) {
         // Replace active poll timer with less demanding idle one
         [_responsePollTimer invalidate];
-        _responsePollTimer = [NSTimer scheduledTimerWithTimeInterval:kIdleMessagingPollDuration target:self selector:@selector(pollForMainThreadMessages) userInfo:nil repeats:YES];
+        [_responsePollTimer release];
+        _responsePollTimer = [[NSTimer scheduledTimerWithTimeInterval:kIdleMessagingPollDuration target:self selector:@selector(pollForMainThreadMessages) userInfo:nil repeats:YES] retain];
     }
 }
 
@@ -1129,9 +1133,11 @@ static void processPendingMessagesOnRealtimeThread(TPAudioController *THIS) {
         [responseBlock retain];
         _pendingResponses++;
         
-        if ( self.running && (!_responsePollTimer || _responsePollTimer.timeInterval == kIdleMessagingPollDuration) ) {
+        if ( self.running && _responsePollTimer.timeInterval == kIdleMessagingPollDuration ) {
             // Replace idle poll timer with more rapid active polling
-            _responsePollTimer = [NSTimer scheduledTimerWithTimeInterval:_preferredBufferDuration target:self selector:@selector(pollForMainThreadMessages) userInfo:nil repeats:YES];
+            [_responsePollTimer invalidate];
+            [_responsePollTimer release];
+            _responsePollTimer = [[NSTimer scheduledTimerWithTimeInterval:_preferredBufferDuration target:self selector:@selector(pollForMainThreadMessages) userInfo:nil repeats:YES] retain];
         }
     }
     
