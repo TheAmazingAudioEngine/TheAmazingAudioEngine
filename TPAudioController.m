@@ -77,8 +77,11 @@ typedef struct {
     void            *ptr;
     void            *userInfo;
     BOOL             playing;
+    float            volume;
+    float            pan;
+    BOOL             muted;
     callback_table_t callbacks;
-} channel_t;
+} channel_t, *TPChannel;
 
 /*!
  * Group graph state
@@ -94,6 +97,7 @@ enum {
  * Channel group
  */
 typedef struct _channel_group_t {
+    TPChannel           channel;
     AUNode              mixerNode;
     AudioUnit           mixerAudioUnit;
     channel_t           channels[kMaximumChannelsPerGroup];
@@ -104,16 +108,13 @@ typedef struct _channel_group_t {
     AudioStreamBasicDescription audioConverterTargetFormat;
     AudioStreamBasicDescription audioConverterSourceFormat;
     int                 graphState;
-    float               volume;
-    float               pan;
-    BOOL                muted;
 } channel_group_t;
 
 /*!
  * Channel producer argument
  */
 typedef struct {
-    channel_t *channel;
+    TPChannel channel;
     AudioTimeStamp inTimeStamp;
     AudioUnitRenderActionFlags *ioActionFlags;
 } channel_producer_arg_t;
@@ -142,8 +143,8 @@ typedef struct _message_t {
     BOOL                _audioSessionSetup;
     BOOL                _runningPriorToInterruption;
     
-    channel_group_t     _channels;
-    channel_t           _topLevelChannel;
+    TPChannelGroup      _topGroup;
+    channel_t           _topChannel;
     
     callback_table_t    _inputCallbacks;
     callback_table_t    _timingCallbacks;
@@ -156,37 +157,36 @@ typedef struct _message_t {
     char               *_renderConversionScratchBuffer;
 }
 
-- (BOOL)setup;
-- (void)teardown;
-- (void)updateGraph;
-
 - (void)pollForMainThreadMessages;
 static void processPendingMessagesOnRealtimeThread(TPAudioController *THIS);
 
-- (BOOL)initialiseGroupChannel:(channel_t*)channel parentGroup:(TPChannelGroup)parentGroup indexInParent:(int)index;
-- (void)configureGraphStateOfGroupChannel:(channel_t*)channel parentGroup:(TPChannelGroup)parentGroup indexInParent:(int)index;
-- (void)configureChannelsInRange:(NSRange)range forGroup:(TPChannelGroup)group;
+- (BOOL)setup;
+- (void)teardown;
+- (void)updateGraph;
+static BOOL initialiseGroupChannel(TPAudioController *THIS, TPChannel channel, TPChannelGroup parentGroup, int index);
+static void configureGraphStateOfGroupChannel(TPAudioController *THIS, TPChannel channel, TPChannelGroup parentGroup, int index);
+static void configureChannelsInRangeForGroup(TPAudioController *THIS, NSRange range, TPChannelGroup group);
+static long removeChannelsFromGroup(TPAudioController *THIS, long *matchingPtrArrayPtr, long *matchingUserInfoArrayPtr, long *channelsCount, void* groupPtr);
+- (void)gatherChannelsFromGroup:(TPChannelGroup)group intoArray:(NSMutableArray*)array;
 - (TPChannelGroup)searchForGroupContainingChannelMatchingPtr:(void*)ptr userInfo:(void*)userInfo index:(int*)index;
-
-- (void)updateVoiceProcessingSettings;
-static void updateInputDeviceStatus(TPAudioController *THIS);
+- (void)releaseResourcesForGroup:(TPChannelGroup)group;
+- (void)markGroupTorndown:(TPChannelGroup)group;
 
 static long addCallbackToTable(TPAudioController *THIS, long *callbackTablePtr, long *callbackPtr, long *userInfoPtr, void* outPtr);
 static long removeCallbackFromTable(TPAudioController *THIS, long *callbackTablePtr, long *callbackPtr, long *userInfoPtr, void* outPtr);
-- (NSArray *)callbacksFromTable:(callback_table_t*)table matchingFlag:(uint8_t)flag;
+- (NSArray *)objectsAssociatedWithCallbacksFromTable:(callback_table_t*)table matchingFlag:(uint8_t)flag;
 - (void)addCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannel:(id<TPAudioPlayable>)channelObj;
 - (void)addCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannelGroup:(TPChannelGroup)group;
 - (void)removeCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channelObj;
 - (void)removeCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group;
-- (NSArray*)callbacksWithFlags:(uint8_t)flags;
-- (NSArray*)callbacksWithFlags:(uint8_t)flags forChannel:(id<TPAudioPlayable>)channelObj;
-- (NSArray*)callbacksWithFlags:(uint8_t)flags forChannelGroup:(TPChannelGroup)group;
-- (void)setVariableSpeedFilter:(TPAudioControllerVariableSpeedFilterCallback)filter userInfo:(void *)userInfo forChannelStruct:(channel_t*)channel;
-- (void)releaseGroupResources:(TPChannelGroup)group freeGroupMemory:(BOOL)freeGroup;
-- (void)teardownGroup:(TPChannelGroup)group;
+- (NSArray*)objectsAssociatedWithCallbacksWithFlags:(uint8_t)flags;
+- (NSArray*)objectsAssociatedWithCallbacksWithFlags:(uint8_t)flags forChannel:(id<TPAudioPlayable>)channelObj;
+- (NSArray*)objectsAssociatedWithCallbacksWithFlags:(uint8_t)flags forChannelGroup:(TPChannelGroup)group;
+- (void)setVariableSpeedFilter:(id<TPAudioVariableSpeedFilter>)filter forChannelStruct:(TPChannel)channel;
+static void handleCallbacksForChannel(TPChannel channel, const AudioTimeStamp *inTimeStamp, UInt32 inNumberFrames, AudioBufferList *ioData);
 
-static void handleCallbacksForChannel(channel_t *channel, const AudioTimeStamp *inTimeStamp, UInt32 inNumberFrames, AudioBufferList *ioData);
-static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UInt32 frames);
+- (void)updateVoiceProcessingSettings;
+static void updateInputDeviceStatus(TPAudioController *THIS);
 @end
 
 @implementation TPAudioController
@@ -287,8 +287,60 @@ static void inputAvailablePropertyListener (void *inClientData, AudioSessionProp
 #pragma mark -
 #pragma mark Input and render callbacks
 
+static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UInt32 frames) {
+    channel_producer_arg_t *arg = (channel_producer_arg_t*)userInfo;
+    TPChannel channel = arg->channel;
+    
+    OSStatus status = noErr;
+    
+    if ( channel->type == kChannelTypeChannel ) {
+        TPAudioControllerRenderCallback callback = (TPAudioControllerRenderCallback) channel->ptr;
+        id<TPAudioPlayable> channelObj = (id<TPAudioPlayable>) channel->userInfo;
+        
+        status = callback(channelObj, &arg->inTimeStamp, frames, audio);
+        
+    } else if ( channel->type == kChannelTypeGroup ) {
+        TPChannelGroup group = (TPChannelGroup)channel->ptr;
+        
+        AudioBufferList *bufferList;
+        
+        if ( group->converterRequired ) {
+            // Initialise output buffer
+            char audioBufferListSpace[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
+            bufferList = (AudioBufferList*)audioBufferListSpace;
+            bufferList->mNumberBuffers = (group->audioConverterSourceFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? group->audioConverterSourceFormat.mChannelsPerFrame : 1;
+            char *dataPtr = group->audioConverterScratchBuffer;
+            for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
+                bufferList->mBuffers[i].mNumberChannels = (group->audioConverterSourceFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? 1 : group->audioConverterSourceFormat.mChannelsPerFrame;
+                bufferList->mBuffers[i].mData           = dataPtr;
+                bufferList->mBuffers[i].mDataByteSize   = group->audioConverterSourceFormat.mBytesPerFrame * frames;
+                dataPtr += bufferList->mBuffers[i].mDataByteSize;
+            }
+            
+        } else {
+            // We can render straight to the buffer, as audio format is the same
+            bufferList = audio;
+        }
+        
+        // Tell mixer to render into bufferList
+        OSStatus status = AudioUnitRender(group->mixerAudioUnit, arg->ioActionFlags, &arg->inTimeStamp, 0, frames, bufferList);
+        if ( !checkResult(status, "AudioUnitRender") ) return status;
+        
+        if ( group->converterRequired ) {
+            // Perform conversion
+            status = AudioConverterConvertComplexBuffer(group->audioConverter, frames, bufferList, audio);
+            checkResult(status, "AudioConverterConvertComplexBuffer");
+        }
+    }
+    
+    // Advance the sample time, to make sure we continue to render if we're called again with the same arguments
+    arg->inTimeStamp.mSampleTime += frames;
+    
+    return status;
+}
+
 static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
-    channel_t *channel = (channel_t*)inRefCon;
+    TPChannel channel = (TPChannel)inRefCon;
     
     if ( channel->ptr == NULL || !channel->playing ) {
         *ioActionFlags |= kAudioUnitRenderAction_OutputIsSilence;
@@ -334,23 +386,18 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
     int sampleCount = inNumberFrames * THIS->_audioDescription.mChannelsPerFrame;
     
     // Render audio into buffer
-    struct bufferlist_t { AudioBufferList bufferList; AudioBuffer nextBuffer; } buffers;
-    
     AudioStreamBasicDescription asbd = THIS->_audioDescription;
     
-    buffers.bufferList.mNumberBuffers = asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? asbd.mChannelsPerFrame : 1;
-    
-    buffers.bufferList.mBuffers[0].mNumberChannels = asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? 1 : asbd.mChannelsPerFrame;
-    buffers.bufferList.mBuffers[0].mData = NULL;
-    buffers.bufferList.mBuffers[0].mDataByteSize = inNumberFrames * asbd.mBytesPerFrame;
-    
-    if ( asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved && asbd.mChannelsPerFrame == 2 ) {
-        buffers.bufferList.mBuffers[1].mNumberChannels = asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? 1 : asbd.mChannelsPerFrame;
-        buffers.bufferList.mBuffers[1].mData = NULL;
-        buffers.bufferList.mBuffers[1].mDataByteSize = inNumberFrames * asbd.mBytesPerFrame;
+    char audioBufferListSpace[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
+    AudioBufferList *bufferList = (AudioBufferList*)audioBufferListSpace;
+    bufferList->mNumberBuffers = asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? asbd.mChannelsPerFrame : 1;
+    for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
+        bufferList->mBuffers[i].mNumberChannels = asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? 1 : asbd.mChannelsPerFrame;
+        bufferList->mBuffers[i].mData = NULL;
+        bufferList->mBuffers[i].mDataByteSize = inNumberFrames * asbd.mBytesPerFrame;
     }
     
-    OSStatus err = AudioUnitRender(THIS->_ioAudioUnit, ioActionFlags, inTimeStamp, 1, inNumberFrames, &buffers.bufferList);
+    OSStatus err = AudioUnitRender(THIS->_ioAudioUnit, ioActionFlags, inTimeStamp, 1, inNumberFrames, bufferList);
     if ( !checkResult(err, "AudioUnitRender") ) { 
         return err; 
     }
@@ -358,20 +405,20 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
     if ( THIS->_numberOfInputChannels == 1 && asbd.mChannelsPerFrame == 2 && !THIS->_receiveMonoInputAsBridgedStereo ) {
         // Convert audio from stereo with only one channel provided, to proper mono
         if ( asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved ) {
-            buffers.bufferList.mNumberBuffers = 1;
+            bufferList->mNumberBuffers = 1;
         } else {
             // Need to replaced interleaved stereo audio with just mono audio
             sampleCount /= 2;
-            buffers.bufferList.mBuffers[0].mDataByteSize /= 2;
+            bufferList->mBuffers[0].mDataByteSize /= 2;
             
             // We support doing this for a couple of different audio formats
             if ( asbd.mBitsPerChannel == sizeof(SInt16)*8 ) {
-                SInt16 *buffer = buffers.bufferList.mBuffers[0].mData;
+                SInt16 *buffer = bufferList->mBuffers[0].mData;
                 for ( UInt32 i = 0, j = 0; i < sampleCount; i++, j+=2 ) {
                     buffer[i] = buffer[j];
                 }
             } else if ( asbd.mBitsPerChannel == sizeof(SInt32)*8 ) {
-                SInt32 *buffer = buffers.bufferList.mBuffers[0].mData;
+                SInt32 *buffer = bufferList->mBuffers[0].mData;
                 for ( UInt32 i = 0, j = 0; i < sampleCount; i++, j+=2 ) {
                     buffer[i] = buffer[j];
                 }
@@ -385,14 +432,14 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
     // Pass audio to input callbacks
     for ( int i=0; i<THIS->_inputCallbacks.count; i++ ) {
         callback_t *callback = &THIS->_inputCallbacks.callbacks[i];
-        ((TPAudioControllerAudioCallback)callback->callback)(callback->userInfo, inTimeStamp, inNumberFrames, &buffers.bufferList);
+        ((TPAudioControllerAudioCallback)callback->callback)(callback->userInfo, inTimeStamp, inNumberFrames, bufferList);
     }
     
     return noErr;
 }
 
 static OSStatus groupRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
-    channel_t *channel = (channel_t*)inRefCon;
+    TPChannel channel = (TPChannel)inRefCon;
     TPChannelGroup group = (TPChannelGroup)channel->ptr;
     
     if ( (*ioActionFlags & kAudioUnitRenderAction_PostRender) ) {
@@ -401,8 +448,8 @@ static OSStatus groupRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionF
         
         if ( group->converterRequired ) {
             // Initialise output buffer
-            struct { AudioBufferList bufferList; AudioBuffer nextBuffer; } buffers;
-            bufferList = &buffers.bufferList;
+            char audioBufferListSpace[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
+            bufferList = (AudioBufferList*)audioBufferListSpace;
             bufferList->mNumberBuffers = (group->audioConverterTargetFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? group->audioConverterTargetFormat.mChannelsPerFrame : 1;
             char *dataPtr = group->audioConverterScratchBuffer;
             for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
@@ -570,7 +617,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         _renderConversionScratchBuffer = NULL;
     }
     
-    [self releaseGroupResources:&_channels freeGroupMemory:NO];
+    [self removeChannelGroup:_topGroup];
     
     TPACCircularBufferCleanup(&_realtimeThreadMessageBuffer);
     TPACCircularBufferCleanup(&_mainThreadMessageBuffer);
@@ -642,7 +689,46 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 #pragma mark - Channel and channel group management
 
 - (void)addChannels:(NSArray*)channels {
-    [self addChannels:channels toChannelGroup:&_channels];
+    [self addChannels:channels toChannelGroup:_topGroup];
+}
+
+- (void)addChannels:(NSArray*)channels toChannelGroup:(TPChannelGroup)group {
+    // Remove the channels from the system, if they're already added
+    [self removeChannels:channels];
+    
+    // Add to group's channel array
+    for ( id<TPAudioPlayable> channel in channels ) {
+        if ( group->channelCount == kMaximumChannelsPerGroup ) {
+            NSLog(@"Warning: Channel limit reached");
+            break;
+        }
+        
+        [channel retain];
+        
+        for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", @"playing", @"muted", nil] ) {
+            [(NSObject*)channel addObserver:self forKeyPath:property options:0 context:NULL];
+        }
+        
+        TPChannel channelElement = &group->channels[group->channelCount++];
+        
+        channelElement->type        = kChannelTypeChannel;
+        channelElement->ptr         = channel.renderCallback;
+        channelElement->userInfo    = channel;
+        channelElement->playing     = [channel respondsToSelector:@selector(playing)] ? channel.playing : YES;
+        channelElement->volume      = [channel respondsToSelector:@selector(volume)] ? channel.volume : 1.0;
+        channelElement->pan         = [channel respondsToSelector:@selector(pan)] ? channel.pan : 0.0;
+        channelElement->muted       = [channel respondsToSelector:@selector(muted)] ? channel.muted : NO;
+    }
+    
+    // Set bus count
+    UInt32 busCount = group->channelCount;
+    OSStatus result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &busCount, sizeof(busCount));
+    if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) return;
+    
+    // Configure each channel
+    configureChannelsInRangeForGroup(self, NSMakeRange(group->channelCount - [channels count], [channels count]), group);
+    
+    [self updateGraph];
 }
 
 - (void)removeChannels:(NSArray *)channels {
@@ -670,197 +756,13 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     }
 }
 
-- (void)gatherChannelsFromGroup:(TPChannelGroup)group intoArray:(NSMutableArray*)array {
-    for ( int i=0; i<group->channelCount; i++ ) {
-        channel_t *channel = &group->channels[i];
-        if ( channel->type == kChannelTypeGroup ) {
-            [self gatherChannelsFromGroup:(TPChannelGroup)channel->ptr intoArray:array];
-        } else {
-            [array addObject:(id)channel->userInfo];
-        }
-    }
-}
-
--(NSArray *)channels {
-    NSMutableArray *channels = [NSMutableArray array];
-    [self gatherChannelsFromGroup:&_channels intoArray:channels];
-    return channels;
-}
-
-- (TPChannelGroup)createChannelGroup {
-    return [self createChannelGroupWithinChannelGroup:&_channels];
-}
-
-- (TPChannelGroup)createChannelGroupWithinChannelGroup:(TPChannelGroup)parentGroup {
-    if ( parentGroup->channelCount == kMaximumChannelsPerGroup ) {
-        NSLog(@"Maximum channels reached in group %p\n", parentGroup);
-        return NULL;
-    }
-    
-    // Allocate group
-    TPChannelGroup group = (TPChannelGroup)calloc(1, sizeof(channel_group_t));
-    group->volume = 1.0;
-    group->pan = 0.0;
-    
-    // Add group as a channel to the parent group
-    int groupIndex = parentGroup->channelCount;
-    
-    channel_t *channel = &parentGroup->channels[groupIndex];
-    memset(channel, 0, sizeof(channel_t));
-    channel->type = kChannelTypeGroup;
-    channel->ptr = group;
-    channel->playing = YES;
-    
-    parentGroup->channelCount++;    
-
-    // Initialise group
-    [self initialiseGroupChannel:channel parentGroup:parentGroup indexInParent:groupIndex];
-
-    [self updateGraph];
-    
-    return group;
-}
-
-static long removeChannelsFromGroup(TPAudioController *THIS, long *matchingPtrArrayPtr, long *matchingUserInfoArrayPtr, long *channelsCount, void* groupPtr) {
-    void **ptrArray = (void**)*matchingPtrArrayPtr;
-    void **userInfoArray = (void**)*matchingUserInfoArrayPtr;
-    TPChannelGroup group = (TPChannelGroup)groupPtr;
-    
-    for ( int i=0; i < *channelsCount; i++ ) {
-        
-        // Find the channel in our fixed array
-        int index = 0;
-        for ( index=0; index < group->channelCount; index++ ) {
-            if ( group->channels[index].ptr == ptrArray[i] && group->channels[index].userInfo == userInfoArray[i] ) {
-                break;
-            }
-        }
-        
-        if ( index < group->channelCount ) {
-            group->channelCount--;
-            
-            if ( index < group->channelCount ) {
-                // Shuffle the later elements backwards one space
-                memmove(&group->channels[index], &group->channels[index+1], (group->channelCount-index) * sizeof(channel_t));
-            }
-            
-            // Zero out the now-unused space
-            memset(&group->channels[group->channelCount], 0, sizeof(channel_t));
-        }
-    }
-    
-    return group->channelCount;
-}
-
-- (void)removeChannelGroup:(TPChannelGroup)group {
-    
-    // Find group's parent
-    TPChannelGroup parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:NULL];
-    NSAssert(parentGroup != NULL, @"Channel group not found");
-    
-    // Move all channels beneath this group to the root group
-    NSMutableArray *channels = [NSMutableArray array];
-    [self gatherChannelsFromGroup:group intoArray:channels];
-    if ( [channels count] > 0 ) {
-        [self addChannels:channels toChannelGroup:&_channels];
-    }
-
-    // Set new bus count of parent group
-    UInt32 busCount = parentGroup->channelCount - 1;
-    OSStatus result = AudioUnitSetProperty(parentGroup->mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &busCount, sizeof(busCount));
-    if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) return;
-    
-    // Remove the group from the parent group's table, on the core audio thread
-    void* ptrMatchArray[1] = { group };
-    void* userInfoMatchArray[1] = { NULL };
-    [self performSynchronousMessageExchangeWithHandler:&removeChannelsFromGroup parameter1:(long)&ptrMatchArray parameter2:(long)&userInfoMatchArray parameter3:1 ioOpaquePtr:parentGroup];
-
-    // Reconfigure all channels for container group
-    [self configureChannelsInRange:NSMakeRange(0, parentGroup->channelCount) forGroup:parentGroup];
-    
-    // Release group resources
-    [self releaseGroupResources:group freeGroupMemory:YES];
-    
-    [self updateGraph];
-}
-
-- (NSArray*)topLevelChannelGroups {
-    return [self channelGroupsInChannelGroup:&_channels];
-}
-
-- (NSArray*)channelGroupsInChannelGroup:(TPChannelGroup)group {
-    NSMutableArray *groups = [NSMutableArray array];
-    for ( int i=0; i<group->channelCount; i++ ) {
-        channel_t *channel = &group->channels[i];
-        if ( channel->type == kChannelTypeGroup ) {
-            [groups addObject:[NSValue valueWithPointer:channel->ptr]];
-        }
-    }
-    return groups;
-}
-
-- (void)addChannels:(NSArray*)channels toChannelGroup:(TPChannelGroup)group {
-    // Remove the channels from the system, if they're already added
-    [self removeChannels:channels];
-    
-    // Add to group's channel array
-    for ( id<TPAudioPlayable> channel in channels ) {
-        if ( group->channelCount == kMaximumChannelsPerGroup ) {
-            NSLog(@"Warning: Channel limit reached");
-            break;
-        }
-        
-        [channel retain];
-        
-        for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", @"playing", @"muted", nil] ) {
-            [(NSObject*)channel addObserver:self forKeyPath:property options:0 context:NULL];
-        }
-        
-        channel_t *channelElement = &group->channels[group->channelCount++];
-        
-        channelElement->type = kChannelTypeChannel;
-        channelElement->ptr = channel.renderCallback;
-        channelElement->userInfo = channel;
-        channelElement->playing = [channel respondsToSelector:@selector(playing)] ? channel.playing : YES;
-    }
-    
-    // Set bus count
-    UInt32 busCount = group->channelCount;
-    OSStatus result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &busCount, sizeof(busCount));
-    if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) return;
-    
-    // Configure each channel
-    [self configureChannelsInRange:NSMakeRange(group->channelCount - [channels count], [channels count]) forGroup:group];
-    
-    [self updateGraph];
-}
-
 - (void)removeChannels:(NSArray*)channels fromChannelGroup:(TPChannelGroup)group {
-    // Set new bus count
-    UInt32 busCount = group->channelCount - [channels count];
-    
-    NSAssert(busCount >= 0, @"Tried to remove channels that weren't added");
-    
-    if ( busCount == 0 ) busCount = 1; // Note: Mixer must have at least 1 channel. It'll just be silent.
-    OSStatus result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &busCount, sizeof(busCount));
-    if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) return;
-    
-    if ( group->channelCount - [channels count] == 0 ) {
-        // Remove render callback and disconnect channel 0, as the mixer must have at least 1 channel, and we want to leave it disconnected
-
-        // Remove any render callback
-        AURenderCallbackStruct rcbs;
-        rcbs.inputProc = NULL;
-        rcbs.inputProcRefCon = NULL;
-        checkResult(AUGraphSetNodeInputCallback(_audioGraph, group->mixerNode, 0, &rcbs),
-                    "AUGraphSetNodeInputCallback");
-        
-        // Make sure the mixer input isn't connected to anything
-        checkResult(AUGraphDisconnectNodeInput(_audioGraph, group->mixerNode, 0), 
-                    "AUGraphDisconnectNodeInput");
+    // Get a list of all the callback objects for these channels
+    NSMutableArray *callbackObjects = [NSMutableArray array];
+    for ( id<TPAudioPlayable> channel in channels ) {
+        NSArray *objects = [self objectsAssociatedWithCallbacksWithFlags:0 forChannel:channel];
+        [callbackObjects addObjectsFromArray:objects];
     }
-    
-    [self updateGraph];
     
     // Remove the channels from the tables, on the core audio thread
     void* ptrMatchArray[[channels count]];
@@ -871,9 +773,6 @@ static long removeChannelsFromGroup(TPAudioController *THIS, long *matchingPtrAr
     }
     [self performSynchronousMessageExchangeWithHandler:&removeChannelsFromGroup parameter1:(long)&ptrMatchArray parameter2:(long)&userInfoMatchArray parameter3:[channels count] ioOpaquePtr:group];
     
-    // Now reconfigure all channels
-    [self configureChannelsInRange:NSMakeRange(0, group->channelCount) forGroup:group];
-    
     // Finally, stop observing and release channels
     for ( NSObject *channel in channels ) {
         for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", @"playing", @"muted", nil] ) {
@@ -881,6 +780,68 @@ static long removeChannelsFromGroup(TPAudioController *THIS, long *matchingPtrAr
         }
     }
     [channels makeObjectsPerformSelector:@selector(release)];
+    
+    // And release the associated callback objects
+    [callbackObjects makeObjectsPerformSelector:@selector(release)];
+}
+
+
+- (void)removeChannelGroup:(TPChannelGroup)group {
+    
+    // Find group's parent
+    TPChannelGroup parentGroup = (group == _topGroup ? NULL : [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:NULL]);
+    NSAssert(group == _topGroup || parentGroup != NULL, @"Channel group not found");
+    
+    // Get a list of contained channels
+    NSMutableArray *channelsWithinGroup = [NSMutableArray array];
+    [self gatherChannelsFromGroup:group intoArray:channelsWithinGroup];
+    
+    // Get a list of all the callback objects for these channels
+    NSMutableArray *channelCallbackObjects = [NSMutableArray array];
+    for ( id<TPAudioPlayable> channel in channelsWithinGroup ) {
+        NSArray *objects = [self objectsAssociatedWithCallbacksWithFlags:0 forChannel:channel];
+        [channelCallbackObjects addObjectsFromArray:objects];
+    }
+    
+    // Get a list of callback objects for this group
+    NSArray *groupCallbackObjects = [self objectsAssociatedWithCallbacksWithFlags:0 forChannelGroup:group];
+    
+    if ( parentGroup ) {
+        // Remove the group from the parent group's table, on the core audio thread
+        void* ptrMatchArray[1] = { group };
+        void* userInfoMatchArray[1] = { NULL };
+        [self performSynchronousMessageExchangeWithHandler:&removeChannelsFromGroup 
+                                                parameter1:(long)&ptrMatchArray
+                                                parameter2:(long)&userInfoMatchArray
+                                                parameter3:1 
+                                               ioOpaquePtr:parentGroup];
+    }
+    
+    // Release channel resources
+    [channelsWithinGroup makeObjectsPerformSelector:@selector(release)];
+    [channelCallbackObjects makeObjectsPerformSelector:@selector(release)];
+    
+    // Release group resources
+    [groupCallbackObjects makeObjectsPerformSelector:@selector(release)];
+    
+    // Release subgroup resources
+    for ( int i=0; i<group->channelCount; i++ ) {
+        TPChannel channel = &group->channels[i];
+        if ( channel->type == kChannelTypeGroup ) {
+            [self releaseResourcesForGroup:(TPChannelGroup)channel->ptr];
+            channel->ptr = NULL;
+        }
+    }
+    
+    free(group);
+    
+    [self updateGraph];
+}
+
+-(NSArray *)channels {
+    NSMutableArray *channels = [NSMutableArray array];
+    [self gatherChannelsFromGroup:_topGroup intoArray:channels];
+    return channels;
 }
 
 - (NSArray*)channelsInChannelGroup:(TPChannelGroup)group {
@@ -893,12 +854,65 @@ static long removeChannelsFromGroup(TPAudioController *THIS, long *matchingPtrAr
     return channels;
 }
 
+
+- (TPChannelGroup)createChannelGroup {
+    return [self createChannelGroupWithinChannelGroup:_topGroup];
+}
+
+- (TPChannelGroup)createChannelGroupWithinChannelGroup:(TPChannelGroup)parentGroup {
+    if ( parentGroup->channelCount == kMaximumChannelsPerGroup ) {
+        NSLog(@"Maximum channels reached in group %p\n", parentGroup);
+        return NULL;
+    }
+    
+    // Allocate group
+    TPChannelGroup group = (TPChannelGroup)calloc(1, sizeof(channel_group_t));
+    
+    // Add group as a channel to the parent group
+    int groupIndex = parentGroup->channelCount;
+    
+    TPChannel channel = &parentGroup->channels[groupIndex];
+    memset(channel, 0, sizeof(channel_t));
+    channel->type    = kChannelTypeGroup;
+    channel->ptr     = group;
+    channel->playing = YES;
+    channel->volume  = 1.0;
+    channel->pan     = 0.0;
+    channel->muted   = NO;
+    
+    group->channel   = channel;
+    
+    parentGroup->channelCount++;    
+
+    // Initialise group
+    initialiseGroupChannel(self, channel, parentGroup, groupIndex);
+
+    [self updateGraph];
+    
+    return group;
+}
+
+- (NSArray*)topLevelChannelGroups {
+    return [self channelGroupsInChannelGroup:_topGroup];
+}
+
+- (NSArray*)channelGroupsInChannelGroup:(TPChannelGroup)group {
+    NSMutableArray *groups = [NSMutableArray array];
+    for ( int i=0; i<group->channelCount; i++ ) {
+        TPChannel channel = &group->channels[i];
+        if ( channel->type == kChannelTypeGroup ) {
+            [groups addObject:[NSValue valueWithPointer:channel->ptr]];
+        }
+    }
+    return groups;
+}
+
 - (void)setVolume:(float)volume forChannelGroup:(TPChannelGroup)group {
     int index;
     TPChannelGroup parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
     NSAssert(parentGroup != NULL, @"Channel not found");
     
-    AudioUnitParameterValue value = group->volume = volume;
+    AudioUnitParameterValue value = group->channel->volume = volume;
     OSStatus result = AudioUnitSetParameter(parentGroup->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, index, value, 0);
     checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
 }
@@ -908,7 +922,7 @@ static long removeChannelsFromGroup(TPAudioController *THIS, long *matchingPtrAr
     TPChannelGroup parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
     NSAssert(parentGroup != NULL, @"Channel not found");
     
-    AudioUnitParameterValue value = group->pan = pan;
+    AudioUnitParameterValue value = group->channel->pan = pan;
     if ( value == -1.0 ) value = -0.999; // Workaround for pan limits bug
     if ( value == 1.0 ) value = 0.999;
     OSStatus result = AudioUnitSetParameter(parentGroup->mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, index, value, 0);
@@ -920,155 +934,166 @@ static long removeChannelsFromGroup(TPAudioController *THIS, long *matchingPtrAr
     TPChannelGroup parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
     NSAssert(parentGroup != NULL, @"Channel not found");
     
-    AudioUnitParameterValue value = group->muted = muted;
+    AudioUnitParameterValue value = group->channel->muted = muted;
     OSStatus result = AudioUnitSetParameter(parentGroup->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
     checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
 }
 
 #pragma mark - Filters
 
-- (void)addFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo {
-    [self addCallback:filter userInfo:userInfo flags:kCallbackIsFilterFlag forChannelGroup:&_channels];
+- (void)addFilter:(id<TPAudioFilter>)filter {
+    [filter retain];
+    [self addCallback:filter.filterCallback userInfo:filter flags:kCallbackIsFilterFlag forChannelGroup:_topGroup];
 }
 
-- (void)addFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo toChannel:(id<TPAudioPlayable>)channel {
-    [self addCallback:filter userInfo:userInfo flags:kCallbackIsFilterFlag forChannel:channel];
+- (void)addFilter:(id<TPAudioFilter>)filter toChannel:(id<TPAudioPlayable>)channel {
+    [filter retain];
+    [self addCallback:filter.filterCallback userInfo:filter flags:kCallbackIsFilterFlag forChannel:channel];
 }
 
-- (void)addFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo toChannelGroup:(TPChannelGroup)group {
-    [self addCallback:filter userInfo:userInfo flags:kCallbackIsFilterFlag forChannelGroup:group];
+- (void)addFilter:(id<TPAudioFilter>)filter toChannelGroup:(TPChannelGroup)group {
+    [filter retain];
+    [self addCallback:filter.filterCallback userInfo:filter flags:kCallbackIsFilterFlag forChannelGroup:group];
 }
 
-- (void)removeFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo {
-    [self removeFilter:filter userInfo:userInfo fromChannelGroup:&_channels];
+- (void)removeFilter:(id<TPAudioFilter>)filter {
+    [self removeCallback:filter.filterCallback userInfo:filter fromChannelGroup:_topGroup];
+    [filter release];
 }
 
-- (void)removeFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channel {
-    [self removeCallback:filter userInfo:userInfo fromChannel:channel];
+- (void)removeFilter:(id<TPAudioFilter>)filter fromChannel:(id<TPAudioPlayable>)channel {
+    [self removeCallback:filter.filterCallback userInfo:filter fromChannel:channel];
+    [filter release];
 }
 
-- (void)removeFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group {
-    [self removeCallback:filter userInfo:userInfo fromChannelGroup:group];
+- (void)removeFilter:(id<TPAudioFilter>)filter fromChannelGroup:(TPChannelGroup)group {
+    [self removeCallback:filter.filterCallback userInfo:filter fromChannelGroup:group];
+    [filter release];
 }
 
 - (NSArray*)filters {
-    return [self callbacksWithFlags:kCallbackIsFilterFlag];
+    return [self objectsAssociatedWithCallbacksWithFlags:kCallbackIsFilterFlag];
 }
 
 - (NSArray*)filtersForChannel:(id<TPAudioPlayable>)channel {
-    return [self callbacksWithFlags:kCallbackIsFilterFlag forChannel:channel];
+    return [self objectsAssociatedWithCallbacksWithFlags:kCallbackIsFilterFlag forChannel:channel];
 }
 
 - (NSArray*)filtersForChannelGroup:(TPChannelGroup)group {
-    return [self callbacksWithFlags:kCallbackIsFilterFlag forChannelGroup:group];
+    return [self objectsAssociatedWithCallbacksWithFlags:kCallbackIsFilterFlag forChannelGroup:group];
 }
 
-#pragma mark - Variable speed filters
-
-- (void)setVariableSpeedFilter:(TPAudioControllerVariableSpeedFilterCallback)filter userInfo:(void*)userInfo {
-    [self setVariableSpeedFilter:filter userInfo:userInfo forChannelGroup:&_channels];
+- (void)setVariableSpeedFilter:(id<TPAudioVariableSpeedFilter>)filter {
+    [self setVariableSpeedFilter:filter forChannelGroup:_topGroup];
 }
 
-- (void)setVariableSpeedFilter:(TPAudioControllerVariableSpeedFilterCallback)filter userInfo:(void*)userInfo forChannel:(id<TPAudioPlayable>)channelObj {
+- (void)setVariableSpeedFilter:(id<TPAudioVariableSpeedFilter>)filter forChannel:(id<TPAudioPlayable>)channelObj {
     int index=0;
     TPChannelGroup parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:channelObj index:&index];
     NSAssert(parentGroup != NULL, @"Channel not found");
     
-    channel_t *channel = &parentGroup->channels[index];
+    TPChannel channel = &parentGroup->channels[index];
     
-    [self setVariableSpeedFilter:filter userInfo:userInfo forChannelStruct:channel];
+    [self setVariableSpeedFilter:filter forChannelStruct:channel];
 }
 
-- (void)setVariableSpeedFilter:(TPAudioControllerVariableSpeedFilterCallback)filter userInfo:(void*)userInfo forChannelGroup:(TPChannelGroup)group {
-    channel_t *channel = NULL;
+- (void)setVariableSpeedFilter:(id<TPAudioVariableSpeedFilter>)filter forChannelGroup:(TPChannelGroup)group {
+    [self setVariableSpeedFilter:filter forChannelStruct:group->channel];
+    
     TPChannelGroup parentGroup = NULL;
     int index=0;
-    
-    if ( group == &_channels ) {
-        channel = &_topLevelChannel;
-    } else {
+    if ( group != _topGroup ) {
         parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
         NSAssert(parentGroup != NULL, @"Channel group not found");
-        channel = &parentGroup->channels[index];
     }
     
-    [self setVariableSpeedFilter:filter userInfo:userInfo forChannelStruct:channel];
-    
-    [self configureGraphStateOfGroupChannel:channel parentGroup:parentGroup indexInParent:index];
+    configureGraphStateOfGroupChannel(self, group->channel, parentGroup, index);
 }
 
-#pragma mark - Output callbacks
+#pragma mark - Output receivers
 
-- (void)addOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo {
-    [self addCallback:callback userInfo:userInfo flags:kCallbackIsOutputCallbackFlag forChannelGroup:&_channels];
+- (void)addOutputReceiver:(id<TPAudioReceiver>)receiver {
+    [receiver retain];
+    [self addCallback:receiver.receiverCallback userInfo:receiver flags:kCallbackIsOutputCallbackFlag forChannelGroup:_topGroup];
 }
 
-- (void)addOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo forChannel:(id<TPAudioPlayable>)channel {
-    [self addCallback:callback userInfo:userInfo flags:kCallbackIsOutputCallbackFlag forChannel:channel];
+- (void)addOutputReceiver:(id<TPAudioReceiver>)receiver forChannel:(id<TPAudioPlayable>)channel {
+    [receiver retain];
+    [self addCallback:receiver.receiverCallback userInfo:receiver flags:kCallbackIsOutputCallbackFlag forChannel:channel];
 }
 
-- (void)addOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo forChannelGroup:(TPChannelGroup)group {
-    [self addCallback:callback userInfo:userInfo flags:kCallbackIsOutputCallbackFlag forChannelGroup:group];
+- (void)addOutputReceiver:(id<TPAudioReceiver>)receiver forChannelGroup:(TPChannelGroup)group {
+    [receiver retain];
+    [self addCallback:receiver.receiverCallback userInfo:receiver flags:kCallbackIsOutputCallbackFlag forChannelGroup:group];
 }
 
-- (void)removeOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo {
-    [self removeCallback:callback userInfo:userInfo fromChannelGroup:&_channels];
+- (void)removeOutputReceiver:(id<TPAudioReceiver>)receiver {
+    [self removeCallback:receiver.receiverCallback userInfo:receiver fromChannelGroup:_topGroup];
+    [receiver release];
 }
 
-- (void)removeOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channel {
-    [self removeCallback:callback userInfo:userInfo fromChannel:channel];
+- (void)removeOutputReceiver:(id<TPAudioReceiver>)receiver fromChannel:(id<TPAudioPlayable>)channel {
+    [self removeCallback:receiver.receiverCallback userInfo:receiver fromChannel:channel];
+    [receiver release];
 }
 
-- (void)removeOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group {
-    [self removeCallback:callback userInfo:userInfo fromChannelGroup:group];
+- (void)removeOutputReceiver:(id<TPAudioReceiver>)receiver fromChannelGroup:(TPChannelGroup)group {
+    [self removeCallback:receiver.receiverCallback userInfo:receiver fromChannelGroup:group];
+    [receiver release];
 }
 
-- (NSArray*)outputCallbacks {
-    return [self callbacksWithFlags:kCallbackIsOutputCallbackFlag];
+- (NSArray*)outputReceivers {
+    return [self objectsAssociatedWithCallbacksWithFlags:kCallbackIsOutputCallbackFlag];
 }
 
-- (NSArray*)outputCallbacksForChannel:(id<TPAudioPlayable>)channel {
-    return [self callbacksWithFlags:kCallbackIsOutputCallbackFlag forChannel:channel];
+- (NSArray*)outputReceiversForChannel:(id<TPAudioPlayable>)channel {
+    return [self objectsAssociatedWithCallbacksWithFlags:kCallbackIsOutputCallbackFlag forChannel:channel];
 }
 
-- (NSArray*)outputCallbacksForChannelGroup:(TPChannelGroup)group {
-    return [self callbacksWithFlags:kCallbackIsOutputCallbackFlag forChannelGroup:group];
+- (NSArray*)outputReceiversForChannelGroup:(TPChannelGroup)group {
+    return [self objectsAssociatedWithCallbacksWithFlags:kCallbackIsOutputCallbackFlag forChannelGroup:group];
 }
 
-#pragma mark - Other callbacks
+#pragma mark - Input receivers
 
-- (void)addInputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo {
+- (void)addInputReceiver:(id<TPAudioReceiver>)receiver {
     if ( _inputCallbacks.count == kMaximumCallbacksPerSource ) {
         NSLog(@"Warning: Maximum number of callbacks reached");
         return;
     }
     
-    [self performAsynchronousMessageExchangeWithHandler:&addCallbackToTable parameter1:(long)callback parameter2:(long)userInfo parameter3:0 ioOpaquePtr:&_inputCallbacks responseBlock:nil];
+    [receiver retain];
+    [self performSynchronousMessageExchangeWithHandler:&addCallbackToTable parameter1:(long)receiver.receiverCallback parameter2:(long)receiver parameter3:0 ioOpaquePtr:&_inputCallbacks];
 }
 
-- (void)removeInputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo {
-    [self performAsynchronousMessageExchangeWithHandler:&removeCallbackFromTable parameter1:(long)callback parameter2:(long)userInfo parameter3:0 ioOpaquePtr:&_inputCallbacks responseBlock:nil];
+- (void)removeInputReceiver:(id<TPAudioReceiver>)receiver {
+    [self performSynchronousMessageExchangeWithHandler:&removeCallbackFromTable parameter1:(long)receiver.receiverCallback parameter2:(long)receiver parameter3:0 ioOpaquePtr:&_inputCallbacks];
+    [receiver release];
 }
 
--(NSArray *)inputCallbacks {
-    return [self callbacksFromTable:&_inputCallbacks matchingFlag:0];
+-(NSArray *)inputReceivers {
+    return [self objectsAssociatedWithCallbacksFromTable:&_inputCallbacks matchingFlag:0];
 }
 
-- (void)addTimingCallback:(TPAudioControllerTimingCallback)callback userInfo:(void *)userInfo {
+#pragma mark - Timing receivers
+
+- (void)addTimingReceiver:(id<TPAudioTimingReceiver>)receiver {
     if ( _timingCallbacks.count == kMaximumCallbacksPerSource ) {
         NSLog(@"Warning: Maximum number of callbacks reached");
         return;
     }
     
-    [self performAsynchronousMessageExchangeWithHandler:&addCallbackToTable parameter1:(long)callback parameter2:(long)userInfo parameter3:0 ioOpaquePtr:&_timingCallbacks responseBlock:nil];
+    [receiver retain];
+    [self performSynchronousMessageExchangeWithHandler:&addCallbackToTable parameter1:(long)receiver.timingReceiverCallback parameter2:(long)receiver parameter3:0 ioOpaquePtr:&_timingCallbacks];
 }
 
-- (void)removeTimingCallback:(TPAudioControllerTimingCallback)callback userInfo:(void *)userInfo {
-    [self performAsynchronousMessageExchangeWithHandler:&removeCallbackFromTable parameter1:(long)callback parameter2:(long)userInfo parameter3:0 ioOpaquePtr:&_timingCallbacks responseBlock:nil];
+- (void)removeTimingReceiver:(id<TPAudioTimingReceiver>)receiver {
+    [self performSynchronousMessageExchangeWithHandler:&removeCallbackFromTable parameter1:(long)receiver.timingReceiverCallback parameter2:(long)receiver parameter3:0 ioOpaquePtr:&_timingCallbacks];
+    [receiver release];
 }
 
--(NSArray *)timingCallbacks {
-    return [self callbacksFromTable:&_timingCallbacks matchingFlag:0];
+-(NSArray *)timingReceivers {
+    return [self objectsAssociatedWithCallbacksFromTable:&_timingCallbacks matchingFlag:0];
 }
 
 #pragma mark - Main thread-realtime thread message sending
@@ -1276,26 +1301,29 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
     int index;
     TPChannelGroup group = [self searchForGroupContainingChannelMatchingPtr:channel.renderCallback userInfo:channel index:&index];
     if ( !group ) return;
+    TPChannel channelElement = &group->channels[index];
     
     if ( [keyPath isEqualToString:@"volume"] ) {
-        AudioUnitParameterValue value = channel.volume;
+        AudioUnitParameterValue value = channelElement->volume = channel.volume;
         OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, index, value, 0);
         checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
         
     } else if ( [keyPath isEqualToString:@"pan"] ) {
-        AudioUnitParameterValue value = channel.pan;
+        AudioUnitParameterValue value = channelElement->pan = channel.pan;
         if ( value == -1.0 ) value = -0.999; // Workaround for pan limits bug
         if ( value == 1.0 ) value = 0.999;
         OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, index, value, 0);
         checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)");
 
     } else if ( [keyPath isEqualToString:@"playing"] ) {
+        channelElement->playing = channel.playing;
         AudioUnitParameterValue value = channel.playing && !channel.muted;
         OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
         checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
         group->channels[index].playing = value;
         
     }  else if ( [keyPath isEqualToString:@"muted"] ) {
+        channelElement->muted = channel.muted;
         AudioUnitParameterValue value = ([channel respondsToSelector:@selector(playing)] ? channel.playing : YES) && !channel.muted;
         OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
         checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
@@ -1308,7 +1336,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
     checkResult(status, "AudioSessionSetActive");
 }
 
-#pragma mark - Helpers
+#pragma mark - Graph configuration
 
 - (BOOL)setup {
 
@@ -1374,14 +1402,24 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
         }
     }
 
-    // Initialise and hook in the main mixer
-    _topLevelChannel.type = kChannelTypeGroup;
-    _topLevelChannel.ptr  = &_channels;
-    _topLevelChannel.playing = YES;
-    [self initialiseGroupChannel:&_topLevelChannel parentGroup:NULL indexInParent:0];
+    if ( !_topGroup ) {
+        // Allocate top-level group
+        _topGroup = (TPChannelGroup)calloc(1, sizeof(channel_group_t));
+        memset(&_topChannel, 0, sizeof(channel_t));
+        _topChannel.type    = kChannelTypeGroup;
+        _topChannel.ptr     = _topGroup;
+        _topChannel.playing = YES;
+        _topChannel.volume  = 1.0;
+        _topChannel.pan     = 0.0;
+        _topChannel.muted   = NO;
+        _topGroup->channel   = &_topChannel;
+    }
+    
+    // Initialise group
+    initialiseGroupChannel(self, &_topChannel, NULL, 0);
     
     // Register a callback to be notified when the main mixer unit renders
-    checkResult(AudioUnitAddRenderNotify(_channels.mixerAudioUnit, &topRenderNotifyCallback, self), "AudioUnitAddRenderNotify");
+    checkResult(AudioUnitAddRenderNotify(_topGroup->mixerAudioUnit, &topRenderNotifyCallback, self), "AudioUnitAddRenderNotify");
     
     // Initialize the graph
 	result = AUGraphInitialize(_audioGraph);
@@ -1395,7 +1433,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
     checkResult(DisposeAUGraph(_audioGraph), "AUGraphClose");
     _audioGraph = NULL;
     _ioAudioUnit = NULL;
-    [self teardownGroup:&_channels];
+    [self markGroupTorndown:_topGroup];
 }
 
 - (void)updateGraph {
@@ -1417,7 +1455,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
     }
 }
 
-- (BOOL)initialiseGroupChannel:(channel_t*)channel parentGroup:(TPChannelGroup)parentGroup indexInParent:(int)index {
+static BOOL initialiseGroupChannel(TPAudioController *THIS, TPChannel channel, TPChannelGroup parentGroup, int index) {
     TPChannelGroup group = (TPChannelGroup)channel->ptr;
     
     OSStatus result;
@@ -1433,16 +1471,16 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
         };
         
         // Add mixer node to graph
-        result = AUGraphAddNode(_audioGraph, &mixer_desc, &group->mixerNode );
+        result = AUGraphAddNode(THIS->_audioGraph, &mixer_desc, &group->mixerNode );
         if ( !checkResult(result, "AUGraphAddNode mixer") ) return NO;
         
         // Get reference to the audio unit
-        result = AUGraphNodeInfo(_audioGraph, group->mixerNode, NULL, &group->mixerAudioUnit);
+        result = AUGraphNodeInfo(THIS->_audioGraph, group->mixerNode, NULL, &group->mixerAudioUnit);
         if ( !checkResult(result, "AUGraphNodeInfo") ) return NO;
         
         // Try to set mixer's output stream format
         group->converterRequired = NO;
-        result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &_audioDescription, sizeof(_audioDescription));
+        result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &THIS->_audioDescription, sizeof(THIS->_audioDescription));
         
         if ( result == kAudioUnitErr_FormatNotSupported ) {
             // The mixer only supports a subset of formats. If it doesn't support this one, then we'll convert manually
@@ -1460,7 +1498,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
             UInt32 size = sizeof(mixerFormat);
             checkResult(AudioUnitGetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &mixerFormat, &size),
                         "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)");
-            mixerFormat.mSampleRate = _audioDescription.mSampleRate;
+            mixerFormat.mSampleRate = THIS->_audioDescription.mSampleRate;
             
             checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &mixerFormat, sizeof(mixerFormat)), 
                         "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat");
@@ -1470,7 +1508,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
         }
         
         // Set mixer's input stream format
-        result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &_audioDescription, sizeof(_audioDescription));
+        result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &THIS->_audioDescription, sizeof(THIS->_audioDescription));
         if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)") ) return NO;
         
         // Set the mixer unit to handle up to 4096 frames per slice to keep rendering during screen lock
@@ -1484,15 +1522,15 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
     if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) return NO;
     
     // Configure graph state
-    [self configureGraphStateOfGroupChannel:channel parentGroup:parentGroup indexInParent:index];
+    configureGraphStateOfGroupChannel(THIS, channel, parentGroup, index);
     
     // Configure inputs
-    [self configureChannelsInRange:NSMakeRange(0, busCount) forGroup:group];
+    configureChannelsInRangeForGroup(THIS, NSMakeRange(0, busCount), group);
     
     return YES;
 }
 
-- (void)configureGraphStateOfGroupChannel:(channel_t*)channel parentGroup:(TPChannelGroup)parentGroup indexInParent:(int)index {
+static void configureGraphStateOfGroupChannel(TPAudioController *THIS, TPChannel channel, TPChannelGroup parentGroup, int index) {
     TPChannelGroup group = (TPChannelGroup)channel->ptr;
     
     BOOL outputCallbacks=NO, filters=NO;
@@ -1506,7 +1544,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
     
     
     Boolean wasRunning = false;
-    OSStatus result = AUGraphIsRunning(_audioGraph, &wasRunning);
+    OSStatus result = AUGraphIsRunning(THIS->_audioGraph, &wasRunning);
     checkResult(result, "AUGraphIsRunning");
 
     BOOL updateGraph = NO;
@@ -1521,22 +1559,22 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
         if ( !checkResult(AudioUnitGetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &mixerFormat, &size), 
                           "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)") ) return;
         
-        group->audioConverterTargetFormat = _audioDescription;
+        group->audioConverterTargetFormat = THIS->_audioDescription;
         group->audioConverterSourceFormat = mixerFormat;
         
         // Create audio converter
-        if ( !checkResult(AudioConverterNew(&mixerFormat, &_audioDescription, &group->audioConverter), 
+        if ( !checkResult(AudioConverterNew(&mixerFormat, &THIS->_audioDescription, &group->audioConverter), 
                           "AudioConverterNew") ) return;
         
         
-        if ( !_renderConversionScratchBuffer ) {
+        if ( !THIS->_renderConversionScratchBuffer ) {
             // Allocate temporary conversion buffer
-            _renderConversionScratchBuffer = (char*)malloc(kRenderConversionScratchBufferSizeInFrames
-                                                                * MAX(_audioDescription.mBytesPerFrame, mixerFormat.mBytesPerFrame)
-                                                                * MAX((_audioDescription.mFormatFlags&kAudioFormatFlagIsNonInterleaved ? _audioDescription.mChannelsPerFrame : 1),
+            THIS->_renderConversionScratchBuffer = (char*)malloc(kRenderConversionScratchBufferSizeInFrames
+                                                                * MAX(THIS->_audioDescription.mBytesPerFrame, mixerFormat.mBytesPerFrame)
+                                                                * MAX((THIS->_audioDescription.mFormatFlags&kAudioFormatFlagIsNonInterleaved ? THIS->_audioDescription.mChannelsPerFrame : 1),
                                                                       (mixerFormat.mFormatFlags&kAudioFormatFlagIsNonInterleaved ? mixerFormat.mChannelsPerFrame : 1)));
         }
-        group->audioConverterScratchBuffer = _renderConversionScratchBuffer;
+        group->audioConverterScratchBuffer = THIS->_renderConversionScratchBuffer;
     }
     
     if ( filters ) {
@@ -1544,14 +1582,14 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
         if ( group->graphState & kGroupGraphStateNodeConnected ) {
             if ( !parentGroup && !graphStopped ) {
                 // Stop the graph first, because we're going to modify the root
-                if ( checkResult(AUGraphStop(_audioGraph), "AUGraphStop") ) {
+                if ( checkResult(AUGraphStop(THIS->_audioGraph), "AUGraphStop") ) {
                     graphStopped = YES;
                 }
             }
             // Remove the node connection
-            if ( checkResult(AUGraphDisconnectNodeInput(_audioGraph, parentGroup ? parentGroup->mixerNode : _ioNode, parentGroup ? index : 0), "AUGraphDisconnectNodeInput") ) {
+            if ( checkResult(AUGraphDisconnectNodeInput(THIS->_audioGraph, parentGroup ? parentGroup->mixerNode : THIS->_ioNode, parentGroup ? index : 0), "AUGraphDisconnectNodeInput") ) {
                 group->graphState &= ~kGroupGraphStateNodeConnected;
-                [self updateGraph];
+                checkResult(AUGraphUpdate(THIS->_audioGraph, NULL), "AUGraphUpdate");
             }
         }
         
@@ -1563,16 +1601,18 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
         }
 
         // Set stream format for callback
-        checkResult(AudioUnitSetProperty(parentGroup ? parentGroup->mixerAudioUnit : _ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, parentGroup ? index : 0, &_audioDescription, sizeof(_audioDescription)),
+        checkResult(AudioUnitSetProperty(parentGroup ? parentGroup->mixerAudioUnit : THIS->_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, parentGroup ? index : 0, &THIS->_audioDescription, sizeof(THIS->_audioDescription)),
                     "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
         
-        // Add the render callback
-        AURenderCallbackStruct rcbs;
-        rcbs.inputProc = &renderCallback;
-        rcbs.inputProcRefCon = channel;
-        if ( checkResult(AUGraphSetNodeInputCallback(_audioGraph, parentGroup ? parentGroup->mixerNode : _ioNode, parentGroup ? index : 0, &rcbs), "AUGraphSetNodeInputCallback") ) {
-            group->graphState |= kGroupGraphStateRenderCallbackSet;
-            updateGraph = YES;
+        if ( !(group->graphState & kGroupGraphStateRenderCallbackSet) ) {
+            // Add the render callback
+            AURenderCallbackStruct rcbs;
+            rcbs.inputProc = &renderCallback;
+            rcbs.inputProcRefCon = channel;
+            if ( checkResult(AUGraphSetNodeInputCallback(THIS->_audioGraph, parentGroup ? parentGroup->mixerNode : THIS->_ioNode, parentGroup ? index : 0, &rcbs), "AUGraphSetNodeInputCallback") ) {
+                group->graphState |= kGroupGraphStateRenderCallbackSet;
+                updateGraph = YES;
+            }
         }
         
     } else if ( group->graphState & kGroupGraphStateRenderCallbackSet ) {
@@ -1581,7 +1621,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
     } else {
         if ( !(group->graphState & kGroupGraphStateNodeConnected) ) {
             // Connect output of mixer directly to the parent mixer
-            if ( checkResult(AUGraphConnectNodeInput(_audioGraph, group->mixerNode, 0, parentGroup ? parentGroup->mixerNode : _ioNode, parentGroup ? index : 0), "AUGraphConnectNodeInput") ) {
+            if ( checkResult(AUGraphConnectNodeInput(THIS->_audioGraph, group->mixerNode, 0, parentGroup ? parentGroup->mixerNode : THIS->_ioNode, parentGroup ? index : 0), "AUGraphConnectNodeInput") ) {
                 group->graphState |= kGroupGraphStateNodeConnected;
                 updateGraph = YES;
             }
@@ -1606,37 +1646,47 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
     }
     
     if ( updateGraph ) {
-        [self updateGraph];
+        Boolean updated;
+        AUGraphUpdate(THIS->_audioGraph, &updated);
     }
     
     if ( graphStopped && wasRunning ) {
-        checkResult(AUGraphStart(_audioGraph), "AUGraphStart");
+        checkResult(AUGraphStart(THIS->_audioGraph), "AUGraphStart");
     }
     
     if ( !outputCallbacks && !filters && group->audioConverter && !(group->graphState & kGroupGraphStateRenderCallbackSet) ) {
         // Cleanup audio converter
-        
-        // Sync first, to wait until end of the current render, whereupon any changes we just made will be applied
-        [self performSynchronousMessageExchangeWithHandler:NULL parameter1:0 parameter2:0 parameter3:0 ioOpaquePtr:NULL];
-        
-        // Now dispose converter
         AudioConverterDispose(group->audioConverter);
         group->audioConverter = NULL;
     }
 }
 
-- (void)configureChannelsInRange:(NSRange)range forGroup:(TPChannelGroup)group {
+static void configureChannelsInRangeForGroup(TPAudioController *THIS, NSRange range, TPChannelGroup group) {
     for ( int i = range.location; i < range.location+range.length; i++ ) {
-        channel_t *channel = &group->channels[i];
+        TPChannel channel = &group->channels[i];
+        
+        // Set volume
+        AudioUnitParameterValue volumeValue = channel->volume;
+        checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, i, volumeValue, 0),
+                    "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
+        
+        // Set pan
+        AudioUnitParameterValue panValue = channel->pan;
+        checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, i, panValue, 0),
+                    "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)");
+        
+        // Set enabled
+        AudioUnitParameterValue enabledValue = channel->playing && !channel->muted;
+        checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, i, enabledValue, 0),
+                    "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
         
         if ( channel->type == kChannelTypeChannel ) {
-            id<TPAudioPlayable> channelObj = (id<TPAudioPlayable>)channel->userInfo;
             
             // Make sure the mixer input isn't connected to anything
-            AUGraphDisconnectNodeInput(_audioGraph, group->mixerNode, i);
+            AUGraphDisconnectNodeInput(THIS->_audioGraph, group->mixerNode, i);
             
             // Set input stream format
-            checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, i, &_audioDescription, sizeof(_audioDescription)),
+            checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, i, &THIS->_audioDescription, sizeof(THIS->_audioDescription)),
                         "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
             
             // Setup render callback struct
@@ -1645,46 +1695,83 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
             rcbs.inputProcRefCon = channel;
             
             // Set a callback for the specified node's specified input
-            checkResult(AUGraphSetNodeInputCallback(_audioGraph, group->mixerNode, i, &rcbs), 
+            checkResult(AUGraphSetNodeInputCallback(THIS->_audioGraph, group->mixerNode, i, &rcbs), 
                         "AUGraphSetNodeInputCallback");
 
-            // Set volume
-            AudioUnitParameterValue volumeValue = (AudioUnitParameterValue)([channelObj respondsToSelector:@selector(volume)] ? channelObj.volume : 1.0);
-            checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, i, volumeValue, 0),
-                        "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
-            
-            // Set pan
-            AudioUnitParameterValue panValue = (AudioUnitParameterValue)([channelObj respondsToSelector:@selector(pan)] ? channelObj.pan : 0.0);
-            checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, i, panValue, 0),
-                        "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)");
-            
-            // Set enabled
-            BOOL playing = [channelObj respondsToSelector:@selector(playing)] ? channelObj.playing : YES;
-            BOOL muted = [channelObj respondsToSelector:@selector(muted)] ? channelObj.muted : NO;
-            AudioUnitParameterValue enabledValue = (AudioUnitParameterValue)(playing && !muted);
-            checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, i, enabledValue, 0),
-                        "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
+
             
         } else if ( channel->type == kChannelTypeGroup ) {
-            TPChannelGroup subgroup = (TPChannelGroup)channel->ptr;
-            
-            // Set volume
-            AudioUnitParameterValue volumeValue = subgroup->volume;
-            checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, i, volumeValue, 0),
-                        "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
-            
-            // Set pan
-            AudioUnitParameterValue panValue = subgroup->pan;
-            checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, i, panValue, 0),
-                        "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)");
-            
-            // Set enabled
-            AudioUnitParameterValue enabledValue = !subgroup->muted;
-            checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, i, enabledValue, 0),
-                        "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
-            
             // Recursively initialise this channel group
-            if ( ![self initialiseGroupChannel:channel parentGroup:group indexInParent:i] ) return;
+            initialiseGroupChannel(THIS, channel, group, i);
+        }
+    }
+}
+
+static long removeChannelsFromGroup(TPAudioController *THIS, long *matchingPtrArrayPtr, long *matchingUserInfoArrayPtr, long *channelsCount, void* groupPtr) {
+    void **ptrArray = (void**)*matchingPtrArrayPtr;
+    void **userInfoArray = (void**)*matchingUserInfoArrayPtr;
+    TPChannelGroup group = (TPChannelGroup)groupPtr;
+    
+    // Set new bus count of group
+    UInt32 busCount = group->channelCount - *channelsCount;
+    assert(busCount >= 0);
+    
+    if ( busCount == 0 ) busCount = 1; // Note: Mixer must have at least 1 channel. It'll just be silent.
+    if ( !checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &busCount, sizeof(busCount)),
+                      "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) return group->channelCount;
+    
+    if ( group->channelCount - *channelsCount == 0 ) {
+        // Remove render callback and disconnect channel 0, as the mixer must have at least 1 channel, and we want to leave it disconnected
+        
+        // Remove any render callback
+        AURenderCallbackStruct rcbs;
+        rcbs.inputProc = NULL;
+        rcbs.inputProcRefCon = NULL;
+        checkResult(AUGraphSetNodeInputCallback(THIS->_audioGraph, group->mixerNode, 0, &rcbs),
+                    "AUGraphSetNodeInputCallback");
+        
+        // Make sure the mixer input isn't connected to anything
+        checkResult(AUGraphDisconnectNodeInput(THIS->_audioGraph, group->mixerNode, 0), 
+                    "AUGraphDisconnectNodeInput");
+    }
+    
+    for ( int i=0; i < *channelsCount; i++ ) {
+        
+        // Find the channel in our fixed array
+        int index = 0;
+        for ( index=0; index < group->channelCount; index++ ) {
+            if ( group->channels[index].ptr == ptrArray[i] && group->channels[index].userInfo == userInfoArray[i] ) {
+                break;
+            }
+        }
+        
+        if ( index < group->channelCount ) {
+            group->channelCount--;
+            
+            if ( index < group->channelCount ) {
+                // Shuffle the later elements backwards one space
+                memmove(&group->channels[index], &group->channels[index+1], (group->channelCount-index) * sizeof(channel_t));
+            }
+            
+            // Zero out the now-unused space
+            memset(&group->channels[group->channelCount], 0, sizeof(channel_t));
+        }
+    }
+    
+    checkResult(AUGraphUpdate(THIS->_audioGraph, NULL), "AUGraphUpdate");
+    
+    configureChannelsInRangeForGroup(THIS, NSMakeRange(0, group->channelCount), group);
+    
+    return group->channelCount;
+}
+
+- (void)gatherChannelsFromGroup:(TPChannelGroup)group intoArray:(NSMutableArray*)array {
+    for ( int i=0; i<group->channelCount; i++ ) {
+        TPChannel channel = &group->channels[i];
+        if ( channel->type == kChannelTypeGroup ) {
+            [self gatherChannelsFromGroup:(TPChannelGroup)channel->ptr intoArray:array];
+        } else {
+            [array addObject:(id)channel->userInfo];
         }
     }
 }
@@ -1692,7 +1779,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
 - (TPChannelGroup)searchForGroupContainingChannelMatchingPtr:(void*)ptr userInfo:(void*)userInfo withinGroup:(TPChannelGroup)group index:(int*)index {
     // Find the matching channel in the table for the given group
     for ( int i=0; i < group->channelCount; i++ ) {
-        channel_t *channel = &group->channels[i];
+        TPChannel channel = &group->channels[i];
         if ( channel->ptr == ptr && channel->userInfo == userInfo ) {
             if ( index ) *index = i;
             return group;
@@ -1707,8 +1794,218 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
 }
 
 - (TPChannelGroup)searchForGroupContainingChannelMatchingPtr:(void*)ptr userInfo:(void*)userInfo index:(int*)index {
-    return [self searchForGroupContainingChannelMatchingPtr:ptr userInfo:userInfo withinGroup:&_channels index:(int*)index];
+    return [self searchForGroupContainingChannelMatchingPtr:ptr userInfo:userInfo withinGroup:_topGroup index:(int*)index];
 }
+
+- (void)releaseResourcesForGroup:(TPChannelGroup)group {
+    if ( group->audioConverter ) {
+        checkResult(AudioConverterDispose(group->audioConverter), "AudioConverterDispose");
+        group->audioConverter = NULL;
+    }
+    
+    if ( group->mixerNode ) {
+        checkResult(AUGraphRemoveNode(_audioGraph, group->mixerNode), "AUGraphRemoveNode");
+        group->mixerNode = 0;
+        group->mixerAudioUnit = NULL;
+    }
+    
+    NSArray *callbackObjects = [self objectsAssociatedWithCallbacksWithFlags:0 forChannelGroup:group];
+    [callbackObjects makeObjectsPerformSelector:@selector(release)];
+    
+    // Release subgroup resources too
+    for ( int i=0; i<group->channelCount; i++ ) {
+        TPChannel channel = &group->channels[i];
+        if ( channel->type == kChannelTypeGroup ) {
+            [self releaseResourcesForGroup:(TPChannelGroup)channel->ptr];
+            channel->ptr = NULL;
+        }
+    }
+    
+    free(group);
+}
+
+- (void)markGroupTorndown:(TPChannelGroup)group {
+    group->graphState = kGroupGraphStateUninitialized;
+    group->mixerNode = 0;
+    group->mixerAudioUnit = NULL;
+    for ( int i=0; i<group->channelCount; i++ ) {
+        TPChannel channel = &group->channels[i];
+        if ( channel->type == kChannelTypeGroup ) {
+            [self markGroupTorndown:(TPChannelGroup)channel->ptr];
+        }
+    }
+}
+
+#pragma mark - Callback management
+
+static long addCallbackToTable(TPAudioController *THIS, long *callbackPtr, long *userInfoPtr, long *flags, void* callbackTablePtr) {
+    callback_table_t* table = (callback_table_t*)callbackTablePtr;
+    
+    table->callbacks[table->count].callback = (void*)*callbackPtr;
+    table->callbacks[table->count].userInfo = (void*)*userInfoPtr;
+    table->callbacks[table->count].flags = (uint8_t)*flags;
+    table->count++;
+    
+    return table->count;
+}
+
+static long removeCallbackFromTable(TPAudioController *THIS, long *callbackPtr, long *userInfoPtr, long *unused, void* callbackTablePtr) {
+    callback_table_t* table = (callback_table_t*)callbackTablePtr;
+    
+    // Find the item in our fixed array
+    int index = 0;
+    for ( index=0; index<table->count; index++ ) {
+        if ( table->callbacks[index].callback == (void*)*callbackPtr && table->callbacks[index].userInfo == (void*)*userInfoPtr ) {
+            break;
+        }
+    }
+    if ( index < table->count ) {
+        // Now shuffle the later elements backwards one space
+        table->count--;
+        for ( int i=index; i<table->count; i++ ) {
+            table->callbacks[i] = table->callbacks[i+1];
+        }
+    }
+    
+    return table->count;
+}
+
+- (NSArray *)objectsAssociatedWithCallbacksFromTable:(callback_table_t*)table matchingFlag:(uint8_t)flag {
+    // Construct NSArray response
+    NSMutableArray *result = [NSMutableArray array];
+    for ( int i=0; i<table->count; i++ ) {
+        if ( flag && !(table->callbacks[i].flags & flag) ) continue;
+        
+        [result addObject:(id)table->callbacks[i].userInfo];
+    }
+    
+    return result;
+}
+
+- (void)addCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannel:(id<TPAudioPlayable>)channelObj {
+    int index=0;
+    TPChannelGroup parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:channelObj index:&index];
+    NSAssert(parentGroup != NULL, @"Channel not found");
+    
+    TPChannel channel = &parentGroup->channels[index];
+    
+    [self performSynchronousMessageExchangeWithHandler:&addCallbackToTable 
+                                            parameter1:(long)callback 
+                                            parameter2:(long)userInfo 
+                                            parameter3:flags 
+                                           ioOpaquePtr:&channel->callbacks];
+}
+
+- (void)addCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannelGroup:(TPChannelGroup)group {
+    [self performSynchronousMessageExchangeWithHandler:&addCallbackToTable 
+                                            parameter1:(long)callback 
+                                            parameter2:(long)userInfo 
+                                            parameter3:flags 
+                                           ioOpaquePtr:&group->channel->callbacks];
+
+    TPChannelGroup parentGroup = NULL;
+    int index=0;
+    if ( group != _topGroup ) {
+        parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
+        NSAssert(parentGroup != NULL, @"Channel group not found");
+    }
+
+    configureGraphStateOfGroupChannel(self, group->channel, parentGroup, index);
+}
+
+- (void)removeCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channelObj {
+    int index=0;
+    TPChannelGroup parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:channelObj index:&index];
+    NSAssert(parentGroup != NULL, @"Channel not found");
+    
+    TPChannel channel = &parentGroup->channels[index];
+    
+    [self performSynchronousMessageExchangeWithHandler:&removeCallbackFromTable 
+                                            parameter1:(long)callback 
+                                            parameter2:(long)userInfo
+                                            parameter3:0
+                                           ioOpaquePtr:&channel->callbacks];
+}
+
+- (void)removeCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group {
+    [self performSynchronousMessageExchangeWithHandler:&removeCallbackFromTable 
+                                            parameter1:(long)callback 
+                                            parameter2:(long)userInfo
+                                            parameter3:0 
+                                           ioOpaquePtr:&group->channel->callbacks];
+    
+    TPChannelGroup parentGroup = NULL;
+    int index=0;
+    if ( group != _topGroup ) {
+        parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
+        NSAssert(parentGroup != NULL, @"Channel group not found");
+    }
+    
+    configureGraphStateOfGroupChannel(self, group->channel, parentGroup, index);
+}
+
+- (NSArray*)objectsAssociatedWithCallbacksWithFlags:(uint8_t)flags {
+    return [self objectsAssociatedWithCallbacksFromTable:&_topChannel.callbacks matchingFlag:flags];
+}
+
+- (NSArray*)objectsAssociatedWithCallbacksWithFlags:(uint8_t)flags forChannel:(id<TPAudioPlayable>)channelObj {
+    int index=0;
+    TPChannelGroup parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:channelObj index:&index];
+    NSAssert(parentGroup != NULL, @"Channel not found");
+    
+    TPChannel channel = &parentGroup->channels[index];
+    
+    return [self objectsAssociatedWithCallbacksFromTable:&channel->callbacks matchingFlag:flags];
+}
+
+- (NSArray*)objectsAssociatedWithCallbacksWithFlags:(uint8_t)flags forChannelGroup:(TPChannelGroup)group {
+    return [self objectsAssociatedWithCallbacksFromTable:&group->channel->callbacks matchingFlag:flags];
+}
+
+- (void)setVariableSpeedFilter:(id<TPAudioVariableSpeedFilter>)filter forChannelStruct:(TPChannel)channel {
+    for ( int i=0; i<channel->callbacks.count; i++ ) {
+        if ( (channel->callbacks.callbacks[i].flags & kCallbackIsVariableSpeedFilterFlag ) ) {
+            // Remove the old callback
+            [self performSynchronousMessageExchangeWithHandler:&removeCallbackFromTable
+                                                    parameter1:(long)channel->callbacks.callbacks[i].callback
+                                                    parameter2:(long)channel->callbacks.callbacks[i].userInfo
+                                                    parameter3:0
+                                                   ioOpaquePtr:&channel->callbacks];
+            break;
+            [(id)(long)channel->callbacks.callbacks[i].userInfo release];
+        }
+    }
+    
+    if ( filter ) {
+        [filter retain];
+        [self performSynchronousMessageExchangeWithHandler:&addCallbackToTable 
+                                                parameter1:(long)filter.filterCallback
+                                                parameter2:(long)filter 
+                                                parameter3:kCallbackIsVariableSpeedFilterFlag 
+                                               ioOpaquePtr:&channel->callbacks];
+    }
+}
+
+static void handleCallbacksForChannel(TPChannel channel, const AudioTimeStamp *inTimeStamp, UInt32 inNumberFrames, AudioBufferList *ioData) {
+    
+    // Pass audio to filters
+    for ( int i=0; i<channel->callbacks.count; i++ ) {
+        callback_t *callback = &channel->callbacks.callbacks[i];
+        if ( callback->flags & kCallbackIsFilterFlag ) {
+            ((TPAudioControllerAudioCallback)callback->callback)(callback->userInfo, inTimeStamp, inNumberFrames, ioData);
+        }
+    }
+    
+    // And finally pass to output callbacks
+    for ( int i=0; i<channel->callbacks.count; i++ ) {
+        callback_t *callback = &channel->callbacks.callbacks[i];
+        if ( callback->flags & kCallbackIsOutputCallbackFlag ) {
+            ((TPAudioControllerAudioCallback)callback->callback)(callback->userInfo, inTimeStamp, inNumberFrames, ioData);
+        }
+    }
+}
+
+#pragma mark - State management
 
 - (void)updateVoiceProcessingSettings {
     
@@ -1780,263 +2077,6 @@ static void updateInputDeviceStatus(TPAudioController *THIS) {
     UInt32 allowMixing = YES;
     checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof(audioCategory), &audioCategory), "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory");
     checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing), "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
-}
-
-static long addCallbackToTable(TPAudioController *THIS, long *callbackPtr, long *userInfoPtr, long *flags, void* callbackTablePtr) {
-    callback_table_t* table = (callback_table_t*)callbackTablePtr;
-    
-    table->callbacks[table->count].callback = (void*)*callbackPtr;
-    table->callbacks[table->count].userInfo = (void*)*userInfoPtr;
-    table->callbacks[table->count].flags = (uint8_t)*flags;
-    table->count++;
-    
-    return table->count;
-}
-
-static long removeCallbackFromTable(TPAudioController *THIS, long *callbackPtr, long *userInfoPtr, long *unused, void* callbackTablePtr) {
-    callback_table_t* table = (callback_table_t*)callbackTablePtr;
-    
-    // Find the item in our fixed array
-    int index = 0;
-    for ( index=0; index<table->count; index++ ) {
-        if ( table->callbacks[index].callback == (void*)*callbackPtr && table->callbacks[index].userInfo == (void*)*userInfoPtr ) {
-            break;
-        }
-    }
-    if ( index < table->count ) {
-        // Now shuffle the later elements backwards one space
-        table->count--;
-        for ( int i=index; i<table->count; i++ ) {
-            table->callbacks[i] = table->callbacks[i+1];
-        }
-    }
-    
-    return table->count;
-}
-
-- (NSArray *)callbacksFromTable:(callback_table_t*)table matchingFlag:(uint8_t)flag {
-    // Construct NSArray response
-    NSMutableArray *result = [NSMutableArray array];
-    for ( int i=0; i<table->count; i++ ) {
-        if ( flag && !(table->callbacks[i].flags & flag) ) continue;
-        
-        [result addObject:[NSDictionary dictionaryWithObjectsAndKeys:
-                           [NSValue valueWithPointer:table->callbacks[i].callback], kTPAudioControllerCallbackKey,
-                           [NSValue valueWithPointer:table->callbacks[i].userInfo], kTPAudioControllerUserInfoKey, nil]];
-    }
-    
-    return result;
-}
-
-- (void)addCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannel:(id<TPAudioPlayable>)channelObj {
-    int index=0;
-    TPChannelGroup parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:channelObj index:&index];
-    NSAssert(parentGroup != NULL, @"Channel not found");
-    
-    channel_t *channel = &parentGroup->channels[index];
-    
-    [self performSynchronousMessageExchangeWithHandler:&addCallbackToTable parameter1:(long)callback parameter2:(long)userInfo parameter3:flags ioOpaquePtr:&channel->callbacks];
-}
-
-- (void)addCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannelGroup:(TPChannelGroup)group {
-    channel_t *channel = NULL;
-    TPChannelGroup parentGroup = NULL;
-    int index=0;
-    
-    if ( group == &_channels ) {
-        channel = &_topLevelChannel;
-    } else {
-        parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
-        NSAssert(parentGroup != NULL, @"Channel group not found");
-        channel = &parentGroup->channels[index];
-    }
-    
-    if ( channel->callbacks.count == kMaximumCallbacksPerSource ) {
-        NSLog(@"Warning: Maximum number of callbacks reached");
-        return;
-    }
-    
-    [self performSynchronousMessageExchangeWithHandler:&addCallbackToTable parameter1:(long)callback parameter2:(long)userInfo parameter3:flags ioOpaquePtr:&channel->callbacks];
-    
-    [self configureGraphStateOfGroupChannel:channel parentGroup:parentGroup indexInParent:index];
-}
-
-- (void)removeCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channelObj {
-    int index=0;
-    TPChannelGroup parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:channelObj index:&index];
-    NSAssert(parentGroup != NULL, @"Channel not found");
-    
-    channel_t *channel = &parentGroup->channels[index];
-    
-    [self performSynchronousMessageExchangeWithHandler:&removeCallbackFromTable parameter1:(long)callback parameter2:(long)userInfo parameter3:0 ioOpaquePtr:&channel->callbacks];
-}
-
-- (void)removeCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group {
-    channel_t *channel = NULL;
-    TPChannelGroup parentGroup = NULL;
-    int index = 0;
-    
-    if ( group == &_channels ) {
-        channel = &_topLevelChannel;
-    } else {
-        parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
-        NSAssert(parentGroup != NULL, @"Channel group not found");
-        channel = &parentGroup->channels[index];
-    }
-    
-    [self performSynchronousMessageExchangeWithHandler:&removeCallbackFromTable parameter1:(long)callback parameter2:(long)userInfo parameter3:0 ioOpaquePtr:&channel->callbacks];
-    
-    [self configureGraphStateOfGroupChannel:channel parentGroup:parentGroup indexInParent:index];
-}
-
-- (NSArray*)callbacksWithFlags:(uint8_t)flags {
-    return [self callbacksFromTable:&_topLevelChannel.callbacks matchingFlag:flags];
-}
-
-- (NSArray*)callbacksWithFlags:(uint8_t)flags forChannel:(id<TPAudioPlayable>)channelObj {
-    int index=0;
-    TPChannelGroup parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:channelObj index:&index];
-    NSAssert(parentGroup != NULL, @"Channel not found");
-    
-    channel_t *channel = &parentGroup->channels[index];
-    
-    return [self callbacksFromTable:&channel->callbacks matchingFlag:flags];
-}
-
-- (NSArray*)callbacksWithFlags:(uint8_t)flags forChannelGroup:(TPChannelGroup)group {
-    channel_t *channel = NULL;
-    TPChannelGroup parentGroup = NULL;
-    int index = 0;
-    
-    if ( group == &_channels ) {
-        channel = &_topLevelChannel;
-    } else {
-        parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
-        NSAssert(parentGroup != NULL, @"Channel group not found");
-        channel = &parentGroup->channels[index];
-    }
-    
-    return [self callbacksFromTable:&channel->callbacks matchingFlag:flags];
-}
-
-- (void)releaseGroupResources:(TPChannelGroup)group freeGroupMemory:(BOOL)freeGroup {
-    if ( group->audioConverter ) {
-        checkResult(AudioConverterDispose(group->audioConverter), "AudioConverterDispose");
-        group->audioConverter = NULL;
-    }
-    
-    for ( int i=0; i<group->channelCount; i++ ) {
-        channel_t* channel = &group->channels[i];
-        if ( channel->type == kChannelTypeGroup ) {
-            [self releaseGroupResources:(TPChannelGroup)channel->ptr freeGroupMemory:YES];
-        }
-    }
-
-    checkResult(AUGraphRemoveNode(_audioGraph, group->mixerNode), "AUGraphRemoveNode");
-
-    if ( freeGroup ) free(group);
-}
-
-- (void)setVariableSpeedFilter:(TPAudioControllerVariableSpeedFilterCallback)filter userInfo:(void *)userInfo forChannelStruct:(channel_t*)channel {
-    for ( int i=0; i<channel->callbacks.count; i++ ) {
-        if ( (channel->callbacks.callbacks[i].flags & kCallbackIsVariableSpeedFilterFlag ) ) {
-            // Remove the old callback
-            [self performSynchronousMessageExchangeWithHandler:&removeCallbackFromTable
-                                                    parameter1:(long)channel->callbacks.callbacks[i].callback
-                                                    parameter2:(long)channel->callbacks.callbacks[i].userInfo
-                                                    parameter3:0
-                                                   ioOpaquePtr:&channel->callbacks];
-        }
-    }
-    
-    if ( filter ) {
-        [self performSynchronousMessageExchangeWithHandler:&addCallbackToTable 
-                                                parameter1:(long)filter
-                                                parameter2:(long)userInfo 
-                                                parameter3:kCallbackIsVariableSpeedFilterFlag 
-                                               ioOpaquePtr:&channel->callbacks];
-    }
-}
-
-- (void)teardownGroup:(TPChannelGroup)group {
-    group->graphState = kGroupGraphStateUninitialized;
-    for ( int i=0; i<group->channelCount; i++ ) {
-        channel_t* channel = &group->channels[i];
-        if ( channel->type == kChannelTypeGroup ) {
-            [self teardownGroup:(TPChannelGroup)channel->ptr];
-        }
-    }
-}
-
-static void handleCallbacksForChannel(channel_t *channel, const AudioTimeStamp *inTimeStamp, UInt32 inNumberFrames, AudioBufferList *ioData) {
-    
-    // Pass audio to filters
-    for ( int i=0; i<channel->callbacks.count; i++ ) {
-        callback_t *callback = &channel->callbacks.callbacks[i];
-        if ( callback->flags & kCallbackIsFilterFlag ) {
-            ((TPAudioControllerAudioCallback)callback->callback)(callback->userInfo, inTimeStamp, inNumberFrames, ioData);
-        }
-    }
-    
-    // And finally pass to output callbacks
-    for ( int i=0; i<channel->callbacks.count; i++ ) {
-        callback_t *callback = &channel->callbacks.callbacks[i];
-        if ( callback->flags & kCallbackIsOutputCallbackFlag ) {
-            ((TPAudioControllerAudioCallback)callback->callback)(callback->userInfo, inTimeStamp, inNumberFrames, ioData);
-        }
-    }
-}
-
-static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UInt32 frames) {
-    channel_producer_arg_t *arg = (channel_producer_arg_t*)userInfo;
-    channel_t *channel = arg->channel;
-    
-    OSStatus status = noErr;
-    
-    if ( channel->type == kChannelTypeChannel ) {
-        TPAudioControllerRenderCallback callback = (TPAudioControllerRenderCallback) channel->ptr;
-        id<TPAudioPlayable> channelObj = (id<TPAudioPlayable>) channel->userInfo;
-        
-        status = callback(channelObj, &arg->inTimeStamp, frames, audio);
-        
-    } else if ( channel->type == kChannelTypeGroup ) {
-        TPChannelGroup group = (TPChannelGroup)channel->ptr;
-        
-        AudioBufferList *bufferList;
-        
-        if ( group->converterRequired ) {
-            // Initialise output buffer
-            struct { AudioBufferList bufferList; AudioBuffer nextBuffer; } buffers;
-            bufferList = &buffers.bufferList;
-            bufferList->mNumberBuffers = (group->audioConverterSourceFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? group->audioConverterSourceFormat.mChannelsPerFrame : 1;
-            char *dataPtr = group->audioConverterScratchBuffer;
-            for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
-                bufferList->mBuffers[i].mNumberChannels = (group->audioConverterSourceFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? 1 : group->audioConverterSourceFormat.mChannelsPerFrame;
-                bufferList->mBuffers[i].mData           = dataPtr;
-                bufferList->mBuffers[i].mDataByteSize   = group->audioConverterSourceFormat.mBytesPerFrame * frames;
-                dataPtr += bufferList->mBuffers[i].mDataByteSize;
-            }
-            
-        } else {
-            // We can render straight to the buffer, as audio format is the same
-            bufferList = audio;
-        }
-        
-        // Tell mixer to render into bufferList
-        OSStatus status = AudioUnitRender(group->mixerAudioUnit, arg->ioActionFlags, &arg->inTimeStamp, 0, frames, bufferList);
-        if ( !checkResult(status, "AudioUnitRender") ) return status;
-        
-        if ( group->converterRequired ) {
-            // Perform conversion
-            status = AudioConverterConvertComplexBuffer(group->audioConverter, frames, bufferList, audio);
-            checkResult(status, "AudioConverterConvertComplexBuffer");
-        }
-    }
-    
-    // Advance the sample time, to make sure we continue to render if we're called again with the same arguments
-    arg->inTimeStamp.mSampleTime += frames;
-    
-    return status;
 }
 
 @end

@@ -54,14 +54,14 @@ void TPBlockLevelFilterSetProcessingBlockSize(TPBlockLevelFilter* filter, int pr
  *      Processes audio in blocks of a fixed size, in float format. Suitable
  *      for filters involving FFTs, for instance.
  */
-@interface TPBlockLevelFilter : NSObject
+@interface TPBlockLevelFilter : NSObject <TPAudioFilter>
 
 /*!
  * Initialise with a given block size, and a function pointer for block processing
  */
 - (id)initWithAudioController:(TPAudioController*)audioController processingBlockSize:(int)processingBlockSizeInFrames blockProcessingCallback:(TPBlockLevelFilterAudioCallback)callback;
 
-@property (nonatomic, readonly) TPAudioControllerAudioCallback callback;
+@property (nonatomic, readonly) TPAudioControllerAudioCallback filterCallback;
 @property (nonatomic, assign) BOOL stereo;
 @property (nonatomic, assign) int processingBlockSizeInFrames;
 @end

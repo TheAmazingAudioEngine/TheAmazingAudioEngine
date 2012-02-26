@@ -28,6 +28,7 @@
 		4C5C511714EA9CC50012D39E /* TPAudioController.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C5C50E314EA98E90012D39E /* TPAudioController.framework */; };
 		4C5C511C14EA9D790012D39E /* TPOscilloscopeLayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C5C511914EA9D790012D39E /* TPOscilloscopeLayer.m */; };
 		4C5C511F14EAA39D0012D39E /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C5C511E14EAA39D0012D39E /* QuartzCore.framework */; };
+		4C80196114F919B00003EFB3 /* TPDoubleSpeedFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C80196014F919B00003EFB3 /* TPDoubleSpeedFilter.m */; };
 		4CAD2F7014E9A3BF00656553 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD2F6F14E9A3BF00656553 /* UIKit.framework */; };
 		4CAD2F7214E9A3BF00656553 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD2F7114E9A3BF00656553 /* Foundation.framework */; };
 		4CAD2F7414E9A3BF00656553 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD2F7314E9A3BF00656553 /* CoreGraphics.framework */; };
@@ -69,6 +70,8 @@
 		4C5C511814EA9D790012D39E /* TPOscilloscopeLayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TPOscilloscopeLayer.h; path = "TPAudioController/Test Suite/TPOscilloscopeLayer.h"; sourceTree = SOURCE_ROOT; };
 		4C5C511914EA9D790012D39E /* TPOscilloscopeLayer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = TPOscilloscopeLayer.m; path = "TPAudioController/Test Suite/TPOscilloscopeLayer.m"; sourceTree = SOURCE_ROOT; };
 		4C5C511E14EAA39D0012D39E /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		4C80195F14F919B00003EFB3 /* TPDoubleSpeedFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TPDoubleSpeedFilter.h; path = "TPAudioController/Test Suite/TPDoubleSpeedFilter.h"; sourceTree = SOURCE_ROOT; };
+		4C80196014F919B00003EFB3 /* TPDoubleSpeedFilter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = TPDoubleSpeedFilter.m; path = "TPAudioController/Test Suite/TPDoubleSpeedFilter.m"; sourceTree = SOURCE_ROOT; };
 		4CAD2F6C14E9A3BF00656553 /* Audio Controller Test Suite.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Audio Controller Test Suite.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		4CAD2F6F14E9A3BF00656553 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		4CAD2F7114E9A3BF00656553 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
@@ -163,6 +166,8 @@
 				4C12E4D914ED082D002BF07A /* TPBlockLevelFilter.m */,
 				4C12E4DA14ED082D002BF07A /* TPConvolutionFilter.h */,
 				4C12E4DB14ED082D002BF07A /* TPConvolutionFilter.m */,
+				4C80195F14F919B00003EFB3 /* TPDoubleSpeedFilter.h */,
+				4C80196014F919B00003EFB3 /* TPDoubleSpeedFilter.m */,
 				4C12E4DE14ED094B002BF07A /* TPCircularBuffer.c */,
 				4C12E4DF14ED094B002BF07A /* TPCircularBuffer.h */,
 				4C34877014E9B79300301A09 /* Resources */,
@@ -478,6 +483,7 @@
 				4C12E4DC14ED082D002BF07A /* TPBlockLevelFilter.m in Sources */,
 				4C12E4DD14ED082D002BF07A /* TPConvolutionFilter.m in Sources */,
 				4C12E4E014ED094B002BF07A /* TPCircularBuffer.c in Sources */,
+				4C80196114F919B00003EFB3 /* TPDoubleSpeedFilter.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -569,6 +575,10 @@
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "TPAudioController/Test Suite/Audio Controller Test Suite-Prefix.pch";
 				INFOPLIST_FILE = "TPAudioController/Test Suite/Audio Controller Test Suite-Info.plist";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/TPAudioController/Test Suite/Dirac3\"",
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				TARGETED_DEVICE_FAMILY = "1,2";
 				WRAPPER_EXTENSION = app;
@@ -583,6 +593,10 @@
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "TPAudioController/Test Suite/Audio Controller Test Suite-Prefix.pch";
 				INFOPLIST_FILE = "TPAudioController/Test Suite/Audio Controller Test Suite-Info.plist";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/TPAudioController/Test Suite/Dirac3\"",
+				);
 				OTHER_CFLAGS = "-DNS_BLOCK_ASSERTIONS=1";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				TARGETED_DEVICE_FAMILY = "1,2";

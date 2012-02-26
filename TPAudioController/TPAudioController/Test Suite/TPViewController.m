@@ -11,25 +11,15 @@
 #import "TPAudioFilePlayer.h"
 #import "TPOscilloscopeLayer.h"
 #import "TPConvolutionFilter.h"
+#import "TPDoubleSpeedFilter.h"
 #import <QuartzCore/QuartzCore.h>
 
 #define kAuxiliaryViewTag 251
 
-#define kDoubleSpeedFilterBufferLength 2048 // samples
 
 @interface TPViewController () {
     TPChannelGroup  _loopsGroup;
-    SInt16         *_doubleSpeedFilterBuffer[2];
-    BOOL            _useDoubleSpeedFilter;
 }
-
-
-static void doubleSpeedFilter(void                     *userInfo,
-                              TPAudioControllerVariableSpeedFilterProducer producer,
-                              void                     *producerToken,
-                              const AudioTimeStamp     *time,
-                              UInt32                    frames,
-                              AudioBufferList          *audio);
 
 @property (nonatomic, retain) TPAudioController *audioController;
 @property (nonatomic, retain) TPAudioFilePlayer *loop1;
@@ -37,6 +27,7 @@ static void doubleSpeedFilter(void                     *userInfo,
 @property (nonatomic, retain) TPAudioFilePlayer *loop3;
 @property (nonatomic, retain) TPAudioFilePlayer *sample1;
 @property (nonatomic, retain) TPConvolutionFilter *filter;
+@property (nonatomic, retain) TPDoubleSpeedFilter *doubleSpeedFilter;
 @property (nonatomic, retain) TPOscilloscopeLayer *outputOscilloscope;
 @property (nonatomic, retain) TPOscilloscopeLayer *inputOscilloscope;
 @end
@@ -48,6 +39,7 @@ static void doubleSpeedFilter(void                     *userInfo,
             loop3=_loop3,
             sample1=_sample1,
             filter=_filter,
+            doubleSpeedFilter=_doubleSpeedFilter,
             outputOscilloscope=_outputOscilloscope,
             inputOscilloscope=_inputOscilloscope;
 
@@ -104,14 +96,13 @@ static void doubleSpeedFilter(void                     *userInfo,
     
     [_audioController removeChannelGroup:_loopsGroup];
 
-    if ( _useDoubleSpeedFilter ) {
-        [_audioController setVariableSpeedFilter:NULL userInfo:NULL];
-        free(_doubleSpeedFilterBuffer[0]);
-        free(_doubleSpeedFilterBuffer[1]);
+    if ( _doubleSpeedFilter ) {
+        [_audioController setVariableSpeedFilter:nil];
+        self.doubleSpeedFilter = nil;
     }
     
     if ( _filter ) {
-        [_audioController removeFilter:_filter.callback userInfo:_filter];
+        [_audioController removeFilter:_filter];
         self.filter = nil;
     }
     
@@ -132,14 +123,14 @@ static void doubleSpeedFilter(void                     *userInfo,
     self.outputOscilloscope = [[[TPOscilloscopeLayer alloc] init] autorelease];
     _outputOscilloscope.frame = oscilloscopeHostView.bounds;
     [oscilloscopeHostView.layer addSublayer:_outputOscilloscope];
-    [_audioController addOutputCallback:_outputOscilloscope.callback userInfo:_outputOscilloscope];
+    [_audioController addOutputReceiver:_outputOscilloscope];
     [_outputOscilloscope start];
     
     self.inputOscilloscope = [[[TPOscilloscopeLayer alloc] init] autorelease];
     _inputOscilloscope.frame = oscilloscopeHostView.bounds;
     _inputOscilloscope.lineColor = [UIColor colorWithWhite:0.0 alpha:0.3];
     [oscilloscopeHostView.layer addSublayer:_inputOscilloscope];
-    [_audioController addInputCallback:_inputOscilloscope.callback userInfo:_inputOscilloscope];
+    [_audioController addInputReceiver:_inputOscilloscope];
     [_inputOscilloscope start];
     
     self.tableView.tableHeaderView = oscilloscopeHostView;
@@ -240,7 +231,7 @@ static void doubleSpeedFilter(void                     *userInfo,
                 }
                 case 1: {
                     cell.textLabel.text = @"Double Speed";
-                    ((UISwitch*)cell.accessoryView).on = _useDoubleSpeedFilter;
+                    ((UISwitch*)cell.accessoryView).on = _doubleSpeedFilter != nil;
                     [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(useDoubleSpeedFilterSwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
                 }
@@ -301,23 +292,20 @@ static void doubleSpeedFilter(void                     *userInfo,
     if ( sender.isOn ) {
         self.filter = [[[TPConvolutionFilter alloc] initWithAudioController:_audioController filter:[TPConvolutionFilter filterFromAudioFile:[[NSBundle mainBundle] URLForResource:@"Factory Hall" withExtension:@"wav"] scale:5.0 error:NULL]] autorelease];
         _filter.stereo = NO;
-        [_audioController addFilter:_filter.callback userInfo:_filter];
+        [_audioController addFilter:_filter];
     } else {
-        [_audioController removeFilter:_filter.callback userInfo:_filter];
+        [_audioController removeFilter:_filter];
         self.filter = nil;
     }
 }
 
 - (void)useDoubleSpeedFilterSwitchChanged:(UISwitch*)sender {
-    _useDoubleSpeedFilter = sender.isOn;
-    if ( _useDoubleSpeedFilter ) {
-        _doubleSpeedFilterBuffer[0] = malloc(sizeof(SInt16) * kDoubleSpeedFilterBufferLength);
-        _doubleSpeedFilterBuffer[1] = malloc(sizeof(SInt16) * kDoubleSpeedFilterBufferLength);
-        [_audioController setVariableSpeedFilter:&doubleSpeedFilter userInfo:(void*)self];
+    if ( sender.isOn ) {
+        self.doubleSpeedFilter = [[[TPDoubleSpeedFilter alloc] initWithAudioController:_audioController] autorelease];
+        [_audioController setVariableSpeedFilter:_doubleSpeedFilter];
     } else {
-        [_audioController setVariableSpeedFilter:NULL userInfo:NULL];
-        free(_doubleSpeedFilterBuffer[0]);
-        free(_doubleSpeedFilterBuffer[1]);
+        [_audioController setVariableSpeedFilter:nil];
+        self.doubleSpeedFilter = nil;
     }
 }
 
@@ -327,32 +315,6 @@ static void doubleSpeedFilter(void                     *userInfo,
         [_sample1 removeObserver:self forKeyPath:@"playing"];
         self.sample1 = nil;
         [(UIButton*)context setSelected:NO];
-    }
-}
-
-static void doubleSpeedFilter(void                     *userInfo,
-                              TPAudioControllerVariableSpeedFilterProducer producer,
-                              void                     *producerToken,
-                              const AudioTimeStamp     *time,
-                              UInt32                    frames,
-                              AudioBufferList          *audio) {
-    TPViewController *THIS = (TPViewController*)userInfo;
-    
-    int framesToGet = frames * 2;
-    
-    struct { AudioBufferList bufferList; AudioBuffer nextBuffer; } inputBuffer;
-    inputBuffer.bufferList.mNumberBuffers = 2;
-    for ( int i=0; i<inputBuffer.bufferList.mNumberBuffers; i++ ) {
-        inputBuffer.bufferList.mBuffers[i].mData = THIS->_doubleSpeedFilterBuffer[i];
-        inputBuffer.bufferList.mBuffers[i].mDataByteSize = sizeof(SInt16) * framesToGet * 2;
-        inputBuffer.bufferList.mBuffers[i].mNumberChannels = 1;
-    }
-    
-    producer(producerToken, &inputBuffer.bufferList, framesToGet);
-    
-    for ( int i=0; i<frames; i++ ) {
-        ((SInt16*)audio->mBuffers[0].mData)[i] = THIS->_doubleSpeedFilterBuffer[0][2*i];
-        ((SInt16*)audio->mBuffers[1].mData)[i] = THIS->_doubleSpeedFilterBuffer[1][2*i];
     }
 }
 

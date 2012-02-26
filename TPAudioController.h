@@ -12,9 +12,6 @@
 
 #pragma mark - Callbacks and protocols
 
-@protocol TPAudioPlayable;
-@class TPAudioController;
-
 /*!
  * Render callback
  *
@@ -24,14 +21,14 @@
  *
  *      The channel object is passed through as a parameter.  You should not send it Objective-C
  *      messages, but if you implement the callback within your channel's \@implementation block, you 
- *      can gain direct access to the instance variables of the channel ("channel->myInstanceVariable").
+ *      can gain direct access to the instance variables of the channel ("((MyChannel*)channel)->myInstanceVariable").
  *
  * @param channel           The channel object
  * @param time              The time the buffer will be played
  * @param frames            The number of frames required
  * @param audio             The audio buffer list - audio should be copied into the provided buffers
  */
-typedef OSStatus (*TPAudioControllerRenderCallback) (id<TPAudioPlayable>       channel,
+typedef OSStatus (*TPAudioControllerRenderCallback) (id                        channel,
                                                      const AudioTimeStamp     *time,
                                                      UInt32                    frames,
                                                      AudioBufferList          *audio);
@@ -102,7 +99,6 @@ typedef OSStatus (*TPAudioControllerRenderCallback) (id<TPAudioPlayable>       c
 
 @end
 
-
 /*!
  * Audio callback
  *
@@ -110,17 +106,67 @@ typedef OSStatus (*TPAudioControllerRenderCallback) (id<TPAudioPlayable>       c
  *      the built-in microphone, or another input device), and outgoing audio that
  *      is about to be played by the system.  It's also used for audio filtering.
  *
+ *      The receiver object is passed through as a parameter.  You should not send it Objective-C
+ *      messages, but if you implement the callback within your receiver's \@implementation block, you 
+ *      can gain direct access to the instance variables of the receiver ("((MyReceiver*)receiver)->myInstanceVariable").
+ *
  *      Do not wait on locks, allocate memory, or call any Objective-C or BSD code.
  *
- * @param userInfo  The opaque pointer you provided when you registered this callback
+ * @param receiver  The receiver object
  * @param time      The time the audio was received (for input), or the time it will be played (for output)
  * @param frames    The length of the audio, in frames
  * @param audio     The audio buffer list
  */
-typedef void (*TPAudioControllerAudioCallback) (void                     *userInfo,
+typedef void (*TPAudioControllerAudioCallback) (id                        receiver,
                                                 const AudioTimeStamp     *time,
                                                 UInt32                    frames,
                                                 AudioBufferList          *audio);
+
+
+/*!
+ * TPAudioReceiver protocol
+ *
+ *      The interface that a object must implement to receive incoming or outgoing output audio.
+ *      This includes 'receiverCallback', which is a @link TPAudioControllerAudioCallback C callback @/link 
+ *      to be called when audio is available.  The callback will be passed a reference to this object, so you 
+ *      should implement it from within the \@implementation block to gain access to your instance variables.
+ */
+@protocol TPAudioReceiver <NSObject>
+
+/*!
+ * Reference to the receiver callback
+ *
+ *      This method must return a pointer to the receiver callback function that accepts received
+ *      audio.  Always return the same pointer - this must not change over time.
+ *
+ * @return Pointer to an audio callback
+ */
+@property (nonatomic, readonly) TPAudioControllerAudioCallback receiverCallback;
+
+@end
+
+/*!
+ * TPAudioFilter protocol
+ *
+ *      The interface that a filter object must implement - this includes 'filterCallback',
+ *      which is a @link TPAudioControllerAudioCallback C callback @/link to be called when 
+ *      audio is to be filtered.  The callback will be passed a reference to this object, so you should
+ *      implement it from within the \@implementation block to gain access to your
+ *      instance variables.
+ */
+@protocol TPAudioFilter <NSObject>
+
+/*!
+ * Reference to the filter callback
+ *
+ *      This method must return a pointer to the filter callback function that performs
+ *      audio manipulation.  Always return the same pointer - this must not change over time.
+ *
+ * @return Pointer to an audio callback
+ */
+@property (nonatomic, readonly) TPAudioControllerAudioCallback filterCallback;
+
+@end
 
 
 /*!
@@ -138,6 +184,7 @@ typedef OSStatus (*TPAudioControllerVariableSpeedFilterProducer)(void           
                                                                  AudioBufferList *audio, 
                                                                  UInt32           frames);
 
+
 /*!
  * Variable speed filter callback
  *
@@ -145,16 +192,20 @@ typedef OSStatus (*TPAudioControllerVariableSpeedFilterProducer)(void           
  *      have a playback rate that is not 1:1.  The system provides as an argument
  *      a function pointer that is used to produce input audio.
  *
+ *      The filter object is passed through as a parameter.  You should not send it Objective-C
+ *      messages, but if you implement the callback within your filter's \@implementation block, you 
+ *      can gain direct access to the instance variables of the filter ("((MyFilter*)filter)->myInstanceVariable").
+ *
  *      Do not wait on locks, allocate memory, or call any Objective-C or BSD code.
  *
- * @param userInfo  The opaque pointer you provided when you registered this callback
+ * @param filter    The filter object
  * @param producer  A function pointer to be used to produce input audio
  * @param producerToken An opaque pointer to be passed to the producer as the first argument
  * @param time      The time the output audio will be played
  * @param frames    The length of the required audio, in frames
  * @param audio     The audio buffer list to write output audio to
  */
-typedef void (*TPAudioControllerVariableSpeedFilterCallback) (void                     *userInfo,
+typedef void (*TPAudioControllerVariableSpeedFilterCallback) (id                        filter,
                                                               TPAudioControllerVariableSpeedFilterProducer producer,
                                                               void                     *producerToken,
                                                               const AudioTimeStamp     *time,
@@ -162,9 +213,33 @@ typedef void (*TPAudioControllerVariableSpeedFilterCallback) (void              
                                                               AudioBufferList          *audio);
 
 /*!
+ * TPAudioVariableSpeedFilter protocol
+ *
+ *      The interface that a variable speed filter object must implement - this includes 'filterCallback',
+ *      which is a @link TPAudioControllerVariableSpeedFilterCallback C callback @/link to be called when 
+ *      audio is to be filtered.  The callback will be passed a reference to this object, so you should
+ *      implement it from within the \@implementation block to gain access to your
+ *      instance variables.
+ */
+@protocol TPAudioVariableSpeedFilter <NSObject>
+
+/*!
+ * Reference to the filter callback
+ *
+ *      This method must return a pointer to the filter callback function that performs
+ *      audio manipulation.  Always return the same pointer - this must not change over time.
+ *
+ * @return Pointer to a variable speed filter callback
+ */
+@property (nonatomic, readonly) TPAudioControllerVariableSpeedFilterCallback filterCallback;
+
+@end
+
+
+/*!
  * Timing contexts
  *
- *      Used to indicate which context the audio system is in when a timing callback
+ *      Used to indicate which context the audio system is in when a timing receiver
  *      is called.
  *
  * @constant TPAudioTimingContextInput
@@ -183,35 +258,46 @@ typedef enum {
  * Timing callback
  *
  *      This callback used to notify you when the system time advances.  When called
- *      from an input context, it occurs before any input callback calls are performed.
- *      When called from an output context, it occurs before any output callbacks are
+ *      from an input context, it occurs before any input receiver calls are performed.
+ *      When called from an output context, it occurs before any output receivers are
  *      performed.
+ *
+ *      The receiver object is passed through as a parameter.  You should not send it Objective-C
+ *      messages, but if you implement the callback within your receiver's \@implementation block, you 
+ *      can gain direct access to the instance variables of the receiver ("((MyReceiver*)receiver)->myInstanceVariable").
+ *
  *      Do not wait on locks, allocate memory, or call any Objective-C or BSD code.
  *
- * @param userInfo  The opaque pointer you provided when you registered this callback
+ * @param receiver  The receiver object
  * @param time      The time the audio was received (for input), or the time it will be played (for output)
  * @param context   The timing context - either input, or output
  */
-typedef void (*TPAudioControllerTimingCallback) (void                     *userInfo,
+typedef void (*TPAudioControllerTimingCallback) (id                        receiver,
                                                  const AudioTimeStamp     *time,
                                                  TPAudioTimingContext      context);
 
-
-/*! 
- * Callback key
+/*!
+ * TPAudioTimingReceiver protocol
  *
- *      Used when returning lists of callbacks (see for example @link inputCallbacks @/link). 
- *      This is an NSValue containing a pointer.
+ *      The interface that a object must implement to receive system time advance notices.
+ *      This includes 'timingReceiver', which is a @link TPAudioControllerTimingReceiver C callback @/link 
+ *      to be called when the system time advances.  The callback will be passed a reference to this object, so you 
+ *      should implement it from within the \@implementation block to gain access to your instance variables.
  */
-extern const NSString *kTPAudioControllerCallbackKey;
+@protocol TPAudioTimingReceiver <NSObject>
 
-/*! 
- * User info key
+/*!
+ * Reference to the receiver callback
  *
- *      Used when returning lists of callbacks (see for example @link inputCallbacks @/link). 
- *      This is an NSValue containing a pointer.
+ *      This method must return a pointer to the receiver callback function that accepts received
+ *      audio.  Always return the same pointer - this must not change over time.
+ *
+ * @return Pointer to an audio callback
  */
-extern const NSString *kTPAudioControllerUserInfoKey;
+@property (nonatomic, readonly) TPAudioControllerTimingCallback timingReceiverCallback;
+
+@end
+
 
 /*!
  * Channel group identifier
@@ -219,6 +305,8 @@ extern const NSString *kTPAudioControllerUserInfoKey;
  *      See @link createChannelGroup @/link for more info.
  */
 typedef struct _channel_group_t* TPChannelGroup;
+
+@class TPAudioController;
 
 /*!
  * Message handler function
@@ -234,7 +322,7 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  *
  *      1. Initialise, with the desired audio format
  *      2. Set required parameters
- *      3. Add channels, input callbacks, output callbacks, timing callbacks and filters, as required.
+ *      3. Add channels, input receivers, output receivers, timing receivers and filters, as required.
  *         Note that all these can be added/removed during operation as well.
  *      4. Call @link start @/link to begin processing audio.
  *      
@@ -332,6 +420,14 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
 - (void)addChannels:(NSArray*)channels;
 
 /*!
+ * Add channels to a channel group
+ *
+ * @param channels Array of id<TPAudioPlayable> objects
+ * @param group    Group identifier
+ */
+- (void)addChannels:(NSArray*)channels toChannelGroup:(TPChannelGroup)group;
+
+/*!
  * Remove channels
  *
  *      Takes an array of one or more objects that implement the @link TPAudioPlayable @/link protocol.
@@ -341,9 +437,25 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
 - (void)removeChannels:(NSArray*)channels;
 
 /*!
+ * Remove channels from a channel group
+ *
+ * @param channels Array of id<TPAudioPlayable> objects
+ * @param group    Group identifier
+ */
+- (void)removeChannels:(NSArray*)channels fromChannelGroup:(TPChannelGroup)group;
+
+/*!
  * Obtain a list of all channels, across all channel groups
  */
 - (NSArray*)channels;
+
+/*!
+ * Get a list of channels within a channel group
+ *
+ * @param group Group identifier
+ * @return Array of id<TPAudioPlayable> objects contained within the group
+ */
+- (NSArray*)channelsInChannelGroup:(TPChannelGroup)group;
 
 /*!
  * Create a channel group
@@ -373,7 +485,6 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  * Remove a channel group
  *
  *      Removes channels from the group and releases associated resources.
- *      Ungrouped channels will be added to the top level of the processing tree.
  *
  * @param group Group identifier
  */
@@ -393,36 +504,6 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  * @return Array of NSNumber containing sub-group identifiers
  */
 - (NSArray*)channelGroupsInChannelGroup:(TPChannelGroup)group;
-
-/*!
- * Add channels to a channel group
- *
- *      If any channels have already been added with @link addChannels: @/link, then
- *      these will be moved from the top level of the processing tree to within the
- *      channel group.
- *
- * @param channels Array of id<TPAudioPlayable> objects
- * @param group    Group identifier
- */
-- (void)addChannels:(NSArray*)channels toChannelGroup:(TPChannelGroup)group;
-
-/*!
- * Remove channels from a channel group
- *
- *      Ungrouped channels will be re-added to the top level of the processing tree.
- *
- * @param channels Array of id<TPAudioPlayable> objects
- * @param group    Group identifier
- */
-- (void)removeChannels:(NSArray*)channels fromChannelGroup:(TPChannelGroup)group;
-
-/*!
- * Get a list of channels within a channel group
- *
- * @param group Group identifier
- * @return Array of id<TPAudioPlayable> objects contained within the group
- */
-- (NSArray*)channelsInChannelGroup:(TPChannelGroup)group;
 
 /*!
  * Set the volume level of a channel group
@@ -457,10 +538,9 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  *
  *      Audio filters are used to process live audio before playback.
  *
- * @param callback A @link TPAudioControllerAudioCallback @/link callback to process audio
- * @param userInfo An opaque pointer to be passed to the callback
+ * @param filter An object that implements the TPAudioFilter protocol
  */
-- (void)addFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo;
+- (void)addFilter:(id<TPAudioFilter>)filter;
 
 /*!
  * Add an audio filter to a channel
@@ -475,11 +555,10 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  *      be performed on the audio in the order in which the filters were added using this
  *      method.
  *
- * @param callback A @link TPAudioControllerAudioCallback @/link callback to process audio
- * @param userInfo An opaque pointer to be passed to the callback
- * @param channel  The channel on which to perform audio processing
+ * @param filter  An object that implements the TPAudioFilter protocol
+ * @param channel The channel on which to perform audio processing
  */
-- (void)addFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo toChannel:(id<TPAudioPlayable>)channel;
+- (void)addFilter:(id<TPAudioFilter>)filter toChannel:(id<TPAudioPlayable>)channel;
 
 /*!
  * Add an audio filter to a channel group
@@ -489,53 +568,41 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  *      Create and add filters to a channel group to process multiple channels with one filter,
  *      without the performance hit of processing each channel individually.
  *
- * @param callback A @link TPAudioControllerAudioCallback @/link callback to process audio
- * @param userInfo An opaque pointer to be passed to the callback
- * @param group    The channel group on which to perform audio processing
+ * @param filter An object that implements the TPAudioFilter protocol
+ * @param group  The channel group on which to perform audio processing
  */
-- (void)addFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo toChannelGroup:(TPChannelGroup)group;
+- (void)addFilter:(id<TPAudioFilter>)filter toChannelGroup:(TPChannelGroup)group;
 
 /*!
  * Remove a filter from system output
  *
- * @param callback The callback to remove
- * @param userInfo The opaque pointer that was passed when the callback was added
+ * @param filter The filter to remove
  */
-- (void)removeFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo;
+- (void)removeFilter:(id<TPAudioFilter>)filter;
 
 /*!
  * Remove a filter from a channel
  *
- * @param callback The callback to remove
- * @param userInfo The opaque pointer that was passed when the callback was added
- * @param channel  The channel to stop filtering
+ * @param filter  The filter to remove
+ * @param channel The channel to stop filtering
  */
-- (void)removeFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channel;
+- (void)removeFilter:(id<TPAudioFilter>)filter fromChannel:(id<TPAudioPlayable>)channel;
 
 /*!
  * Remove a filter from a channel group
  *
- * @param callback The callback to remove
- * @param userInfo The opaque pointer that was passed when the callback was added
- * @param group    The group to stop filtering
+ * @param filter The filter to remove
+ * @param group  The group to stop filtering
  */
-- (void)removeFilter:(TPAudioControllerAudioCallback)filter userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group;
+- (void)removeFilter:(id<TPAudioFilter>)filter fromChannelGroup:(TPChannelGroup)group;
 
 /*!
  * Get a list of all top-level filters
- *
- *      This method returns an NSArray of NSDictionary elements, each containing
- *      a filter callback (kTPAudioControllerCallbackKey) and the corresponding userinfo
- *      (kTPAudioControllerUserInfoKey).
  */
 - (NSArray*)filters;
 
 /*!
  * Get a list of all filters currently operating on the channel
- *
- *      This method returns an NSArray of NSDictionary elements, each containing
- *      a filter callback (kTPAudioControllerCallbackKey) and the corresponding userinfo
- *      (kTPAudioControllerUserInfoKey).
  *
  * @param channel Channel to get filters for
  */
@@ -544,17 +611,22 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
 /*!
  * Get a list of all filters currently operating on the channel group
  *
- *      This method returns an NSArray of NSDictionary elements, each containing
- *      a filter callback (kTPAudioControllerCallbackKey) and the corresponding userinfo
- *      (kTPAudioControllerUserInfoKey).
- *
  * @param group Channel group to get filters for
  */
 - (NSArray*)filtersForChannelGroup:(TPChannelGroup)group;
 
-#pragma mark - Variable speed filters
-
-/*! @methodgroup Variable speed filters */
+/*!
+ * Set variable speed audio filter for the system output
+ *
+ *      Variable audio filters are used to process live audio before playback, at a
+ *      playback rate other than 1:1. You can provide one variable audio filter per
+ *      node (channel, group, the root system node).
+ *
+ *      See @link TPAudioControllerVariableSpeedFilterCallback @/link for more info.
+ *
+ * @param filter An object that implements the TPAudioVariableSpeedFilter protocol, or nil
+ */
+- (void)setVariableSpeedFilter:(id<TPAudioVariableSpeedFilter>)filter;
 
 /*!
  * Set variable speed audio filter for the system output
@@ -565,11 +637,10 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  *
  *      See @link TPAudioControllerVariableSpeedFilterCallback @/link for more info.
  *
- * @param callback A @link TPAudioControllerVariableSpeedFilterCallback @/link callback to process audio, 
- *                 or NULL to unset the filter.
- * @param userInfo An opaque pointer to be passed to the callback
+ * @param filter An object that implements the TPAudioVariableSpeedFilter protocol, or nil
+ * @param channel Channel to assign filter to
  */
-- (void)setVariableSpeedFilter:(TPAudioControllerVariableSpeedFilterCallback)filter userInfo:(void*)userInfo;
+- (void)setVariableSpeedFilter:(id<TPAudioVariableSpeedFilter>)filter forChannel:(id<TPAudioPlayable>)channel;
 
 /*!
  * Set variable speed audio filter for the system output
@@ -580,189 +651,150 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  *
  *      See @link TPAudioControllerVariableSpeedFilterCallback @/link for more info.
  *
- * @param callback A @link TPAudioControllerVariableSpeedFilterCallback @/link callback to process audio, 
- *                 or NULL to unset the filter.
- * @param userInfo An opaque pointer to be passed to the callback
- * @param channel  Channel to assign filter to
+ * @param filter An object that implements the TPAudioVariableSpeedFilter protocol, or nil
+ * @param group Group to assign filter to
  */
-- (void)setVariableSpeedFilter:(TPAudioControllerVariableSpeedFilterCallback)filter userInfo:(void*)userInfo forChannel:(id<TPAudioPlayable>)channel;
+- (void)setVariableSpeedFilter:(id<TPAudioVariableSpeedFilter>)filter forChannelGroup:(TPChannelGroup)group;
+
+#pragma mark - Output receivers
+
+/*! @methodgroup Output receivers */
 
 /*!
- * Set variable speed audio filter for the system output
+ * Add an output receiver
  *
- *      Variable audio filters are used to process live audio before playback, at a
- *      playback rate other than 1:1. You can provide one variable audio filter per
- *      node (channel, group, the root system node).
- *
- *      See @link TPAudioControllerVariableSpeedFilterCallback @/link for more info.
- *
- * @param callback A @link TPAudioControllerVariableSpeedFilterCallback @/link callback to process audio, 
- *                 or NULL to unset the filter.
- * @param userInfo An opaque pointer to be passed to the callback
- * @param group    Group to assign filter to
- */
-- (void)setVariableSpeedFilter:(TPAudioControllerVariableSpeedFilterCallback)filter userInfo:(void*)userInfo forChannelGroup:(TPChannelGroup)group;
-
-#pragma mark - Output callbacks
-
-/*! @methodgroup Output callbacks */
-
-/*!
- * Add a output callback
- *
- *      Output callbacks receive audio that is being played by the system.  Use this
- *      method to add a callback to receive audio that consists of all the playing channels
+ *      Output receivers receive audio that is being played by the system.  Use this
+ *      method to add a receiver to receive audio that consists of all the playing channels
  *      mixed together.
  *
- * @param callback A @link TPAudioControllerAudioCallback @/link callback to receive audio
- * @param userInfo An opaque pointer to be passed to the callback
+ * @param receiver An object that implements the TPAudioReceiver protocol
  */
-- (void)addOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo;
+- (void)addOutputReceiver:(id<TPAudioReceiver>)receiver;
 
 /*!
- * Add a output callback
+ * Add an output receiver
  *
- *      Output callbacks receive audio that is being played by the system.  Use this
+ *      Output receivers receive audio that is being played by the system.  Use this
  *      method to add a callback to receive audio from a particular channel.
  *
- * @param callback A @link TPAudioControllerAudioCallback @/link callback to receive audio
- * @param userInfo An opaque pointer to be passed to the callback
+ * @param receiver An object that implements the TPAudioReceiver protocol
  * @param channel  A channel
  */
-- (void)addOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo forChannel:(id<TPAudioPlayable>)channel;
+- (void)addOutputReceiver:(id<TPAudioReceiver>)receiver forChannel:(id<TPAudioPlayable>)channel;
 
 /*!
- * Add a output callback for a particular channel group
+ * Add an output receiver for a particular channel group
  *
- *      Output callbacks receive audio that is being played by the system.  By registering
+ *      Output receivers receive audio that is being played by the system.  By registering
  *      a callback for a particular channel group, you can receive the mixed audio of only that
  *      group.
  *
- * @param callback A @link TPAudioControllerAudioCallback @/link callback to receive audio
- * @param userInfo An opaque pointer to be passed to the callback
+ * @param receiver An object that implements the TPAudioReceiver protocol
  * @param group    A channel group identifier
  */
-- (void)addOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo forChannelGroup:(TPChannelGroup)group;
+- (void)addOutputReceiver:(id<TPAudioReceiver>)receiver forChannelGroup:(TPChannelGroup)group;
 
 /*!
- * Remove a output callback
+ * Remove an output receiver
  *
- * @param callback The callback to remove
- * @param userInfo The opaque pointer that was passed when the callback was added
+ * @param receiver The receiver to remove
  */
-- (void)removeOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo;
+- (void)removeOutputReceiver:(id<TPAudioReceiver>)receiver;
 
 /*!
- * Remove a output callback
+ * Remove an output receiver from a channel
  *
- * @param callback The callback to remove
- * @param userInfo The opaque pointer that was passed when the callback was added
+ * @param receiver The receiver to remove
+ * @param channel  Channel to remove receiver from
  */
-- (void)removeOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<TPAudioPlayable>)channel;
+- (void)removeOutputReceiver:(id<TPAudioReceiver>)receiver fromChannel:(id<TPAudioPlayable>)channel;
 
 /*!
- * Remove a output callback from a particular channel group
+ * Remove an output receiver from a particular channel group
  *
- * @param callback The callback to remove
- * @param userInfo The opaque pointer that was passed when the callback was added
+ * @param receiver The receiver to remove
  * @param group    A channel group identifier
  */
-- (void)removeOutputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(TPChannelGroup)group;
+- (void)removeOutputReceiver:(id<TPAudioReceiver>)receiver fromChannelGroup:(TPChannelGroup)group;
 
 /*!
- * Obtain a list of all top-level output callbacks
- *
- *      This yields an NSArray of NSDictionary elements, each containing a callback
- *      (kTPAudioControllerCallbackKey) and the corresponding userinfo (kTPAudioControllerUserInfoKey).
+ * Obtain a list of all top-level output receivers
  */
-- (NSArray*)outputCallbacks;
+- (NSArray*)outputReceivers;
 
 /*!
- * Obtain a list of all output callbacks for the specified channel
- *
- *      This yields an NSArray of NSDictionary elements, each containing a callback
- *      (kTPAudioControllerCallbackKey) and the corresponding userinfo (kTPAudioControllerUserInfoKey).
+ * Obtain a list of all output receivers for the specified channel
  *
  * @param channel A channel
  */
-- (NSArray*)outputCallbacksForChannel:(id<TPAudioPlayable>)channel;
+- (NSArray*)outputReceiversForChannel:(id<TPAudioPlayable>)channel;
 
 /*!
- * Obtain a list of all output callbacks for the specified group
- *
- *      This yields an NSArray of NSDictionary elements, each containing a callback
- *      (kTPAudioControllerCallbackKey) and the corresponding userinfo (kTPAudioControllerUserInfoKey).
+ * Obtain a list of all output receivers for the specified group
  *
  * @param group A channel group identifier
  */
-- (NSArray*)outputCallbacksForChannelGroup:(TPChannelGroup)group;
+- (NSArray*)outputReceiversForChannelGroup:(TPChannelGroup)group;
 
-#pragma mark - Other callbacks
+#pragma mark - Input receivers
 
-/*! @methodgroup Other callbacks */
+/*! @methodgroup Input receivers */
 
 /*!
- * Add a input callback
+ * Add an input receiver
  *
- *      Input callbacks receive audio that is being received by the microphone or another input device.
+ *      Input receivers receive audio that is being received by the microphone or another input device.
  *
  *      Note that if the @link receiveMonoInputAsBridgedStereo @/link property is set to YES, then incoming
  *      audio may be mono. Check the audio buffer list parameters to determine the kind of audio you are
  *      receiving (for example, if you are using the @link interleaved16BitStereoAudioDescription @/link
  *      then the audio->mBuffers[0].mNumberOfChannels field will be 1 for mono, and 2 for stereo audio).
  *
- * @param callback A @link TPAudioControllerAudioCallback @/link callback to receive audio
- * @param userInfo An opaque pointer to be passed to the callback
+ * @param receiver An object that implements the TPAudioReceiver protocol
  */
-
-- (void)addInputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo;
+- (void)addInputReceiver:(id<TPAudioReceiver>)receiver;
 
 /*!
- * Remove a input callback
+ * Remove an input receiver
  *
- * @param callback The callback to remove
- * @param userInfo The opaque pointer that was passed when the callback was added
+ * @param receiver Receiver to remove
  */
-- (void)removeInputCallback:(TPAudioControllerAudioCallback)callback userInfo:(void*)userInfo;
+- (void)removeInputReceiver:(id<TPAudioReceiver>)receiver;
 
 /*!
- * Obtain a list of all input callbacks
- *
- *      This yields an NSArray of NSDictionary elements, each containing a callback
- *      (kTPAudioControllerCallbackKey) and the corresponding userinfo (kTPAudioControllerUserInfoKey).
+ * Obtain a list of all input receivers
  */
-- (NSArray*)inputCallbacks;
+- (NSArray*)inputReceivers;
+
+#pragma mark - Timing receivers
+
+/*! @methodgroup Timing receivers */
 
 /*!
- * Add a timing callback
+ * Add a timing receiver
  *
- *      Timing callbacks receive notifications for when time has advanced.  When called
- *      from an input context, the call occurs before any input callback calls are performed.
- *      When called from an output context, it occurs before any output callbacks are
+ *      Timing receivers receive notifications for when time has advanced.  When called
+ *      from an input context, the call occurs before any input receiver calls are performed.
+ *      When called from an output context, it occurs before any output receivers are
  *      performed.
  *
  *      This mechanism can be used to trigger time-dependent events.
  *
- * @param callback A @link TPAudioControllerTimingCallback @/link callback to receive audio
- * @param userInfo An opaque pointer to be passed to the callback
+ * @param receiver An object that implements the TPAudioTimingReceiver protocol
  */
-- (void)addTimingCallback:(TPAudioControllerTimingCallback)callback userInfo:(void*)userInfo;
+- (void)addTimingReceiver:(id<TPAudioTimingReceiver>)receiver;
 
 /*!
- * Remove a timing callback
+ * Remove a timing receiver
  *
- * @param callback The callback to remove
- * @param userInfo The opaque pointer that was passed when the callback was added
+ * @param receiver An object that implements the TPAudioTimingReceiver protocol
  */
-- (void)removeTimingCallback:(TPAudioControllerTimingCallback)callback userInfo:(void*)userInfo;
+- (void)removeTimingReceiver:(id<TPAudioTimingReceiver>)receiver;
 
 /*!
- * Obtain a list of all timing callbacks
- *
- *      This yields an NSArray of NSDictionary elements, each containing a callback
- *      (TPAudioControllerTimingCallback) and the corresponding userinfo (kTPAudioControllerUserInfoKey).
+ * Obtain a list of all timing receivers
  */
-- (NSArray*)timingCallbacks;
+- (NSArray*)timingReceivers;
 
 #pragma mark - Realtime/Main thread messaging system
 
@@ -860,7 +892,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
  * Mute output
  *
  *      Set to YES to mute all system output. Note that even if this is YES, playback
- *      callbacks will still receive audio, as the silencing happens after output callback
+ *      callbacks will still receive audio, as the silencing happens after output receiver
  *      callbacks are called.
  */
 @property (nonatomic, assign) BOOL muteOutput;
@@ -897,10 +929,10 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
  * Whether to receive audio input from mono devices as bridged stereo
  *
  *      If you are using a stereo audio format, setting this to YES causes audio input
- *      from mono input devices to be received by input callbacks as bridged stereo audio.
+ *      from mono input devices to be received by input receivers as bridged stereo audio.
  *      Otherwise, audio will be received as mono audio.
  *
- *      See also discussion of @link addInputCallback:userInfo: @/link.
+ *      See also discussion of @link addInputReceiver:userInfo: @/link.
  *
  *      Default is YES.
  */

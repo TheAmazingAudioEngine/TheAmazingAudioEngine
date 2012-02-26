@@ -28,7 +28,7 @@
     self.window = [[[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]] autorelease];
     
     // Create an instance of the audio controller, set it up and start it running
-    self.audioController = [[[TPAudioController alloc] initWithAudioDescription:[TPAudioController nonInterleaved16BitStereoAudioDescription] inputEnabled:YES useVoiceProcessing:NO] autorelease];
+    self.audioController = [[[TPAudioController alloc] initWithAudioDescription:[TPAudioController nonInterleaved16BitStereoAudioDescription] inputEnabled:YES useVoiceProcessing:YES] autorelease];
     [_audioController start];
     
     // Create and display view controller

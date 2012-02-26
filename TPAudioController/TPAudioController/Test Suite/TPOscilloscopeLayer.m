@@ -21,7 +21,7 @@
 }
 @end
 
-static void audioCallback(void *THIS, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio);
+static void audioCallback(id THIS, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio);
 
 @implementation TPOscilloscopeLayer
 @synthesize lineColor=_lineColor;
@@ -57,7 +57,7 @@ static void audioCallback(void *THIS, const AudioTimeStamp *time, UInt32 frames,
     _timer = nil;
 }
 
--(TPAudioControllerAudioCallback)callback {
+-(TPAudioControllerAudioCallback)receiverCallback {
     return &audioCallback;
 }
 
@@ -107,7 +107,7 @@ static void audioCallback(void *THIS, const AudioTimeStamp *time, UInt32 frames,
 
 #pragma mark - Callback
 
-static void audioCallback(void *THISptr, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
+static void audioCallback(id THISptr, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
     TPOscilloscopeLayer *THIS = (TPOscilloscopeLayer*)THISptr;
     
     // Get a pointer to the audio buffer that we can advance

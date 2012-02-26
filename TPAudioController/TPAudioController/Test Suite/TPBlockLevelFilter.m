@@ -28,7 +28,7 @@ struct filter_rec_t {
 
 @implementation TPBlockLevelFilter
 @synthesize stereo=_stereo, processingBlockSizeInFrames=_processingBlockSizeInFrames;
-@dynamic callback;
+@dynamic filterCallback;
 
 - (id)initWithAudioController:(TPAudioController *)audioController processingBlockSize:(int)processingBlockSizeInFrames blockProcessingCallback:(TPBlockLevelFilterAudioCallback)callback {
     if ( !(self = [super init]) ) return nil;
@@ -99,8 +99,8 @@ static long setProcessingBlockSize(TPAudioController *audioController, long *ioP
     [_audioController performSynchronousMessageExchangeWithHandler:&setProcessingBlockSize parameter1:processingBlockSizeInFrames parameter2:0 parameter3:0 ioOpaquePtr:self];
 }
 
-static void callback(void *userInfo, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
-    TPBlockLevelFilter *THIS = (TPBlockLevelFilter*)userInfo;
+static void filterCallback(id filter, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
+    TPBlockLevelFilter *THIS = (TPBlockLevelFilter*)filter;
     
     BOOL inputIsStereo = audio->mNumberBuffers == 2 || audio->mBuffers[0].mNumberChannels == 2;
     BOOL inputIsNonInterleaved = audio->mNumberBuffers == 2;
@@ -155,17 +155,20 @@ static void callback(void *userInfo, const AudioTimeStamp *time, UInt32 frames, 
         TPCircularBufferProduce(&THIS->_channelRecord[0].inputBuffer, frames*sizeof(float));
     }
     
-    struct { AudioBufferList bufferList; AudioBuffer nextBuffer; } output, input;
-    
-    input.bufferList.mNumberBuffers = output.bufferList.mNumberBuffers = stereo ? 2 : 1;
-    output.bufferList.mBuffers[0].mNumberChannels = input.bufferList.mBuffers[0].mNumberChannels = 1;
-    output.bufferList.mBuffers[1].mNumberChannels = input.bufferList.mBuffers[1].mNumberChannels = 1;
+    char outputAudioBufferListSpace[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
+    AudioBufferList *output = (AudioBufferList*)outputAudioBufferListSpace;
+    char inputAudioBufferListSpace[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
+    AudioBufferList *input = (AudioBufferList*)inputAudioBufferListSpace;
+            
+    input->mNumberBuffers = output->mNumberBuffers = stereo ? 2 : 1;
+    output->mBuffers[0].mNumberChannels = input->mBuffers[0].mNumberChannels = 1;
+    output->mBuffers[1].mNumberChannels = input->mBuffers[1].mNumberChannels = 1;
     
     while ( 1 ) {
         // The input signal (left/mono channel)...
         int32_t availableInputBytes;
-        input.bufferList.mBuffers[0].mData = TPCircularBufferTail(&THIS->_channelRecord[0].inputBuffer, &availableInputBytes);
-        input.bufferList.mBuffers[0].mDataByteSize = availableInputBytes;
+        input->mBuffers[0].mData = TPCircularBufferTail(&THIS->_channelRecord[0].inputBuffer, &availableInputBytes);
+        input->mBuffers[0].mDataByteSize = availableInputBytes;
 
         int availableInputFrames = availableInputBytes / sizeof(float);
         if ( availableInputFrames < THIS->_processingBlockSizeInFrames ) break;
@@ -174,18 +177,18 @@ static void callback(void *userInfo, const AudioTimeStamp *time, UInt32 frames, 
         
         // Prepare to write to the output buffer (left/mono channel)...
         int32_t availableOutputBytes;
-        output.bufferList.mBuffers[0].mData = TPCircularBufferHead(&THIS->_channelRecord[0].outputBuffer, &availableOutputBytes);
-        output.bufferList.mBuffers[0].mDataByteSize = availableOutputBytes;
+        output->mBuffers[0].mData = TPCircularBufferHead(&THIS->_channelRecord[0].outputBuffer, &availableOutputBytes);
+        output->mBuffers[0].mDataByteSize = availableOutputBytes;
         assert(availableOutputBytes > THIS->_processingBlockSizeInFrames*sizeof(float));
         
         // The input signal (right channel)
         if ( stereo ) {
-            input.bufferList.mBuffers[1].mData = TPCircularBufferTail(&THIS->_channelRecord[1].inputBuffer, &availableInputBytes);
-            input.bufferList.mBuffers[1].mDataByteSize = availableInputBytes;
+            input->mBuffers[1].mData = TPCircularBufferTail(&THIS->_channelRecord[1].inputBuffer, &availableInputBytes);
+            input->mBuffers[1].mDataByteSize = availableInputBytes;
             assert(availableInputBytes >= THIS->_processingBlockSizeInFrames*sizeof(float));
             
-            output.bufferList.mBuffers[1].mData = TPCircularBufferHead(&THIS->_channelRecord[1].outputBuffer, &availableOutputBytes);
-            output.bufferList.mBuffers[1].mDataByteSize = availableOutputBytes;
+            output->mBuffers[1].mData = TPCircularBufferHead(&THIS->_channelRecord[1].outputBuffer, &availableOutputBytes);
+            output->mBuffers[1].mDataByteSize = availableOutputBytes;
             assert(availableOutputBytes > THIS->_processingBlockSizeInFrames*sizeof(float));
         }
         
@@ -193,7 +196,7 @@ static void callback(void *userInfo, const AudioTimeStamp *time, UInt32 frames, 
         int consumedFrames = THIS->_processingBlockSizeInFrames;
         int producedFrames = THIS->_processingBlockSizeInFrames;
         
-        THIS->_blockProcessingCallback(THIS, time, THIS->_processingBlockSizeInFrames, &input.bufferList, &output.bufferList, &consumedFrames, &producedFrames);
+        THIS->_blockProcessingCallback(THIS, time, THIS->_processingBlockSizeInFrames, input, output, &consumedFrames, &producedFrames);
         
         TPCircularBufferProduce(&THIS->_channelRecord[0].outputBuffer, producedFrames * sizeof(float));
         TPCircularBufferConsume(&THIS->_channelRecord[0].inputBuffer, consumedFrames * sizeof(float));
@@ -260,8 +263,8 @@ static void callback(void *userInfo, const AudioTimeStamp *time, UInt32 frames, 
     }
 }
 
--(TPAudioControllerAudioCallback)callback {
-    return &callback;
+-(TPAudioControllerAudioCallback)filterCallback {
+    return &filterCallback;
 }
 
 @end

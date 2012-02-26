@@ -102,20 +102,22 @@
         audioDataPtr[i] = audioDataPtr[i-1] + (fileLengthInFrames * audioDescription.mBytesPerFrame);
     }
     
-    struct { AudioBufferList bufferList; AudioBuffer nextBuffer; } buffers;
-    buffers.bufferList.mNumberBuffers = bufferCount;
+    char audioBufferListSpace[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
+    AudioBufferList *bufferList = (AudioBufferList*)audioBufferListSpace;
+    
+    bufferList->mNumberBuffers = bufferCount;
 
     // Perform read in multiple small chunks (otherwise ExtAudioFileRead crashes when performing sample rate conversion)
     while ( remainingFrames > 0 ) {
-        for ( int i=0; i<buffers.bufferList.mNumberBuffers; i++ ) {
-            buffers.bufferList.mBuffers[i].mNumberChannels = (audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? 1 : audioDescription.mChannelsPerFrame;
-            buffers.bufferList.mBuffers[i].mData = audioDataPtr[i];
-            buffers.bufferList.mBuffers[i].mDataByteSize = MIN(16384, remainingFrames * audioDescription.mBytesPerFrame);
+        for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
+            bufferList->mBuffers[i].mNumberChannels = (audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? 1 : audioDescription.mChannelsPerFrame;
+            bufferList->mBuffers[i].mData = audioDataPtr[i];
+            bufferList->mBuffers[i].mDataByteSize = MIN(16384, remainingFrames * audioDescription.mBytesPerFrame);
         }
         
         // Perform read
-        UInt32 numberOfPackets = (UInt32)(buffers.bufferList.mBuffers[0].mDataByteSize / audioDescription.mBytesPerFrame);
-        status = ExtAudioFileRead(audioFile, &numberOfPackets, &buffers.bufferList);
+        UInt32 numberOfPackets = (UInt32)(bufferList->mBuffers[0].mDataByteSize / audioDescription.mBytesPerFrame);
+        status = ExtAudioFileRead(audioFile, &numberOfPackets, bufferList);
         
         if ( numberOfPackets == 0 ) {
             // Termination condition
@@ -133,7 +135,7 @@
             return nil;
         }
         
-        for ( int i=0; i<buffers.bufferList.mNumberBuffers; i++ ) {
+        for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
             audioDataPtr[i] += numberOfPackets * audioDescription.mBytesPerFrame;
         }
         remainingFrames -= numberOfPackets;

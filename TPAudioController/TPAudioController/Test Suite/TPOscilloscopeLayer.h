@@ -10,7 +10,7 @@
 #import <QuartzCore/QuartzCore.h>
 #import <TPAudioController/TPAudioController.h>
 
-@interface TPOscilloscopeLayer : CALayer
+@interface TPOscilloscopeLayer : CALayer <TPAudioReceiver>
 
 /*!
  * Begin rendering
@@ -30,6 +30,6 @@
 /*! The line color to render with */
 @property (nonatomic, retain) UIColor *lineColor;
 
-- (TPAudioControllerAudioCallback)callback;
+- (TPAudioControllerAudioCallback)receiverCallback;
 
 @end

@@ -29,7 +29,7 @@
 
 @implementation TPConvolutionFilter
 @synthesize filter=_filter;
-@dynamic stereo, callback;
+@dynamic stereo;
 
 #pragma mark - Filter kernel generation
 
@@ -161,17 +161,18 @@
     
     while ( 1 ) {
         // Set up buffers
-        struct { AudioBufferList bufferList; AudioBuffer nextBuffer; } buffers;
+        char audioBufferListSpace[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
+        AudioBufferList *bufferList = (AudioBufferList*)audioBufferListSpace;
         
-        buffers.bufferList.mNumberBuffers = targetAudioDescription.mChannelsPerFrame;
-        for ( int i=0; i<buffers.bufferList.mNumberBuffers; i++ ) {
-            buffers.bufferList.mBuffers[i].mData = audioDataPtr[i];
-            buffers.bufferList.mBuffers[i].mDataByteSize = MIN(16384, remainingFrames * targetAudioDescription.mBytesPerFrame);
+        bufferList->mNumberBuffers = targetAudioDescription.mChannelsPerFrame;
+        for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
+            bufferList->mBuffers[i].mData = audioDataPtr[i];
+            bufferList->mBuffers[i].mDataByteSize = MIN(16384, remainingFrames * targetAudioDescription.mBytesPerFrame);
         }
         
         // Perform read
-        UInt32 numberOfPackets = (UInt32)(buffers.bufferList.mBuffers[0].mDataByteSize / targetAudioDescription.mBytesPerFrame);
-        status = ExtAudioFileRead(audioFile, &numberOfPackets, &buffers.bufferList);
+        UInt32 numberOfPackets = (UInt32)(bufferList->mBuffers[0].mDataByteSize / targetAudioDescription.mBytesPerFrame);
+        status = ExtAudioFileRead(audioFile, &numberOfPackets, bufferList);
         
         if ( numberOfPackets == 0 ) {
             // Termination condition
@@ -189,7 +190,7 @@
             return nil;
         }
         
-        for ( int i=0; i<buffers.bufferList.mNumberBuffers; i++ ) {
+        for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
             audioDataPtr[i] += numberOfPackets;
         }
         remainingFrames -= numberOfPackets;
