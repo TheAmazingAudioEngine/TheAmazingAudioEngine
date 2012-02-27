@@ -37,7 +37,7 @@ typedef OSStatus (*TPAudioControllerRenderCallback) (id                        c
  * TPAudioPlayable protocol
  *
  *      The interface that a channel object must implement - this includes 'renderCallback',
- *      which is a @link TPAudioControllerRenderCallback C callback @/link to be called when 
+ *      which is a @link TPAudioControllerRenderCallback C callback @endlink to be called when 
  *      audio is required.  The callback will be passed a reference to this object, so you should
  *      implement it from within the \@implementation block to gain access to your
  *      instance variables.
@@ -127,7 +127,7 @@ typedef void (*TPAudioControllerAudioCallback) (id                        receiv
  * TPAudioReceiver protocol
  *
  *      The interface that a object must implement to receive incoming or outgoing output audio.
- *      This includes 'receiverCallback', which is a @link TPAudioControllerAudioCallback C callback @/link 
+ *      This includes 'receiverCallback', which is a @link TPAudioControllerAudioCallback C callback @endlink 
  *      to be called when audio is available.  The callback will be passed a reference to this object, so you 
  *      should implement it from within the \@implementation block to gain access to your instance variables.
  */
@@ -149,7 +149,7 @@ typedef void (*TPAudioControllerAudioCallback) (id                        receiv
  * TPAudioFilter protocol
  *
  *      The interface that a filter object must implement - this includes 'filterCallback',
- *      which is a @link TPAudioControllerAudioCallback C callback @/link to be called when 
+ *      which is a @link TPAudioControllerAudioCallback C callback @endlink to be called when 
  *      audio is to be filtered.  The callback will be passed a reference to this object, so you should
  *      implement it from within the \@implementation block to gain access to your
  *      instance variables.
@@ -216,7 +216,7 @@ typedef void (*TPAudioControllerVariableSpeedFilterCallback) (id                
  * TPAudioVariableSpeedFilter protocol
  *
  *      The interface that a variable speed filter object must implement - this includes 'filterCallback',
- *      which is a @link TPAudioControllerVariableSpeedFilterCallback C callback @/link to be called when 
+ *      which is a @link TPAudioControllerVariableSpeedFilterCallback C callback @endlink to be called when 
  *      audio is to be filtered.  The callback will be passed a reference to this object, so you should
  *      implement it from within the \@implementation block to gain access to your
  *      instance variables.
@@ -237,15 +237,16 @@ typedef void (*TPAudioControllerVariableSpeedFilterCallback) (id                
 
 
 /*!
- * Timing contexts
+ * @enum TPAudioTimingContext
+ *      Timing contexts
  *
  *      Used to indicate which context the audio system is in when a timing receiver
  *      is called.
  *
- * @constant TPAudioTimingContextInput
+ * @var TPAudioTimingContextInput
  *      Input context: Audio system is about to process some incoming audio (from microphone, etc).
  *
- * @constant TPAudioTimingContextOutput
+ * @var TPAudioTimingContextOutput
  *      Output context: Audios sytem is about to render the next buffer for playback.
  *
  */
@@ -280,7 +281,7 @@ typedef void (*TPAudioControllerTimingCallback) (id                        recei
  * TPAudioTimingReceiver protocol
  *
  *      The interface that a object must implement to receive system time advance notices.
- *      This includes 'timingReceiver', which is a @link TPAudioControllerTimingReceiver C callback @/link 
+ *      This includes 'timingReceiver', which is a @link TPAudioControllerTimingCallback C callback @endlink 
  *      to be called when the system time advances.  The callback will be passed a reference to this object, so you 
  *      should implement it from within the \@implementation block to gain access to your instance variables.
  */
@@ -302,7 +303,7 @@ typedef void (*TPAudioControllerTimingCallback) (id                        recei
 /*!
  * Channel group identifier
  *
- *      See @link createChannelGroup @/link for more info.
+ *      See @link createChannelGroup @endlink for more info.
  */
 typedef struct _channel_group_t* TPChannelGroup;
 
@@ -316,28 +317,28 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
 #pragma mark -
 
 /*!
- *  Main controller class
+ * Main controller class
  *
  *      Use:
  *
- *      1. Initialise, with the desired audio format
- *      2. Set required parameters
+ *      1. Initialise, with the desired audio format.
+ *      2. Set required parameters.
  *      3. Add channels, input receivers, output receivers, timing receivers and filters, as required.
  *         Note that all these can be added/removed during operation as well.
- *      4. Call @link start @/link to begin processing audio.
+ *      4. Call @link start @endlink to begin processing audio.
  *      
  */
 @interface TPAudioController : NSObject
 
 #pragma mark - Setup and start/stop
-
-/*! @methodgroup Setup and start/stop */
+/** @name Setup and start/stop */
+///@{
 
 /*!
  * Canonical Audio Unit audio description
  *
  *      This is the non-interleaved audio description associated with the kAudioFormatFlagsAudioUnitCanonical flag,
- *      at 44.1kHz that can be used with @link initWithAudioDescription: @/link.
+ *      at 44.1kHz that can be used with @link initWithAudioDescription: @endlink.
  *
  *      This is the 8.24 fixed-point audio format recommended by Apple, although it is relatively 
  *      inconvenient to work with individual samples without converting.
@@ -348,7 +349,7 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  * 16-bit stereo audio description, interleaved
  *
  *      This is a 16-bit signed PCM, stereo, interleaved format at 44.1kHz that can be used
- *      with @link initWithAudioDescription: @/link.
+ *      with @link initWithAudioDescription: @endlink.
  */
 + (AudioStreamBasicDescription)interleaved16BitStereoAudioDescription;
 
@@ -356,7 +357,7 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  * 16-bit stereo audio description, non-interleaved
  *
  *      This is a 16-bit signed PCM, stereo, non-interleaved format at 44.1kHz that can be used
- *      with @link initWithAudioDescription: @/link.
+ *      with @link initWithAudioDescription: @endlink.
  */
 + (AudioStreamBasicDescription)nonInterleaved16BitStereoAudioDescription;
 
@@ -364,7 +365,7 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  * Determine whether voice processing is available on this device
  *
  *      Older devices are not able to perform voice processing - this determines
- *      whether it's available.  See @link voiceProcessingEnabled @/link for info.
+ *      whether it's available.  See @link voiceProcessingEnabled @endlink for info.
  */
 + (BOOL)voiceProcessingAvailable;
 
@@ -374,7 +375,7 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  *      Creates and configures the audio unit and initial mixer audio unit.
  *
  *      This initialises the audio system without input (from microphone, etc) enabled. If
- *      you desire audio input, use @link initWithAudioDescription:inputEnabled:useVoiceProcessing: @/link.
+ *      you desire audio input, use @link initWithAudioDescription:inputEnabled:useVoiceProcessing: @endlink.
  *
  * @param audioDescription  Audio description to use for all audio
  */
@@ -387,7 +388,7 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  *
  * @param audioDescription    Audio description to use for all audio
  * @param enableInput         Whether to enable audio input from the microphone or another input device
- * @param useVoiceProcessing  Whether to use the voice processing unit (see @link voiceProcessingEnabled @/link and @link voiceProcessingAvailable @/link).
+ * @param useVoiceProcessing  Whether to use the voice processing unit (see @link voiceProcessingEnabled @endlink and @link voiceProcessingAvailable @endlink).
  */
 - (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing;
 
@@ -396,7 +397,7 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  *
  *      Calling this method for the first time causes the audio session to be initialised
  *      (either in MediaPlayback mode, or PlayAndRecord mode if you have enabled
- *      @link enableInput input @/link).
+ *      @link enableInput input @endlink).
  */
 - (void)start;
 
@@ -405,15 +406,15 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  */
 - (void)stop;
 
-
+///@}
 #pragma mark - Channel and channel group management
-
-/*! @methodgroup Channel and channel group management */
+/** @name Channel and channel group management */
+///@{
 
 /*!
  * Add channels
  *
- *      Takes an array of one or more objects that implement the @link TPAudioPlayable @/link protocol.
+ *      Takes an array of one or more objects that implement the @link TPAudioPlayable @endlink protocol.
  *
  * @param channels An array of id<TPAudioPlayable> objects
  */
@@ -430,7 +431,7 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
 /*!
  * Remove channels
  *
- *      Takes an array of one or more objects that implement the @link TPAudioPlayable @/link protocol.
+ *      Takes an array of one or more objects that implement the @link TPAudioPlayable @endlink protocol.
  *
  * @param channels An array of id<TPAudioPlayable> objects
  */
@@ -463,7 +464,7 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  *      Channel groups cause the channels within the group to be pre-mixed together, so that one filter
  *      can be applied to several channels without the added performance impact.
  *
- *      You can create trees of channel groups using @link addChannels:toChannelGroup: @/link, with
+ *      You can create trees of channel groups using @link addChannels:toChannelGroup: @endlink, with
  *      filtering at each branch, for complex filter chaining.
  *
  * @return An identifier for the created group
@@ -529,9 +530,10 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  */
 - (void)setMuted:(BOOL)muted forChannelGroup:(TPChannelGroup)group;
 
+///@}
 #pragma mark - Filters
-
-/*! @methodgroup Filters */
+/** @name Filters */
+///@{
 
 /*!
  * Add an audio filter to the system output
@@ -549,7 +551,7 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  *
  *      You can apply audio filters to one or more channels - use channel groups to do so
  *      without the extra performance overhead by pre-mixing channels together first. See
- *      @link createChannelGroup @/link.
+ *      @link createChannelGroup @endlink.
  *
  *      You can also apply more than one audio filter to a channel - each audio filter will
  *      be performed on the audio in the order in which the filters were added using this
@@ -622,7 +624,7 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  *      playback rate other than 1:1. You can provide one variable audio filter per
  *      node (channel, group, the root system node).
  *
- *      See @link TPAudioControllerVariableSpeedFilterCallback @/link for more info.
+ *      See @link TPAudioControllerVariableSpeedFilterCallback @endlink for more info.
  *
  * @param filter An object that implements the TPAudioVariableSpeedFilter protocol, or nil
  */
@@ -635,7 +637,7 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  *      playback rate other than 1:1. You can provide one variable audio filter per
  *      node (channel, group, the root system node).
  *
- *      See @link TPAudioControllerVariableSpeedFilterCallback @/link for more info.
+ *      See @link TPAudioControllerVariableSpeedFilterCallback @endlink for more info.
  *
  * @param filter An object that implements the TPAudioVariableSpeedFilter protocol, or nil
  * @param channel Channel to assign filter to
@@ -649,16 +651,17 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  *      playback rate other than 1:1. You can provide one variable audio filter per
  *      node (channel, group, the root system node).
  *
- *      See @link TPAudioControllerVariableSpeedFilterCallback @/link for more info.
+ *      See @link TPAudioControllerVariableSpeedFilterCallback @endlink for more info.
  *
  * @param filter An object that implements the TPAudioVariableSpeedFilter protocol, or nil
  * @param group Group to assign filter to
  */
 - (void)setVariableSpeedFilter:(id<TPAudioVariableSpeedFilter>)filter forChannelGroup:(TPChannelGroup)group;
 
+///@}
 #pragma mark - Output receivers
-
-/*! @methodgroup Output receivers */
+/** @name Output receivers */
+///@{
 
 /*!
  * Add an output receiver
@@ -736,18 +739,19 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  */
 - (NSArray*)outputReceiversForChannelGroup:(TPChannelGroup)group;
 
+///@}
 #pragma mark - Input receivers
-
-/*! @methodgroup Input receivers */
+/** @name Input receivers */
+///@{
 
 /*!
  * Add an input receiver
  *
  *      Input receivers receive audio that is being received by the microphone or another input device.
  *
- *      Note that if the @link receiveMonoInputAsBridgedStereo @/link property is set to YES, then incoming
+ *      Note that if the @link receiveMonoInputAsBridgedStereo @endlink property is set to YES, then incoming
  *      audio may be mono. Check the audio buffer list parameters to determine the kind of audio you are
- *      receiving (for example, if you are using the @link interleaved16BitStereoAudioDescription @/link
+ *      receiving (for example, if you are using the @link interleaved16BitStereoAudioDescription @endlink
  *      then the audio->mBuffers[0].mNumberOfChannels field will be 1 for mono, and 2 for stereo audio).
  *
  * @param receiver An object that implements the TPAudioReceiver protocol
@@ -766,9 +770,10 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  */
 - (NSArray*)inputReceivers;
 
+///@}
 #pragma mark - Timing receivers
-
-/*! @methodgroup Timing receivers */
+/** @name Timing receivers */
+///@{
 
 /*!
  * Add a timing receiver
@@ -796,9 +801,10 @@ typedef long (*TPAudioControllerMessageHandler) (TPAudioController *audioControl
  */
 - (NSArray*)timingReceivers;
 
+///@}
 #pragma mark - Realtime/Main thread messaging system
-
-/*! @methodgroup Realtime/Main thread messaging system */
+/** @name Realtime/Main thread messaging system */
+///@{
 
 /*!
  * Send a message to the realtime thread asynchronously, optionally receiving a response via a block
@@ -871,10 +877,8 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
                                                           long parameter3,
                                                           void *ioOpaquePtr);
 
-
+///@}
 #pragma mark - Properties
-
-/*! @group Properties */
 
 /*!
  * Enable audio input
@@ -932,7 +936,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
  *      from mono input devices to be received by input receivers as bridged stereo audio.
  *      Otherwise, audio will be received as mono audio.
  *
- *      See also discussion of @link addInputReceiver:userInfo: @/link.
+ *      See also discussion of @link addInputReceiver: @endlink.
  *
  *      Default is YES.
  */

@@ -932,7 +932,7 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
  *      from mono input devices to be received by input receivers as bridged stereo audio.
  *      Otherwise, audio will be received as mono audio.
  *
- *      See also discussion of @link addInputReceiver:userInfo: @/link.
+ *      See also discussion of @link addInputReceiver: @/link.
  *
  *      Default is YES.
  */

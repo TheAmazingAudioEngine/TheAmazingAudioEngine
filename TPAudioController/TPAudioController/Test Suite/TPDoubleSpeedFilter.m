@@ -54,28 +54,11 @@ static void doubleSpeedFilter(id                        filter,
     for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
         bufferList->mBuffers[i].mData = THIS->_scratchBuffer[i];
         bufferList->mBuffers[i].mNumberChannels = THIS->_audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? 1 : THIS->_audioDescription.mChannelsPerFrame;
-    }
-    
-    while ( framesToGet > 0 ) {
-        int block = MIN(framesToGet, 256);
-        for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
-            bufferList->mBuffers[i].mDataByteSize = block * THIS->_audioDescription.mBytesPerFrame;
-        }
-
-        producer(producerToken, bufferList, block);
-        
-        framesToGet -= block;
-        
-        for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
-            bufferList->mBuffers[i].mData = (char*)bufferList->mBuffers[i].mData + (block * THIS->_audioDescription.mBytesPerFrame);
-        }
-    }
-    
-    for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
-        bufferList->mBuffers[i].mData = THIS->_scratchBuffer[i];
         bufferList->mBuffers[i].mDataByteSize = framesToGet * THIS->_audioDescription.mBytesPerFrame;
     }
     
+    producer(producerToken, bufferList, framesToGet);
+
     if ( bufferList->mNumberBuffers == 2 ) {
         for ( int i=0; i<frames; i++ ) {
             ((SInt16*)audio->mBuffers[0].mData)[i] = THIS->_scratchBuffer[0][2*i];
