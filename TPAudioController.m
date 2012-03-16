@@ -20,7 +20,7 @@
 #define kMaximumCallbacksPerSource 15
 #define kMessageBufferLength 50
 #define kIdleMessagingPollDuration 0.2
-#define kRenderConversionScratchBufferSizeInFrames 4096
+#define kRenderConversionScratchBufferSize 16384
 
 const NSString *kTPAudioControllerCallbackKey = @"callback";
 const NSString *kTPAudioControllerUserInfoKey = @"userinfo";
@@ -304,17 +304,16 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
         
         AudioBufferList *bufferList;
         
+        char audioBufferListSpace[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
+
         if ( group->converterRequired ) {
             // Initialise output buffer
-            char audioBufferListSpace[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
             bufferList = (AudioBufferList*)audioBufferListSpace;
             bufferList->mNumberBuffers = (group->audioConverterSourceFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? group->audioConverterSourceFormat.mChannelsPerFrame : 1;
-            char *dataPtr = group->audioConverterScratchBuffer;
             for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
                 bufferList->mBuffers[i].mNumberChannels = (group->audioConverterSourceFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? 1 : group->audioConverterSourceFormat.mChannelsPerFrame;
-                bufferList->mBuffers[i].mData           = dataPtr;
+                bufferList->mBuffers[i].mData           = group->audioConverterScratchBuffer + (i * kRenderConversionScratchBufferSize/bufferList->mNumberBuffers);
                 bufferList->mBuffers[i].mDataByteSize   = group->audioConverterSourceFormat.mBytesPerFrame * frames;
-                dataPtr += bufferList->mBuffers[i].mDataByteSize;
             }
             
         } else {
@@ -451,12 +450,10 @@ static OSStatus groupRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionF
             char audioBufferListSpace[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
             bufferList = (AudioBufferList*)audioBufferListSpace;
             bufferList->mNumberBuffers = (group->audioConverterTargetFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? group->audioConverterTargetFormat.mChannelsPerFrame : 1;
-            char *dataPtr = group->audioConverterScratchBuffer;
             for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
                 bufferList->mBuffers[i].mNumberChannels = (group->audioConverterTargetFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? 1 : group->audioConverterTargetFormat.mChannelsPerFrame;
-                bufferList->mBuffers[i].mData           = dataPtr;
+                bufferList->mBuffers[i].mData           = group->audioConverterScratchBuffer + (i * kRenderConversionScratchBufferSize/bufferList->mNumberBuffers);
                 bufferList->mBuffers[i].mDataByteSize   = group->audioConverterTargetFormat.mBytesPerFrame * inNumberFrames;
-                dataPtr += bufferList->mBuffers[i].mDataByteSize;
             }
             
             // Perform conversion
@@ -1332,8 +1329,10 @@ void TPAudioControllerSendAsynchronousMessageToMainThread(TPAudioController* aud
 }
 
 - (void)applicationDidBecomeActive:(NSNotification*)notification {
-    OSStatus status = AudioSessionSetActive(true);
-    checkResult(status, "AudioSessionSetActive");
+    if ( _audioSessionSetup ) {
+        OSStatus status = AudioSessionSetActive(true);
+        checkResult(status, "AudioSessionSetActive");
+    }
 }
 
 #pragma mark - Graph configuration
@@ -1569,10 +1568,7 @@ static void configureGraphStateOfGroupChannel(TPAudioController *THIS, TPChannel
         
         if ( !THIS->_renderConversionScratchBuffer ) {
             // Allocate temporary conversion buffer
-            THIS->_renderConversionScratchBuffer = (char*)malloc(kRenderConversionScratchBufferSizeInFrames
-                                                                * MAX(THIS->_audioDescription.mBytesPerFrame, mixerFormat.mBytesPerFrame)
-                                                                * MAX((THIS->_audioDescription.mFormatFlags&kAudioFormatFlagIsNonInterleaved ? THIS->_audioDescription.mChannelsPerFrame : 1),
-                                                                      (mixerFormat.mFormatFlags&kAudioFormatFlagIsNonInterleaved ? mixerFormat.mChannelsPerFrame : 1)));
+            THIS->_renderConversionScratchBuffer = (char*)malloc(kRenderConversionScratchBufferSize);
         }
         group->audioConverterScratchBuffer = THIS->_renderConversionScratchBuffer;
     }
