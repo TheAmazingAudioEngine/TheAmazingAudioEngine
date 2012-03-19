@@ -1265,6 +1265,8 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController* aud
     checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof (audioCategory), &audioCategory), "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory");
     checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing), "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
 
+    [NSThread sleepForTimeInterval:0.1]; // Sleep for a moment http://prod.lists.apple.com/archives/coreaudio-api/2012/Jan/msg00028.html
+    
     [self setup];
     if ( running ) [self start];
 }
@@ -2024,6 +2026,7 @@ static void handleCallbacksForChannel(AEChannel channel, const AudioTimeStamp *i
         // Replace audio unit
         [self stop];
         [self teardown];
+        [NSThread sleepForTimeInterval:0.1]; // Sleep for a moment http://prod.lists.apple.com/archives/coreaudio-api/2012/Jan/msg00028.html
         [self setup];
         [self start];
     }
