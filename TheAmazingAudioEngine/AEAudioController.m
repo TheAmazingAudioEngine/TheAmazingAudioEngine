@@ -9,7 +9,7 @@
 #import "AEAudioController.h"
 #import <UIKit/UIKit.h>
 #import <libkern/OSAtomic.h>
-#import "AECircularBuffer.h"
+#import "TPCircularBuffer.h"
 #include <sys/types.h>
 #include <sys/sysctl.h>
 
@@ -150,8 +150,8 @@ typedef struct _message_t {
     callback_table_t    _inputCallbacks;
     callback_table_t    _timingCallbacks;
     
-    AECircularBuffer  _realtimeThreadMessageBuffer;
-    AECircularBuffer  _mainThreadMessageBuffer;
+    TPCircularBuffer  _realtimeThreadMessageBuffer;
+    TPCircularBuffer  _mainThreadMessageBuffer;
     NSTimer            *_responsePollTimer;
     int                 _pendingResponses;
     
@@ -578,8 +578,8 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationDidBecomeActive:) name:UIApplicationDidBecomeActiveNotification object:nil];
     
-    AECircularBufferInit(&_realtimeThreadMessageBuffer, kMessageBufferLength * sizeof(message_t));
-    AECircularBufferInit(&_mainThreadMessageBuffer, kMessageBufferLength * sizeof(message_t));
+    TPCircularBufferInit(&_realtimeThreadMessageBuffer, kMessageBufferLength * sizeof(message_t));
+    TPCircularBufferInit(&_mainThreadMessageBuffer, kMessageBufferLength * sizeof(message_t));
     
     if ( ![self setup] ) {
         [self release];
@@ -617,8 +617,8 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     [self removeChannelGroup:_topGroup];
     
-    AECircularBufferCleanup(&_realtimeThreadMessageBuffer);
-    AECircularBufferCleanup(&_mainThreadMessageBuffer);
+    TPCircularBufferCleanup(&_realtimeThreadMessageBuffer);
+    TPCircularBufferCleanup(&_mainThreadMessageBuffer);
     
     [super dealloc];
 }
@@ -1100,11 +1100,11 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
     // Only call this from the Core Audio thread, or the main thread if audio system is not yet running
     
     int32_t availableBytes;
-    message_t *messages = AECircularBufferTail(&THIS->_realtimeThreadMessageBuffer, &availableBytes);
+    message_t *messages = TPCircularBufferTail(&THIS->_realtimeThreadMessageBuffer, &availableBytes);
     int messageCount = availableBytes / sizeof(message_t);
     for ( int i=0; i<messageCount; i++ ) {
         message_t message = messages[i];
-        AECircularBufferConsume(&THIS->_realtimeThreadMessageBuffer, sizeof(message_t));
+        TPCircularBufferConsume(&THIS->_realtimeThreadMessageBuffer, sizeof(message_t));
         
         message.result = 0;
         
@@ -1113,7 +1113,7 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
         }
         
         if ( message.responseBlock ) {
-            AECircularBufferProduceBytes(&THIS->_mainThreadMessageBuffer, &message, sizeof(message_t));
+            TPCircularBufferProduceBytes(&THIS->_mainThreadMessageBuffer, &message, sizeof(message_t));
         }
     }
     
@@ -1121,11 +1121,11 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
 
 -(void)pollForMainThreadMessages {
     int32_t availableBytes;
-    message_t *messages = AECircularBufferTail(&_mainThreadMessageBuffer, &availableBytes);
+    message_t *messages = TPCircularBufferTail(&_mainThreadMessageBuffer, &availableBytes);
     int messageCount = availableBytes / sizeof(message_t);
     for ( int i=0; i<messageCount; i++ ) {
         message_t message = messages[i];
-        AECircularBufferConsume(&_mainThreadMessageBuffer, sizeof(message_t));
+        TPCircularBufferConsume(&_mainThreadMessageBuffer, sizeof(message_t));
         
         if ( message.responseBlock ) {
             message.responseBlock(message.result, message.parameter1, message.parameter2, message.parameter3, message.ioOpaquePtr);
@@ -1173,7 +1173,7 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
         .responseBlock = responseBlock
     };
     
-    AECircularBufferProduceBytes(&_realtimeThreadMessageBuffer, &message, sizeof(message_t));
+    TPCircularBufferProduceBytes(&_realtimeThreadMessageBuffer, &message, sizeof(message_t));
     
     if ( !self.running ) {
         processPendingMessagesOnRealtimeThread(self);
@@ -1226,7 +1226,7 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController* aud
         .responseBlock = nil
     };
     
-    AECircularBufferProduceBytes(&audioController->_mainThreadMessageBuffer, &message, sizeof(message_t));
+    TPCircularBufferProduceBytes(&audioController->_mainThreadMessageBuffer, &message, sizeof(message_t));
 }
 
 #pragma mark - Setters, getters

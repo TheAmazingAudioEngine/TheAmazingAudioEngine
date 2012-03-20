@@ -1,28 +1,12 @@
 //
-//  AECircularBuffer.c
+//  TPCircularBuffer.c
 //  Circular/Ring buffer implementation
 //
 //  Created by Michael Tyson on 10/12/2011.
-//  Copyright 2011 A Tasty Pixel. All rights reserved.
-//
-//  MIT license:
-// 
-//  Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-//  associated documentation files (the "Software"), to deal in the Software without restriction, 
-//  including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, 
-//  and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, 
-//  subject to the following conditions:
-//  
-//  The above copyright notice and this permission notice shall be included in all copies or substantial 
-//  portions of the Software.
-//  
-//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT 
-//  LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
-//  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-//  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
-//  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+//  Copyright 2011-2012 A Tasty Pixel. All rights reserved.
 
-#include "AECircularBuffer.h"
+
+#include "TPCircularBuffer.h"
 #include <mach/mach.h>
 #include <stdio.h>
 
@@ -35,7 +19,7 @@ static inline bool _checkResult(kern_return_t result, const char *operation, con
     return true;
 }
 
-bool AECircularBufferInit(AECircularBuffer *buffer, int length) {
+bool TPCircularBufferInit(TPCircularBuffer *buffer, int length) {
     
     buffer->length = round_page(length);    // We need whole page sizes
 
@@ -80,12 +64,12 @@ bool AECircularBufferInit(AECircularBuffer *buffer, int length) {
     return true;
 }
 
-void AECircularBufferCleanup(AECircularBuffer *buffer) {
+void TPCircularBufferCleanup(TPCircularBuffer *buffer) {
     vm_deallocate(mach_task_self(), (vm_address_t)buffer->buffer, buffer->length * 2);
-    memset(buffer, 0, sizeof(AECircularBuffer));
+    memset(buffer, 0, sizeof(TPCircularBuffer));
 }
 
-void AECircularBufferClear(AECircularBuffer *buffer) {
+void TPCircularBufferClear(TPCircularBuffer *buffer) {
     buffer->head = buffer->tail = 0;
     buffer->fillCount = 0;
 }

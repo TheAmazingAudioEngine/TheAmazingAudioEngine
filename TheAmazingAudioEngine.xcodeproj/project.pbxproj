@@ -21,6 +21,10 @@
 		4C5C511C14EA9D790012D39E /* TPOscilloscopeLayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C5C511914EA9D790012D39E /* TPOscilloscopeLayer.m */; };
 		4C5C511F14EAA39D0012D39E /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C5C511E14EAA39D0012D39E /* QuartzCore.framework */; };
 		4C80196114F919B00003EFB3 /* TPDoubleSpeedFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C80196014F919B00003EFB3 /* TPDoubleSpeedFilter.m */; };
+		4C9D6E28151925A10043A340 /* TPCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C9D6E26151925A00043A340 /* TPCircularBuffer.c */; };
+		4C9D6E29151925A10043A340 /* TPCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C9D6E26151925A00043A340 /* TPCircularBuffer.c */; };
+		4C9D6E2A151925A10043A340 /* TPCircularBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C9D6E27151925A10043A340 /* TPCircularBuffer.h */; };
+		4C9D6E2B151925A10043A340 /* TPCircularBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C9D6E27151925A10043A340 /* TPCircularBuffer.h */; };
 		4CAD2F7014E9A3BF00656553 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD2F6F14E9A3BF00656553 /* UIKit.framework */; };
 		4CAD2F7214E9A3BF00656553 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD2F7114E9A3BF00656553 /* Foundation.framework */; };
 		4CAD2F7414E9A3BF00656553 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD2F7314E9A3BF00656553 /* CoreGraphics.framework */; };
@@ -31,8 +35,6 @@
 		4CAD56871516281D003CE861 /* AEAudioController.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CAD56801516281D003CE861 /* AEAudioController.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4CAD56881516281D003CE861 /* AEAudioController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CAD56811516281D003CE861 /* AEAudioController.m */; };
 		4CAD56891516281D003CE861 /* AEAudioController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CAD56811516281D003CE861 /* AEAudioController.m */; };
-		4CAD568A1516281D003CE861 /* AECircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4CAD56821516281D003CE861 /* AECircularBuffer.c */; };
-		4CAD568B1516281D003CE861 /* AECircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4CAD56821516281D003CE861 /* AECircularBuffer.c */; };
 		4CAD56911516281D003CE861 /* AETrialModeController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CAD56851516281D003CE861 /* AETrialModeController.m */; };
 		4CAD569415162822003CE861 /* TheAmazingAudioEngine.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CAD569315162822003CE861 /* TheAmazingAudioEngine.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4CAD569515162822003CE861 /* TheAmazingAudioEngine.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CAD569315162822003CE861 /* TheAmazingAudioEngine.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -75,6 +77,8 @@
 		4C5C511E14EAA39D0012D39E /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
 		4C80195F14F919B00003EFB3 /* TPDoubleSpeedFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TPDoubleSpeedFilter.h; path = "TheAmazingAudioEngine/Test Suite/TPDoubleSpeedFilter.h"; sourceTree = SOURCE_ROOT; };
 		4C80196014F919B00003EFB3 /* TPDoubleSpeedFilter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = TPDoubleSpeedFilter.m; path = "TheAmazingAudioEngine/Test Suite/TPDoubleSpeedFilter.m"; sourceTree = SOURCE_ROOT; };
+		4C9D6E26151925A00043A340 /* TPCircularBuffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = TPCircularBuffer.c; sourceTree = "<group>"; };
+		4C9D6E27151925A10043A340 /* TPCircularBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TPCircularBuffer.h; sourceTree = "<group>"; };
 		4CAD2F6C14E9A3BF00656553 /* Test Suite.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Test Suite.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		4CAD2F6F14E9A3BF00656553 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		4CAD2F7114E9A3BF00656553 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
@@ -88,8 +92,6 @@
 		4CAD2F9614E9A41200656553 /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = main.m; path = "TheAmazingAudioEngine/Test Suite/main.m"; sourceTree = SOURCE_ROOT; };
 		4CAD56801516281D003CE861 /* AEAudioController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEAudioController.h; sourceTree = "<group>"; };
 		4CAD56811516281D003CE861 /* AEAudioController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEAudioController.m; sourceTree = "<group>"; };
-		4CAD56821516281D003CE861 /* AECircularBuffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = AECircularBuffer.c; sourceTree = "<group>"; };
-		4CAD56831516281D003CE861 /* AECircularBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AECircularBuffer.h; sourceTree = "<group>"; };
 		4CAD56841516281D003CE861 /* AETrialModeController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AETrialModeController.h; sourceTree = "<group>"; };
 		4CAD56851516281D003CE861 /* AETrialModeController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AETrialModeController.m; sourceTree = "<group>"; };
 		4CAD569315162822003CE861 /* TheAmazingAudioEngine.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TheAmazingAudioEngine.h; sourceTree = "<group>"; };
@@ -216,12 +218,12 @@
 				4CAD569315162822003CE861 /* TheAmazingAudioEngine.h */,
 				4CAD56801516281D003CE861 /* AEAudioController.h */,
 				4CAD56811516281D003CE861 /* AEAudioController.m */,
-				4CAD56821516281D003CE861 /* AECircularBuffer.c */,
-				4CAD56831516281D003CE861 /* AECircularBuffer.h */,
 				4CAD56A915163488003CE861 /* AEAudioFilePlayer.h */,
 				4CAD56AA15163488003CE861 /* AEAudioFilePlayer.m */,
 				4CAD56841516281D003CE861 /* AETrialModeController.h */,
 				4CAD56851516281D003CE861 /* AETrialModeController.m */,
+				4C9D6E26151925A00043A340 /* TPCircularBuffer.c */,
+				4C9D6E27151925A10043A340 /* TPCircularBuffer.h */,
 				4CE501921493F82600F23607 /* Supporting Files */,
 			);
 			path = TheAmazingAudioEngine;
@@ -248,6 +250,7 @@
 				4CAD56861516281D003CE861 /* AEAudioController.h in Headers */,
 				4CAD569415162822003CE861 /* TheAmazingAudioEngine.h in Headers */,
 				4CAD56AB15163488003CE861 /* AEAudioFilePlayer.h in Headers */,
+				4C9D6E2A151925A10043A340 /* TPCircularBuffer.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -258,6 +261,7 @@
 				4CAD56871516281D003CE861 /* AEAudioController.h in Headers */,
 				4CAD569515162822003CE861 /* TheAmazingAudioEngine.h in Headers */,
 				4CAD56AC15163488003CE861 /* AEAudioFilePlayer.h in Headers */,
+				4C9D6E2B151925A10043A340 /* TPCircularBuffer.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -468,8 +472,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				4CAD56881516281D003CE861 /* AEAudioController.m in Sources */,
-				4CAD568A1516281D003CE861 /* AECircularBuffer.c in Sources */,
 				4CAD56AD15163488003CE861 /* AEAudioFilePlayer.m in Sources */,
+				4C9D6E28151925A10043A340 /* TPCircularBuffer.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -478,9 +482,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				4CAD56891516281D003CE861 /* AEAudioController.m in Sources */,
-				4CAD568B1516281D003CE861 /* AECircularBuffer.c in Sources */,
 				4CAD56911516281D003CE861 /* AETrialModeController.m in Sources */,
 				4CAD56AE15163488003CE861 /* AEAudioFilePlayer.m in Sources */,
+				4C9D6E29151925A10043A340 /* TPCircularBuffer.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -520,6 +524,20 @@
 				GCC_PREFIX_HEADER = "TheAmazingAudioEngine/TheAmazingAudioEngine-Prefix.pch";
 				GCC_THUMB_SUPPORT = NO;
 				INFOPLIST_FILE = "TheAmazingAudioEngine/TheAmazingAudioEngine-Info.plist";
+				OTHER_CFLAGS = (
+					"-DTPCircularBuffer=AECB",
+					"-DTPCircularBufferInit=AECBInit",
+					"-DTPCircularBufferCleanup=AECBClean",
+					"-DTPCircularBufferClear=AECBClear",
+					"-DTPCircularBufferTail=AECBTail",
+					"-DTPCircularBufferConsume=AECBConsume",
+					"-DTPCircularBufferHead=AECBHead",
+					"-DTPCircularBufferProduce=AECBProduce",
+					"-DTPCircularBufferProduceBytes=AECBProduceBytes",
+					"-DTPCircularBufferProduceAudioBufferList=AECBProduceBL",
+					"-DTPCircularBufferNextBufferList=AECBNextBL",
+					"-DTPCircularBufferConsumeBufferList=AECBConsumeBL",
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				WRAPPER_EXTENSION = framework;
@@ -536,6 +554,20 @@
 				GCC_PREFIX_HEADER = "TheAmazingAudioEngine/TheAmazingAudioEngine-Prefix.pch";
 				GCC_THUMB_SUPPORT = NO;
 				INFOPLIST_FILE = "TheAmazingAudioEngine/TheAmazingAudioEngine-Info.plist";
+				OTHER_CFLAGS = (
+					"-DTPCircularBuffer=AECB",
+					"-DTPCircularBufferInit=AECBInit",
+					"-DTPCircularBufferCleanup=AECBClean",
+					"-DTPCircularBufferClear=AECBClear",
+					"-DTPCircularBufferTail=AECBTail",
+					"-DTPCircularBufferConsume=AECBConsume",
+					"-DTPCircularBufferHead=AECBHead",
+					"-DTPCircularBufferProduce=AECBProduce",
+					"-DTPCircularBufferProduceBytes=AECBProduceBytes",
+					"-DTPCircularBufferProduceAudioBufferList=AECBProduceBL",
+					"-DTPCircularBufferNextBufferList=AECBNextBL",
+					"-DTPCircularBufferConsumeBufferList=AECBConsumeBL",
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				WRAPPER_EXTENSION = framework;
@@ -556,6 +588,7 @@
 				);
 				GCC_THUMB_SUPPORT = NO;
 				INFOPLIST_FILE = "TheAmazingAudioEngine/TheAmazingAudioEngineTrial-Info.plist";
+				OTHER_CFLAGS = "";
 				PRODUCT_NAME = TheAmazingAudioEngine;
 				SKIP_INSTALL = YES;
 				WRAPPER_EXTENSION = framework;
@@ -573,6 +606,7 @@
 				GCC_PREPROCESSOR_DEFINITIONS = "TRIAL=1";
 				GCC_THUMB_SUPPORT = NO;
 				INFOPLIST_FILE = "TheAmazingAudioEngine/TheAmazingAudioEngineTrial-Info.plist";
+				OTHER_CFLAGS = "";
 				PRODUCT_NAME = TheAmazingAudioEngine;
 				SKIP_INSTALL = YES;
 				WRAPPER_EXTENSION = framework;
