@@ -99,7 +99,7 @@ static long setProcessingBlockSize(AEAudioController *audioController, long *ioP
     [_audioController performSynchronousMessageExchangeWithHandler:&setProcessingBlockSize parameter1:processingBlockSizeInFrames parameter2:0 parameter3:0 ioOpaquePtr:self];
 }
 
-static void filterCallback(id filter, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
+static void filterCallback(id filter, void *source, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
     TPBlockLevelFilter *THIS = (TPBlockLevelFilter*)filter;
     
     BOOL inputIsStereo = audio->mNumberBuffers == 2 || audio->mBuffers[0].mNumberChannels == 2;

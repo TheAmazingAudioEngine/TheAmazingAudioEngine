@@ -23,6 +23,9 @@
 #define kIdleMessagingPollDuration 0.2
 #define kRenderConversionScratchBufferSize 16384
 
+NSString * AEAudioControllerSessionInterruptionBeganNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionBeganNotification";
+NSString * AEAudioControllerSessionInterruptionEndedNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionEndedNotification";
+
 const NSString *kAEAudioControllerCallbackKey = @"callback";
 const NSString *kAEAudioControllerUserInfoKey = @"userinfo";
 
@@ -141,7 +144,6 @@ typedef struct _message_t {
     AUGraph             _audioGraph;
     AUNode              _ioNode;
     AudioUnit           _ioAudioUnit;
-    BOOL                _audioSessionSetup;
     BOOL                _runningPriorToInterruption;
     
     AEChannelGroup      _topGroup;
@@ -150,8 +152,8 @@ typedef struct _message_t {
     callback_table_t    _inputCallbacks;
     callback_table_t    _timingCallbacks;
     
-    TPCircularBuffer  _realtimeThreadMessageBuffer;
-    TPCircularBuffer  _mainThreadMessageBuffer;
+    TPCircularBuffer    _realtimeThreadMessageBuffer;
+    TPCircularBuffer    _mainThreadMessageBuffer;
     NSTimer            *_responsePollTimer;
     int                 _pendingResponses;
     
@@ -161,9 +163,12 @@ typedef struct _message_t {
 - (void)pollForMainThreadMessages;
 static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS);
 
+- (void)initAudioSession;
 - (BOOL)setup;
 - (void)teardown;
 - (void)updateGraph;
+- (void)updateVoiceProcessingSettings;
+- (void)updateInputDeviceStatus;
 static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannel channel, AEChannelGroup parentGroup, int index);
 static void configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannel channel, AEChannelGroup parentGroup, int index);
 static void configureChannelsInRangeForGroup(AEAudioController *THIS, NSRange range, AEChannelGroup group);
@@ -185,9 +190,6 @@ static long removeCallbackFromTable(AEAudioController *THIS, long *callbackTable
 - (NSArray*)objectsAssociatedWithCallbacksWithFlags:(uint8_t)flags forChannelGroup:(AEChannelGroup)group;
 - (void)setVariableSpeedFilter:(id<AEAudioVariableSpeedFilter>)filter forChannelStruct:(AEChannel)channel;
 static void handleCallbacksForChannel(AEChannel channel, const AudioTimeStamp *inTimeStamp, UInt32 inNumberFrames, AudioBufferList *ioData);
-
-- (void)updateVoiceProcessingSettings;
-static void updateInputDeviceStatus(AEAudioController *THIS);
 @end
 
 @implementation AEAudioController
@@ -195,15 +197,16 @@ static void updateInputDeviceStatus(AEAudioController *THIS);
             numberOfInputChannels       = _numberOfInputChannels, 
             enableInput                 = _enableInput, 
             muteOutput                  = _muteOutput, 
+            enableBluetoothInput        = _enableBluetoothInput,
             voiceProcessingEnabled      = _voiceProcessingEnabled,
             voiceProcessingOnlyForSpeakerAndMicrophone = _voiceProcessingOnlyForSpeakerAndMicrophone,
             playingThroughDeviceSpeaker = _playingThroughDeviceSpeaker,
             preferredBufferDuration     = _preferredBufferDuration, 
-            receiveMonoInputAsBridgedStereo = _receiveMonoInputAsBridgedStereo, 
+            inputMode                   = _inputMode, 
             audioDescription            = _audioDescription, 
             audioUnit                   = _ioAudioUnit;
 
-@dynamic    running;
+@dynamic    running, inputGainAvailable, inputGain;
 
 #pragma mark - Audio session callbacks
 
@@ -219,11 +222,15 @@ static void interruptionListener(void *inClientData, UInt32 inInterruption) {
         if ( THIS->_runningPriorToInterruption ) {
             [THIS start];
         }
+        
+        [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionEndedNotification object:THIS];
 	} else if (inInterruption == kAudioSessionBeginInterruption) {
         THIS->_runningPriorToInterruption = THIS.running;
         if ( THIS->_runningPriorToInterruption ) {
             [THIS stop];
         }
+        
+        [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionBeganNotification object:THIS];
     }
 }
 
@@ -264,24 +271,14 @@ static void audioRouteChangePropertyListener(void *inClientData, AudioSessionPro
             }
         }
         
-        // Check channels on input
-        AudioStreamBasicDescription inDesc;
-        UInt32 inDescSize = sizeof(inDesc);
-        OSStatus result = AudioUnitGetProperty(THIS->_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 1, &inDesc, &inDescSize);
-        if ( checkResult(result, "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)") && inDesc.mChannelsPerFrame != 0 ) {
-            if ( THIS->_numberOfInputChannels != inDesc.mChannelsPerFrame ) {
-                [THIS willChangeValueForKey:@"numberOfInputChannels"];
-                THIS->_numberOfInputChannels = inDesc.mChannelsPerFrame;
-                [THIS didChangeValueForKey:@"numberOfInputChannels"];
-            }
-        }
+        [THIS updateInputDeviceStatus];
     }
 }
 
 static void inputAvailablePropertyListener (void *inClientData, AudioSessionPropertyID inID, UInt32 inDataSize, const void *inData) {
     AEAudioController *THIS = (AEAudioController *)inClientData;
     if ( inID == kAudioSessionProperty_AudioInputAvailable ) {
-        updateInputDeviceStatus(THIS);
+        [THIS updateInputDeviceStatus];
     }
 }
 
@@ -383,16 +380,22 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
         ((AEAudioControllerTimingCallback)callback->callback)(callback->userInfo, inTimeStamp, AEAudioTimingContextInput);
     }
     
-    int sampleCount = inNumberFrames * THIS->_audioDescription.mChannelsPerFrame;
-    
     // Render audio into buffer
     AudioStreamBasicDescription asbd = THIS->_audioDescription;
     
     char audioBufferListSpace[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
     AudioBufferList *bufferList = (AudioBufferList*)audioBufferListSpace;
-    bufferList->mNumberBuffers = asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? asbd.mChannelsPerFrame : 1;
+    
+    int channels = THIS->_inputMode == ABInputModeStereoOrBridgedMono ? THIS->_audioDescription.mChannelsPerFrame :
+                    THIS->_inputMode == ABInputModeDualMonoOrMono ? THIS->_numberOfInputChannels :
+                      MIN(THIS->_audioDescription.mChannelsPerFrame, THIS->_numberOfInputChannels);
+    BOOL nonInterleaved = THIS->_inputMode == ABInputModeDualMonoOrMono ? YES : THIS->_audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved;
+    
+    assert(channels <= 2);
+    
+    bufferList->mNumberBuffers = nonInterleaved ? channels : 1;
     for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
-        bufferList->mBuffers[i].mNumberChannels = asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? 1 : asbd.mChannelsPerFrame;
+        bufferList->mBuffers[i].mNumberChannels = nonInterleaved ? 1 : channels;
         bufferList->mBuffers[i].mData = NULL;
         bufferList->mBuffers[i].mDataByteSize = inNumberFrames * asbd.mBytesPerFrame;
     }
@@ -402,37 +405,26 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
         return err; 
     }
     
-    if ( THIS->_numberOfInputChannels == 1 && asbd.mChannelsPerFrame == 2 && !THIS->_receiveMonoInputAsBridgedStereo ) {
-        // Convert audio from stereo with only one channel provided, to proper mono
-        if ( asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved ) {
-            bufferList->mNumberBuffers = 1;
-        } else {
-            // Need to replaced interleaved stereo audio with just mono audio
-            sampleCount /= 2;
-            bufferList->mBuffers[0].mDataByteSize /= 2;
-            
-            // We support doing this for a couple of different audio formats
-            if ( asbd.mBitsPerChannel == sizeof(SInt16)*8 ) {
-                SInt16 *buffer = bufferList->mBuffers[0].mData;
-                for ( UInt32 i = 0, j = 0; i < sampleCount; i++, j+=2 ) {
-                    buffer[i] = buffer[j];
-                }
-            } else if ( asbd.mBitsPerChannel == sizeof(SInt32)*8 ) {
-                SInt32 *buffer = bufferList->mBuffers[0].mData;
-                for ( UInt32 i = 0, j = 0; i < sampleCount; i++, j+=2 ) {
-                    buffer[i] = buffer[j];
-                }
-            } else {
-                printf("Unsupported audio format (%lu bits per channel) for conversion of bridged stereo to mono input\n", asbd.mBitsPerChannel);
-                assert(0);
-            }
-        }
-    }
-        
     // Pass audio to input callbacks
     for ( int i=0; i<THIS->_inputCallbacks.count; i++ ) {
         callback_t *callback = &THIS->_inputCallbacks.callbacks[i];
-        ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, inTimeStamp, inNumberFrames, bufferList);
+        if ( THIS->_inputMode == ABInputModeDualMonoOrMono && channels == 2 ) {
+            // Dual mono mode: Pass each channel to the callback separately
+            AudioBufferList dualMonoBufferList;
+            dualMonoBufferList.mNumberBuffers = 1;
+            dualMonoBufferList.mBuffers[0].mNumberChannels = 1;
+            
+            dualMonoBufferList.mBuffers[0].mDataByteSize = bufferList->mBuffers[0].mDataByteSize;
+            dualMonoBufferList.mBuffers[0].mData = bufferList->mBuffers[0].mData;
+            ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, AEAudioSourceInput, inTimeStamp, inNumberFrames, &dualMonoBufferList);
+            
+            dualMonoBufferList.mBuffers[0].mDataByteSize = bufferList->mBuffers[1].mDataByteSize;
+            dualMonoBufferList.mBuffers[0].mData = bufferList->mBuffers[1].mData;
+            ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, AEAudioSourceInputAlternate, inTimeStamp, inNumberFrames, &dualMonoBufferList);
+            
+        } else {
+            ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, AEAudioSourceInput, inTimeStamp, inNumberFrames, bufferList);
+        }
     }
     
     return noErr;
@@ -571,15 +563,18 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     _audioDescription = audioDescription;
     _enableInput = enableInput;
+    _enableBluetoothInput = YES;
     _voiceProcessingEnabled = useVoiceProcessing;
     _preferredBufferDuration = 0.005;
-    _receiveMonoInputAsBridgedStereo = YES;
+    _inputMode = ABInputModeStereoOrBridgedMono;
     _voiceProcessingOnlyForSpeakerAndMicrophone = YES;
     
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationDidBecomeActive:) name:UIApplicationDidBecomeActiveNotification object:nil];
     
     TPCircularBufferInit(&_realtimeThreadMessageBuffer, kMessageBufferLength * sizeof(message_t));
     TPCircularBufferInit(&_mainThreadMessageBuffer, kMessageBufferLength * sizeof(message_t));
+    
+    [self initAudioSession];
     
     if ( ![self setup] ) {
         [self release];
@@ -624,41 +619,15 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 - (void)start {
-    OSStatus result;
-    
-    if ( !_audioSessionSetup ) {
-        // Initialise the audio session
-        result = AudioSessionInitialize(NULL, NULL, interruptionListener, self);
-        if ( !checkResult(result, "AudioSessionInitialize") ) return;
-        
-        // Register property listeners
-        result = AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audioRouteChangePropertyListener, self);
-        checkResult(result, "AudioSessionAddPropertyListener");
-        
-        result = AudioSessionAddPropertyListener(kAudioSessionProperty_AudioInputAvailable, inputAvailablePropertyListener, self);
-        checkResult(result, "AudioSessionAddPropertyListener");
-        
-        // Set preferred buffer size
-        Float32 preferredBufferSize = _preferredBufferDuration;
-        result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
-        checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
-        
-        // Set sample rate
-        Float64 sampleRate = _audioDescription.mSampleRate;
-        result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareSampleRate, sizeof(sampleRate), &sampleRate);
-        checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareSampleRate)");
-        
-        _audioSessionSetup = YES;
-    }
-    
+
     // Determine if audio input is available, and the number of input channels available
-    updateInputDeviceStatus(self);
+    [self updateInputDeviceStatus];
     
 #if !TARGET_IPHONE_SIMULATOR
     // Force audio to speaker, not receiver
     CFStringRef route;
     UInt32 size = sizeof(route);
-    result = AudioSessionGetProperty(kAudioSessionProperty_AudioRoute, &size, &route);
+    OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_AudioRoute, &size, &route);
     if ( checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_AudioRoute)") ) {
         if ( [(NSString*)route isEqualToString:@"ReceiverAndMicrophone"] ) {
             UInt32 newRoute = kAudioSessionOverrideAudioRoute_Speaker;
@@ -1271,14 +1240,55 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController* aud
     if ( running ) [self start];
 }
 
+-(void)setEnableBluetoothInput:(BOOL)enableBluetoothInput {
+    _enableBluetoothInput = enableBluetoothInput;
+
+    // Enable/disable bluetooth input
+    UInt32 allowBluetoothInput = _enableBluetoothInput;
+    OSStatus result = AudioSessionSetProperty (kAudioSessionProperty_OverrideCategoryEnableBluetoothInput, sizeof (allowBluetoothInput), &allowBluetoothInput);
+    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryEnableBluetoothInput)");
+}
+
+-(BOOL)inputGainAvailable {
+    UInt32 inputGainAvailable = NO;
+    UInt32 size = sizeof(inputGainAvailable);
+    OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_InputGainAvailable, &size, &inputGainAvailable);
+    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_InputGainAvailable)");
+    return inputGainAvailable;
+}
+
+-(float)inputGain {
+    Float32 inputGain = NO;
+    UInt32 size = sizeof(inputGain);
+    OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_InputGainScalar, &size, &inputGain);
+    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_InputGainScalar)");
+    return inputGain;
+}
+
+-(void)setInputGain:(float)inputGain {
+    Float32 inputGainScaler = inputGain;
+    OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_InputGainScalar, sizeof(inputGainScaler), &inputGainScaler);
+    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_InputGainScalar)");
+}
+
+-(void)setInputMode:(ABInputMode)inputMode {
+    _inputMode = inputMode;
+    
+    if ( _inputMode != ABInputModeStereoOrMono ) {
+        // Set input stream format to the main audio description
+        OSStatus result = AudioUnitSetProperty(_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &_audioDescription, sizeof(_audioDescription));
+        checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
+    }
+    
+    [self updateInputDeviceStatus];
+}
+
 -(void)setPreferredBufferDuration:(float)preferredBufferDuration {
     _preferredBufferDuration = preferredBufferDuration;
 
-    if ( _audioSessionSetup ) {
-        Float32 preferredBufferSize = _preferredBufferDuration;
-        OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
-        checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
-    }
+    Float32 preferredBufferSize = _preferredBufferDuration;
+    OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
+    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
 }
 
 -(void)setVoiceProcessingEnabled:(BOOL)voiceProcessingEnabled {
@@ -1332,13 +1342,75 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController* aud
 }
 
 - (void)applicationDidBecomeActive:(NSNotification*)notification {
-    if ( _audioSessionSetup ) {
-        OSStatus status = AudioSessionSetActive(true);
-        checkResult(status, "AudioSessionSetActive");
-    }
+    OSStatus status = AudioSessionSetActive(true);
+    checkResult(status, "AudioSessionSetActive");
 }
 
-#pragma mark - Graph configuration
+#pragma mark - Graph and audio session configuration
+
+- (void)initAudioSession {
+    
+    // Initialise the audio session
+    OSStatus result = AudioSessionInitialize(NULL, NULL, interruptionListener, self);
+    if ( !checkResult(result, "AudioSessionInitialize") ) return;
+    
+    // Register property listeners
+    result = AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audioRouteChangePropertyListener, self);
+    checkResult(result, "AudioSessionAddPropertyListener");
+    
+    result = AudioSessionAddPropertyListener(kAudioSessionProperty_AudioInputAvailable, inputAvailablePropertyListener, self);
+    checkResult(result, "AudioSessionAddPropertyListener");
+    
+    // Set preferred buffer size
+    Float32 preferredBufferSize = _preferredBufferDuration;
+    result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
+    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
+    
+    // Set sample rate
+    Float64 sampleRate = _audioDescription.mSampleRate;
+    result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareSampleRate, sizeof(sampleRate), &sampleRate);
+    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareSampleRate)");
+    
+    // Fetch sample rate, in case we didn't get quite what we requested
+    Float64 achievedSampleRate;
+    UInt32 size = sizeof(achievedSampleRate);
+    result = AudioSessionGetProperty(kAudioSessionProperty_PreferredHardwareSampleRate, &size, &achievedSampleRate);
+    checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_PreferredHardwareSampleRate)");
+    if ( achievedSampleRate != sampleRate ) {
+        NSLog(@"Warning: Delivered sample rate is %f", achievedSampleRate);
+        _audioDescription.mSampleRate = achievedSampleRate;
+    }
+    
+    UInt32 inputAvailable = NO;
+    if ( _enableInput ) {
+        // See if input's available
+        UInt32 size = sizeof(inputAvailable);
+        OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_AudioInputAvailable, &size, &inputAvailable);
+        checkResult(result, "AudioSessionGetProperty");
+    }
+    
+    // Assign audio category depending on whether we're recording or not
+    UInt32 audioCategory;
+    if ( inputAvailable && _enableInput ) {
+        // Set the audio session category for simultaneous play and record
+        audioCategory = kAudioSessionCategory_PlayAndRecord;
+    } else {
+        // Just playback
+        audioCategory = kAudioSessionCategory_MediaPlayback;
+    }
+    
+    UInt32 allowMixing = YES;
+    checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof(audioCategory), &audioCategory), "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory");
+    checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing), "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
+    
+    // Enable/disable bluetooth input
+    UInt32 allowBluetoothInput = _enableBluetoothInput;
+    result = AudioSessionSetProperty (kAudioSessionProperty_OverrideCategoryEnableBluetoothInput, sizeof (allowBluetoothInput), &allowBluetoothInput);
+    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryEnableBluetoothInput)");
+    
+    // Start session
+    checkResult(AudioSessionSetActive(true), "AudioSessionSetActive");
+}
 
 - (BOOL)setup {
 
@@ -1369,13 +1441,13 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController* aud
 
     if ( _enableInput ) {
         // Determine number of input channels
-        AudioStreamBasicDescription inDesc;
-        UInt32 inDescSize = sizeof(inDesc);
-        result = AudioUnitGetProperty(_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 1, &inDesc, &inDescSize);
-        if ( checkResult(result, "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)") && inDesc.mChannelsPerFrame != 0 ) {
-            if ( _numberOfInputChannels != inDesc.mChannelsPerFrame ) {
+        UInt32 numberOfChannels;
+        UInt32 size = sizeof(numberOfChannels);
+        OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &numberOfChannels);
+        if ( checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels)") ) {
+            if ( _numberOfInputChannels != numberOfChannels ) {
                 [self willChangeValueForKey:@"numberOfInputChannels"];
-                _numberOfInputChannels = inDesc.mChannelsPerFrame;
+                _numberOfInputChannels = numberOfChannels;
                 [self didChangeValueForKey:@"numberOfInputChannels"];
             }
         }
@@ -1408,12 +1480,13 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController* aud
         // Allocate top-level group
         _topGroup = (AEChannelGroup)calloc(1, sizeof(channel_group_t));
         memset(&_topChannel, 0, sizeof(channel_t));
-        _topChannel.type    = kChannelTypeGroup;
-        _topChannel.ptr     = _topGroup;
-        _topChannel.playing = YES;
-        _topChannel.volume  = 1.0;
-        _topChannel.pan     = 0.0;
-        _topChannel.muted   = NO;
+        _topChannel.type     = kChannelTypeGroup;
+        _topChannel.ptr      = _topGroup;
+        _topChannel.userInfo = AEAudioSourceMainOutput;
+        _topChannel.playing  = YES;
+        _topChannel.volume   = 1.0;
+        _topChannel.pan      = 0.0;
+        _topChannel.muted    = NO;
         _topGroup->channel   = &_topChannel;
     }
     
@@ -1455,6 +1528,107 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController* aud
             checkResult(err, "AUGraphUpdate");
         }
     }
+}
+
+- (void)updateVoiceProcessingSettings {
+    
+    BOOL useVoiceProcessing = (_voiceProcessingEnabled && _enableInput && (!_voiceProcessingOnlyForSpeakerAndMicrophone || _playingThroughDeviceSpeaker));
+    
+    AudioComponentDescription target_io_desc = {
+        .componentType = kAudioUnitType_Output,
+        .componentSubType = useVoiceProcessing ? kAudioUnitSubType_VoiceProcessingIO : kAudioUnitSubType_RemoteIO,
+        .componentManufacturer = kAudioUnitManufacturer_Apple,
+        .componentFlags = 0,
+        .componentFlagsMask = 0
+    };
+    
+    AudioComponentDescription io_desc;
+    if ( !checkResult(AUGraphNodeInfo(_audioGraph, _ioNode, &io_desc, NULL), "AUGraphNodeInfo(ioNode)") )
+        return;
+    
+    if ( io_desc.componentSubType != target_io_desc.componentSubType ) {
+        // Replace audio unit
+        [self stop];
+        [self teardown];
+        [NSThread sleepForTimeInterval:0.1]; // Sleep for a moment http://prod.lists.apple.com/archives/coreaudio-api/2012/Jan/msg00028.html
+        [self setup];
+        [self start];
+    }
+}
+
+static long updateInputDeviceStatusHandler(AEAudioController *THIS, long *ioParameter1, long *ioParameter2, long *ioParameter3, void *ioOpaquePtr) {
+    UInt32 numberOfInputChannels = *ioParameter1;
+    UInt32 inputAvailable = *ioParameter2;
+    AudioStreamBasicDescription *audioDescription = (AudioStreamBasicDescription*)*ioParameter3;
+    OSStatus result = AudioUnitSetProperty(THIS->_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, audioDescription, sizeof(AudioStreamBasicDescription));
+    checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
+    
+    THIS->_numberOfInputChannels = numberOfInputChannels;
+    THIS->_audioInputAvailable = inputAvailable;
+    return 0;
+}
+
+- (void)updateInputDeviceStatus {
+    UInt32 inputAvailable=0;
+    
+    if ( _enableInput ) {
+        // Determine if audio input is available, and the number of input channels available
+        UInt32 size = sizeof(inputAvailable);
+        OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_AudioInputAvailable, &size, &inputAvailable);
+        checkResult(result, "AudioSessionGetProperty");
+        
+        UInt32 numberOfInputChannels = 0;
+        size = sizeof(numberOfInputChannels);
+        if ( inputAvailable ) {
+            // Check channels on input
+            OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &numberOfInputChannels);
+            checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels)");
+        }
+        
+        AudioStreamBasicDescription audioDescription = _audioDescription;
+        
+        if ( _inputMode == ABInputModeStereoOrMono && audioDescription.mChannelsPerFrame == 2 && numberOfInputChannels == 1 ) {
+            // Set the input audio description channels to the number of actual available channels
+            if ( !(audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ) {
+                audioDescription.mBytesPerFrame *= (float)numberOfInputChannels / audioDescription.mChannelsPerFrame;
+                audioDescription.mBytesPerPacket *= (float)numberOfInputChannels / audioDescription.mChannelsPerFrame;
+            }
+            audioDescription.mChannelsPerFrame = numberOfInputChannels;
+        } else if ( _inputMode == ABInputModeDualMonoOrMono && numberOfInputChannels == 2 ) {
+            // Use a noninterleaved stereo audio description
+            audioDescription.mFormatFlags |= kAudioFormatFlagIsNonInterleaved;
+            audioDescription.mChannelsPerFrame = 2;
+            audioDescription.mBytesPerFrame = 
+            audioDescription.mBytesPerPacket = audioDescription.mBitsPerChannel / 8;
+        }
+        
+        // Set input stream format and update the properties
+        [self performSynchronousMessageExchangeWithHandler:updateInputDeviceStatusHandler parameter1:numberOfInputChannels parameter2:inputAvailable parameter3:(long)&audioDescription ioOpaquePtr:NULL];
+        
+        if ( _numberOfInputChannels != numberOfInputChannels ) {
+            [self willChangeValueForKey:@"numberOfInputChannels"];
+            [self didChangeValueForKey:@"numberOfInputChannels"];
+        }
+        
+        if ( _audioInputAvailable != inputAvailable ) {
+            [self willChangeValueForKey:@"audioInputAvailable"];
+            [self didChangeValueForKey:@"audioInputAvailable"];
+        }
+    }
+    
+    // Assign audio category depending on whether we're recording or not
+    UInt32 audioCategory;
+    if ( inputAvailable && _enableInput ) {
+        // Set the audio session category for simultaneous play and record
+        audioCategory = kAudioSessionCategory_PlayAndRecord;
+    } else {
+        // Just playback
+        audioCategory = kAudioSessionCategory_MediaPlayback;
+    }
+    
+    UInt32 allowMixing = YES;
+    checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof(audioCategory), &audioCategory), "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory");
+    checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing), "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
 }
 
 static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannel channel, AEChannelGroup parentGroup, int index) {
@@ -1986,12 +2160,11 @@ static long removeCallbackFromTable(AEAudioController *THIS, long *callbackPtr, 
 }
 
 static void handleCallbacksForChannel(AEChannel channel, const AudioTimeStamp *inTimeStamp, UInt32 inNumberFrames, AudioBufferList *ioData) {
-    
     // Pass audio to filters
     for ( int i=0; i<channel->callbacks.count; i++ ) {
         callback_t *callback = &channel->callbacks.callbacks[i];
         if ( callback->flags & kCallbackIsFilterFlag ) {
-            ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, inTimeStamp, inNumberFrames, ioData);
+            ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, channel->userInfo, inTimeStamp, inNumberFrames, ioData);
         }
     }
     
@@ -1999,84 +2172,9 @@ static void handleCallbacksForChannel(AEChannel channel, const AudioTimeStamp *i
     for ( int i=0; i<channel->callbacks.count; i++ ) {
         callback_t *callback = &channel->callbacks.callbacks[i];
         if ( callback->flags & kCallbackIsOutputCallbackFlag ) {
-            ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, inTimeStamp, inNumberFrames, ioData);
+            ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, channel->userInfo, inTimeStamp, inNumberFrames, ioData);
         }
     }
-}
-
-#pragma mark - State management
-
-- (void)updateVoiceProcessingSettings {
-    
-    BOOL useVoiceProcessing = (_voiceProcessingEnabled && _enableInput && (!_voiceProcessingOnlyForSpeakerAndMicrophone || _playingThroughDeviceSpeaker));
-    
-    AudioComponentDescription target_io_desc = {
-        .componentType = kAudioUnitType_Output,
-        .componentSubType = useVoiceProcessing ? kAudioUnitSubType_VoiceProcessingIO : kAudioUnitSubType_RemoteIO,
-        .componentManufacturer = kAudioUnitManufacturer_Apple,
-        .componentFlags = 0,
-        .componentFlagsMask = 0
-    };
-    
-    AudioComponentDescription io_desc;
-    if ( !checkResult(AUGraphNodeInfo(_audioGraph, _ioNode, &io_desc, NULL), "AUGraphNodeInfo(ioNode)") )
-        return;
-    
-    if ( io_desc.componentSubType != target_io_desc.componentSubType ) {
-        // Replace audio unit
-        [self stop];
-        [self teardown];
-        [NSThread sleepForTimeInterval:0.1]; // Sleep for a moment http://prod.lists.apple.com/archives/coreaudio-api/2012/Jan/msg00028.html
-        [self setup];
-        [self start];
-    }
-}
-
-static void updateInputDeviceStatus(AEAudioController *THIS) {
-    UInt32 inputAvailable=0;
-    
-    if ( THIS->_enableInput ) {
-        // Determine if audio input is available, and the number of input channels available
-        UInt32 size = sizeof(inputAvailable);
-        OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_AudioInputAvailable, &size, &inputAvailable);
-        checkResult(result, "AudioSessionGetProperty");
-        
-        int numberOfInputChannels = 0;
-        if ( THIS->_audioInputAvailable ) {
-            AudioStreamBasicDescription inDesc;
-            UInt32 inDescSize = sizeof(inDesc);
-            OSStatus result = AudioUnitGetProperty(THIS->_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 1, &inDesc, &inDescSize);
-            if ( checkResult(result, "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)") && inDesc.mChannelsPerFrame != 0 ) {
-                numberOfInputChannels = inDesc.mChannelsPerFrame;
-            }
-        }
-        
-        if ( THIS->_numberOfInputChannels != numberOfInputChannels ) {
-            [THIS willChangeValueForKey:@"numberOfInputChannels"];
-            THIS->_numberOfInputChannels = numberOfInputChannels;
-            [THIS didChangeValueForKey:@"numberOfInputChannels"];
-        }
-        
-        if ( THIS->_audioInputAvailable != inputAvailable ) {
-            [THIS willChangeValueForKey:@"audioInputAvailable"];
-            THIS->_audioInputAvailable = inputAvailable;
-            [THIS didChangeValueForKey:@"audioInputAvailable"];
-        }
-    }
-    
-    // Assign audio category depending on whether we're recording or not
-    UInt32 audioCategory;
-    if ( inputAvailable && THIS->_enableInput ) {
-        // Set the audio session category for simultaneous play and record
-        audioCategory = kAudioSessionCategory_PlayAndRecord;
-    } else {
-        // Just playback
-        audioCategory = kAudioSessionCategory_MediaPlayback;
-    }
-    
-    UInt32 allowMixing = YES;
-    checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof(audioCategory), &audioCategory), "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory");
-    checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing), "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
 }
 
 @end
