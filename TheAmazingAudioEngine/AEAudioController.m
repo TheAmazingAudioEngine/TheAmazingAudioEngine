@@ -167,6 +167,7 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS);
 - (BOOL)setup;
 - (void)teardown;
 - (void)updateGraph;
+- (void)setAudioSessionCategory;
 - (void)updateVoiceProcessingSettings;
 - (void)updateInputDeviceStatus;
 static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannel channel, AEChannelGroup parentGroup, int index);
@@ -236,6 +237,7 @@ static void interruptionListener(void *inClientData, UInt32 inInterruption) {
 
 static void audioRouteChangePropertyListener(void *inClientData, AudioSessionPropertyID inID, UInt32 inDataSize, const void *inData) {
     if (inID == kAudioSessionProperty_AudioRouteChange) {
+        int reason = [[(NSDictionary*)inData objectForKey:(id)kAudioSession_RouteChangeKey_Reason] intValue];
         AEAudioController *THIS = (AEAudioController *)inClientData;
         
         CFStringRef route;
@@ -260,7 +262,11 @@ static void audioRouteChangePropertyListener(void *inClientData, AudioSessionPro
         }
         
         CFRelease(route);
-
+        
+        if ( reason == kAudioSessionRouteChangeReason_NewDeviceAvailable || reason == kAudioSessionRouteChangeReason_OldDeviceUnavailable ) {
+            [THIS updateInputDeviceStatus];
+        }
+        
         if ( THIS->_playingThroughDeviceSpeaker != playingThroughSpeaker ) {
             [THIS willChangeValueForKey:@"playingThroughDeviceSpeaker"];
             THIS->_playingThroughDeviceSpeaker = playingThroughSpeaker;
@@ -270,8 +276,6 @@ static void audioRouteChangePropertyListener(void *inClientData, AudioSessionPro
                 [THIS updateVoiceProcessingSettings];
             }
         }
-        
-        [THIS updateInputDeviceStatus];
     }
 }
 
@@ -622,21 +626,6 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 
     // Determine if audio input is available, and the number of input channels available
     [self updateInputDeviceStatus];
-    
-#if !TARGET_IPHONE_SIMULATOR
-    // Force audio to speaker, not receiver
-    CFStringRef route;
-    UInt32 size = sizeof(route);
-    OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_AudioRoute, &size, &route);
-    if ( checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_AudioRoute)") ) {
-        if ( [(NSString*)route isEqualToString:@"ReceiverAndMicrophone"] ) {
-            UInt32 newRoute = kAudioSessionOverrideAudioRoute_Speaker;
-            result = AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute,  sizeof(route), &newRoute);
-            checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute)");
-        }
-    }
-    CFRelease(route);
-#endif
     
     // Start messaging poll timer
     _responsePollTimer = [[NSTimer scheduledTimerWithTimeInterval:kIdleMessagingPollDuration target:self selector:@selector(pollForMainThreadMessages) userInfo:nil repeats:YES] retain];
@@ -1221,19 +1210,8 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController* aud
     if ( running ) [self stop];
     [self teardown];
     
-    UInt32 audioCategory;
-    if ( _audioInputAvailable && _enableInput ) {
-        // Set the audio session category for simultaneous play and record
-        audioCategory = kAudioSessionCategory_PlayAndRecord;
-    } else {
-        // Just playback
-        audioCategory = kAudioSessionCategory_MediaPlayback;
-    }
+    [self setAudioSessionCategory];
     
-    UInt32 allowMixing = YES;
-    checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof (audioCategory), &audioCategory), "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory");
-    checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing), "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
-
     [NSThread sleepForTimeInterval:0.1]; // Sleep for a moment http://prod.lists.apple.com/archives/coreaudio-api/2012/Jan/msg00028.html
     
     [self setup];
@@ -1388,25 +1366,9 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController* aud
         OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_AudioInputAvailable, &size, &inputAvailable);
         checkResult(result, "AudioSessionGetProperty");
     }
+    _audioInputAvailable = inputAvailable;
     
-    // Assign audio category depending on whether we're recording or not
-    UInt32 audioCategory;
-    if ( inputAvailable && _enableInput ) {
-        // Set the audio session category for simultaneous play and record
-        audioCategory = kAudioSessionCategory_PlayAndRecord;
-    } else {
-        // Just playback
-        audioCategory = kAudioSessionCategory_MediaPlayback;
-    }
-    
-    UInt32 allowMixing = YES;
-    checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof(audioCategory), &audioCategory), "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory");
-    checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing), "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
-    
-    // Enable/disable bluetooth input
-    UInt32 allowBluetoothInput = _enableBluetoothInput;
-    result = AudioSessionSetProperty (kAudioSessionProperty_OverrideCategoryEnableBluetoothInput, sizeof (allowBluetoothInput), &allowBluetoothInput);
-    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryEnableBluetoothInput)");
+    [self setAudioSessionCategory];
     
     // Start session
     checkResult(AudioSessionSetActive(true), "AudioSessionSetActive");
@@ -1530,6 +1492,26 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController* aud
     }
 }
 
+- (void)setAudioSessionCategory {
+    UInt32 audioCategory;
+    if ( _audioInputAvailable && _enableInput ) {
+        // Set the audio session category for simultaneous play and record
+        audioCategory = kAudioSessionCategory_PlayAndRecord;
+    } else {
+        // Just playback
+        audioCategory = kAudioSessionCategory_MediaPlayback;
+    }
+    
+    UInt32 allowMixing = YES;
+    checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof (audioCategory), &audioCategory), "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory");
+    checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing), "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
+    if ( audioCategory == kAudioSessionCategory_PlayAndRecord ) {
+        UInt32 toSpeaker = YES;
+        checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryDefaultToSpeaker, sizeof (toSpeaker), &toSpeaker), "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryDefaultToSpeaker)");
+        [self setEnableBluetoothInput:_enableBluetoothInput];
+    }
+}
+
 - (void)updateVoiceProcessingSettings {
     
     BOOL useVoiceProcessing = (_voiceProcessingEnabled && _enableInput && (!_voiceProcessingOnlyForSpeakerAndMicrophone || _playingThroughDeviceSpeaker));
@@ -1616,19 +1598,7 @@ static long updateInputDeviceStatusHandler(AEAudioController *THIS, long *ioPara
         }
     }
     
-    // Assign audio category depending on whether we're recording or not
-    UInt32 audioCategory;
-    if ( inputAvailable && _enableInput ) {
-        // Set the audio session category for simultaneous play and record
-        audioCategory = kAudioSessionCategory_PlayAndRecord;
-    } else {
-        // Just playback
-        audioCategory = kAudioSessionCategory_MediaPlayback;
-    }
-    
-    UInt32 allowMixing = YES;
-    checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof(audioCategory), &audioCategory), "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory");
-    checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing), "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
+    [self setAudioSessionCategory];
 }
 
 static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannel channel, AEChannelGroup parentGroup, int index) {
