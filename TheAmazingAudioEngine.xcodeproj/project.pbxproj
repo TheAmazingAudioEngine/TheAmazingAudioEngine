@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4C12CC9A151D1EDA00562E2A /* AEUtilities.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C12CC98151D1EDA00562E2A /* AEUtilities.h */; };
+		4C12CC9B151D1EDA00562E2A /* AEUtilities.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C12CC98151D1EDA00562E2A /* AEUtilities.h */; };
+		4C12CC9C151D1EDA00562E2A /* AEUtilities.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C12CC99151D1EDA00562E2A /* AEUtilities.c */; };
+		4C12CC9D151D1EDA00562E2A /* AEUtilities.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C12CC99151D1EDA00562E2A /* AEUtilities.c */; };
 		4C12E4D614ED0822002BF07A /* Factory Hall.wav in Resources */ = {isa = PBXBuildFile; fileRef = 4C12E4D514ED0822002BF07A /* Factory Hall.wav */; };
 		4C12E4DC14ED082D002BF07A /* TPBlockLevelFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C12E4D914ED082D002BF07A /* TPBlockLevelFilter.m */; };
 		4C12E4DD14ED082D002BF07A /* TPConvolutionFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C12E4DB14ED082D002BF07A /* TPConvolutionFilter.m */; };
@@ -55,6 +59,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		4C12CC98151D1EDA00562E2A /* AEUtilities.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEUtilities.h; sourceTree = "<group>"; };
+		4C12CC99151D1EDA00562E2A /* AEUtilities.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = AEUtilities.c; sourceTree = "<group>"; };
 		4C12E4D514ED0822002BF07A /* Factory Hall.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = "Factory Hall.wav"; path = "TheAmazingAudioEngine/Test Suite/Factory Hall.wav"; sourceTree = SOURCE_ROOT; };
 		4C12E4D814ED082D002BF07A /* TPBlockLevelFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TPBlockLevelFilter.h; path = "TheAmazingAudioEngine/Test Suite/TPBlockLevelFilter.h"; sourceTree = SOURCE_ROOT; };
 		4C12E4D914ED082D002BF07A /* TPBlockLevelFilter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = TPBlockLevelFilter.m; path = "TheAmazingAudioEngine/Test Suite/TPBlockLevelFilter.m"; sourceTree = SOURCE_ROOT; };
@@ -220,6 +226,8 @@
 				4CAD56811516281D003CE861 /* AEAudioController.m */,
 				4CAD56A915163488003CE861 /* AEAudioFilePlayer.h */,
 				4CAD56AA15163488003CE861 /* AEAudioFilePlayer.m */,
+				4C12CC98151D1EDA00562E2A /* AEUtilities.h */,
+				4C12CC99151D1EDA00562E2A /* AEUtilities.c */,
 				4CAD56841516281D003CE861 /* AETrialModeController.h */,
 				4CAD56851516281D003CE861 /* AETrialModeController.m */,
 				4C9D6E26151925A00043A340 /* TPCircularBuffer.c */,
@@ -251,6 +259,7 @@
 				4CAD569415162822003CE861 /* TheAmazingAudioEngine.h in Headers */,
 				4CAD56AB15163488003CE861 /* AEAudioFilePlayer.h in Headers */,
 				4C9D6E2A151925A10043A340 /* TPCircularBuffer.h in Headers */,
+				4C12CC9A151D1EDA00562E2A /* AEUtilities.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -262,6 +271,7 @@
 				4CAD569515162822003CE861 /* TheAmazingAudioEngine.h in Headers */,
 				4CAD56AC15163488003CE861 /* AEAudioFilePlayer.h in Headers */,
 				4C9D6E2B151925A10043A340 /* TPCircularBuffer.h in Headers */,
+				4C12CC9B151D1EDA00562E2A /* AEUtilities.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -474,6 +484,7 @@
 				4CAD56881516281D003CE861 /* AEAudioController.m in Sources */,
 				4CAD56AD15163488003CE861 /* AEAudioFilePlayer.m in Sources */,
 				4C9D6E28151925A10043A340 /* TPCircularBuffer.c in Sources */,
+				4C12CC9C151D1EDA00562E2A /* AEUtilities.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -485,6 +496,7 @@
 				4CAD56911516281D003CE861 /* AETrialModeController.m in Sources */,
 				4CAD56AE15163488003CE861 /* AEAudioFilePlayer.m in Sources */,
 				4C9D6E29151925A10043A340 /* TPCircularBuffer.c in Sources */,
+				4C12CC9D151D1EDA00562E2A /* AEUtilities.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

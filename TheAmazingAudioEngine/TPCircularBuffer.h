@@ -17,6 +17,8 @@
 //  http://www.snoize.com/Code/PlayBufferedSoundFile.tar.gz)
 //
 
+#ifndef TPCircularBuffer_h
+#define TPCircularBuffer_h
 
 #include <libkern/OSAtomic.h>
 #include <string.h>
@@ -74,4 +76,6 @@ static __inline__ __attribute__((always_inline)) int TPCircularBufferProduceByte
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif
