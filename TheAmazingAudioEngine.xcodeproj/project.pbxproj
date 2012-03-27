@@ -7,8 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		4C12CC9A151D1EDA00562E2A /* AEUtilities.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C12CC98151D1EDA00562E2A /* AEUtilities.h */; };
-		4C12CC9B151D1EDA00562E2A /* AEUtilities.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C12CC98151D1EDA00562E2A /* AEUtilities.h */; };
+		4C12CC9A151D1EDA00562E2A /* AEUtilities.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C12CC98151D1EDA00562E2A /* AEUtilities.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4C12CC9B151D1EDA00562E2A /* AEUtilities.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C12CC98151D1EDA00562E2A /* AEUtilities.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4C12CC9C151D1EDA00562E2A /* AEUtilities.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C12CC99151D1EDA00562E2A /* AEUtilities.c */; };
 		4C12CC9D151D1EDA00562E2A /* AEUtilities.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C12CC99151D1EDA00562E2A /* AEUtilities.c */; };
 		4C12E4D614ED0822002BF07A /* Factory Hall.wav in Resources */ = {isa = PBXBuildFile; fileRef = 4C12E4D514ED0822002BF07A /* Factory Hall.wav */; };
@@ -27,8 +27,6 @@
 		4C80196114F919B00003EFB3 /* TPDoubleSpeedFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C80196014F919B00003EFB3 /* TPDoubleSpeedFilter.m */; };
 		4C9D6E28151925A10043A340 /* TPCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C9D6E26151925A00043A340 /* TPCircularBuffer.c */; };
 		4C9D6E29151925A10043A340 /* TPCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C9D6E26151925A00043A340 /* TPCircularBuffer.c */; };
-		4C9D6E2A151925A10043A340 /* TPCircularBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C9D6E27151925A10043A340 /* TPCircularBuffer.h */; };
-		4C9D6E2B151925A10043A340 /* TPCircularBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C9D6E27151925A10043A340 /* TPCircularBuffer.h */; };
 		4CAD2F7014E9A3BF00656553 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD2F6F14E9A3BF00656553 /* UIKit.framework */; };
 		4CAD2F7214E9A3BF00656553 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD2F7114E9A3BF00656553 /* Foundation.framework */; };
 		4CAD2F7414E9A3BF00656553 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD2F7314E9A3BF00656553 /* CoreGraphics.framework */; };
@@ -258,7 +256,6 @@
 				4CAD56861516281D003CE861 /* AEAudioController.h in Headers */,
 				4CAD569415162822003CE861 /* TheAmazingAudioEngine.h in Headers */,
 				4CAD56AB15163488003CE861 /* AEAudioFilePlayer.h in Headers */,
-				4C9D6E2A151925A10043A340 /* TPCircularBuffer.h in Headers */,
 				4C12CC9A151D1EDA00562E2A /* AEUtilities.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -269,9 +266,8 @@
 			files = (
 				4CAD56871516281D003CE861 /* AEAudioController.h in Headers */,
 				4CAD569515162822003CE861 /* TheAmazingAudioEngine.h in Headers */,
-				4CAD56AC15163488003CE861 /* AEAudioFilePlayer.h in Headers */,
-				4C9D6E2B151925A10043A340 /* TPCircularBuffer.h in Headers */,
 				4C12CC9B151D1EDA00562E2A /* AEUtilities.h in Headers */,
+				4CAD56AC15163488003CE861 /* AEAudioFilePlayer.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

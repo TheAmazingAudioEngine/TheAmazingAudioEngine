@@ -299,6 +299,10 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
         AEAudioControllerRenderCallback callback = (AEAudioControllerRenderCallback) channel->ptr;
         id<AEAudioPlayable> channelObj = (id<AEAudioPlayable>) channel->userInfo;
         
+        for ( int i=0; i<audio->mNumberBuffers; i++ ) {
+            memset(audio->mBuffers[i].mData, 0, audio->mBuffers[i].mDataByteSize);
+        }
+        
         status = callback(channelObj, &arg->inTimeStamp, frames, audio);
         
     } else if ( channel->type == kChannelTypeGroup ) {
@@ -438,7 +442,7 @@ static OSStatus groupRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionF
     AEChannel channel = (AEChannel)inRefCon;
     AEChannelGroup group = (AEChannelGroup)channel->ptr;
     
-    if ( (*ioActionFlags & kAudioUnitRenderAction_PostRender) ) {
+    if ( !(*ioActionFlags & kAudioUnitRenderAction_PreRender) ) {
         // After render
         AudioBufferList *bufferList;
         
@@ -480,7 +484,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
             callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
             ((AEAudioControllerTimingCallback)callback->callback)(callback->userInfo, inTimeStamp, AEAudioTimingContextOutput);
         }
-    } else if ( (*ioActionFlags & kAudioUnitRenderAction_PostRender) ) {
+    } else {
         // After render
         if ( THIS->_muteOutput ) {
             for ( int i=0; i<ioData->mNumberBuffers; i++ ) {
@@ -1850,6 +1854,18 @@ static void configureChannelsInRangeForGroup(AEAudioController *THIS, NSRange ra
     }
 }
 
+static long updateGroupDelayed(AEAudioController *THIS, long *unused1, long *unused2, long *unused3, void* groupPtr) {
+    AEChannelGroup group = (AEChannelGroup)groupPtr;
+    OSStatus result = AUGraphUpdate(THIS->_audioGraph, NULL);
+    if ( result == kAUGraphErr_InvalidConnection && group->channelCount == 0 ) {
+        // Ignore this error
+    } else {
+        checkResult(result, "AUGraphUpdate");
+    }
+    configureChannelsInRangeForGroup(THIS, NSMakeRange(0, group->channelCount), group);
+    return 0;
+}
+
 static long removeChannelsFromGroup(AEAudioController *THIS, long *matchingPtrArrayPtr, long *matchingUserInfoArrayPtr, long *channelsCount, void* groupPtr) {
     void **ptrArray = (void**)*matchingPtrArrayPtr;
     void **userInfoArray = (void**)*matchingUserInfoArrayPtr;
@@ -1901,9 +1917,13 @@ static long removeChannelsFromGroup(AEAudioController *THIS, long *matchingPtrAr
         }
     }
     
-    checkResult(AUGraphUpdate(THIS->_audioGraph, NULL), "AUGraphUpdate");
-    
-    configureChannelsInRangeForGroup(THIS, NSMakeRange(0, group->channelCount), group);
+    OSStatus result = AUGraphUpdate(THIS->_audioGraph, NULL);
+    if ( result == kAUGraphErr_CannotDoInCurrentContext ) {
+        // Complete the refresh on the main thread
+        AEAudioControllerSendAsynchronousMessageToMainThread(THIS, updateGroupDelayed, 0, 0, 0, group);
+    } else if ( checkResult(result, "AUGraphUpdate") ) {
+        configureChannelsInRangeForGroup(THIS, NSMakeRange(0, group->channelCount), group);
+    }
     
     return group->channelCount;
 }
