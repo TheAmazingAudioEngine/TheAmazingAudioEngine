@@ -607,7 +607,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     NSArray *channels = [self channels];
     for ( NSObject *channel in channels ) {
-        for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", "playing", @"muted", nil] ) {
+        for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", @"playing", @"muted", nil] ) {
             [channel removeObserver:self forKeyPath:property];
         }
     }
