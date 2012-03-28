@@ -44,6 +44,9 @@
 		4CAD56AC15163488003CE861 /* AEAudioFilePlayer.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CAD56A915163488003CE861 /* AEAudioFilePlayer.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4CAD56AD15163488003CE861 /* AEAudioFilePlayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CAD56AA15163488003CE861 /* AEAudioFilePlayer.m */; };
 		4CAD56AE15163488003CE861 /* AEAudioFilePlayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CAD56AA15163488003CE861 /* AEAudioFilePlayer.m */; };
+		4CBD02DF1523391200053E43 /* Icon-72.png in Resources */ = {isa = PBXBuildFile; fileRef = 4CBD02DC1523391200053E43 /* Icon-72.png */; };
+		4CBD02E01523391200053E43 /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 4CBD02DD1523391200053E43 /* Icon.png */; };
+		4CBD02E11523391200053E43 /* Icon@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 4CBD02DE1523391200053E43 /* Icon@2x.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -101,6 +104,9 @@
 		4CAD569315162822003CE861 /* TheAmazingAudioEngine.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TheAmazingAudioEngine.h; sourceTree = "<group>"; };
 		4CAD56A915163488003CE861 /* AEAudioFilePlayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEAudioFilePlayer.h; sourceTree = "<group>"; };
 		4CAD56AA15163488003CE861 /* AEAudioFilePlayer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEAudioFilePlayer.m; sourceTree = "<group>"; };
+		4CBD02DC1523391200053E43 /* Icon-72.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "Icon-72.png"; path = "TheAmazingAudioEngine/Test Suite/Icon-72.png"; sourceTree = SOURCE_ROOT; };
+		4CBD02DD1523391200053E43 /* Icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon.png; path = "TheAmazingAudioEngine/Test Suite/Icon.png"; sourceTree = SOURCE_ROOT; };
+		4CBD02DE1523391200053E43 /* Icon@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "Icon@2x.png"; path = "TheAmazingAudioEngine/Test Suite/Icon@2x.png"; sourceTree = SOURCE_ROOT; };
 		4CE501931493F82600F23607 /* TheAmazingAudioEngine-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "TheAmazingAudioEngine-Info.plist"; sourceTree = "<group>"; };
 		4CE501971493F82600F23607 /* TheAmazingAudioEngine-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TheAmazingAudioEngine-Prefix.pch"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -140,6 +146,9 @@
 		4C34877014E9B79300301A09 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				4CBD02DC1523391200053E43 /* Icon-72.png */,
+				4CBD02DD1523391200053E43 /* Icon.png */,
+				4CBD02DE1523391200053E43 /* Icon@2x.png */,
 				4C34877814EA699300301A09 /* dmxbeat.aiff */,
 				4C34877114E9B7A400301A09 /* caitlin.caf */,
 				4C34877214E9B7A400301A09 /* congaloop.caf */,
@@ -386,6 +395,9 @@
 				4C34877914EA699300301A09 /* dmxbeat.aiff in Resources */,
 				4C34877B14EA841000301A09 /* lead.aif in Resources */,
 				4C12E4D614ED0822002BF07A /* Factory Hall.wav in Resources */,
+				4CBD02DF1523391200053E43 /* Icon-72.png in Resources */,
+				4CBD02E01523391200053E43 /* Icon.png in Resources */,
+				4CBD02E11523391200053E43 /* Icon@2x.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -643,7 +655,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "TheAmazingAudioEngine/Test Suite/Test Suite-Prefix.pch";
 				INFOPLIST_FILE = "TheAmazingAudioEngine/Test Suite/Test Suite-Info.plist";
@@ -653,6 +665,7 @@
 				);
 				OTHER_CFLAGS = "-DNS_BLOCK_ASSERTIONS=1";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				"PROVISIONING_PROFILE[sdk=iphoneos*]" = "";
 				TARGETED_DEVICE_FAMILY = "1,2";
 				WRAPPER_EXTENSION = app;
 			};
