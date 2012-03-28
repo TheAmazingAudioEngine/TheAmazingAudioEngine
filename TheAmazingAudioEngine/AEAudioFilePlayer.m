@@ -14,7 +14,7 @@
     }
 
 @interface AEAudioFilePlayer () {
-    char                         *_audio;
+    AudioBufferList              *_audio;
     int                           _lengthInFrames;
     AudioStreamBasicDescription   _audioDescription;
     int                           _playhead;
@@ -80,44 +80,49 @@
     // Calculate the true length in frames, given the original and target sample rates
     fileLengthInFrames = ceil(fileLengthInFrames * (audioDescription.mSampleRate / fileAudioDescription.mSampleRate));
     
-    // Allocate space for audio
-    char *audioSamples = malloc(fileLengthInFrames * (audioDescription.mBitsPerChannel/8) * audioDescription.mChannelsPerFrame);
-    
-    if ( !audioSamples ) {
-        ExtAudioFileDispose(audioFile);
-        if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
-                                              userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:
-                                                                                           NSLocalizedString(@"Not enough memory to open file", @""),
-                                                                                           status]
-                                                                                   forKey:NSLocalizedDescriptionKey]];
-        return nil;
-    }
-    
     // Prepare buffers
     int bufferCount = (audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? audioDescription.mChannelsPerFrame : 1;
-    UInt64 remainingFrames = fileLengthInFrames;
-    char* audioDataPtr[bufferCount];
-    audioDataPtr[0] = audioSamples;
-    for ( int i=1; i<bufferCount; i++ ) {
-        audioDataPtr[i] = audioDataPtr[i-1] + (fileLengthInFrames * audioDescription.mBytesPerFrame);
-    }
-    
-    char audioBufferListSpace[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
-    AudioBufferList *bufferList = (AudioBufferList*)audioBufferListSpace;
-    
+    int channelsPerBuffer = (audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? 1 : audioDescription.mChannelsPerFrame;
+    AudioBufferList *bufferList = (AudioBufferList*)malloc(sizeof(AudioBufferList) + (bufferCount-1)*sizeof(AudioBuffer));
     bufferList->mNumberBuffers = bufferCount;
+    char* audioDataPtr[bufferCount];
+    for ( int i=0; i<bufferCount; i++ ) {
+        int bufferSize = fileLengthInFrames * (audioDescription.mBitsPerChannel/8) * channelsPerBuffer;
+        audioDataPtr[i] = malloc(bufferSize);
+        if ( !audioDataPtr[i] ) {
+            ExtAudioFileDispose(audioFile);
+            for ( int j=0; j<i; j++ ) free(audioDataPtr[j]);
+            free(bufferList);
+            if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
+                                                  userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:
+                                                                                               NSLocalizedString(@"Not enough memory to open file", @""),
+                                                                                               status]
+                                                                                       forKey:NSLocalizedDescriptionKey]];
+            return nil;
+        }
+        
+        bufferList->mBuffers[i].mData = audioDataPtr[i];
+        bufferList->mBuffers[i].mDataByteSize = bufferSize;
+        bufferList->mBuffers[i].mNumberChannels = channelsPerBuffer;
+    }
+
+    char audioBufferListSpace[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
+    AudioBufferList *scratchBufferList = (AudioBufferList*)audioBufferListSpace;
+    
+    scratchBufferList->mNumberBuffers = bufferCount;
 
     // Perform read in multiple small chunks (otherwise ExtAudioFileRead crashes when performing sample rate conversion)
+    UInt64 remainingFrames = fileLengthInFrames;
     while ( remainingFrames > 0 ) {
-        for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
-            bufferList->mBuffers[i].mNumberChannels = (audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? 1 : audioDescription.mChannelsPerFrame;
-            bufferList->mBuffers[i].mData = audioDataPtr[i];
-            bufferList->mBuffers[i].mDataByteSize = MIN(16384, remainingFrames * audioDescription.mBytesPerFrame);
+        for ( int i=0; i<scratchBufferList->mNumberBuffers; i++ ) {
+            scratchBufferList->mBuffers[i].mNumberChannels = channelsPerBuffer;
+            scratchBufferList->mBuffers[i].mData = audioDataPtr[i];
+            scratchBufferList->mBuffers[i].mDataByteSize = MIN(16384, remainingFrames * audioDescription.mBytesPerFrame);
         }
         
         // Perform read
-        UInt32 numberOfPackets = (UInt32)(bufferList->mBuffers[0].mDataByteSize / audioDescription.mBytesPerFrame);
-        status = ExtAudioFileRead(audioFile, &numberOfPackets, bufferList);
+        UInt32 numberOfPackets = (UInt32)(scratchBufferList->mBuffers[0].mDataByteSize / audioDescription.mBytesPerFrame);
+        status = ExtAudioFileRead(audioFile, &numberOfPackets, scratchBufferList);
         
         if ( numberOfPackets == 0 ) {
             // Termination condition
@@ -126,7 +131,6 @@
         
         if ( status != noErr ) {
             ExtAudioFileDispose(audioFile);
-            free(audioSamples);
             if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
                                                   userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:
                                                                                                NSLocalizedString(@"Couldn't read the audio file (error %d)", @""),
@@ -149,7 +153,7 @@
     player->_playing = YES;
     player->_audioController = audioController;
     player->_audioDescription = audioDescription;
-    player->_audio = audioSamples;
+    player->_audio = bufferList;
     player->_lengthInFrames = fileLengthInFrames;
     
     return player;
@@ -187,18 +191,12 @@ static OSStatus renderCallback(AEAudioFilePlayer *THIS, const AudioTimeStamp *ti
         // The number of frames left before the end of the audio
         int framesToCopy = MIN(remainingFrames, THIS->_lengthInFrames - THIS->_playhead);
 
-        // A pointer to the next audio to play
-        char *ptr = THIS->_audio + THIS->_playhead * bytesPerFrame;
-        
         // Fill each buffer with the audio
         for ( int i=0; i<audio->mNumberBuffers; i++ ) {
-            memcpy(audioPtrs[i], ptr, framesToCopy * bytesPerFrame);
+            memcpy(audioPtrs[i], ((char*)THIS->_audio->mBuffers[i].mData) + THIS->_playhead * bytesPerFrame, framesToCopy * bytesPerFrame);
             
             // Advance the output buffers
             audioPtrs[i] += framesToCopy * bytesPerFrame;
-            
-            // Advance the audio pointer to the next channel, if we're non-interleaved
-            ptr += THIS->_lengthInFrames * bytesPerFrame;
         }
         
         // Advance playhead
