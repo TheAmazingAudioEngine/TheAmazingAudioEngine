@@ -36,6 +36,10 @@
 		4C5C511C14EA9D790012D39E /* TPOscilloscopeLayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C5C511914EA9D790012D39E /* TPOscilloscopeLayer.m */; };
 		4C5C511F14EAA39D0012D39E /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C5C511E14EAA39D0012D39E /* QuartzCore.framework */; };
 		4C80196114F919B00003EFB3 /* TPDoubleSpeedFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C80196014F919B00003EFB3 /* TPDoubleSpeedFilter.m */; };
+		4CA7EE81152456B200630345 /* TheAmazingAudioEngine.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CAD569315162822003CE861 /* TheAmazingAudioEngine.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4CA7EE82152456B200630345 /* AEAudioController.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CAD56801516281D003CE861 /* AEAudioController.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4CA7EE83152456B200630345 /* AEAudioFilePlayer.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CAD56A915163488003CE861 /* AEAudioFilePlayer.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4CA7EE84152456B200630345 /* AEUtilities.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C12CC98151D1EDA00562E2A /* AEUtilities.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4CAD2F7014E9A3BF00656553 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD2F6F14E9A3BF00656553 /* UIKit.framework */; };
 		4CAD2F7214E9A3BF00656553 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD2F7114E9A3BF00656553 /* Foundation.framework */; };
 		4CAD2F7414E9A3BF00656553 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD2F7314E9A3BF00656553 /* CoreGraphics.framework */; };
@@ -269,6 +273,10 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4CA7EE81152456B200630345 /* TheAmazingAudioEngine.h in Headers */,
+				4CA7EE82152456B200630345 /* AEAudioController.h in Headers */,
+				4CA7EE83152456B200630345 /* AEAudioFilePlayer.h in Headers */,
+				4CA7EE84152456B200630345 /* AEUtilities.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
