@@ -8,6 +8,43 @@
 #import <AudioToolbox/AudioToolbox.h>
 #import <AudioUnit/AudioUnit.h>
 
+#pragma mark - Notifications and constants
+
+/*!
+ * @var AEAudioControllerSessionInterruptionBeganNotification
+ *      Notification that the audio session has been interrupted.
+ *
+ * @var AEAudioControllerSessionInterruptionEndedNotification
+ *      Notification that the audio session interrupted has ended, and control
+ *      has been passed back to the application.
+ */
+extern NSString * AEAudioControllerSessionInterruptionBeganNotification;
+extern NSString * AEAudioControllerSessionInterruptionEndedNotification;
+
+/*!
+ * @enum ABInputMode
+ *      Input mode
+ *
+ *      How to handle incoming audio
+ *
+ * @var ABInputModeStereoOrBridgedMono
+ *      If input is stereo and system audio description is stereo, provide stereo audio; 
+ *      if input is mono, bridge the mono audio to stereo audio
+ *
+ * @var ABInputModeStereoOrMono
+ *      If input is stereo and system audio description is stereo, provide stereo audio; 
+ *      if input is mono, provide mono audio
+ *
+ * @var ABInputModeDualMonoOrMono
+ *      If input is stereo, treat this as two separate mono channels; 
+ *      if input is mono, provide mono audio
+ *
+ */
+typedef enum {
+    ABInputModeStereoOrBridgedMono,
+    ABInputModeStereoOrMono,
+    ABInputModeDualMonoOrMono
+} ABInputMode;
 
 #pragma mark - Callbacks and protocols
 
@@ -99,6 +136,20 @@ typedef OSStatus (*AEAudioControllerRenderCallback) (id                        c
 @end
 
 /*!
+ * @var AEAudioSourceInput
+ *      Main audio input
+ *
+ * @var AEAudioSourceMainOutput
+ *      Main audio output
+ *
+ * @var AEAudioSourceInputAlternate
+ *      If selected @link AEAudioController::inputMode input mode @endlink is @link ABInputModeDualMonoOrMono @endlink, this corresponds to the second input channel
+ */
+#define AEAudioSourceInput           ((void*)0x01)
+#define AEAudioSourceMainOutput      ((void*)0x02)
+#define AEAudioSourceInputAlternate  ((void*)0x03)
+
+/*!
  * Audio callback
  *
  *      This callback is used for notifying you of incoming audio (either from 
@@ -111,12 +162,14 @@ typedef OSStatus (*AEAudioControllerRenderCallback) (id                        c
  *
  *      Do not wait on locks, allocate memory, or call any Objective-C or BSD code.
  *
- * @param receiver  The receiver object
- * @param time      The time the audio was received (for input), or the time it will be played (for output)
- * @param frames    The length of the audio, in frames
- * @param audio     The audio buffer list
+ * @param receiver   The receiver object
+ * @param source     The source of the audio: @link AEAudioSourceInput @endlink, @link AEAudioSourceMainOutput @endlink, @link AEAudioSourceInputAlternate @endlink, an AEChannelGroup or an id<AEAudioPlayable>.
+ * @param time       The time the audio was received (for input), or the time it will be played (for output)
+ * @param frames     The length of the audio, in frames
+ * @param audio      The audio buffer list
  */
 typedef void (*AEAudioControllerAudioCallback) (id                        receiver,
+                                                void                     *source,
                                                 const AudioTimeStamp     *time,
                                                 UInt32                    frames,
                                                 AudioBufferList          *audio);
@@ -246,7 +299,7 @@ typedef void (*AEAudioControllerVariableSpeedFilterCallback) (id                
  *      Input context: Audio system is about to process some incoming audio (from microphone, etc).
  *
  * @var AEAudioTimingContextOutput
- *      Output context: Audios sytem is about to render the next buffer for playback.
+ *      Output context: Audio system is about to render the next buffer for playback.
  *
  */
 typedef enum {
@@ -302,7 +355,7 @@ typedef void (*AEAudioControllerTimingCallback) (id                        recei
 /*!
  * Channel group identifier
  *
- *      See @link createChannelGroup @endlink for more info.
+ *      See @link AEAudioController::createChannelGroup @endlink for more info.
  */
 typedef struct _channel_group_t* AEChannelGroup;
 
@@ -320,12 +373,13 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
  *
  *      Use:
  *
- *      1. Initialise, with the desired audio format.
- *      2. Set required parameters.
- *      3. Add channels, input receivers, output receivers, timing receivers and filters, as required.
- *         Note that all these can be added/removed during operation as well.
- *      4. Call @link start @endlink to begin processing audio.
- *      
+ *      <ol>
+ *      <li>@link initWithAudioDescription: Initialise@endlink, with the desired audio format.</li>
+ *      <li>Set required parameters.</li>
+ *      <li>Add channels, input receivers, output receivers, timing receivers and filters, as required.
+ *         Note that all these can be added/removed during operation as well.</li>
+ *      <li>Call @link start @endlink to begin processing audio.</li>
+ *      </ol>
  */
 @interface AEAudioController : NSObject
 
@@ -393,10 +447,6 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
 
 /*!
  * Start audio engine
- *
- *      Calling this method for the first time causes the audio session to be initialised
- *      (either in MediaPlayback mode, or PlayAndRecord mode if you have enabled
- *      @link enableInput input @endlink).
  */
 - (void)start;
 
@@ -748,10 +798,12 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
  *
  *      Input receivers receive audio that is being received by the microphone or another input device.
  *
- *      Note that if the @link receiveMonoInputAsBridgedStereo @endlink property is set to YES, then incoming
- *      audio may be mono. Check the audio buffer list parameters to determine the kind of audio you are
- *      receiving (for example, if you are using the @link interleaved16BitStereoAudioDescription @endlink
- *      then the audio->mBuffers[0].mNumberOfChannels field will be 1 for mono, and 2 for stereo audio).
+ *      Note that the audio format provided to input receivers depends on the value of @link inputMode @endlink.
+ *      Check the audio buffer list parameters to determine the kind of audio you are receiving (for example, if
+ *      you are using an interleaved format such as @link interleaved16BitStereoAudioDescription @endlink
+ *      then the audio->mBuffers[0].mNumberOfChannels field will be 1 for mono, and 2 for stereo audio).  If you
+ *      are using a non-interleaved format such as @link nonInterleaved16BitStereoAudioDescription @endlink, then
+ *      audio->mNumberBuffers will be 1 for mono, and 2 for stereo.
  *
  * @param receiver An object that implements the AEAudioReceiver protocol
  */
@@ -901,6 +953,25 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController* aud
 @property (nonatomic, assign) BOOL muteOutput;
 
 /*!
+ * Enable audio input from Bluetooth devices
+ *
+ *      Default is YES.
+ */
+@property (nonatomic, assign) BOOL enableBluetoothInput;
+
+/*!
+ * Determine whether input gain is available
+ */
+@property (nonatomic, readonly) BOOL inputGainAvailable;
+
+/*!
+ * Set audio input gain (if input gain is available)
+ *
+ *      Value must be in the range 0-1
+ */
+@property (nonatomic, assign) float inputGain;
+
+/*!
  * Whether to use the built-in voice processing system
  *
  *      This can be useful for removing echo/feedback when playing through the speaker
@@ -929,17 +1000,16 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController* aud
 @property (nonatomic, assign) BOOL voiceProcessingOnlyForSpeakerAndMicrophone;
 
 /*! 
- * Whether to receive audio input from mono devices as bridged stereo
+ * Input mode: How to handle incoming audio
  *
- *      If you are using a stereo audio format, setting this to YES causes audio input
- *      from mono input devices to be received by input receivers as bridged stereo audio.
- *      Otherwise, audio will be received as mono audio.
+ *      If you are using a stereo audio format, this setting defines how the system
+ *      receives incoming audio.
  *
- *      See also discussion of @link addInputReceiver: @endlink.
+ *      See @link ABInputMode @endlink for a description of the available options.
  *
- *      Default is YES.
+ *      Default is ABInputModeStereoOrBridgedMono.
  */
-@property (nonatomic, assign) BOOL receiveMonoInputAsBridgedStereo;
+@property (nonatomic, assign) ABInputMode inputMode;
 
 /*!
  * Preferred buffer duration (in seconds)

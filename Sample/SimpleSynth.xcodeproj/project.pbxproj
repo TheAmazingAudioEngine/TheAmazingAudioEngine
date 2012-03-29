@@ -7,9 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4CA7EE8C1524573B00630345 /* libTheAmazingAudioEngineTrial.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CA7EE8B1524573B00630345 /* libTheAmazingAudioEngineTrial.a */; };
 		4CAA260514ABB22500F7CC81 /* TPSynthGenerator.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CAA260414ABB22500F7CC81 /* TPSynthGenerator.m */; };
 		4CAA260914ABB2A400F7CC81 /* TPCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4CAA260714ABB2A400F7CC81 /* TPCircularBuffer.c */; };
-		4CAD56A8151633CF003CE861 /* TheAmazingAudioEngine.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD56A7151633CF003CE861 /* TheAmazingAudioEngine.framework */; };
 		4CE62D34149527AF00F908A6 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CE62D33149527AF00F908A6 /* UIKit.framework */; };
 		4CE62D36149527AF00F908A6 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CE62D35149527AF00F908A6 /* Foundation.framework */; };
 		4CE62D38149527AF00F908A6 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CE62D37149527AF00F908A6 /* CoreGraphics.framework */; };
@@ -31,11 +31,11 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		4CA7EE8B1524573B00630345 /* libTheAmazingAudioEngineTrial.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libTheAmazingAudioEngineTrial.a; path = SimpleSynth/Library/libTheAmazingAudioEngineTrial.a; sourceTree = "<group>"; };
 		4CAA260314ABB22500F7CC81 /* TPSynthGenerator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TPSynthGenerator.h; sourceTree = "<group>"; };
 		4CAA260414ABB22500F7CC81 /* TPSynthGenerator.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TPSynthGenerator.m; sourceTree = "<group>"; };
 		4CAA260714ABB2A400F7CC81 /* TPCircularBuffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = TPCircularBuffer.c; sourceTree = "<group>"; };
 		4CAA260814ABB2A400F7CC81 /* TPCircularBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TPCircularBuffer.h; sourceTree = "<group>"; };
-		4CAD56A7151633CF003CE861 /* TheAmazingAudioEngine.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = TheAmazingAudioEngine.framework; path = SimpleSynth/TheAmazingAudioEngine.framework; sourceTree = "<group>"; };
 		4CE62D2F149527AF00F908A6 /* SimpleSynth.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SimpleSynth.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4CE62D33149527AF00F908A6 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		4CE62D35149527AF00F908A6 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
@@ -72,7 +72,7 @@
 				4CE62D38149527AF00F908A6 /* CoreGraphics.framework in Frameworks */,
 				4CE62D57149527F500F908A6 /* AudioToolbox.framework in Frameworks */,
 				4CE62D761495384F00F908A6 /* QuartzCore.framework in Frameworks */,
-				4CAD56A8151633CF003CE861 /* TheAmazingAudioEngine.framework in Frameworks */,
+				4CA7EE8C1524573B00630345 /* libTheAmazingAudioEngineTrial.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -99,7 +99,7 @@
 		4CE62D32149527AF00F908A6 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				4CAD56A7151633CF003CE861 /* TheAmazingAudioEngine.framework */,
+				4CA7EE8B1524573B00630345 /* libTheAmazingAudioEngineTrial.a */,
 				4CE62D55149527F500F908A6 /* AudioToolbox.framework */,
 				4CE62D751495384F00F908A6 /* QuartzCore.framework */,
 				4CE62D33149527AF00F908A6 /* UIKit.framework */,
@@ -301,7 +301,12 @@
 				);
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "SimpleSynth/SimpleSynth-Prefix.pch";
+				HEADER_SEARCH_PATHS = "\"$(SRCROOT)/SimpleSynth/Library/TheAmazingAudioEngineTrial\"";
 				INFOPLIST_FILE = "SimpleSynth/SimpleSynth-Info.plist";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/SimpleSynth/Library\"",
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				WRAPPER_EXTENSION = app;
 			};
@@ -316,7 +321,12 @@
 				);
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "SimpleSynth/SimpleSynth-Prefix.pch";
+				HEADER_SEARCH_PATHS = "\"$(SRCROOT)/SimpleSynth/Library/TheAmazingAudioEngineTrial\"";
 				INFOPLIST_FILE = "SimpleSynth/SimpleSynth-Info.plist";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/SimpleSynth/Library\"",
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				WRAPPER_EXTENSION = app;
 			};

@@ -8,7 +8,7 @@
 
 #import "TPAppDelegate.h"
 #import "TPSimpleSynthViewController.h"
-#import <TheAmazingAudioEngine/TheAmazingAudioEngine.h>
+#import "TheAmazingAudioEngine.h"
 #import "TPSynthGenerator.h"
 
 @implementation TPAppDelegate

@@ -7,10 +7,10 @@
 //
 
 #import <Foundation/Foundation.h>
-#import <TheAmazingAudioEngine/TheAmazingAudioEngine.h>
+#import "TheAmazingAudioEngine.h"
 #import "TPCircularBuffer.h"
 
-@interface TPSynthGenerator : NSObject <TPAudioPlayable> {
+@interface TPSynthGenerator : NSObject <AEAudioPlayable> {
     TPCircularBuffer _notes;
 }
 
