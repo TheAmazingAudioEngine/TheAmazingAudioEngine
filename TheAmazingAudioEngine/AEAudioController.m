@@ -590,7 +590,9 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     }
     
 #ifdef TRIAL
-    [[AETrialModeController alloc] init];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[AETrialModeController alloc] init];
+    });
 #endif
     
     return self;
