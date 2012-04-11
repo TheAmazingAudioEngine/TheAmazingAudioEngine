@@ -69,8 +69,6 @@ static OSStatus renderCallback (TPSynthGenerator         *THIS,
                                 UInt32                    frames,
                                 AudioBufferList          *audio) {
 
-    memset(audio->mBuffers[0].mData, 0, audio->mBuffers[0].mDataByteSize);
-    
     int32_t noteCount;
     note_t *note = TPCircularBufferTail(&THIS->_notes, &noteCount);
     noteCount /= sizeof(note_t);
