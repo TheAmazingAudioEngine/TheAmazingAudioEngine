@@ -140,6 +140,12 @@ typedef struct _message_t {
 
 #pragma mark -
 
+@interface AEAudioControllerProxy : NSProxy {
+    AEAudioController *_audioController;
+}
+- (id)initWithAudioController:(AEAudioController*)audioController;
+@end
+
 @interface AEAudioController () {
     AUGraph             _audioGraph;
     AUNode              _ioNode;
@@ -634,7 +640,11 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     [self updateInputDeviceStatus];
     
     // Start messaging poll timer
-    _responsePollTimer = [[NSTimer scheduledTimerWithTimeInterval:kIdleMessagingPollDuration target:self selector:@selector(pollForMainThreadMessages) userInfo:nil repeats:YES] retain];
+    _responsePollTimer = [[NSTimer scheduledTimerWithTimeInterval:kIdleMessagingPollDuration
+                                                           target:[[[AEAudioControllerProxy alloc] initWithAudioController:self] autorelease] 
+                                                         selector:@selector(pollForMainThreadMessages) 
+                                                         userInfo:nil 
+                                                          repeats:YES] retain];
     
     // Start things up
     checkResult(AudioSessionSetActive(true), "AudioSessionSetActive");
@@ -1105,7 +1115,11 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
         // Replace active poll timer with less demanding idle one
         [_responsePollTimer invalidate];
         [_responsePollTimer release];
-        _responsePollTimer = [[NSTimer scheduledTimerWithTimeInterval:kIdleMessagingPollDuration target:self selector:@selector(pollForMainThreadMessages) userInfo:nil repeats:YES] retain];
+        _responsePollTimer = [[NSTimer scheduledTimerWithTimeInterval:kIdleMessagingPollDuration 
+                                                               target:[[[AEAudioControllerProxy alloc] initWithAudioController:self] autorelease] 
+                                                             selector:@selector(pollForMainThreadMessages) 
+                                                             userInfo:nil 
+                                                              repeats:YES] retain];
     }
 }
 
@@ -1124,7 +1138,11 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
             // Replace idle poll timer with more rapid active polling
             [_responsePollTimer invalidate];
             [_responsePollTimer release];
-            _responsePollTimer = [[NSTimer scheduledTimerWithTimeInterval:_preferredBufferDuration target:self selector:@selector(pollForMainThreadMessages) userInfo:nil repeats:YES] retain];
+            _responsePollTimer = [[NSTimer scheduledTimerWithTimeInterval:_preferredBufferDuration
+                                                                   target:[[[AEAudioControllerProxy alloc] initWithAudioController:self] autorelease] 
+                                                                 selector:@selector(pollForMainThreadMessages) 
+                                                                 userInfo:nil 
+                                                                  repeats:YES] retain];
         }
     }
     
@@ -2169,4 +2187,18 @@ static void handleCallbacksForChannel(AEChannel channel, const AudioTimeStamp *i
     }
 }
 
+@end
+
+@implementation AEAudioControllerProxy
+- (id)initWithAudioController:(AEAudioController *)audioController {
+    _audioController = audioController;
+    return self;
+}
+- (NSMethodSignature *)methodSignatureForSelector:(SEL)selector {
+    return [_audioController methodSignatureForSelector:selector];
+}
+- (void)forwardInvocation:(NSInvocation *)invocation {
+    [invocation setTarget:_audioController];
+    [invocation invoke];
+}
 @end
