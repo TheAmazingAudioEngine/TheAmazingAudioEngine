@@ -37,7 +37,7 @@ typedef struct {
     AEAudioMixerBufferSourceRenderCallback  renderCallback;
     void                                   *callbackUserinfo;
     TPCircularBuffer                        buffer;
-    uint8_t                                 lastAudioTimestamp;
+    uint64_t                                lastAudioTimestamp;
     BOOL                                    processedForCurrentTimeSlice;
 } source_t;
 
@@ -75,6 +75,12 @@ static void prepareNewSource(AEAudioMixerBuffer *THIS, AEAudioMixerBufferSource 
 - (void)refreshMixingGraph;
 @end
 
+@interface AEAudioMixerBufferProxy : NSProxy {
+    AEAudioMixerBuffer *_mixerBuffer;
+}
+- (id)initWithMixerBuffer:(AEAudioMixerBuffer*)mixerBuffer;
+@end
+
 @implementation AEAudioMixerBuffer
 
 +(void)initialize {
@@ -91,8 +97,11 @@ static void prepareNewSource(AEAudioMixerBuffer *THIS, AEAudioMixerBufferSource 
     _scratchBuffer = (uint8_t*)malloc(kScratchBufferLength);
 
     TPCircularBufferInit(&_mainThreadActionBuffer, kActionBufferSize);
-    _mainThreadActionPollTimer = [NSTimer scheduledTimerWithTimeInterval:kActionMainThreadPollDuration target:self selector:@selector(pollActionBuffer) userInfo:nil repeats:YES];
-    
+    _mainThreadActionPollTimer = [NSTimer scheduledTimerWithTimeInterval:kActionMainThreadPollDuration
+                                                                  target:[[[AEAudioMixerBufferProxy alloc] initWithMixerBuffer:self] autorelease]
+                                                                selector:@selector(pollActionBuffer) 
+                                                                userInfo:nil
+                                                                 repeats:YES];
     return self;
 }
 
@@ -329,6 +338,9 @@ UInt32 AEAudioMixerBufferPeek(AEAudioMixerBuffer *THIS, uint64_t *outNextTimesta
                 // This source is empty
                 if ( outNextTimestamp ) *outNextTimestamp = 0;
                 return 0;
+            } else {
+                if ( !now ) now = mach_absolute_time();
+                source->lastAudioTimestamp = now;
             }
             
             uint64_t endTimestamp = timestamp + (((double)frameCount / THIS->_clientFormat.mSampleRate) * __secondsToHostTicks);
@@ -611,4 +623,19 @@ static void prepareNewSource(AEAudioMixerBuffer *THIS, AEAudioMixerBufferSource 
     [THIS refreshMixingGraph];
 }
 
+@end
+
+
+@implementation AEAudioMixerBufferProxy
+- (id)initWithMixerBuffer:(AEAudioMixerBuffer*)mixerBuffer {
+    _mixerBuffer = mixerBuffer;
+    return self;
+}
+- (NSMethodSignature *)methodSignatureForSelector:(SEL)selector {
+    return [_mixerBuffer methodSignatureForSelector:selector];
+}
+- (void)forwardInvocation:(NSInvocation *)invocation {
+    [invocation setTarget:_mixerBuffer];
+    [invocation invoke];
+}
 @end
