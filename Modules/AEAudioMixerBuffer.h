@@ -151,6 +151,31 @@ void AEAudioMixerBufferDequeueSingleSource(AEAudioMixerBuffer *mixerBuffer, AEAu
 UInt32 AEAudioMixerBufferPeek(AEAudioMixerBuffer *mixerBuffer, uint64_t *outNextTimestamp);
 
 /*!
+ * Set a different AudioStreamBasicDescription for a source
+ */
+- (void)setAudioDescription:(AudioStreamBasicDescription*)audioDescription forSource:(AEAudioMixerBufferSource)source;
+
+/*!
+ * Set volume for source
+ */
+- (void)setVolume:(float)volume forSource:(AEAudioMixerBufferSource)source;
+
+/*!
+ * Get volume for source
+ */
+- (float)volumeForSource:(AEAudioMixerBufferSource)source;
+
+/*!
+ * Set pan for source
+ */
+- (void)setPan:(float)pan forSource:(AEAudioMixerBufferSource)source;
+
+/*!
+ * Get pan for source
+ */
+- (float)panForSource:(AEAudioMixerBufferSource)source;
+
+/*!
  * Force the mixer to unregister a source
  *
  *  After this function is called, the mixer will have reconfigured to stop
