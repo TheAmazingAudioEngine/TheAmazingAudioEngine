@@ -7,6 +7,7 @@
 //
 
 #import "AEAudioFilePlayer.h"
+#import "AEAudioFileLoaderOperation.h"
 
 #define checkStatus(status) \
     if ( (status) != noErr ) {\
@@ -15,10 +16,9 @@
 
 @interface AEAudioFilePlayer () {
     AudioBufferList              *_audio;
-    int                           _lengthInFrames;
+    UInt32                        _lengthInFrames;
     AudioStreamBasicDescription   _audioDescription;
     int                           _playhead;
-    AEAudioController            *_audioController;
 }
 @end
 
@@ -27,136 +27,41 @@
 
 + (id)audioFilePlayerWithURL:(NSURL*)url audioController:(AEAudioController *)audioController error:(NSError **)error {
     
-    ExtAudioFileRef audioFile;
-    OSStatus status;
-    
-    // Open file
-    status = ExtAudioFileOpenURL((CFURLRef)url, &audioFile);
-    checkStatus(status);
-    if ( status != noErr ) {
-        if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
-                                              userInfo:[NSDictionary dictionaryWithObject:NSLocalizedString(@"Couldn't open the audio file", @"") 
-                                                                                   forKey:NSLocalizedDescriptionKey]];
-        return nil;
-    }
-    
-    // Get file data format
-    AudioStreamBasicDescription fileAudioDescription;
-    UInt32 size = sizeof(fileAudioDescription);
-    status = ExtAudioFileGetProperty(audioFile, kExtAudioFileProperty_FileDataFormat, &size, &fileAudioDescription);
-    if ( status != noErr ) {
-        ExtAudioFileDispose(audioFile);
-        if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
-                                              userInfo:[NSDictionary dictionaryWithObject:NSLocalizedString(@"Couldn't read the audio file", @"") 
-                                                                                   forKey:NSLocalizedDescriptionKey]];
-        return nil;
-    }
-    
-    // Apply client format
-    AudioStreamBasicDescription audioDescription = audioController.audioDescription;
-    status = ExtAudioFileSetProperty(audioFile, kExtAudioFileProperty_ClientDataFormat, sizeof(audioDescription), &audioDescription);
-    if ( status != noErr ) {
-        ExtAudioFileDispose(audioFile);
-        if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
-                                              userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:
-                                                                                           NSLocalizedString(@"Couldn't convert the audio file (error %d)", @""),
-                                                                                           status]
-                                                                                   forKey:NSLocalizedDescriptionKey]];
-        return nil;
-    }
-    
-    // Determine length in frames (in original file's sample rate)
-    UInt64 fileLengthInFrames;
-    size = sizeof(fileLengthInFrames);
-    status = ExtAudioFileGetProperty(audioFile, kExtAudioFileProperty_FileLengthFrames, &size, &fileLengthInFrames);
-    if ( status != noErr ) {
-        ExtAudioFileDispose(audioFile);
-        if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
-                                              userInfo:[NSDictionary dictionaryWithObject:NSLocalizedString(@"Couldn't read the audio file", @"") 
-                                                                                   forKey:NSLocalizedDescriptionKey]];
-        return nil;
-    }
-    
-    // Calculate the true length in frames, given the original and target sample rates
-    fileLengthInFrames = ceil(fileLengthInFrames * (audioDescription.mSampleRate / fileAudioDescription.mSampleRate));
-    
-    // Prepare buffers
-    int bufferCount = (audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? audioDescription.mChannelsPerFrame : 1;
-    int channelsPerBuffer = (audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? 1 : audioDescription.mChannelsPerFrame;
-    AudioBufferList *bufferList = (AudioBufferList*)malloc(sizeof(AudioBufferList) + (bufferCount-1)*sizeof(AudioBuffer));
-    bufferList->mNumberBuffers = bufferCount;
-    char* audioDataPtr[bufferCount];
-    for ( int i=0; i<bufferCount; i++ ) {
-        int bufferSize = fileLengthInFrames * (audioDescription.mBitsPerChannel/8) * channelsPerBuffer;
-        audioDataPtr[i] = malloc(bufferSize);
-        if ( !audioDataPtr[i] ) {
-            ExtAudioFileDispose(audioFile);
-            for ( int j=0; j<i; j++ ) free(audioDataPtr[j]);
-            free(bufferList);
-            if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
-                                                  userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:
-                                                                                               NSLocalizedString(@"Not enough memory to open file", @""),
-                                                                                               status]
-                                                                                       forKey:NSLocalizedDescriptionKey]];
-            return nil;
-        }
-        
-        bufferList->mBuffers[i].mData = audioDataPtr[i];
-        bufferList->mBuffers[i].mDataByteSize = bufferSize;
-        bufferList->mBuffers[i].mNumberChannels = channelsPerBuffer;
-    }
-
-    char audioBufferListSpace[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
-    AudioBufferList *scratchBufferList = (AudioBufferList*)audioBufferListSpace;
-    
-    scratchBufferList->mNumberBuffers = bufferCount;
-
-    // Perform read in multiple small chunks (otherwise ExtAudioFileRead crashes when performing sample rate conversion)
-    UInt64 remainingFrames = fileLengthInFrames;
-    while ( remainingFrames > 0 ) {
-        for ( int i=0; i<scratchBufferList->mNumberBuffers; i++ ) {
-            scratchBufferList->mBuffers[i].mNumberChannels = channelsPerBuffer;
-            scratchBufferList->mBuffers[i].mData = audioDataPtr[i];
-            scratchBufferList->mBuffers[i].mDataByteSize = MIN(16384, remainingFrames * audioDescription.mBytesPerFrame);
-        }
-        
-        // Perform read
-        UInt32 numberOfPackets = (UInt32)(scratchBufferList->mBuffers[0].mDataByteSize / audioDescription.mBytesPerFrame);
-        status = ExtAudioFileRead(audioFile, &numberOfPackets, scratchBufferList);
-        
-        if ( numberOfPackets == 0 ) {
-            // Termination condition
-            break;
-        }
-        
-        if ( status != noErr ) {
-            ExtAudioFileDispose(audioFile);
-            if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
-                                                  userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:
-                                                                                               NSLocalizedString(@"Couldn't read the audio file (error %d)", @""),
-                                                                                               status]
-                                                                                       forKey:NSLocalizedDescriptionKey]];
-            return nil;
-        }
-        
-        for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
-            audioDataPtr[i] += numberOfPackets * audioDescription.mBytesPerFrame;
-        }
-        remainingFrames -= numberOfPackets;
-    }
-    
-    // Clean up        
-    ExtAudioFileDispose(audioFile);
-    
     AEAudioFilePlayer *player = [[[AEAudioFilePlayer alloc] init] autorelease];
     player->_volume = 1.0;
     player->_playing = YES;
-    player->_audioController = audioController;
-    player->_audioDescription = audioDescription;
-    player->_audio = bufferList;
-    player->_lengthInFrames = fileLengthInFrames;
+    player->_audioDescription = audioController.audioDescription;
+    
+    AEAudioFileLoaderOperation *operation = [[AEAudioFileLoaderOperation alloc] initWithFileURL:url targetAudioDescription:player->_audioDescription];
+    NSOperationQueue *queue = [[NSOperationQueue alloc] init];
+    [queue addOperation:operation];
+    [queue waitUntilAllOperationsAreFinished];
+    
+    if ( operation.error ) {
+        if ( error ) *error = operation.error;
+        [player release];
+        [operation release];
+        [queue release];
+        return nil;
+    }
+    
+    player->_audio = operation.bufferList;
+    player->_lengthInFrames = operation.lengthInFrames;
+    
+    [operation release];
+    [queue release];
     
     return player;
+}
+
+- (void)dealloc {
+    if ( _audio ) {
+        for ( int i=0; i<_audio->mNumberBuffers; i++ ) {
+            free(_audio->mBuffers[i].mData);
+        }
+        free(_audio);
+    }
+    [super dealloc];
 }
 
 static long notifyPlaybackStopped(AEAudioController *audioController, long *ioParameter1, long *ioParameter2, long *ioParameter3, void *ioOpaquePtr) {
