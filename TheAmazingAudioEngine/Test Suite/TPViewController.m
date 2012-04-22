@@ -11,13 +11,15 @@
 #import "TPOscilloscopeLayer.h"
 #import "TPConvolutionFilter.h"
 #import "TPDoubleSpeedFilter.h"
+#import "AEAudioPlaythroughChannel.h"
+#import "AEAudioLimiterFilter.h"
 #import <QuartzCore/QuartzCore.h>
 
 #define kAuxiliaryViewTag 251
 
 
 @interface TPViewController () {
-    AEChannelGroup  _loopsGroup;
+    AEChannelGroupRef  _loopsGroup;
 }
 
 @property (nonatomic, retain) AEAudioController *audioController;
@@ -27,8 +29,11 @@
 @property (nonatomic, retain) AEAudioFilePlayer *sample1;
 @property (nonatomic, retain) TPConvolutionFilter *filter;
 @property (nonatomic, retain) TPDoubleSpeedFilter *doubleSpeedFilter;
+@property (nonatomic, retain) AEAudioPlaythroughChannel *playthrough;
+@property (nonatomic, retain) AEAudioLimiterFilter *limiter;
 @property (nonatomic, retain) TPOscilloscopeLayer *outputOscilloscope;
 @property (nonatomic, retain) TPOscilloscopeLayer *inputOscilloscope;
+@property (nonatomic, retain) UILabel *channelCountLabel;
 @end
 
 @implementation TPViewController
@@ -39,8 +44,11 @@
             sample1=_sample1,
             filter=_filter,
             doubleSpeedFilter=_doubleSpeedFilter,
+            playthrough=_playthrough,
+            limiter=_limiter,
             outputOscilloscope=_outputOscilloscope,
-            inputOscilloscope=_inputOscilloscope;
+            inputOscilloscope=_inputOscilloscope,
+            channelCountLabel = _channelCountLabel;
 
 - (id)initWithAudioController:(AEAudioController*)audioController {
     if ( !(self = [super initWithStyle:UITableViewStyleGrouped]) ) return nil;
@@ -71,12 +79,13 @@
     _loopsGroup = [_audioController createChannelGroup];
     [_audioController addChannels:[NSArray arrayWithObjects:_loop1, _loop2, _loop3, nil] toChannelGroup:_loopsGroup];
     
-    self.tableView.scrollEnabled = NO;
-    
     return self;
 }
 
 -(void)dealloc {
+    
+    self.channelCountLabel = nil;
+    
     NSMutableArray *channelsToRemove = [NSMutableArray arrayWithObjects:_loop1, _loop2, _loop3, nil];
 
     self.loop1 = nil;
@@ -95,6 +104,17 @@
     
     [_audioController removeChannelGroup:_loopsGroup];
 
+    if ( _playthrough ) {
+        [_audioController removeInputReceiver:_playthrough];
+        [_audioController removeChannels:[NSArray arrayWithObject:_playthrough]];
+        self.playthrough = nil;
+    }
+    
+    if ( _limiter ) {
+        [_audioController removeFilter:_limiter];
+        self.limiter = nil;
+    }
+    
     if ( _doubleSpeedFilter ) {
         [_audioController setVariableSpeedFilter:nil];
         self.doubleSpeedFilter = nil;
@@ -133,10 +153,28 @@
     [_inputOscilloscope start];
     
     self.tableView.tableHeaderView = oscilloscopeHostView;
+    
+    self.channelCountLabel = [[[UILabel alloc] initWithFrame:CGRectZero] autorelease];
+    _channelCountLabel.font = [UIFont boldSystemFontOfSize:12];
+    _channelCountLabel.textColor = [UIColor colorWithWhite:0.0 alpha:0.5];
+    _channelCountLabel.backgroundColor = [UIColor clearColor];
+    _channelCountLabel.shadowColor = [UIColor whiteColor];
+    _channelCountLabel.shadowOffset = CGSizeMake(0, 1);
+    _channelCountLabel.text = [NSString stringWithFormat:@"%d input channels", _audioController.numberOfInputChannels];
+    [_channelCountLabel sizeToFit];
+    _channelCountLabel.frame = CGRectOffset(_channelCountLabel.frame, 10, 10);
+    [self.view addSubview:_channelCountLabel];
+    [_audioController addObserver:self forKeyPath:@"numberOfInputChannels" options:0 context:NULL];
+}
+
+-(void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    
+    [_audioController removeObserver:self forKeyPath:@"numberOfInputChannels"];
 }
 
 -(NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 3;
+    return 4;
 }
 
 -(NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
@@ -149,7 +187,10 @@
             return 1;
             
         case 2:
-            return 2;
+            return 3;
+        
+        case 3:
+            return 1;
     }
     return 0;
 }
@@ -223,15 +264,34 @@
             
             switch ( indexPath.row ) {
                 case 0: {
+                    cell.textLabel.text = @"Limiter";
+                    ((UISwitch*)cell.accessoryView).on = _limiter != nil;
+                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(limiterSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                    break;
+                }
+                case 1: {
                     cell.textLabel.text = @"Reverb";
                     ((UISwitch*)cell.accessoryView).on = _filter != nil;
                     [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(filterSwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
                 }
-                case 1: {
+                case 2: {
                     cell.textLabel.text = @"Double Speed";
                     ((UISwitch*)cell.accessoryView).on = _doubleSpeedFilter != nil;
                     [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(useDoubleSpeedFilterSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                    break;
+                }
+            }
+            break;
+        }
+        case 3: {
+            cell.accessoryView = [[[UISwitch alloc] initWithFrame:CGRectZero] autorelease];
+            
+            switch ( indexPath.row ) {
+                case 0: {
+                    cell.textLabel.text = @"Input Playthrough";
+                    ((UISwitch*)cell.accessoryView).on = _playthrough != nil;
+                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(playthroughSwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
                 }
             }
@@ -287,6 +347,29 @@
     }
 }
 
+- (void)playthroughSwitchChanged:(UISwitch*)sender {
+    if ( sender.isOn ) {
+        self.playthrough = [[[AEAudioPlaythroughChannel alloc] initWithAudioController:_audioController] autorelease];
+        [_audioController addInputReceiver:_playthrough];
+        [_audioController addChannels:[NSArray arrayWithObject:_playthrough]];
+    } else {
+        [_audioController removeChannels:[NSArray arrayWithObject:_playthrough]];
+        [_audioController removeInputReceiver:_playthrough];
+        self.playthrough = nil;
+    }
+}
+
+- (void)limiterSwitchChanged:(UISwitch*)sender {
+    if ( sender.isOn ) {
+        self.limiter = [[[AEAudioLimiterFilter alloc] init] autorelease];
+        _limiter.level = INT16_MAX * 0.1;
+        [_audioController addFilter:_limiter];
+    } else {
+        [_audioController removeFilter:_limiter];
+        self.limiter = nil;
+    }
+}
+
 - (void)filterSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
         self.filter = [[[TPConvolutionFilter alloc] initWithAudioController:_audioController filter:[TPConvolutionFilter filterFromAudioFile:[[NSBundle mainBundle] URLForResource:@"Factory Hall" withExtension:@"wav"] scale:5.0 error:NULL]] autorelease];
@@ -314,6 +397,9 @@
         [_sample1 removeObserver:self forKeyPath:@"playing"];
         self.sample1 = nil;
         [(UIButton*)context setSelected:NO];
+    } else if ( object == _audioController ) {
+        _channelCountLabel.text = [NSString stringWithFormat:@"%d channels", _audioController.numberOfInputChannels];
+        [_channelCountLabel sizeToFit];
     }
 }
 

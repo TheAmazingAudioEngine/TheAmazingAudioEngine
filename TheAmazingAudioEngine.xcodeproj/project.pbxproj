@@ -39,8 +39,11 @@
 		4C5C511C14EA9D790012D39E /* TPOscilloscopeLayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C5C511914EA9D790012D39E /* TPOscilloscopeLayer.m */; };
 		4C5C511F14EAA39D0012D39E /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C5C511E14EAA39D0012D39E /* QuartzCore.framework */; };
 		4C80196114F919B00003EFB3 /* TPDoubleSpeedFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C80196014F919B00003EFB3 /* TPDoubleSpeedFilter.m */; };
+		4CA689B41541F05A00AF8DDD /* AEAudioMixerBuffer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C8A0F3E1540BBD300307CB6 /* AEAudioMixerBuffer.m */; };
+		4CA689B51541F05D00AF8DDD /* AEAudioLimiter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA689B21541EF4A00AF8DDD /* AEAudioLimiter.m */; };
 		4CA689BA1541F54200AF8DDD /* TPCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4CA689B61541F54200AF8DDD /* TPCircularBuffer.c */; };
 		4CA689BB1541F54200AF8DDD /* TPCircularBuffer+AudioBufferList.c in Sources */ = {isa = PBXBuildFile; fileRef = 4CA689B81541F54200AF8DDD /* TPCircularBuffer+AudioBufferList.c */; };
+		4CA689BE1542D4FE00AF8DDD /* AEAudioLimiterFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA689BD1542D4FE00AF8DDD /* AEAudioLimiterFilter.m */; };
 		4CA689C11542DC8C00AF8DDD /* AEAudioPlaythroughChannel.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA689C01542DC8C00AF8DDD /* AEAudioPlaythroughChannel.m */; };
 		4CA7EE81152456B200630345 /* TheAmazingAudioEngine.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CAD569315162822003CE861 /* TheAmazingAudioEngine.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4CA7EE82152456B200630345 /* AEAudioController.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CAD56801516281D003CE861 /* AEAudioController.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -91,12 +94,18 @@
 		4C5C511E14EAA39D0012D39E /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
 		4C80195F14F919B00003EFB3 /* TPDoubleSpeedFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TPDoubleSpeedFilter.h; path = "TheAmazingAudioEngine/Test Suite/TPDoubleSpeedFilter.h"; sourceTree = SOURCE_ROOT; };
 		4C80196014F919B00003EFB3 /* TPDoubleSpeedFilter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = TPDoubleSpeedFilter.m; path = "TheAmazingAudioEngine/Test Suite/TPDoubleSpeedFilter.m"; sourceTree = SOURCE_ROOT; };
+		4C8A0F3D1540BBD300307CB6 /* AEAudioMixerBuffer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AEAudioMixerBuffer.h; path = Modules/AEAudioMixerBuffer.h; sourceTree = "<group>"; };
+		4C8A0F3E1540BBD300307CB6 /* AEAudioMixerBuffer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = AEAudioMixerBuffer.m; path = Modules/AEAudioMixerBuffer.m; sourceTree = "<group>"; };
 		4C9D6E26151925A00043A340 /* TPCircularBuffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = TPCircularBuffer.c; sourceTree = "<group>"; };
 		4C9D6E27151925A10043A340 /* TPCircularBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TPCircularBuffer.h; sourceTree = "<group>"; };
+		4CA689B11541EF4A00AF8DDD /* AEAudioLimiter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AEAudioLimiter.h; path = Modules/AEAudioLimiter.h; sourceTree = "<group>"; };
+		4CA689B21541EF4A00AF8DDD /* AEAudioLimiter.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = AEAudioLimiter.m; path = Modules/AEAudioLimiter.m; sourceTree = "<group>"; };
 		4CA689B61541F54200AF8DDD /* TPCircularBuffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = TPCircularBuffer.c; path = Modules/TPCircularBuffer.c; sourceTree = "<group>"; };
 		4CA689B71541F54200AF8DDD /* TPCircularBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TPCircularBuffer.h; path = Modules/TPCircularBuffer.h; sourceTree = "<group>"; };
 		4CA689B81541F54200AF8DDD /* TPCircularBuffer+AudioBufferList.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = "TPCircularBuffer+AudioBufferList.c"; path = "Modules/TPCircularBuffer+AudioBufferList.c"; sourceTree = "<group>"; };
 		4CA689B91541F54200AF8DDD /* TPCircularBuffer+AudioBufferList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TPCircularBuffer+AudioBufferList.h"; path = "Modules/TPCircularBuffer+AudioBufferList.h"; sourceTree = "<group>"; };
+		4CA689BC1542D4FE00AF8DDD /* AEAudioLimiterFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AEAudioLimiterFilter.h; path = Modules/AEAudioLimiterFilter.h; sourceTree = "<group>"; };
+		4CA689BD1542D4FE00AF8DDD /* AEAudioLimiterFilter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = AEAudioLimiterFilter.m; path = Modules/AEAudioLimiterFilter.m; sourceTree = "<group>"; };
 		4CA689BF1542DC8C00AF8DDD /* AEAudioPlaythroughChannel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AEAudioPlaythroughChannel.h; path = Modules/AEAudioPlaythroughChannel.h; sourceTree = "<group>"; };
 		4CA689C01542DC8C00AF8DDD /* AEAudioPlaythroughChannel.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = AEAudioPlaythroughChannel.m; path = Modules/AEAudioPlaythroughChannel.m; sourceTree = "<group>"; };
 		4CAD2F6C14E9A3BF00656553 /* Test Suite.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Test Suite.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -186,6 +195,10 @@
 				4CA689C215446AAC00AF8DDD /* TPCircularBuffer */,
 				4C8A0F3D1540BBD300307CB6 /* AEAudioMixerBuffer.h */,
 				4C8A0F3E1540BBD300307CB6 /* AEAudioMixerBuffer.m */,
+				4CA689B11541EF4A00AF8DDD /* AEAudioLimiter.h */,
+				4CA689B21541EF4A00AF8DDD /* AEAudioLimiter.m */,
+				4CA689BC1542D4FE00AF8DDD /* AEAudioLimiterFilter.h */,
+				4CA689BD1542D4FE00AF8DDD /* AEAudioLimiterFilter.m */,
 				4CA689BF1542DC8C00AF8DDD /* AEAudioPlaythroughChannel.h */,
 				4CA689C01542DC8C00AF8DDD /* AEAudioPlaythroughChannel.m */,
 			);
@@ -488,8 +501,10 @@
 				4C12E4DD14ED082D002BF07A /* TPConvolutionFilter.m in Sources */,
 				4C80196114F919B00003EFB3 /* TPDoubleSpeedFilter.m in Sources */,
 				4CA689B41541F05A00AF8DDD /* AEAudioMixerBuffer.m in Sources */,
+				4CA689B51541F05D00AF8DDD /* AEAudioLimiter.m in Sources */,
 				4CA689BA1541F54200AF8DDD /* TPCircularBuffer.c in Sources */,
 				4CA689BB1541F54200AF8DDD /* TPCircularBuffer+AudioBufferList.c in Sources */,
+				4CA689BE1542D4FE00AF8DDD /* AEAudioLimiterFilter.m in Sources */,
 				4CA689C11542DC8C00AF8DDD /* AEAudioPlaythroughChannel.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
