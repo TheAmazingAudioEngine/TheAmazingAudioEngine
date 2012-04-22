@@ -8,6 +8,8 @@
 #import <AudioToolbox/AudioToolbox.h>
 #import <AudioUnit/AudioUnit.h>
 
+@class AEAudioController;
+
 #pragma mark - Notifications and constants
 
 /*!
@@ -22,29 +24,32 @@ extern NSString * AEAudioControllerSessionInterruptionBeganNotification;
 extern NSString * AEAudioControllerSessionInterruptionEndedNotification;
 
 /*!
- * @enum ABInputMode
+ * @enum AEInputMode
  *      Input mode
  *
  *      How to handle incoming audio
  *
- * @var ABInputModeStereoOrBridgedMono
- *      If input is stereo and system audio description is stereo, provide stereo audio; 
- *      if input is mono, bridge the mono audio to stereo audio
+ * @var AEInputModeFixedAudioFormat
+ *      Receive input in the exact, fixed audio format you specified when initializing the
+ *      audio controller, regardless of the number of input channels. For example, if you
+ *      specified a stereo audio stream description, and you have a mono input source, the mono source
+ *      will be bridged to stereo.
  *
- * @var ABInputModeStereoOrMono
- *      If input is stereo and system audio description is stereo, provide stereo audio; 
- *      if input is mono, provide mono audio
+ *      This is the default.
  *
- * @var ABInputModeDualMonoOrMono
- *      If input is stereo, treat this as two separate mono channels; 
- *      if input is mono, provide mono audio
- *
+ * @var AEInputModeVariableAudioFormat
+ *      Audio format will change, depending on the number of input channels available.
+ *      Mono audio sources will produce mono audio; 8-channel audio sources will produce 8-channel
+ *      audio. You can determine how many channels are being provided by examining the
+ *      `mNumberBuffers` field of the AudioBufferList for non-interleaved audio, or the
+ *      `mNumberOfChannels` field of the first buffer within the AudioBufferList for 
+ *      interleaved audio. Note that this might change without warning, as the user plugs/unplugs
+ *      hardware.
  */
 typedef enum {
-    ABInputModeStereoOrBridgedMono,
-    ABInputModeStereoOrMono,
-    ABInputModeDualMonoOrMono
-} ABInputMode;
+    AEInputModeFixedAudioFormat,
+    AEInputModeVariableAudioFormat
+} AEInputMode;
 
 #pragma mark - Callbacks and protocols
 
@@ -60,11 +65,13 @@ typedef enum {
  *      can gain direct access to the instance variables of the channel ("((MyChannel*)channel)->myInstanceVariable").
  *
  * @param channel           The channel object
+ * @param audioController   The Audio Controller
  * @param time              The time the buffer will be played
  * @param frames            The number of frames required
  * @param audio             The audio buffer list - audio should be copied into the provided buffers
  */
 typedef OSStatus (*AEAudioControllerRenderCallback) (id                        channel,
+                                                     AEAudioController        *audioController,
                                                      const AudioTimeStamp     *time,
                                                      UInt32                    frames,
                                                      AudioBufferList          *audio);
@@ -141,13 +148,9 @@ typedef OSStatus (*AEAudioControllerRenderCallback) (id                        c
  *
  * @var AEAudioSourceMainOutput
  *      Main audio output
- *
- * @var AEAudioSourceInputAlternate
- *      If selected @link AEAudioController::inputMode input mode @endlink is @link ABInputModeDualMonoOrMono @endlink, this corresponds to the second input channel
  */
 #define AEAudioSourceInput           ((void*)0x01)
 #define AEAudioSourceMainOutput      ((void*)0x02)
-#define AEAudioSourceInputAlternate  ((void*)0x03)
 
 /*!
  * Audio callback
@@ -163,12 +166,14 @@ typedef OSStatus (*AEAudioControllerRenderCallback) (id                        c
  *      Do not wait on locks, allocate memory, or call any Objective-C or BSD code.
  *
  * @param receiver   The receiver object
- * @param source     The source of the audio: @link AEAudioSourceInput @endlink, @link AEAudioSourceMainOutput @endlink, @link AEAudioSourceInputAlternate @endlink, an AEChannelGroup or an id<AEAudioPlayable>.
+ * @param audioController The Audio Controller
+ * @param source     The source of the audio: @link AEAudioSourceInput @endlink, @link AEAudioSourceMainOutput @endlink, @link AEAudioSourceInputAlternate @endlink, an AEChannelGroupRef or an id<AEAudioPlayable>.
  * @param time       The time the audio was received (for input), or the time it will be played (for output)
  * @param frames     The length of the audio, in frames
  * @param audio      The audio buffer list
  */
 typedef void (*AEAudioControllerAudioCallback) (id                        receiver,
+                                                AEAudioController        *audioController,
                                                 void                     *source,
                                                 const AudioTimeStamp     *time,
                                                 UInt32                    frames,
@@ -251,6 +256,7 @@ typedef OSStatus (*AEAudioControllerVariableSpeedFilterProducer)(void           
  *      Do not wait on locks, allocate memory, or call any Objective-C or BSD code.
  *
  * @param filter    The filter object
+ * @param audioController The Audio Controller
  * @param producer  A function pointer to be used to produce input audio
  * @param producerToken An opaque pointer to be passed to the producer as the first argument
  * @param time      The time the output audio will be played
@@ -258,6 +264,7 @@ typedef OSStatus (*AEAudioControllerVariableSpeedFilterProducer)(void           
  * @param audio     The audio buffer list to write output audio to
  */
 typedef void (*AEAudioControllerVariableSpeedFilterCallback) (id                        filter,
+                                                              AEAudioController        *audioController,
                                                               AEAudioControllerVariableSpeedFilterProducer producer,
                                                               void                     *producerToken,
                                                               const AudioTimeStamp     *time,
@@ -322,10 +329,12 @@ typedef enum {
  *      Do not wait on locks, allocate memory, or call any Objective-C or BSD code.
  *
  * @param receiver  The receiver object
+ * @param audioController The Audio Controller
  * @param time      The time the audio was received (for input), or the time it will be played (for output)
  * @param context   The timing context - either input, or output
  */
 typedef void (*AEAudioControllerTimingCallback) (id                        receiver,
+                                                 AEAudioController        *audioController,
                                                  const AudioTimeStamp     *time,
                                                  AEAudioTimingContext      context);
 
@@ -357,14 +366,18 @@ typedef void (*AEAudioControllerTimingCallback) (id                        recei
  *
  *      See @link AEAudioController::createChannelGroup @endlink for more info.
  */
-typedef struct _channel_group_t* AEChannelGroup;
+typedef struct _channel_group_t* AEChannelGroupRef;
 
 @class AEAudioController;
 
 /*!
  * Message handler function
+ *
+ * @param audioController   The audio controller
+ * @param userInfo          Pointer to your data
+ * @param userInfoLength    Length of userInfo in bytes
  */
-typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioController, long *ioParameter1, long *ioParameter2, long *ioParameter3, void *ioOpaquePtr);
+typedef void (*AEAudioControllerMessageHandler)(AEAudioController *audioController, void *userInfo, int userInfoLength);
 
 #pragma mark -
 
@@ -475,7 +488,7 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
  * @param channels Array of id<AEAudioPlayable> objects
  * @param group    Group identifier
  */
-- (void)addChannels:(NSArray*)channels toChannelGroup:(AEChannelGroup)group;
+- (void)addChannels:(NSArray*)channels toChannelGroup:(AEChannelGroupRef)group;
 
 /*!
  * Remove channels
@@ -492,7 +505,7 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
  * @param channels Array of id<AEAudioPlayable> objects
  * @param group    Group identifier
  */
-- (void)removeChannels:(NSArray*)channels fromChannelGroup:(AEChannelGroup)group;
+- (void)removeChannels:(NSArray*)channels fromChannelGroup:(AEChannelGroupRef)group;
 
 /*!
  * Obtain a list of all channels, across all channel groups
@@ -505,7 +518,7 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
  * @param group Group identifier
  * @return Array of id<AEAudioPlayable> objects contained within the group
  */
-- (NSArray*)channelsInChannelGroup:(AEChannelGroup)group;
+- (NSArray*)channelsInChannelGroup:(AEChannelGroupRef)group;
 
 /*!
  * Create a channel group
@@ -518,7 +531,7 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
  *
  * @return An identifier for the created group
  */
-- (AEChannelGroup)createChannelGroup;
+- (AEChannelGroupRef)createChannelGroup;
 
 /*!
  * Create a channel sub-group within an existing channel group
@@ -529,7 +542,7 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
  * @param group Group identifier
  * @return An identifier for the created group
  */
-- (AEChannelGroup)createChannelGroupWithinChannelGroup:(AEChannelGroup)group;
+- (AEChannelGroupRef)createChannelGroupWithinChannelGroup:(AEChannelGroupRef)group;
 
 /*!
  * Remove a channel group
@@ -538,7 +551,7 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
  *
  * @param group Group identifier
  */
-- (void)removeChannelGroup:(AEChannelGroup)group;
+- (void)removeChannelGroup:(AEChannelGroupRef)group;
 
 /*!
  * Get a list of top-level channel groups
@@ -553,7 +566,7 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
  * @param group Group identifier
  * @return Array of NSNumber containing sub-group identifiers
  */
-- (NSArray*)channelGroupsInChannelGroup:(AEChannelGroup)group;
+- (NSArray*)channelGroupsInChannelGroup:(AEChannelGroupRef)group;
 
 /*!
  * Set the volume level of a channel group
@@ -561,7 +574,7 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
  * @param volume    Group volume (0 - 1)
  * @param group     Group identifier
  */
-- (void)setVolume:(float)volume forChannelGroup:(AEChannelGroup)group;
+- (void)setVolume:(float)volume forChannelGroup:(AEChannelGroupRef)group;
 
 /*!
  * Set the pan of a channel group
@@ -569,7 +582,7 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
  * @param pan       Group pan (-1.0, left to 1.0, right)
  * @param group     Group identifier
  */
-- (void)setPan:(float)pan forChannelGroup:(AEChannelGroup)group;
+- (void)setPan:(float)pan forChannelGroup:(AEChannelGroupRef)group;
 
 /*!
  * Set the mute status of a channel group
@@ -577,7 +590,7 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
  * @param muted     Whether group is muted
  * @param group     Group identifier
  */
-- (void)setMuted:(BOOL)muted forChannelGroup:(AEChannelGroup)group;
+- (void)setMuted:(BOOL)muted forChannelGroup:(AEChannelGroupRef)group;
 
 ///@}
 #pragma mark - Filters
@@ -622,7 +635,16 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
  * @param filter An object that implements the AEAudioFilter protocol
  * @param group  The channel group on which to perform audio processing
  */
-- (void)addFilter:(id<AEAudioFilter>)filter toChannelGroup:(AEChannelGroup)group;
+- (void)addFilter:(id<AEAudioFilter>)filter toChannelGroup:(AEChannelGroupRef)group;
+
+/*!
+ * Add an audio filter to the system input
+ *
+ *      Audio filters are used to process live audio.
+ *
+ * @param filter An object that implements the AEAudioFilter protocol
+ */
+- (void)addInputFilter:(id<AEAudioFilter>)filter;
 
 /*!
  * Remove a filter from system output
@@ -645,10 +667,17 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
  * @param filter The filter to remove
  * @param group  The group to stop filtering
  */
-- (void)removeFilter:(id<AEAudioFilter>)filter fromChannelGroup:(AEChannelGroup)group;
+- (void)removeFilter:(id<AEAudioFilter>)filter fromChannelGroup:(AEChannelGroupRef)group;
 
 /*!
- * Get a list of all top-level filters
+ * Remove a filter from system input
+ *
+ * @param filter The filter to remove
+ */
+- (void)removeInputFilter:(id<AEAudioFilter>)filter;
+
+/*!
+ * Get a list of all top-level output filters
  */
 - (NSArray*)filters;
 
@@ -664,7 +693,12 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
  *
  * @param group Channel group to get filters for
  */
-- (NSArray*)filtersForChannelGroup:(AEChannelGroup)group;
+- (NSArray*)filtersForChannelGroup:(AEChannelGroupRef)group;
+
+/*!
+ * Get a list of all input filters
+ */
+- (NSArray*)inputFilters;
 
 /*!
  * Set variable speed audio filter for the system output
@@ -705,7 +739,7 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
  * @param filter An object that implements the AEAudioVariableSpeedFilter protocol, or nil
  * @param group Group to assign filter to
  */
-- (void)setVariableSpeedFilter:(id<AEAudioVariableSpeedFilter>)filter forChannelGroup:(AEChannelGroup)group;
+- (void)setVariableSpeedFilter:(id<AEAudioVariableSpeedFilter>)filter forChannelGroup:(AEChannelGroupRef)group;
 
 ///@}
 #pragma mark - Output receivers
@@ -744,7 +778,7 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
  * @param receiver An object that implements the AEAudioReceiver protocol
  * @param group    A channel group identifier
  */
-- (void)addOutputReceiver:(id<AEAudioReceiver>)receiver forChannelGroup:(AEChannelGroup)group;
+- (void)addOutputReceiver:(id<AEAudioReceiver>)receiver forChannelGroup:(AEChannelGroupRef)group;
 
 /*!
  * Remove an output receiver
@@ -767,7 +801,7 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
  * @param receiver The receiver to remove
  * @param group    A channel group identifier
  */
-- (void)removeOutputReceiver:(id<AEAudioReceiver>)receiver fromChannelGroup:(AEChannelGroup)group;
+- (void)removeOutputReceiver:(id<AEAudioReceiver>)receiver fromChannelGroup:(AEChannelGroupRef)group;
 
 /*!
  * Obtain a list of all top-level output receivers
@@ -786,7 +820,7 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
  *
  * @param group A channel group identifier
  */
-- (NSArray*)outputReceiversForChannelGroup:(AEChannelGroup)group;
+- (NSArray*)outputReceiversForChannelGroup:(AEChannelGroupRef)group;
 
 ///@}
 #pragma mark - Input receivers
@@ -862,71 +896,97 @@ typedef long (*AEAudioControllerMessageHandler) (AEAudioController *audioControl
  *
  *      This is a synchronization mechanism that allows you to schedule actions to be performed 
  *      on the realtime audio thread without any locking mechanism required.  Pass in a function pointer
- *      and a number of arguments, and the function will be called on the realtime thread at the next
- *      polling interval.
+ *      and optionally a pointer to data to be copied and passed to the handler, and the function will 
+ *      be called on the realtime thread at the next polling interval.
  *
  *      If provided, the response block will be called on the main thread after the message has
- *      been sent, and will be passed the parameters and result code from the handler.
+ *      been sent, and will be passed the original userInfo data, which may be modified by the
+ *      handler.
  *
  * @param handler       A pointer to a function to call on the realtime thread
- * @param parameter1    First parameter, usage up to the developer
- * @param parameter2    Second parameter
- * @param parameter3    Third parameter
- * @param ioOpaquePtr   An opaque pointer
- * @param responseBlock A block to be performed on the main thread after the handler has been run
+ * @param userInfo      Pointer to user info data to pass to handler - this will be copied
+ * @param userInfoLength Length of userInfo in bytes
+ * @param responseBlock A block to be performed on the main thread after the handler has been run.
  */
 - (void)performAsynchronousMessageExchangeWithHandler:(AEAudioControllerMessageHandler)handler 
-                                           parameter1:(long)parameter1 
-                                           parameter2:(long)parameter2
-                                           parameter3:(long)parameter3
-                                          ioOpaquePtr:(void*)ioOpaquePtr 
-                                        responseBlock:(void (^)(long result, long parameter1, long parameter2, long parameter3, void *ioOpaquePtr))responseBlock;
+                                        userInfoBytes:(void*)userInfo 
+                                               length:(int)userInfoLength
+                                        responseBlock:(void (^)(void *userInfo, int userInfoLength))responseBlock;
 
 /*!
  * Send a message to the realtime thread synchronously
  *
  *      This is a synchronization mechanism that allows you to schedule actions to be performed 
  *      on the realtime audio thread without any locking mechanism required.  Pass in a function pointer
- *      and a number of arguments, and the function will be called on the realtime thread at the next
- *      polling interval.
+ *      and optionally a pointer to data to be copied and passed to the handler, and the function will 
+ *      be called on the realtime thread at the next polling interval.
  *
  *      This method will block on the main thread until the handler has been called, and a response
  *      received.
  *
+ *      If all you need is a checkpoint to make sure the Core Audio thread is not mid-render, etc, then
+ *      you may pass NULL for the handler.
+ *
  * @param handler       A pointer to a function to call on the realtime thread
- * @param parameter1    First parameter, usage up to the developer
- * @param parameter2    Second parameter
- * @param parameter3    Third parameter
- * @param ioOpaquePtr   An opaque pointer
- * @return The result returned from the handler
+ * @param userInfo      Pointer to user info data to pass to handler - this will be passed by reference to the handler
+ * @param userInfoLength Length of userInfo in bytes
  */
-- (long)performSynchronousMessageExchangeWithHandler:(AEAudioControllerMessageHandler)handler 
-                                          parameter1:(long)parameter1 
-                                          parameter2:(long)parameter2 
-                                          parameter3:(long)parameter3
-                                         ioOpaquePtr:(void*)ioOpaquePtr;
+- (void)performSynchronousMessageExchangeWithHandler:(AEAudioControllerMessageHandler)handler 
+                                       userInfoBytes:(void*)userInfo 
+                                              length:(int)userInfoLength;
 
 /*!
  * Send a message to the main thread asynchronously
  *
  *      This is a synchronization mechanism that allows you to schedule actions to be performed 
  *      on the main thread, without any locking or memory allocation.  Pass in a function pointer
- *      and a number of arguments, and the function will be called on the main thread at the next
- *      polling interval.
+ *      optionally a pointer to data to be copied and passed to the handler, and the function will 
+ *      be called on the realtime thread at the next polling interval.
  *
  * @param audioController The audio controller
  * @param handler       A pointer to a function to call on the main thread
- * @param parameter1    First parameter, usage up to the developer
- * @param parameter2    Second parameter
- * @param parameter3    Third parameter
- * @param ioOpaquePtr   An opaque pointer
+ * @param userInfo      Pointer to user info data to pass to handler - this will be copied
+ * @param userInfoLength Length of userInfo in bytes
  */
-void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController* audioController, 
-                                                          AEAudioControllerMessageHandler handler, 
-                                                          long parameter1, 
-                                                          long parameter2,
-                                                          long parameter3,
-                                                          void *ioOpaquePtr);
+void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController                 *audioController, 
+                                                          AEAudioControllerMessageHandler    handler, 
+                                                          void                              *userInfo,
+                                                          int                                userInfoLength);
+
+
+///@}
+#pragma mark - Metering
+/** @name Metering */
+///@{
+
+- (void)outputAveragePowerLevel:(Float32*)averagePower peakHoldLevel:(Float32*)peakLevel;
+- (void)averagePowerLevel:(Float32*)averagePower peakHoldLevel:(Float32*)peakLevel forGroup:(AEChannelGroupRef)group;
+
+
+///@}
+#pragma mark - Utilities
+/** @name Utilities */
+///@{
+
+/*!
+ * Get access to the configured AudioStreamBasicDescription
+ */
+AudioStreamBasicDescription *AEAudioControllerAudioDescription(AEAudioController *audioController);
+
+/*!
+ * Get access to the input AudioStreamBasicDescription
+ */
+AudioStreamBasicDescription *AEAudioControllerInputAudioDescription(AEAudioController *audioController);
+
+/*!
+ * Convert a time span in seconds into a number of frames at the current sample rate
+ */
+UInt32 AEConvertSecondsToFrames(AEAudioController *audioController, NSTimeInterval seconds);
+
+/*!
+ * Convert a number of frames into a time span in seconds
+ */
+NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, UInt32 frames);
 
 ///@}
 #pragma mark - Properties
@@ -1005,11 +1065,11 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController* aud
  *      If you are using a stereo audio format, this setting defines how the system
  *      receives incoming audio.
  *
- *      See @link ABInputMode @endlink for a description of the available options.
+ *      See @link AEInputMode @endlink for a description of the available options.
  *
- *      Default is ABInputModeStereoOrBridgedMono.
+ *      Default is AEInputModeFixedAudioFormat.
  */
-@property (nonatomic, assign) ABInputMode inputMode;
+@property (nonatomic, assign) AEInputMode inputMode;
 
 /*!
  * Preferred buffer duration (in seconds)
@@ -1049,6 +1109,13 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController* aud
  *      Note: This property is observable
  */
 @property (nonatomic, readonly) NSUInteger numberOfInputChannels;
+
+/*!
+ * The audio description defining the input audio format
+ *
+ * See also @link inputMode @endlink
+ */
+@property (nonatomic, readonly) AudioStreamBasicDescription inputAudioDescription;
 
 /*!
  * The audio description that the audio controller was setup with

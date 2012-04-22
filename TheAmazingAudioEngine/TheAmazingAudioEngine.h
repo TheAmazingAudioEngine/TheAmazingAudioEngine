@@ -7,5 +7,6 @@
 //
 
 #import "AEAudioController.h"
+#import "AEAudioFileLoaderOperation.h"
 #import "AEAudioFilePlayer.h"
 #import "AEUtilities.h"

@@ -64,18 +64,16 @@
     [super dealloc];
 }
 
-static long notifyPlaybackStopped(AEAudioController *audioController, long *ioParameter1, long *ioParameter2, long *ioParameter3, void *ioOpaquePtr) {
-    AEAudioFilePlayer *THIS = ioOpaquePtr;
+static void notifyPlaybackStopped(AEAudioController *audioController, void *userInfo, int length) {
+    AEAudioFilePlayer *THIS = *(AEAudioFilePlayer**)userInfo;
     THIS.playing = NO;
     
     if ( THIS->_removeUponFinish ) {
         [audioController removeChannels:[NSArray arrayWithObject:THIS]];
     }
-    
-    return 0;
 }
 
-static OSStatus renderCallback(AEAudioFilePlayer *THIS, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
+static OSStatus renderCallback(AEAudioFilePlayer *THIS, AEAudioController *audioController, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
     if ( !THIS->_loop && THIS->_playhead == THIS->_lengthInFrames ) {
         // At the end of playback - silence whole buffer and return
         for ( int i=0; i<audio->mNumberBuffers; i++ ) memset(audio->mBuffers[i].mData, 0, audio->mBuffers[i].mDataByteSize);
@@ -117,7 +115,7 @@ static OSStatus renderCallback(AEAudioFilePlayer *THIS, const AudioTimeStamp *ti
                 for ( int i=0; i<audio->mNumberBuffers; i++ ) memset(audioPtrs[i], 0, remainingFrames * bytesPerFrame);
                 
                 // Notify main thread that playback has finished
-                AEAudioControllerSendAsynchronousMessageToMainThread(THIS->_audioController, &notifyPlaybackStopped, 0, 0, 0, THIS);
+                AEAudioControllerSendAsynchronousMessageToMainThread(audioController, notifyPlaybackStopped, &THIS, sizeof(AEAudioFilePlayer*));
                 break;
             }
         }

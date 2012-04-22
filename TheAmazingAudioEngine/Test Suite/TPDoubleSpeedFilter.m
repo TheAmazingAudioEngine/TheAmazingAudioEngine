@@ -39,6 +39,7 @@
 }
 
 static void doubleSpeedFilter(id                        filter,
+                              AEAudioController        *audioController,
                               AEAudioControllerVariableSpeedFilterProducer producer,
                               void                     *producerToken,
                               const AudioTimeStamp     *time,

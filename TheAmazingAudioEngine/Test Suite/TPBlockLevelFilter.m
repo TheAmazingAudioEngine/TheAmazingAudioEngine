@@ -90,16 +90,19 @@ void TPBlockLevelFilterSetProcessingBlockSize(TPBlockLevelFilter* THIS, int proc
     }
 }
 
-static long setProcessingBlockSize(AEAudioController *audioController, long *ioParameter1, long *ioParameter2, long *ioParameter3, void *ioOpaquePtr) {
-    TPBlockLevelFilterSetProcessingBlockSize(ioOpaquePtr, *ioParameter1);
-    return 0;
+struct setProcessingBlockSize_t { TPBlockLevelFilter *THIS; int size; };
+static void setProcessingBlockSize(AEAudioController *audioController, void *userInfo, int length) {
+    struct setProcessingBlockSize_t *arg = userInfo;
+    TPBlockLevelFilterSetProcessingBlockSize(arg->THIS, arg->size);
 }
 
 -(void)setProcessingBlockSizeInFrames:(int)processingBlockSizeInFrames {
-    [_audioController performSynchronousMessageExchangeWithHandler:&setProcessingBlockSize parameter1:processingBlockSizeInFrames parameter2:0 parameter3:0 ioOpaquePtr:self];
+    [_audioController performSynchronousMessageExchangeWithHandler:setProcessingBlockSize
+                                                     userInfoBytes:&(struct setProcessingBlockSize_t){ .THIS = self, .size = processingBlockSizeInFrames }
+                                                            length:sizeof(struct setProcessingBlockSize_t)];
 }
 
-static void filterCallback(id filter, void *source, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
+static void filterCallback(id filter, AEAudioController *audioController, void *source, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
     TPBlockLevelFilter *THIS = (TPBlockLevelFilter*)filter;
     
     BOOL inputIsStereo = audio->mNumberBuffers == 2 || audio->mBuffers[0].mNumberChannels == 2;

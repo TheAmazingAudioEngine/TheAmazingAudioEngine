@@ -276,14 +276,16 @@ static void filterBlock(TPBlockLevelFilter      *filter,
     return self;
 }
 
-static long setFilter(AEAudioController *audioController, long *ioParameter1, long *ioParameter2, long *ioParameter3, void *ioOpaquePtr) {
-    TPConvolutionFilter *THIS = (TPConvolutionFilter*)ioOpaquePtr;
-    THIS->_filterChannels = *ioParameter1;
-    THIS->_filterLength = *ioParameter2;
-    for ( int i=0; i<*ioParameter1; i++ ) {
-        THIS->_filterData[i] = ((float**)*ioParameter3)[i];
+struct setFilter_t { TPConvolutionFilter *THIS; int filterChannels; int filterLength; float** filterData; };
+static void setFilter(AEAudioController *audioController, void *userInfo, int length) {
+    struct setFilter_t *arg = userInfo;
+    
+    TPConvolutionFilter *THIS = arg->THIS;
+    THIS->_filterChannels = arg->filterChannels;
+    THIS->_filterLength = arg->filterLength;
+    for ( int i=0; i<THIS->_filterChannels; i++ ) {
+        THIS->_filterData[i] = arg->filterData[i];
     }
-    return 0;
 }
 
 - (void)setFilter:(NSArray*)filter {
@@ -296,7 +298,13 @@ static long setFilter(AEAudioController *audioController, long *ioParameter1, lo
         filterData[i] = (float*)[[filter objectAtIndex:i] bytes];
     }
     
-    [_audioController performSynchronousMessageExchangeWithHandler:setFilter parameter1:filterChannels parameter2:filterLength parameter3:(long)filterData ioOpaquePtr:self];
+    [_audioController performSynchronousMessageExchangeWithHandler:setFilter
+                                                     userInfoBytes:&(struct setFilter_t) {
+                                                         .THIS = self,
+                                                         .filterChannels = filterChannels,
+                                                         .filterLength = filterLength,
+                                                         .filterData = filterData }
+                                                            length:sizeof(struct setFilter_t)];
     
     [_filter release];
     _filter = filter;
