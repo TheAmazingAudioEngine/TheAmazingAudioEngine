@@ -12,7 +12,7 @@
 #import "TPCircularBuffer+AudioBufferList.h"
 #import <Accelerate/Accelerate.h>
 
-const int kBufferSize = 65536;
+const int kBufferSize = 176400;
 const UInt32 kNoValue = INT_MAX;
 
 typedef enum {
@@ -242,9 +242,9 @@ void AELimiterDequeue(AELimiter *THIS, float** buffers, int numberOfBuffers, UIn
     }
 }
 
-UInt32 AELimiterFillCount(AELimiter *THIS) {
+UInt32 AELimiterFillCount(AELimiter *THIS, AudioTimeStamp *timestamp) {
     int fillCount = 0;
-    AudioBufferList *bufferList = TPCircularBufferNextBufferList(&THIS->_buffer, NULL);
+    AudioBufferList *bufferList = TPCircularBufferNextBufferList(&THIS->_buffer, timestamp);
     while ( bufferList ) {
         fillCount += bufferList->mBuffers[0].mDataByteSize / sizeof(float);
         bufferList = TPCircularBufferNextBufferListAfter(&THIS->_buffer, bufferList, NULL);
@@ -254,9 +254,11 @@ UInt32 AELimiterFillCount(AELimiter *THIS) {
 
 void AELimiterReset(AELimiter *THIS) {
     THIS->_gain = 1.0;
+    THIS->_state = kStateIdle;
     THIS->_framesSinceLastTrigger = kNoValue;
     THIS->_framesToNextTrigger = kNoValue;
-    
+    THIS->_triggerValue = 0;
+    TPCircularBufferClear(&THIS->_buffer);
 }
 
 static inline void advanceTime(AELimiter *THIS, UInt32 frames) {

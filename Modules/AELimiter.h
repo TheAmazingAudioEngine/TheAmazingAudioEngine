@@ -13,7 +13,7 @@
 
 BOOL AELimiterEnqueue(AELimiter *limiter, float** buffers, int numberOfBuffers, UInt32 length, AudioTimeStamp *timestamp);
 void AELimiterDequeue(AELimiter *limiter, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp);
-UInt32 AELimiterFillCount(AELimiter *limiter);
+UInt32 AELimiterFillCount(AELimiter *limiter, AudioTimeStamp *timestamp);
 
 void AELimiterReset(AELimiter *limiter);
 
