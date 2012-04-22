@@ -131,15 +131,15 @@ static __inline__ __attribute__((always_inline)) void TPCircularBufferProduce(TP
  * @param buffer Circular buffer
  * @param src Source buffer
  * @param len Number of bytes in source buffer
- * @return Number of bytes written (may be less than 'len')
+ * @return true if bytes copied, false if there was insufficient space
  */
-static __inline__ __attribute__((always_inline)) int TPCircularBufferProduceBytes(TPCircularBuffer *buffer, const void* src, int32_t len) {
+static __inline__ __attribute__((always_inline)) bool TPCircularBufferProduceBytes(TPCircularBuffer *buffer, const void* src, int32_t len) {
     int32_t space;
     void *ptr = TPCircularBufferHead(buffer, &space);
-    int copied = len > space ? space : len;
-    memcpy(ptr, src, copied);
-    TPCircularBufferProduce(buffer, copied);
-    return copied;
+    if ( space < len ) return false;
+    memcpy(ptr, src, len);
+    TPCircularBufferProduce(buffer, len);
+    return true;
 }
 
 #ifdef __cplusplus
