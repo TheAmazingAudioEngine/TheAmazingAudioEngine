@@ -9,10 +9,10 @@
 #import "TPViewController.h"
 #import <TheAmazingAudioEngine/TheAmazingAudioEngine.h>
 #import "TPOscilloscopeLayer.h"
-#import "TPConvolutionFilter.h"
 #import "TPDoubleSpeedFilter.h"
-#import "AEAudioPlaythroughChannel.h"
-#import "AEAudioLimiterFilter.h"
+#import "AEPlaythroughChannel.h"
+#import "AEExpanderFilter.h"
+#import "AELimiterFilter.h"
 #import <QuartzCore/QuartzCore.h>
 
 #define kAuxiliaryViewTag 251
@@ -27,10 +27,10 @@
 @property (nonatomic, retain) AEAudioFilePlayer *loop2;
 @property (nonatomic, retain) AEAudioFilePlayer *loop3;
 @property (nonatomic, retain) AEAudioFilePlayer *sample1;
-@property (nonatomic, retain) TPConvolutionFilter *filter;
+@property (nonatomic, retain) AEPlaythroughChannel *playthrough;
+@property (nonatomic, retain) AELimiterFilter *limiter;
+@property (nonatomic, retain) AEExpanderFilter *expander;
 @property (nonatomic, retain) TPDoubleSpeedFilter *doubleSpeedFilter;
-@property (nonatomic, retain) AEAudioPlaythroughChannel *playthrough;
-@property (nonatomic, retain) AEAudioLimiterFilter *limiter;
 @property (nonatomic, retain) TPOscilloscopeLayer *outputOscilloscope;
 @property (nonatomic, retain) TPOscilloscopeLayer *inputOscilloscope;
 @property (nonatomic, retain) UILabel *channelCountLabel;
@@ -42,10 +42,10 @@
             loop2=_loop2,
             loop3=_loop3,
             sample1=_sample1,
-            filter=_filter,
-            doubleSpeedFilter=_doubleSpeedFilter,
             playthrough=_playthrough,
             limiter=_limiter,
+            expander=_expander,
+            doubleSpeedFilter=_doubleSpeedFilter,
             outputOscilloscope=_outputOscilloscope,
             inputOscilloscope=_inputOscilloscope,
             channelCountLabel = _channelCountLabel;
@@ -115,14 +115,14 @@
         self.limiter = nil;
     }
     
+    if ( _expander ) {
+        [_audioController removeFilter:_expander];
+        self.expander = nil;
+    }
+    
     if ( _doubleSpeedFilter ) {
         [_audioController setVariableSpeedFilter:nil];
         self.doubleSpeedFilter = nil;
-    }
-    
-    if ( _filter ) {
-        [_audioController removeFilter:_filter];
-        self.filter = nil;
     }
     
     self.outputOscilloscope = nil;
@@ -270,9 +270,9 @@
                     break;
                 }
                 case 1: {
-                    cell.textLabel.text = @"Reverb";
-                    ((UISwitch*)cell.accessoryView).on = _filter != nil;
-                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(filterSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                    cell.textLabel.text = @"Expander";
+                    ((UISwitch*)cell.accessoryView).on = _expander != nil;
+                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(expanderSwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
                 }
                 case 2: {
@@ -349,7 +349,7 @@
 
 - (void)playthroughSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
-        self.playthrough = [[[AEAudioPlaythroughChannel alloc] initWithAudioController:_audioController] autorelease];
+        self.playthrough = [[[AEPlaythroughChannel alloc] initWithAudioController:_audioController] autorelease];
         [_audioController addInputReceiver:_playthrough];
         [_audioController addChannels:[NSArray arrayWithObject:_playthrough]];
     } else {
@@ -361,7 +361,7 @@
 
 - (void)limiterSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
-        self.limiter = [[[AEAudioLimiterFilter alloc] init] autorelease];
+        self.limiter = [[[AELimiterFilter alloc] init] autorelease];
         _limiter.level = INT16_MAX * 0.1;
         [_audioController addFilter:_limiter];
     } else {
@@ -370,14 +370,13 @@
     }
 }
 
-- (void)filterSwitchChanged:(UISwitch*)sender {
+- (void)expanderSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
-        self.filter = [[[TPConvolutionFilter alloc] initWithAudioController:_audioController filter:[TPConvolutionFilter filterFromAudioFile:[[NSBundle mainBundle] URLForResource:@"Factory Hall" withExtension:@"wav"] scale:5.0 error:NULL]] autorelease];
-        _filter.stereo = NO;
-        [_audioController addFilter:_filter];
+        self.expander = [[[AEExpanderFilter alloc] init] autorelease];
+        [_audioController addFilter:_expander];
     } else {
-        [_audioController removeFilter:_filter];
-        self.filter = nil;
+        [_audioController removeFilter:_expander];
+        self.expander = nil;
     }
 }
 

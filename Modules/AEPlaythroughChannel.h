@@ -1,5 +1,5 @@
 //
-//  AEAudioPlaythroughChannel.h
+//  AEPlaythroughChannel.h
 //  TheAmazingAudioEngine
 //
 //  Created by Michael Tyson on 21/04/2012.
@@ -9,6 +9,6 @@
 #import <Foundation/Foundation.h>
 #import "TheAmazingAudioEngine.h"
 
-@interface AEAudioPlaythroughChannel : NSObject <AEAudioPlayable, AEAudioReceiver>
+@interface AEPlaythroughChannel : NSObject <AEAudioPlayable, AEAudioReceiver>
 - (id)initWithAudioController:(AEAudioController*)audioController;
 @end

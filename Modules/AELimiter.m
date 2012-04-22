@@ -1,12 +1,12 @@
 //
-//  AEAudioLimiter.m
+//  AELimiter.m
 //  The Amazing Audio Engine
 //
 //  Created by Michael Tyson on 20/04/2012.
 //  Copyright (c) 2012 A Tasty Pixel. All rights reserved.
 //
 
-#import "AEAudioLimiter.h"
+#import "AELimiter.h"
 #import "TheAmazingAudioEngine.h"
 #import "TPCircularBuffer.h"
 #import "TPCircularBuffer+AudioBufferList.h"
@@ -29,7 +29,7 @@ typedef struct {
 
 static inline int min(int a, int b) { return a>b ? b : a; }
 
-@interface AEAudioLimiter () {
+@interface AELimiter () {
     TPCircularBuffer _buffer;
     float            _gain;
     AELimiterState   _state;
@@ -38,12 +38,12 @@ static inline int min(int a, int b) { return a>b ? b : a; }
     float            _triggerValue;
     AudioStreamBasicDescription _audioDescription;
 }
-static inline void advanceTime(AEAudioLimiter *THIS, UInt32 frames);
-static element_t findMaxValueInRange(AEAudioLimiter *THIS, AudioBufferList *dequeuedBufferList, int dequeuedBufferListOffset, NSRange range);
-static element_t findNextTriggerValueInRange(AEAudioLimiter *THIS, AudioBufferList *dequeuedBufferList, int dequeuedBufferListOffset, NSRange range);
+static inline void advanceTime(AELimiter *THIS, UInt32 frames);
+static element_t findMaxValueInRange(AELimiter *THIS, AudioBufferList *dequeuedBufferList, int dequeuedBufferListOffset, NSRange range);
+static element_t findNextTriggerValueInRange(AELimiter *THIS, AudioBufferList *dequeuedBufferList, int dequeuedBufferListOffset, NSRange range);
 @end
 
-@implementation AEAudioLimiter
+@implementation AELimiter
 @synthesize hold = _hold, attack = _attack, decay = _decay, level = _level;
 
 - (id)init {
@@ -70,7 +70,7 @@ static element_t findNextTriggerValueInRange(AEAudioLimiter *THIS, AudioBufferLi
     return self;
 }
 
-BOOL AEAudioLimiterEnqueue(AEAudioLimiter *THIS, float** buffers, int numberOfBuffers, UInt32 length, AudioTimeStamp *timestamp) {
+BOOL AELimiterEnqueue(AELimiter *THIS, float** buffers, int numberOfBuffers, UInt32 length, AudioTimeStamp *timestamp) {
     assert(numberOfBuffers <= 2);
     
     char audioBufferListBytes[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
@@ -85,9 +85,9 @@ BOOL AEAudioLimiterEnqueue(AEAudioLimiter *THIS, float** buffers, int numberOfBu
     return TPCircularBufferCopyAudioBufferList(&THIS->_buffer, bufferList, timestamp);
 }
 
-void AEAudioLimiterDequeue(AEAudioLimiter *THIS, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
+void AELimiterDequeue(AELimiter *THIS, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
     assert(numberOfBuffers <= 2);
-    *ioLength = min(*ioLength, AEAudioLimiterFillCount(THIS));
+    *ioLength = min(*ioLength, AELimiterFillCount(THIS));
     
     // Dequeue the audio
     char audioBufferListBytes[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
@@ -242,7 +242,7 @@ void AEAudioLimiterDequeue(AEAudioLimiter *THIS, float** buffers, int numberOfBu
     }
 }
 
-UInt32 AEAudioLimiterFillCount(AEAudioLimiter *THIS) {
+UInt32 AELimiterFillCount(AELimiter *THIS) {
     int fillCount = 0;
     AudioBufferList *bufferList = TPCircularBufferNextBufferList(&THIS->_buffer, NULL);
     while ( bufferList ) {
@@ -252,14 +252,14 @@ UInt32 AEAudioLimiterFillCount(AEAudioLimiter *THIS) {
     return MAX(0, fillCount - (int)THIS->_attack);
 }
 
-void AEAudioLimiterReset(AEAudioLimiter *THIS) {
+void AELimiterReset(AELimiter *THIS) {
     THIS->_gain = 1.0;
     THIS->_framesSinceLastTrigger = kNoValue;
     THIS->_framesToNextTrigger = kNoValue;
     
 }
 
-static inline void advanceTime(AEAudioLimiter *THIS, UInt32 frames) {
+static inline void advanceTime(AELimiter *THIS, UInt32 frames) {
     if ( THIS->_framesSinceLastTrigger != kNoValue ) {
         THIS->_framesSinceLastTrigger += frames;
         if ( THIS->_framesSinceLastTrigger > THIS->_hold+THIS->_decay ) {
@@ -276,7 +276,7 @@ static inline void advanceTime(AEAudioLimiter *THIS, UInt32 frames) {
 }
 
 
-static element_t findNextTriggerValueInRange(AEAudioLimiter *THIS, AudioBufferList *dequeuedBufferList, int dequeuedBufferListOffset, NSRange range) {
+static element_t findNextTriggerValueInRange(AELimiter *THIS, AudioBufferList *dequeuedBufferList, int dequeuedBufferListOffset, NSRange range) {
     int framesSeen = 0;
     AudioBufferList *buffer = dequeuedBufferList;
     while ( framesSeen < range.location+range.length && buffer ) {
@@ -310,7 +310,7 @@ static element_t findNextTriggerValueInRange(AEAudioLimiter *THIS, AudioBufferLi
     return (element_t) {0, 0};
 }
 
-static element_t findMaxValueInRange(AEAudioLimiter *THIS, AudioBufferList *dequeuedBufferList, int dequeuedBufferListOffset, NSRange range) {
+static element_t findMaxValueInRange(AELimiter *THIS, AudioBufferList *dequeuedBufferList, int dequeuedBufferListOffset, NSRange range) {
     vDSP_Length index = 0;
     float max = 0.0;
     int framesSeen = 0;

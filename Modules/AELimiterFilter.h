@@ -1,5 +1,5 @@
 //
-//  AEAudioLimiterFilter.h
+//  AELimiterFilter.h
 //  TheAmazingAudioEngine
 //
 //  Created by Michael Tyson on 21/04/2012.
@@ -9,7 +9,7 @@
 #import <Foundation/Foundation.h>
 #import "TheAmazingAudioEngine.h"
 
-@interface AEAudioLimiterFilter : NSObject <AEAudioFilter>
+@interface AELimiterFilter : NSObject <AEAudioFilter>
 @property (nonatomic, assign) UInt32 hold;
 @property (nonatomic, assign) UInt32 attack;
 @property (nonatomic, assign) UInt32 decay;

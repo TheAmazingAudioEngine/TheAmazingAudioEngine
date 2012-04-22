@@ -1,5 +1,5 @@
 //
-//  AEAudioMixerBuffer.h
+//  AEMixerBuffer.h
 //  The Amazing Audio Engine
 //
 //  Created by Michael Tyson on 12/04/2012.
@@ -10,24 +10,24 @@
 #import <AudioToolbox/AudioToolbox.h>
 
 /*!
- * A source identifier, for use with [AEAudioMixerBufferEnqueue](@ref AEAudioMixerBuffer::AEAudioMixerBufferEnqueue).
+ * A source identifier, for use with [AEMixerBufferEnqueue](@ref AEMixerBuffer::AEMixerBufferEnqueue).
  *
  * This can be anything you like, as long as it is not NULL, and is unique to each source.
  */
-typedef void* AEAudioMixerBufferSource;
+typedef void* AEMixerBufferSource;
 
 /*!
  * Source render callback
  *
- *      This is called by AEAudioMixerBuffer when audio for the source is required, if you have provided callbacks
- *      for the source via [AEAudioMixerBufferSetSourceCallbacks](@ref AEAudioMixerBuffer::AEAudioMixerBufferSetSourceCallbacks).
+ *      This is called by AEMixerBuffer when audio for the source is required, if you have provided callbacks
+ *      for the source via [AEMixerBufferSetSourceCallbacks](@ref AEMixerBuffer::AEMixerBufferSetSourceCallbacks).
  *
  * @param source            The source. This can be anything you like, as long as it is not NULL, and is unique to each source.
  * @param frames            The number of frames required.
  * @param audio             The audio buffer list - audio should be copied into the provided buffers. May be NULL, in which case your render callback should simply discard the requested audio.
- * @param userInfo          The opaque pointer passed to [AEAudioMixerBufferSetSourceCallbacks](@ref AEAudioMixerBuffer::AEAudioMixerBufferSetSourceCallbacks).
+ * @param userInfo          The opaque pointer passed to [AEMixerBufferSetSourceCallbacks](@ref AEMixerBuffer::AEMixerBufferSetSourceCallbacks).
  */
-typedef void (*AEAudioMixerBufferSourceRenderCallback) (AEAudioMixerBufferSource  source,
+typedef void (*AEMixerBufferSourceRenderCallback) (AEMixerBufferSource  source,
                                                         UInt32                    frames,
                                                         AudioBufferList          *audio,
                                                         void                     *userInfo);
@@ -35,16 +35,16 @@ typedef void (*AEAudioMixerBufferSourceRenderCallback) (AEAudioMixerBufferSource
 /*!
  * Source peek callback
  *
- *      This is called by AEAudioMixerBuffer when it needs to know the status of the source, if you have
+ *      This is called by AEMixerBuffer when it needs to know the status of the source, if you have
  *      provided callbacks for the source via
- *      [AEAudioMixerBufferSetSourceCallbacks](@ref AEAudioMixerBuffer::AEAudioMixerBufferSetSourceCallbacks).
+ *      [AEMixerBufferSetSourceCallbacks](@ref AEMixerBuffer::AEMixerBufferSetSourceCallbacks).
  *
  * @param source            The source. This can be anything you like, as long as it is not NULL, and is unique to each source.
  * @param outTimestamp      On output, the timestamp of the next audio from the source.
- * @param userInfo          The opaque pointer passed to [AEAudioMixerBufferSetSourceCallbacks](@ref AEAudioMixerBuffer::AEAudioMixerBufferSetSourceCallbacks).
+ * @param userInfo          The opaque pointer passed to [AEMixerBufferSetSourceCallbacks](@ref AEMixerBuffer::AEMixerBufferSetSourceCallbacks).
  * @return The number of available frames
  */
-typedef UInt32 (*AEAudioMixerBufferSourcePeekCallback) (AEAudioMixerBufferSource  source,
+typedef UInt32 (*AEMixerBufferSourcePeekCallback) (AEMixerBufferSource  source,
                                                         uint64_t                 *outTimestamp,
                                                         void                     *userInfo);
 
@@ -56,14 +56,14 @@ typedef UInt32 (*AEAudioMixerBufferSourcePeekCallback) (AEAudioMixerBufferSource
  *  to each audio packet from each source to synchronise all sources together.
  *
  *  To use it, create an instance, passing in the AudioStreamBasicDescription of your audio,
- *  then provide data for each source by calling @link AEAudioMixerBufferEnqueue @endlink. Or,
- *  provide callbacks for one or more sources with @link AEAudioMixerBufferSetSourceCallbacks @endlink,
+ *  then provide data for each source by calling @link AEMixerBufferEnqueue @endlink. Or,
+ *  provide callbacks for one or more sources with @link AEMixerBufferSetSourceCallbacks @endlink,
  *  which will cause this class to call your callbacks when data is needed.
  *
- *  Then, call @link AEAudioMixerBufferDequeue @endlink to consume mixed and synchronised audio
+ *  Then, call @link AEMixerBufferDequeue @endlink to consume mixed and synchronised audio
  *  ready for playback, recording, etc.
  */
-@interface AEAudioMixerBuffer : NSObject
+@interface AEMixerBuffer : NSObject
 
 /*!
  * Initialiser
@@ -76,7 +76,7 @@ typedef UInt32 (*AEAudioMixerBufferSourcePeekCallback) (AEAudioMixerBufferSource
  * Enqueue audio
  *
  *  Feed the buffer with audio blocks. Identify each source via the `source` parameter. You
- *  may use any identifier you like - pointers, numbers, etc (just cast to AEAudioMixerBufferSource).
+ *  may use any identifier you like - pointers, numbers, etc (just cast to AEMixerBufferSource).
  *
  *  When you enqueue audio from a new source (that is, the `source` value is one that hasn't been
  *  seen before, this class will automatically reconfigure itself to start mixing the new source.
@@ -90,21 +90,21 @@ typedef UInt32 (*AEAudioMixerBufferSourcePeekCallback) (AEAudioMixerBufferSource
  * @param lengthInFrames The length of audio.
  * @param hostTime       The timestamp, in host ticks, associated with the audio.
  */
-void AEAudioMixerBufferEnqueue(AEAudioMixerBuffer *mixerBuffer, AEAudioMixerBufferSource source, AudioBufferList *audio, UInt32 lengthInFrames, UInt64 hostTime);
+void AEMixerBufferEnqueue(AEMixerBuffer *mixerBuffer, AEMixerBufferSource source, AudioBufferList *audio, UInt32 lengthInFrames, UInt64 hostTime);
 
 /*!
  * Assign callbacks for a source
  *
- *  Rather than providing audio for a source using @link AEAudioMixerBufferEnqueue @endlink, you may
+ *  Rather than providing audio for a source using @link AEMixerBufferEnqueue @endlink, you may
  *  provide callbacks which will be called by the mixer as required. You must either provide audio via
- *  @link AEAudioMixerBufferEnqueue @endlink, or via this method, but never both.
+ *  @link AEMixerBufferEnqueue @endlink, or via this method, but never both.
  *
  * @param renderCallback    The render callback, used to receive audio.
  * @param peekCallback      The peek callback, used to get info about the source's buffer status.
  * @param userInfo          An opaque pointer that will be provided to the callbacks.
  * @param source            The audio source.
  */
-- (void)setRenderCallback:(AEAudioMixerBufferSourceRenderCallback)renderCallback peekCallback:(AEAudioMixerBufferSourcePeekCallback)peekCallback userInfo:(void *)userInfo forSource:(AEAudioMixerBufferSource)source;
+- (void)setRenderCallback:(AEMixerBufferSourceRenderCallback)renderCallback peekCallback:(AEMixerBufferSourcePeekCallback)peekCallback userInfo:(void *)userInfo forSource:(AEMixerBufferSource)source;
 
 /*!
  * Dequeue audio
@@ -119,7 +119,7 @@ void AEAudioMixerBufferEnqueue(AEAudioMixerBuffer *mixerBuffer, AEAudioMixerBuff
  * @param ioLengthInFrames  On input, the number of frames of audio to dequeue. On output, 
  *                          the number of frames returned.
  */
-void AEAudioMixerBufferDequeue(AEAudioMixerBuffer *mixerBuffer, AudioBufferList *bufferList, UInt32 *ioLengthInFrames);
+void AEMixerBufferDequeue(AEMixerBuffer *mixerBuffer, AudioBufferList *bufferList, UInt32 *ioLengthInFrames);
 
 /*!
  * Dequeue a single source
@@ -128,7 +128,7 @@ void AEAudioMixerBufferDequeue(AEAudioMixerBuffer *mixerBuffer, AudioBufferList 
  *  a number of sources, rather than mixing the sources together also, then this function allows you
  *  to access the synchronized audio for each source.
  *
- *  Do not use this function together with AEAudioMixerBufferDequeue.
+ *  Do not use this function together with AEMixerBufferDequeue.
  *
  * @param mixerBuffer       The mixer buffer.
  * @param source            The audio source.
@@ -137,7 +137,7 @@ void AEAudioMixerBufferDequeue(AEAudioMixerBuffer *mixerBuffer, AudioBufferList 
  * @param ioLengthInFrames  On input, the number of frames of audio to dequeue. On output, 
  *                          the number of frames returned.
  */
-void AEAudioMixerBufferDequeueSingleSource(AEAudioMixerBuffer *mixerBuffer, AEAudioMixerBufferSource source, AudioBufferList *bufferList, UInt32 *ioLengthInFrames);
+void AEMixerBufferDequeueSingleSource(AEMixerBuffer *mixerBuffer, AEMixerBufferSource source, AudioBufferList *bufferList, UInt32 *ioLengthInFrames);
 
 /*!
  * Peek the audio buffer
@@ -148,32 +148,32 @@ void AEAudioMixerBufferDequeueSingleSource(AEAudioMixerBuffer *mixerBuffer, AEAu
  * @param outNextTimestamp  If not NULL, the timestamp in host ticks of the next available audio
  * @return Number of frames of available audio, in the specified audio format.
  */
-UInt32 AEAudioMixerBufferPeek(AEAudioMixerBuffer *mixerBuffer, uint64_t *outNextTimestamp);
+UInt32 AEMixerBufferPeek(AEMixerBuffer *mixerBuffer, uint64_t *outNextTimestamp);
 
 /*!
  * Set a different AudioStreamBasicDescription for a source
  */
-- (void)setAudioDescription:(AudioStreamBasicDescription*)audioDescription forSource:(AEAudioMixerBufferSource)source;
+- (void)setAudioDescription:(AudioStreamBasicDescription*)audioDescription forSource:(AEMixerBufferSource)source;
 
 /*!
  * Set volume for source
  */
-- (void)setVolume:(float)volume forSource:(AEAudioMixerBufferSource)source;
+- (void)setVolume:(float)volume forSource:(AEMixerBufferSource)source;
 
 /*!
  * Get volume for source
  */
-- (float)volumeForSource:(AEAudioMixerBufferSource)source;
+- (float)volumeForSource:(AEMixerBufferSource)source;
 
 /*!
  * Set pan for source
  */
-- (void)setPan:(float)pan forSource:(AEAudioMixerBufferSource)source;
+- (void)setPan:(float)pan forSource:(AEMixerBufferSource)source;
 
 /*!
  * Get pan for source
  */
-- (float)panForSource:(AEAudioMixerBufferSource)source;
+- (float)panForSource:(AEMixerBufferSource)source;
 
 /*!
  * Force the mixer to unregister a source
@@ -188,6 +188,6 @@ UInt32 AEAudioMixerBufferPeek(AEAudioMixerBuffer *mixerBuffer, uint64_t *outNext
  *
  * @param source            The audio source.
  */
-- (void)unregisterSource:(AEAudioMixerBufferSource)source;
+- (void)unregisterSource:(AEMixerBufferSource)source;
 
 @end

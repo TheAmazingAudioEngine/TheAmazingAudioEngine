@@ -1,24 +1,24 @@
 //
-//  AEAudioPlaythroughChannel.m
+//  AEPlaythroughChannel.m
 //  TheAmazingAudioEngine
 //
 //  Created by Michael Tyson on 21/04/2012.
 //  Copyright (c) 2012 A Tasty Pixel. All rights reserved.
 //
 
-#import "AEAudioPlaythroughChannel.h"
+#import "AEPlaythroughChannel.h"
 #import "TPCircularBuffer.h"
 #import "TPCircularBuffer+AudioBufferList.h"
 
 static const int kAudioBufferLength = 16384;
 
-@interface AEAudioPlaythroughChannel () {
+@interface AEPlaythroughChannel () {
     TPCircularBuffer _buffer;
 }
 @property (nonatomic, retain) AEAudioController *audioController;
 @end
 
-@implementation AEAudioPlaythroughChannel
+@implementation AEPlaythroughChannel
 @synthesize audioController=_audioController;
 
 - (id)initWithAudioController:(AEAudioController*)audioController {
@@ -41,7 +41,7 @@ static void inputCallback(id                        receiver,
                           UInt32                    frames,
                           AudioBufferList          *audio) {
     
-    TPCircularBufferCopyAudioBufferList(&((AEAudioPlaythroughChannel*)receiver)->_buffer, 
+    TPCircularBufferCopyAudioBufferList(&((AEPlaythroughChannel*)receiver)->_buffer, 
                                         audio, 
                                         time);
 }
@@ -56,7 +56,7 @@ static OSStatus renderCallback(id                        channel,
                                UInt32                    frames,
                                AudioBufferList          *audio) {
     
-    TPCircularBufferConsumeBufferListFrames(&((AEAudioPlaythroughChannel*)channel)->_buffer, 
+    TPCircularBufferConsumeBufferListFrames(&((AEPlaythroughChannel*)channel)->_buffer, 
                                             &frames, 
                                             audio, 
                                             NULL, 

@@ -1,30 +1,30 @@
 //
-//  AEAudioLimiterFilter.m
+//  AELimiterFilter.m
 //  TheAmazingAudioEngine
 //
 //  Created by Michael Tyson on 21/04/2012.
 //  Copyright (c) 2012 A Tasty Pixel. All rights reserved.
 //
 
-#import "AEAudioLimiterFilter.h"
-#import "AEAudioLimiter.h"
+#import "AELimiterFilter.h"
+#import "AELimiter.h"
 #import <Accelerate/Accelerate.h>
 
 const int kScratchBufferLength = 8192;
 
-@interface AEAudioLimiterFilter () {
-    AEAudioLimiter *_limiter;
+@interface AELimiterFilter () {
+    AELimiter *_limiter;
     float *_scratchBuffer[2];
 }
 @end
 
-@implementation AEAudioLimiterFilter
+@implementation AELimiterFilter
 @synthesize hold = _hold, attack = _attack, decay = _decay, level = _level;
 
 - (id)init {
     if ( !(self = [super init]) ) return nil;
     
-    _limiter = [[AEAudioLimiter alloc] init];
+    _limiter = [[AELimiter alloc] init];
     _hold = _limiter.hold;
     _attack = _limiter.attack;
     _decay = _limiter.decay;
@@ -66,7 +66,7 @@ static void filterCallback(id                        receiver,
                            AudioBufferList          *audio) {
     
     assert(frames < kScratchBufferLength);
-    AEAudioLimiterFilter *THIS = receiver;
+    AELimiterFilter *THIS = receiver;
     
     // Copy buffer into floating point scratch buffer
     vDSP_vflt16(audio->mBuffers[0].mData, audio->mBuffers[0].mNumberChannels, THIS->_scratchBuffer[0], 1, frames);
@@ -76,8 +76,8 @@ static void filterCallback(id                        receiver,
         vDSP_vflt16(audio->mBuffers[1].mData, 1, THIS->_scratchBuffer[1], 1, frames);
     }
     
-    AEAudioLimiterEnqueue(THIS->_limiter, THIS->_scratchBuffer, MAX(audio->mBuffers[0].mNumberChannels, audio->mNumberBuffers), frames);
-    AEAudioLimiterDequeue(THIS->_limiter, THIS->_scratchBuffer, MAX(audio->mBuffers[0].mNumberChannels, audio->mNumberBuffers), &frames);
+    AELimiterEnqueue(THIS->_limiter, THIS->_scratchBuffer, MAX(audio->mBuffers[0].mNumberChannels, audio->mNumberBuffers), frames, NULL);
+    AELimiterDequeue(THIS->_limiter, THIS->_scratchBuffer, MAX(audio->mBuffers[0].mNumberChannels, audio->mNumberBuffers), &frames, NULL);
     
     if ( frames > 0 ) {
         // Convert back to buffer
