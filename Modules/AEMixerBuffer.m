@@ -191,7 +191,7 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
     
     // If buffer list is provided with NULL mData pointers, use our own scratch buffer
     if ( bufferList && !bufferList->mBuffers[0].mData ) {
-        assert(*ioLengthInFrames * THIS->_clientFormat.mBytesPerFrame * bufferList->mNumberBuffers <= kScratchBufferLength);
+        *ioLengthInFrames = MIN(*ioLengthInFrames, (kScratchBufferLength / THIS->_clientFormat.mBytesPerFrame) / bufferList->mNumberBuffers);
         for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
             bufferList->mBuffers[i].mData = THIS->_scratchBuffer + i*(kScratchBufferLength/bufferList->mNumberBuffers);
             bufferList->mBuffers[i].mDataByteSize = kScratchBufferLength/bufferList->mNumberBuffers;
@@ -420,6 +420,7 @@ UInt32 AEMixerBufferPeek(AEMixerBuffer *THIS, uint64_t *outNextTimestamp) {
     // and address sources that are behind the timeline
     uint64_t earliestEndTimestamp = UINT64_MAX;
     uint64_t earliestStartTimestamp = UINT64_MAX;
+    UInt32 minFrameCount = UINT32_MAX;
     for ( int i=0; i<kMaxSources; i++ ) {
         if ( THIS->_table[i].source ) {
             source_t *source = &THIS->_table[i];
@@ -446,8 +447,8 @@ UInt32 AEMixerBufferPeek(AEMixerBuffer *THIS, uint64_t *outNextTimestamp) {
                 if ( outNextTimestamp ) *outNextTimestamp = 0;
                 return 0;
             } else {
-                if ( !now ) now = mach_absolute_time();
-                source->lastAudioTimestamp = now;
+                if ( frameCount < minFrameCount ) minFrameCount = frameCount;
+                source->lastAudioTimestamp = timestamp ? timestamp : (now ? now : (now=mach_absolute_time()));
             }
             
             uint64_t endTimestamp = timestamp + (((double)frameCount / source->audioDescription.mSampleRate) * __secondsToHostTicks);
@@ -464,6 +465,7 @@ UInt32 AEMixerBufferPeek(AEMixerBuffer *THIS, uint64_t *outNextTimestamp) {
     }
     
     UInt32 frameCount = round((earliestEndTimestamp - earliestStartTimestamp) * __hostTicksToSeconds * THIS->_clientFormat.mSampleRate);
+    if ( frameCount > minFrameCount ) frameCount = minFrameCount;
     
     if ( outNextTimestamp ) *outNextTimestamp = earliestStartTimestamp;
     return frameCount;

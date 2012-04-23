@@ -87,7 +87,7 @@ BOOL AELimiterEnqueue(AELimiter *THIS, float** buffers, int numberOfBuffers, UIn
 
 void AELimiterDequeue(AELimiter *THIS, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
     assert(numberOfBuffers <= 2);
-    *ioLength = min(*ioLength, AELimiterFillCount(THIS));
+    *ioLength = min(*ioLength, AELimiterFillCount(THIS, NULL));
     
     // Dequeue the audio
     char audioBufferListBytes[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
