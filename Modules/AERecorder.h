@@ -9,10 +9,8 @@
 #import <Foundation/Foundation.h>
 #import "TheAmazingAudioEngine.h"
 
-extern NSString * AEAudioFileWriterDidEncounterErrorNotification;
-
-extern NSString * kAEAudioFileWriterErrorKey;
-extern NSString * AEAudioFileWriterErrorDomain;
+extern NSString * AERecorderDidEncounterErrorNotification;
+extern NSString * kAERecorderErrorKey;
 
 @interface AERecorder : NSObject <AEAudioReceiver>
 + (BOOL)AACEncodingAvailable;

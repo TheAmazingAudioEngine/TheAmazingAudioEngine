@@ -12,6 +12,9 @@
 
 #define kProcessChunkSize 8192
 
+NSString * AERecorderDidEncounterErrorNotification = @"AERecorderDidEncounterErrorNotification";
+NSString * kAERecorderErrorKey = @"error";
+
 @interface AERecorder () {
     BOOL _recording;
     AudioBufferList *_buffer;
@@ -31,7 +34,7 @@
 - (id)initWithAudioController:(AEAudioController*)audioController {
     if ( !(self = [super init]) ) return nil;
     self.mixer = [[[AEMixerBuffer alloc] initWithAudioDescription:*audioController.audioDescription] autorelease];
-    self.writer = [[[AEAudioFileWriter alloc] initWithAudioDescription:*audioController.audioDescription audioController:audioController] autorelease];
+    self.writer = [[[AEAudioFileWriter alloc] initWithAudioDescription:*audioController.audioDescription] autorelease];
     if ( audioController.inputAudioDescription->mChannelsPerFrame != audioController.audioDescription->mChannelsPerFrame ) {
         [_mixer setAudioDescription:AEAudioControllerInputAudioDescription(audioController) forSource:AEAudioSourceInput];
     }
@@ -62,6 +65,18 @@
     return _writer.path;
 }
 
+struct reportError_t { AERecorder *THIS; OSStatus result; };
+static void reportError(AEAudioController *audioController, void *userInfo, int length) {
+    struct reportError_t *arg = userInfo;
+    NSError *error = [NSError errorWithDomain:NSOSStatusErrorDomain 
+                                         code:arg->result
+                                     userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Error while saving audio: %@", @""), [error localizedDescription]]
+                                                                          forKey:NSLocalizedDescriptionKey]];
+    [[NSNotificationCenter defaultCenter] postNotificationName:AERecorderDidEncounterErrorNotification
+                                                        object:arg->THIS
+                                                      userInfo:[NSDictionary dictionaryWithObject:error forKey:kAERecorderErrorKey]];
+}
+
 static void audioCallback(id                        receiver,
                           AEAudioController        *audioController,
                           void                     *source,
@@ -72,7 +87,6 @@ static void audioCallback(id                        receiver,
     if ( !THIS->_recording ) return;
     
     AEMixerBufferEnqueue(THIS->_mixer, source, audio, frames, time->mHostTime);
-    printf("%lu in (%p)\n", frames, source);
     
     // Let the mixer buffer provide the audio buffer
     UInt32 bufferLength = kProcessChunkSize;
@@ -82,10 +96,15 @@ static void audioCallback(id                        receiver,
     }
     
     AEMixerBufferDequeue(THIS->_mixer, THIS->_buffer, &bufferLength);
-    printf("%lu out\n", bufferLength);
     
     if ( bufferLength > 0 ) {
-        AEAudioFileWriterAddAudio(THIS->_writer, THIS->_buffer, bufferLength);
+        OSStatus status = AEAudioFileWriterAddAudio(THIS->_writer, THIS->_buffer, bufferLength);
+        if ( status != noErr ) {
+            AEAudioControllerSendAsynchronousMessageToMainThread(audioController, 
+                                                                 reportError, 
+                                                                 &(struct reportError_t) { .THIS = THIS, .result = status }, 
+                                                                 sizeof(struct reportError_t));
+        }
     }
 }
 

@@ -9,4 +9,5 @@
 #import "AEAudioController.h"
 #import "AEAudioFileLoaderOperation.h"
 #import "AEAudioFilePlayer.h"
+#import "AEAudioFileWriter.h"
 #import "AEUtilities.h"

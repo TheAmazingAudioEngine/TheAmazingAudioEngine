@@ -9,8 +9,6 @@
 #import "AEAudioFileWriter.h"
 #import "TheAmazingAudioEngine.h"
 
-NSString * AEAudioFileWriterDidEncounterErrorNotification = @"AEAudioFileWriterDidEncounterErrorNotification";
-NSString * kAEAudioFileWriterErrorKey = @"error";
 NSString * AEAudioFileWriterErrorDomain = @"com.theamazingaudioengine.AEAudioFileWriterErrorDomain";
 
 #define checkResult(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/'),__LINE__))
@@ -29,12 +27,11 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     AudioStreamBasicDescription _audioDescription;
 }
 
-@property (nonatomic, retain) AEAudioController *audioController;
 @property (nonatomic, retain, readwrite) NSString *path;
 @end
 
 @implementation AEAudioFileWriter
-@synthesize path = _path, audioController = _audioController;
+@synthesize path = _path;
 
 + (BOOL)AACEncodingAvailable {
 #if TARGET_IPHONE_SIMULATOR
@@ -77,9 +74,8 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 #endif
 }
 
-- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription audioController:(AEAudioController *)audioController {
+- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription {
     if ( !(self = [super init]) ) return nil;
-    self.audioController = audioController;
     _audioDescription = audioDescription;
     return self;
 }
@@ -88,7 +84,6 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     if ( _writing ) {
         [self finishWriting];
     }
-    self.audioController = nil;
     self.path = nil;
     [super dealloc];
 }
@@ -99,7 +94,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     if ( fileType == kAudioFileM4AType ) {
         if ( ![AEAudioFileWriter AACEncodingAvailable] ) {
             if ( error ) *error = [NSError errorWithDomain:AEAudioFileWriterErrorDomain 
-                                                      code:AEAudioFileWriterFormatError 
+                                                      code:kAEAudioFileWriterFormatError 
                                                   userInfo:[NSDictionary dictionaryWithObject:NSLocalizedString(@"AAC Encoding not available", @"")
                                                                                        forKey:NSLocalizedDescriptionKey]];
             
@@ -209,27 +204,8 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     }
 }
 
-struct reportError_t { AEAudioFileWriter *THIS; OSStatus error; };
-static void reportError(AEAudioController *audioController, void *userInfo, int length) {
-    struct reportError_t *arg = userInfo;
-    [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioFileWriterDidEncounterErrorNotification 
-                                                        object:arg->THIS
-                                                      userInfo:[NSDictionary dictionaryWithObject:
-                                                                [NSError errorWithDomain:NSOSStatusErrorDomain 
-                                                                                    code:arg->error 
-                                                                                userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't write to output file (error %d)", @""), arg->error] 
-                                                                                                                     forKey:NSLocalizedDescriptionKey]]
-                                                                                           forKey:kAEAudioFileWriterErrorKey]];
-}
-
-void AEAudioFileWriterAddAudio(AEAudioFileWriter* THIS, AudioBufferList *bufferList, UInt32 lengthInFrames) {
-    OSStatus status = ExtAudioFileWriteAsync(THIS->_audioFile, lengthInFrames, bufferList);
-    if ( status != noErr ) {
-        AEAudioControllerSendAsynchronousMessageToMainThread(THIS->_audioController,
-                                                             reportError, 
-                                                             &(struct reportError_t){ .THIS = THIS, .error = status }, 
-                                                             sizeof(struct reportError_t));
-    }
+OSStatus AEAudioFileWriterAddAudio(AEAudioFileWriter* THIS, AudioBufferList *bufferList, UInt32 lengthInFrames) {
+    return ExtAudioFileWriteAsync(THIS->_audioFile, lengthInFrames, bufferList);
 }
 
 @end

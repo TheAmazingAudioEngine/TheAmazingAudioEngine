@@ -9,12 +9,10 @@
 #import <Foundation/Foundation.h>
 #import <AudioToolbox/AudioToolbox.h>
 
-extern NSString * AEAudioFileWriterDidEncounterErrorNotification;
-
-extern NSString * kAEAudioFileWriterErrorKey;
 extern NSString * AEAudioFileWriterErrorDomain;
+
 enum {
-    AEAudioFileWriterFormatError
+    kAEAudioFileWriterFormatError
 };
 
 @class AEAudioController;
@@ -22,12 +20,12 @@ enum {
 @interface AEAudioFileWriter : NSObject
 + (BOOL)AACEncodingAvailable;
 
-- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription audioController:(AEAudioController*)audioController;
+- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription;
 
 - (BOOL)beginWritingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType error:(NSError**)error;
 - (void)finishWriting;
 
-void AEAudioFileWriterAddAudio(AEAudioFileWriter* recorder, AudioBufferList *bufferList, UInt32 lengthInFrames);
+OSStatus AEAudioFileWriterAddAudio(AEAudioFileWriter* recorder, AudioBufferList *bufferList, UInt32 lengthInFrames);
 
 @property (nonatomic, retain, readonly) NSString *path;
 @end
