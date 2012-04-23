@@ -961,7 +961,7 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController     
 
 - (void)outputAveragePowerLevel:(Float32*)averagePower peakHoldLevel:(Float32*)peakLevel;
 - (void)averagePowerLevel:(Float32*)averagePower peakHoldLevel:(Float32*)peakLevel forGroup:(AEChannelGroupRef)group;
-
+- (void)inputAveragePowerLevel:(Float32*)averagePower peakHoldLevel:(Float32*)peakLevel;
 
 ///@}
 #pragma mark - Utilities

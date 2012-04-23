@@ -34,6 +34,9 @@
 @property (nonatomic, retain) TPDoubleSpeedFilter *doubleSpeedFilter;
 @property (nonatomic, retain) TPOscilloscopeLayer *outputOscilloscope;
 @property (nonatomic, retain) TPOscilloscopeLayer *inputOscilloscope;
+@property (nonatomic, retain) CALayer *inputLevelLayer;
+@property (nonatomic, retain) CALayer *outputLevelLayer;
+@property (nonatomic, assign) NSTimer *levelsTimer;
 @property (nonatomic, retain) AERecorder *recorder;
 @property (nonatomic, retain) AEAudioFilePlayer *player;
 @property (nonatomic, retain) UILabel *channelCountLabel;
@@ -53,6 +56,9 @@
             doubleSpeedFilter=_doubleSpeedFilter,
             outputOscilloscope=_outputOscilloscope,
             inputOscilloscope=_inputOscilloscope,
+            inputLevelLayer=_inputLevelLayer,
+            outputLevelLayer=_outputLevelLayer,
+            levelsTimer=_levelsTimer,
             recorder=_recorder,
             player=_player,
             channelCountLabel = _channelCountLabel,
@@ -141,6 +147,9 @@
     
     self.outputOscilloscope = nil;
     self.inputOscilloscope = nil;
+    if ( _levelsTimer ) [_levelsTimer invalidate];
+    self.inputLevelLayer = nil;
+    self.outputLevelLayer = nil;
     
     self.audioController = nil;
 
@@ -150,23 +159,33 @@
 -(void)viewDidLoad {
     [super viewDidLoad];
     
-    UIView *oscilloscopeHostView = [[[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 100)] autorelease];
-    oscilloscopeHostView.backgroundColor = [UIColor groupTableViewBackgroundColor];
+    UIView *headerView = [[[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 100)] autorelease];
+    headerView.backgroundColor = [UIColor groupTableViewBackgroundColor];
     
     self.outputOscilloscope = [[[TPOscilloscopeLayer alloc] init] autorelease];
-    _outputOscilloscope.frame = oscilloscopeHostView.bounds;
-    [oscilloscopeHostView.layer addSublayer:_outputOscilloscope];
+    _outputOscilloscope.frame = CGRectMake(0, 0, headerView.bounds.size.width, 80);
+    [headerView.layer addSublayer:_outputOscilloscope];
     [_audioController addOutputReceiver:_outputOscilloscope];
     [_outputOscilloscope start];
     
     self.inputOscilloscope = [[[TPOscilloscopeLayer alloc] init] autorelease];
-    _inputOscilloscope.frame = oscilloscopeHostView.bounds;
+    _inputOscilloscope.frame = CGRectMake(0, 0, headerView.bounds.size.width, 80);
     _inputOscilloscope.lineColor = [UIColor colorWithWhite:0.0 alpha:0.3];
-    [oscilloscopeHostView.layer addSublayer:_inputOscilloscope];
+    [headerView.layer addSublayer:_inputOscilloscope];
     [_audioController addInputReceiver:_inputOscilloscope];
     [_inputOscilloscope start];
     
-    self.tableView.tableHeaderView = oscilloscopeHostView;
+    self.inputLevelLayer = [CALayer layer];
+    _inputLevelLayer.backgroundColor = [[UIColor colorWithWhite:0.0 alpha:0.3] CGColor];
+    _inputLevelLayer.frame = CGRectMake(headerView.bounds.size.width/2.0 - 5.0 - (0.0), 90, 0, 10);
+    [headerView.layer addSublayer:_inputLevelLayer];
+    
+    self.outputLevelLayer = [CALayer layer];
+    _outputLevelLayer.backgroundColor = [[UIColor colorWithWhite:0.0 alpha:0.3] CGColor];
+    _outputLevelLayer.frame = CGRectMake(headerView.bounds.size.width/2.0 + 5.0, 90, 0, 10);
+    [headerView.layer addSublayer:_outputLevelLayer];
+    
+    self.tableView.tableHeaderView = headerView;
     
     UIView *footerView = [[[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 80)] autorelease];
     self.recordButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
@@ -201,10 +220,15 @@
     _channelCountLabel.text = [NSString stringWithFormat:@"%d input channels", _audioController.numberOfInputChannels];
     [_channelCountLabel sizeToFit];
     _channelCountLabel.frame = CGRectOffset(_channelCountLabel.frame, 10, 10);
+    
+    self.levelsTimer = [NSTimer scheduledTimerWithTimeInterval:0.05 target:self selector:@selector(updateLevels:) userInfo:nil repeats:YES];
 }
 
 -(void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
+    
+    [_levelsTimer invalidate];
+    self.levelsTimer = nil;
     
     [_audioController removeObserver:self forKeyPath:@"numberOfInputChannels"];
 }
@@ -491,6 +515,34 @@
     [_player release];
     _player = player;
     if ( _player ) [_player addObserver:self forKeyPath:@"playing" options:0 context:NULL];
+}
+
+static inline float translate(float val, float min, float max) {
+    if ( val < min ) val = min;
+    if ( val > max ) val = max;
+    return (val - min) / (max - min);
+}
+
+- (void)updateLevels:(NSTimer*)timer {
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    
+    Float32 inputAvg, inputPeak, outputAvg, outputPeak;
+    [_audioController inputAveragePowerLevel:&inputAvg peakHoldLevel:&inputPeak];
+    [_audioController outputAveragePowerLevel:&outputAvg peakHoldLevel:&outputPeak];
+    UIView *headerView = self.tableView.tableHeaderView;
+
+    _inputLevelLayer.frame = CGRectMake(headerView.bounds.size.width/2.0 - 5.0 - (translate(inputPeak, -20, -1) * (headerView.bounds.size.width/2.0 - 15.0)),
+                                        90,
+                                        translate(inputPeak, -20, -1) * (headerView.bounds.size.width/2.0 - 15.0),
+                                        10);
+    
+    _outputLevelLayer.frame = CGRectMake(_outputLevelLayer.frame.origin.x,
+                                         _outputLevelLayer.frame.origin.y, 
+                                         translate(outputPeak, -20, -1) * (headerView.bounds.size.width/2.0 - 15.0),
+                                         10);
+    
+    [CATransaction commit];
 }
 
 -(void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
