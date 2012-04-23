@@ -13,6 +13,7 @@
 #import "AEPlaythroughChannel.h"
 #import "AEExpanderFilter.h"
 #import "AELimiterFilter.h"
+#import "AERecorder.h"
 #import <QuartzCore/QuartzCore.h>
 
 #define kAuxiliaryViewTag 251
@@ -33,7 +34,11 @@
 @property (nonatomic, retain) TPDoubleSpeedFilter *doubleSpeedFilter;
 @property (nonatomic, retain) TPOscilloscopeLayer *outputOscilloscope;
 @property (nonatomic, retain) TPOscilloscopeLayer *inputOscilloscope;
+@property (nonatomic, retain) AERecorder *recorder;
+@property (nonatomic, retain) AEAudioFilePlayer *player;
 @property (nonatomic, retain) UILabel *channelCountLabel;
+@property (nonatomic, retain) UIButton *recordButton;
+@property (nonatomic, retain) UIButton *playButton;
 @end
 
 @implementation TPViewController
@@ -48,7 +53,11 @@
             doubleSpeedFilter=_doubleSpeedFilter,
             outputOscilloscope=_outputOscilloscope,
             inputOscilloscope=_inputOscilloscope,
-            channelCountLabel = _channelCountLabel;
+            recorder=_recorder,
+            player=_player,
+            channelCountLabel = _channelCountLabel,
+            recordButton = _recordButton,
+            playButton = _playButton;
 
 - (id)initWithAudioController:(AEAudioController*)audioController {
     if ( !(self = [super initWithStyle:UITableViewStyleGrouped]) ) return nil;
@@ -86,11 +95,12 @@
     
     self.channelCountLabel = nil;
     
-    NSMutableArray *channelsToRemove = [NSMutableArray arrayWithObjects:_loop1, _loop2, _loop3, nil];
+    NSMutableArray *channelsToRemove = [NSMutableArray arrayWithObjects:_loop1, _loop2, _loop3, _player, nil];
 
     self.loop1 = nil;
     self.loop2 = nil;
     self.loop3 = nil;
+    self.player = nil;
     
     if ( _sample1 ) {
         [channelsToRemove addObject:_sample1];
@@ -125,6 +135,10 @@
         self.doubleSpeedFilter = nil;
     }
     
+    self.recorder = nil;
+    self.recordButton = nil;
+    self.playButton = nil;
+    
     self.outputOscilloscope = nil;
     self.inputOscilloscope = nil;
     
@@ -133,8 +147,8 @@
     [super dealloc];
 }
 
--(void)viewWillAppear:(BOOL)animated {
-    [super viewWillAppear:animated];
+-(void)viewDidLoad {
+    [super viewDidLoad];
     
     UIView *oscilloscopeHostView = [[[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 100)] autorelease];
     oscilloscopeHostView.backgroundColor = [UIColor groupTableViewBackgroundColor];
@@ -154,17 +168,39 @@
     
     self.tableView.tableHeaderView = oscilloscopeHostView;
     
+    UIView *footerView = [[[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 80)] autorelease];
+    self.recordButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+    [_recordButton setTitle:@"Record" forState:UIControlStateNormal];
+    [_recordButton setTitle:@"Stop" forState:UIControlStateSelected];
+    [_recordButton addTarget:self action:@selector(record:) forControlEvents:UIControlEventTouchUpInside];
+    _recordButton.frame = CGRectMake(10, 10, ((footerView.bounds.size.width-30) / 2), footerView.bounds.size.height - 20);
+    self.playButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+    [_playButton setTitle:@"Play" forState:UIControlStateNormal];
+    [_playButton setTitle:@"Stop" forState:UIControlStateSelected];
+    [_playButton addTarget:self action:@selector(play:) forControlEvents:UIControlEventTouchUpInside];
+    _playButton.frame = CGRectMake(_recordButton.frame.origin.x+_recordButton.frame.size.width+10, 10, ((footerView.bounds.size.width-30) / 2), footerView.bounds.size.height - 20);
+    [footerView addSubview:_recordButton];
+    [footerView addSubview:_playButton];
+    self.tableView.tableFooterView = footerView;
+    
     self.channelCountLabel = [[[UILabel alloc] initWithFrame:CGRectZero] autorelease];
     _channelCountLabel.font = [UIFont boldSystemFontOfSize:12];
     _channelCountLabel.textColor = [UIColor colorWithWhite:0.0 alpha:0.5];
     _channelCountLabel.backgroundColor = [UIColor clearColor];
     _channelCountLabel.shadowColor = [UIColor whiteColor];
     _channelCountLabel.shadowOffset = CGSizeMake(0, 1);
-    _channelCountLabel.text = [NSString stringWithFormat:@"%d input channels", _audioController.numberOfInputChannels];
     [_channelCountLabel sizeToFit];
     _channelCountLabel.frame = CGRectOffset(_channelCountLabel.frame, 10, 10);
     [self.view addSubview:_channelCountLabel];
+}
+
+-(void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    
     [_audioController addObserver:self forKeyPath:@"numberOfInputChannels" options:0 context:NULL];
+    _channelCountLabel.text = [NSString stringWithFormat:@"%d input channels", _audioController.numberOfInputChannels];
+    [_channelCountLabel sizeToFit];
+    _channelCountLabel.frame = CGRectOffset(_channelCountLabel.frame, 10, 10);
 }
 
 -(void)viewWillDisappear:(BOOL)animated {
@@ -390,12 +426,82 @@
     }
 }
 
+- (void)record:(id)sender {
+    if ( _recorder ) {
+        [_recorder finishRecording];
+        [_audioController removeOutputReceiver:_recorder];
+        [_audioController removeInputReceiver:_recorder];
+        self.recorder = nil;
+        _recordButton.selected = NO;
+    } else {
+        self.recorder = [[[AERecorder alloc] initWithAudioController:_audioController] autorelease];
+        NSArray *documentsFolders = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+        NSString *path = [[documentsFolders objectAtIndex:0] stringByAppendingPathComponent:@"Recording.m4a"];
+        NSError *error = nil;
+        if ( ![_recorder beginRecordingToFileAtPath:path fileType:kAudioFileM4AType error:&error] ) {
+            [[[[UIAlertView alloc] initWithTitle:@"Error" 
+                                         message:[NSString stringWithFormat:@"Couldn't start recording: %@", [error localizedDescription]]
+                                        delegate:nil
+                               cancelButtonTitle:nil
+                               otherButtonTitles:@"OK", nil] autorelease] show];
+            self.recorder = nil;
+            return;
+        }
+        
+        _recordButton.selected = YES;
+        
+        [_audioController addOutputReceiver:_recorder];
+        [_audioController addInputReceiver:_recorder];
+    }
+}
+
+- (void)play:(id)sender {
+    if ( _player ) {
+        [_audioController removeChannels:[NSArray arrayWithObject:_player]];
+        self.player = nil;
+        _playButton.selected = NO;
+    } else {
+        NSArray *documentsFolders = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+        NSString *path = [[documentsFolders objectAtIndex:0] stringByAppendingPathComponent:@"Recording.m4a"];
+        
+        if ( ![[NSFileManager defaultManager] fileExistsAtPath:path] ) return;
+        
+        NSError *error = nil;
+        self.player = [AEAudioFilePlayer audioFilePlayerWithURL:[NSURL fileURLWithPath:path] audioController:_audioController error:&error];
+        
+        if ( !_player ) {
+            [[[[UIAlertView alloc] initWithTitle:@"Error" 
+                                         message:[NSString stringWithFormat:@"Couldn't start playback: %@", [error localizedDescription]]
+                                        delegate:nil
+                               cancelButtonTitle:nil
+                               otherButtonTitles:@"OK", nil] autorelease] show];
+            return;
+        }
+        
+        _player.removeUponFinish = YES;
+        [_audioController addChannels:[NSArray arrayWithObject:_player]];
+        
+        _playButton.selected = YES;
+    }
+}
+
+-(void)setPlayer:(AEAudioFilePlayer *)player {
+    if ( _player ) [_player removeObserver:self forKeyPath:@"playing"];
+    [player retain];
+    [_player release];
+    _player = player;
+    if ( _player ) [_player addObserver:self forKeyPath:@"playing" options:0 context:NULL];
+}
+
 -(void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
     if ( object == _sample1 ) {
         [_audioController removeChannels:[NSArray arrayWithObject:_sample1]];
         [_sample1 removeObserver:self forKeyPath:@"playing"];
         self.sample1 = nil;
         [(UIButton*)context setSelected:NO];
+    } else if ( object == _player ) {
+        self.player = nil;
+        _playButton.selected = NO;
     } else if ( object == _audioController ) {
         _channelCountLabel.text = [NSString stringWithFormat:@"%d channels", _audioController.numberOfInputChannels];
         [_channelCountLabel sizeToFit];

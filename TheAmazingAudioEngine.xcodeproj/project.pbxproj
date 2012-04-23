@@ -30,6 +30,7 @@
 		4C34877414E9B7A400301A09 /* congaloop.caf in Resources */ = {isa = PBXBuildFile; fileRef = 4C34877214E9B7A400301A09 /* congaloop.caf */; };
 		4C34877914EA699300301A09 /* dmxbeat.aiff in Resources */ = {isa = PBXBuildFile; fileRef = 4C34877814EA699300301A09 /* dmxbeat.aiff */; };
 		4C34877B14EA841000301A09 /* lead.aif in Resources */ = {isa = PBXBuildFile; fileRef = 4C34877A14EA841000301A09 /* lead.aif */; };
+		4C38DC521545840E009F4454 /* AERecorder.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C38DC511545840E009F4454 /* AERecorder.m */; };
 		4C38DC5515458AB1009F4454 /* AEAudioFileWriter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C38DC5315458AB1009F4454 /* AEAudioFileWriter.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4C38DC5615458AB1009F4454 /* AEAudioFileWriter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C38DC5315458AB1009F4454 /* AEAudioFileWriter.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4C38DC5715458AB1009F4454 /* AEAudioFileWriter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C38DC5415458AB1009F4454 /* AEAudioFileWriter.m */; };
@@ -86,6 +87,8 @@
 		4C34877214E9B7A400301A09 /* congaloop.caf */ = {isa = PBXFileReference; lastKnownFileType = file; name = congaloop.caf; path = "TheAmazingAudioEngine/Test Suite/congaloop.caf"; sourceTree = SOURCE_ROOT; };
 		4C34877814EA699300301A09 /* dmxbeat.aiff */ = {isa = PBXFileReference; lastKnownFileType = audio.aiff; name = dmxbeat.aiff; path = "TheAmazingAudioEngine/Test Suite/dmxbeat.aiff"; sourceTree = SOURCE_ROOT; };
 		4C34877A14EA841000301A09 /* lead.aif */ = {isa = PBXFileReference; lastKnownFileType = file; name = lead.aif; path = "TheAmazingAudioEngine/Test Suite/lead.aif"; sourceTree = SOURCE_ROOT; };
+		4C38DC501545840E009F4454 /* AERecorder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AERecorder.h; path = Modules/AERecorder.h; sourceTree = SOURCE_ROOT; };
+		4C38DC511545840E009F4454 /* AERecorder.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = AERecorder.m; path = Modules/AERecorder.m; sourceTree = SOURCE_ROOT; };
 		4C38DC5315458AB1009F4454 /* AEAudioFileWriter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEAudioFileWriter.h; sourceTree = "<group>"; };
 		4C38DC5415458AB1009F4454 /* AEAudioFileWriter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEAudioFileWriter.m; sourceTree = "<group>"; };
 		4C49FE30153DC21A008725E0 /* AEAudioFileLoaderOperation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEAudioFileLoaderOperation.h; sourceTree = "<group>"; };
@@ -206,6 +209,8 @@
 				4CA689C415447E3100AF8DDD /* AEExpanderFilter.m */,
 				4CA689BF1542DC8C00AF8DDD /* AEPlaythroughChannel.h */,
 				4CA689C01542DC8C00AF8DDD /* AEPlaythroughChannel.m */,
+				4C38DC501545840E009F4454 /* AERecorder.h */,
+				4C38DC511545840E009F4454 /* AERecorder.m */,
 			);
 			name = Modules;
 			sourceTree = "<group>";
@@ -267,8 +272,8 @@
 			isa = PBXGroup;
 			children = (
 				4CE501911493F82600F23607 /* TheAmazingAudioEngine */,
-				4CAD2F7514E9A3BF00656553 /* Test Suite */,
 				4C8A0F401540BBD700307CB6 /* Modules */,
+				4CAD2F7514E9A3BF00656553 /* Test Suite */,
 				4C215CED1523A7D500D36CAD /* Frameworks */,
 				4CE501901493F82600F23607 /* Products */,
 			);
@@ -512,6 +517,7 @@
 				4CA689BE1542D4FE00AF8DDD /* AELimiterFilter.m in Sources */,
 				4CA689C11542DC8C00AF8DDD /* AEPlaythroughChannel.m in Sources */,
 				4CA689C515447E3100AF8DDD /* AEExpanderFilter.m in Sources */,
+				4C38DC521545840E009F4454 /* AERecorder.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
