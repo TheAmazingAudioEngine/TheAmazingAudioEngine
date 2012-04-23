@@ -17,6 +17,7 @@ AudioBufferList *AEAllocateAndInitAudioBufferList(AudioStreamBasicDescription *a
     if ( !audio ) {
         return NULL;
     }
+    audio->mNumberBuffers = numberOfBuffers;
     for ( int i=0; i<numberOfBuffers; i++ ) {
         if ( bytesPerBuffer > 0 ) {
             audio->mBuffers[i].mData = malloc(bytesPerBuffer);

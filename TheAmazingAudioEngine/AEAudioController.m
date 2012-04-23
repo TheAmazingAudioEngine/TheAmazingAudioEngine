@@ -150,6 +150,8 @@ typedef struct _message_t {
     AUNode              _ioNode;
     AudioUnit           _ioAudioUnit;
     BOOL                _runningPriorToInterruption;
+    AudioStreamBasicDescription _audioDescription;
+    AudioStreamBasicDescription _inputAudioDescription;
     
     AEChannelGroupRef   _topGroup;
     channel_t           _topChannel;
@@ -215,11 +217,9 @@ static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp
             playingThroughDeviceSpeaker = _playingThroughDeviceSpeaker,
             preferredBufferDuration     = _preferredBufferDuration, 
             inputMode                   = _inputMode, 
-            audioDescription            = _audioDescription, 
-            inputAudioDescription       = _inputAudioDescription,
             audioUnit                   = _ioAudioUnit;
 
-@dynamic    running, inputGainAvailable, inputGain;
+@dynamic    running, inputGainAvailable, inputGain, audioDescription, inputAudioDescription;
 
 #pragma mark - Audio session callbacks
 
@@ -1409,6 +1409,14 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, UInt32 frames) 
     [self updateVoiceProcessingSettings];
 }
 
+-(AudioStreamBasicDescription *)audioDescription {
+    return &_audioDescription;
+}
+
+-(AudioStreamBasicDescription *)inputAudioDescription {
+    return &_inputAudioDescription;
+}
+
 #pragma mark - Events
 
 -(void) observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
@@ -1776,11 +1784,6 @@ static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannelRef channel
         
         if ( result == kAudioUnitErr_FormatNotSupported ) {
             // The mixer only supports a subset of formats. If it doesn't support this one, then we'll convert manually
-            #if DEBUG
-            if ( parentGroup == NULL ) {
-                NSLog(@"Note: The AudioStreamBasicDescription you have provided is not natively supported by the iOS mixer unit. Use of filters and output callbacks will result in use of audio converters.");
-            }
-            #endif
             
             // Indicate that an audio converter will be required
             group->converterRequired = YES;

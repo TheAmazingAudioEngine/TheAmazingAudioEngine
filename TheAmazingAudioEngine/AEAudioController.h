@@ -1115,12 +1115,12 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, UInt
  *
  * See also @link inputMode @endlink
  */
-@property (nonatomic, readonly) AudioStreamBasicDescription inputAudioDescription;
+@property (nonatomic, readonly) AudioStreamBasicDescription *inputAudioDescription;
 
 /*!
  * The audio description that the audio controller was setup with
  */
-@property (nonatomic, readonly) AudioStreamBasicDescription audioDescription;
+@property (nonatomic, readonly) AudioStreamBasicDescription *audioDescription;
 
 /*!
  * The Remote IO audio unit used for input and output
