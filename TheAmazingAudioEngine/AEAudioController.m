@@ -86,6 +86,7 @@ typedef struct {
     float            volume;
     float            pan;
     BOOL             muted;
+    AudioStreamBasicDescription audioDescription;
     callback_table_t callbacks;
     AEAudioController *audioController;
 } channel_t, *AEChannelRef;
@@ -624,7 +625,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     NSArray *channels = [self channels];
     for ( NSObject *channel in channels ) {
-        for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", @"playing", @"muted", nil] ) {
+        for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", @"playing", @"muted", @"audioDescription", nil] ) {
             [channel removeObserver:self forKeyPath:property];
         }
     }
@@ -695,7 +696,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         
         [channel retain];
         
-        for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", @"playing", @"muted", nil] ) {
+        for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", @"playing", @"muted", @"audioDescription", nil] ) {
             [(NSObject*)channel addObserver:self forKeyPath:property options:0 context:NULL];
         }
         
@@ -708,6 +709,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         channelElement->volume      = [channel respondsToSelector:@selector(volume)] ? channel.volume : 1.0;
         channelElement->pan         = [channel respondsToSelector:@selector(pan)] ? channel.pan : 0.0;
         channelElement->muted       = [channel respondsToSelector:@selector(muted)] ? channel.muted : NO;
+        channelElement->audioDescription = [channel respondsToSelector:@selector(audioDescription)] ? *channel.audioDescription : _audioDescription;
         channelElement->audioController = self;
     }
     
@@ -772,7 +774,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     // Finally, stop observing and release channels
     for ( NSObject *channel in channels ) {
-        for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", @"playing", @"muted", nil] ) {
+        for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", @"playing", @"muted", @"audioDescription", nil] ) {
             [(NSObject*)channel removeObserver:self forKeyPath:property];
         }
     }
@@ -1503,6 +1505,11 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, UInt32 frames) 
         OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
         checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
         
+    } else if ( [keyPath isEqualToString:@"audioDescription"] ) {
+        channelElement->audioDescription = *channel.audioDescription;
+        OSStatus result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, index, &channelElement->audioDescription, sizeof(AudioStreamBasicDescription));
+        checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
+        
     }
 }
 
@@ -1623,6 +1630,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, UInt32 frames) 
         _topChannel.volume   = 1.0;
         _topChannel.pan      = 0.0;
         _topChannel.muted    = NO;
+        _topChannel.audioDescription = _audioDescription;
         _topChannel.audioController = self;
         _topGroup->channel   = &_topChannel;
     }
@@ -2029,7 +2037,7 @@ static void configureChannelsInRangeForGroup(AEAudioController *THIS, NSRange ra
             AUGraphDisconnectNodeInput(THIS->_audioGraph, group->mixerNode, i);
             
             // Set input stream format
-            checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, i, &THIS->_audioDescription, sizeof(THIS->_audioDescription)),
+            checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, i, &channel->audioDescription, sizeof(channel->audioDescription)),
                         "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
             
             // Setup render callback struct

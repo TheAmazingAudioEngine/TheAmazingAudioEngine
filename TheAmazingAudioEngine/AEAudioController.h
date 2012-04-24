@@ -140,6 +140,11 @@ typedef OSStatus (*AEAudioControllerRenderCallback) (id                        c
  */
 @property (nonatomic, readonly) BOOL muted;
 
+/*
+ * The audio format for this channel
+ */
+@property (nonatomic, readonly) AudioStreamBasicDescription *audioDescription;
+
 @end
 
 /*!
@@ -1112,8 +1117,10 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, UInt
 
 /*!
  * The audio description defining the input audio format
+ * 
+ *      Note: This property is observable
  *
- * See also @link inputMode @endlink
+ *      See also @link inputMode @endlink
  */
 @property (nonatomic, readonly) AudioStreamBasicDescription *inputAudioDescription;
 

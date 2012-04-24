@@ -11,4 +11,7 @@
 
 @interface AEPlaythroughChannel : NSObject <AEAudioPlayable, AEAudioReceiver>
 - (id)initWithAudioController:(AEAudioController*)audioController;
+
+@property (nonatomic, readonly) float volume;
+@property (nonatomic, readonly) AudioStreamBasicDescription *audioDescription;
 @end

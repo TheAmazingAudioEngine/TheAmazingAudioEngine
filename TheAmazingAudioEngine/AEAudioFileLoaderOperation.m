@@ -167,17 +167,17 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
         UInt32 numberOfPackets = (UInt32)(scratchBufferList->mBuffers[0].mDataByteSize / _targetAudioDescription.mBytesPerFrame);
         status = ExtAudioFileRead(audioFile, &numberOfPackets, scratchBufferList);
         
-        if ( numberOfPackets == 0 ) {
-            // Termination condition
-            break;
-        }
-        
         if ( status != noErr ) {
             ExtAudioFileDispose(audioFile);
             self.error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
                                          userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't read the audio file (error %d)", @""), status]
                                                                               forKey:NSLocalizedDescriptionKey]];
             return;
+        }
+        
+        if ( numberOfPackets == 0 ) {
+            // Termination condition
+            break;
         }
         
         for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {

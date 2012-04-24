@@ -11,6 +11,7 @@
 #import "TPCircularBuffer+AudioBufferList.h"
 
 static const int kAudioBufferLength = 16384;
+static const int kAudioBufferMaxLatencyInFrames = 128;
 
 @interface AEPlaythroughChannel () {
     TPCircularBuffer _buffer;
@@ -19,12 +20,18 @@ static const int kAudioBufferLength = 16384;
 @end
 
 @implementation AEPlaythroughChannel
-@synthesize audioController=_audioController;
+@synthesize audioController=_audioController, volume = _volume;
+@dynamic audioDescription;
+
++(NSSet *)keyPathsForValuesAffectingAudioDescription {
+    return [NSSet setWithObject:@"audioController.inputAudioDescription"];
+}
 
 - (id)initWithAudioController:(AEAudioController*)audioController {
     if ( !(self = [super init]) ) return nil;
     TPCircularBufferInit(&_buffer, kAudioBufferLength);
     self.audioController = audioController;
+    _volume = 1.0;
     return self;
 }
 
@@ -40,8 +47,15 @@ static void inputCallback(id                        receiver,
                           const AudioTimeStamp     *time,
                           UInt32                    frames,
                           AudioBufferList          *audio) {
+    AEPlaythroughChannel *THIS = receiver;
     
-    TPCircularBufferCopyAudioBufferList(&((AEPlaythroughChannel*)receiver)->_buffer, 
+    UInt32 fillCount = TPCircularBufferPeek(&THIS->_buffer, NULL, AEAudioControllerAudioDescription(audioController));
+    if ( fillCount > frames+kAudioBufferMaxLatencyInFrames ) {
+        UInt32 skip = fillCount - frames;
+        TPCircularBufferConsumeBufferListFrames(&THIS->_buffer, &skip, NULL, NULL, AEAudioControllerAudioDescription(audioController));
+    }
+    
+    TPCircularBufferCopyAudioBufferList(&THIS->_buffer, 
                                         audio, 
                                         time);
 }
@@ -66,6 +80,10 @@ static OSStatus renderCallback(id                        channel,
 
 -(AEAudioControllerRenderCallback)renderCallback {
     return renderCallback;
+}
+
+-(AudioStreamBasicDescription *)audioDescription {
+    return _audioController.inputAudioDescription;
 }
 
 @end
