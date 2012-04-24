@@ -14,7 +14,7 @@
 BOOL AELimiterEnqueue(AELimiter *limiter, float** buffers, int numberOfBuffers, UInt32 length, AudioTimeStamp *timestamp);
 void AELimiterDequeue(AELimiter *limiter, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp);
 UInt32 AELimiterFillCount(AELimiter *limiter, AudioTimeStamp *timestamp);
-
+void AELimiterDrain(AELimiter *limiter, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp);
 void AELimiterReset(AELimiter *limiter);
 
 @property (nonatomic, assign) UInt32 hold;

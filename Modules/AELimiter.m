@@ -38,6 +38,7 @@ static inline int min(int a, int b) { return a>b ? b : a; }
     float            _triggerValue;
     AudioStreamBasicDescription _audioDescription;
 }
+static void _AELimiterDequeue(AELimiter *THIS, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp);
 static inline void advanceTime(AELimiter *THIS, UInt32 frames);
 static element_t findMaxValueInRange(AELimiter *THIS, AudioBufferList *dequeuedBufferList, int dequeuedBufferListOffset, NSRange range);
 static element_t findNextTriggerValueInRange(AELimiter *THIS, AudioBufferList *dequeuedBufferList, int dequeuedBufferListOffset, NSRange range);
@@ -86,8 +87,16 @@ BOOL AELimiterEnqueue(AELimiter *THIS, float** buffers, int numberOfBuffers, UIn
 }
 
 void AELimiterDequeue(AELimiter *THIS, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
-    assert(numberOfBuffers <= 2);
     *ioLength = min(*ioLength, AELimiterFillCount(THIS, NULL));
+    _AELimiterDequeue(THIS, buffers, numberOfBuffers, ioLength, timestamp);
+}
+
+void AELimiterDrain(AELimiter *THIS, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
+    _AELimiterDequeue(THIS, buffers, numberOfBuffers, ioLength, timestamp);
+}
+
+static void _AELimiterDequeue(AELimiter *THIS, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
+    assert(numberOfBuffers <= 2);
     
     // Dequeue the audio
     char audioBufferListBytes[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
