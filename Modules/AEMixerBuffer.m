@@ -24,12 +24,14 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     return YES;
 }
 
-static const int               kMaxSources                             = 10;
-static const NSTimeInterval    kSourceTimestampThreshold               = 0.0025;
-static const NSTimeInterval    kSourceTimestampIdleThreshold           = 0.1;
-static const int               kConversionBufferLength                 = 16384;
-static const int               kScratchBufferLength                    = 16384;
-static const int               kSourceBufferLength                     = 16384;
+#define kMaxSources                       10
+#define kSourceTimestampThreshold         0.0025
+#define kSourceTimestampIdleThreshold     0.1
+#define kConversionBufferLength           16384
+#define kScratchBufferLength              16384
+#define kSourceBufferLength               16384
+#define kActionBufferSize                 sizeof(action_t) * 10
+#define kActionMainThreadPollDuration     0.2
 
 typedef struct {
     AEMixerBufferSource                source;
@@ -51,8 +53,7 @@ typedef struct {
     void *userInfo;
 } action_t;
 
-const int               kActionBufferSize                       = sizeof(action_t) * 10;
-const NSTimeInterval    kActionMainThreadPollDuration           = 0.2;
+
 
 @interface AEMixerBuffer () {
     AudioStreamBasicDescription _clientFormat;
@@ -477,7 +478,7 @@ UInt32 AEMixerBufferPeek(AEMixerBuffer *THIS, uint64_t *outNextTimestamp) {
     
     if ( !source ) {
         prepareNewSource(self, sourceID);
-        source = sourceWithID(self, sourceID, NULL);
+        source = sourceWithID(self, sourceID, &index);
     }
     
     source->audioDescription = *audioDescription;
@@ -493,7 +494,7 @@ UInt32 AEMixerBufferPeek(AEMixerBuffer *THIS, uint64_t *outNextTimestamp) {
     
     if ( !source ) {
         prepareNewSource(self, sourceID);
-        source = sourceWithID(self, sourceID, NULL);
+        source = sourceWithID(self, sourceID, &index);
     }
     
     source->volume = volume;
@@ -517,7 +518,7 @@ UInt32 AEMixerBufferPeek(AEMixerBuffer *THIS, uint64_t *outNextTimestamp) {
     
     if ( !source ) {
         prepareNewSource(self, sourceID);
-        source = sourceWithID(self, sourceID, NULL);
+        source = sourceWithID(self, sourceID, &index);
     }
     
     source->pan = pan;
