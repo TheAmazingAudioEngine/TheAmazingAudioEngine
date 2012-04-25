@@ -986,12 +986,12 @@ AudioStreamBasicDescription *AEAudioControllerInputAudioDescription(AEAudioContr
 /*!
  * Convert a time span in seconds into a number of frames at the current sample rate
  */
-UInt32 AEConvertSecondsToFrames(AEAudioController *audioController, NSTimeInterval seconds);
+long AEConvertSecondsToFrames(AEAudioController *audioController, NSTimeInterval seconds);
 
 /*!
  * Convert a number of frames into a time span in seconds
  */
-NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, UInt32 frames);
+NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long frames);
 
 ///@}
 #pragma mark - Properties

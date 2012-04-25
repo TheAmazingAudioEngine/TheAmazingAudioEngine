@@ -189,7 +189,7 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS);
 - (void)initAudioSession;
 - (BOOL)setup;
 - (void)teardown;
-- (void)updateGraph;
+- (OSStatus)updateGraph;
 - (void)setAudioSessionCategory;
 - (void)updateVoiceProcessingSettings;
 - (void)updateInputDeviceStatus;
@@ -727,7 +727,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     // Configure each channel
     configureChannelsInRangeForGroup(self, NSMakeRange(group->channelCount - [channels count], [channels count]), group);
     
-    [self updateGraph];
+    checkResult([self updateGraph], "Update graph");
 }
 
 - (void)removeChannels:(NSArray *)channels {
@@ -842,7 +842,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     free(group);
     
-    [self updateGraph];
+    checkResult([self updateGraph], "Update graph");
 }
 
 -(NSArray *)channels {
@@ -895,7 +895,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     // Initialise group
     initialiseGroupChannel(self, channel, parentGroup, groupIndex);
 
-    [self updateGraph];
+    checkResult([self updateGraph], "Update graph");
     
     return group;
 }
@@ -1365,11 +1365,11 @@ AudioStreamBasicDescription *AEAudioControllerInputAudioDescription(AEAudioContr
     return &THIS->_inputAudioDescription;
 }
 
-UInt32 AEConvertSecondsToFrames(AEAudioController *THIS, NSTimeInterval seconds) {
+long AEConvertSecondsToFrames(AEAudioController *THIS, NSTimeInterval seconds) {
     return round(seconds * THIS->_audioDescription.mSampleRate);
 }
 
-NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, UInt32 frames) {
+NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
     return (double)frames / THIS->_audioDescription.mSampleRate;
 }
 
@@ -1655,7 +1655,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, UInt32 frames) 
     [self markGroupTorndown:_topGroup];
 }
 
-- (void)updateGraph {
+- (OSStatus)updateGraph {
     // Only update if graph is running
     Boolean graphIsRunning;
     AUGraphIsRunning(_audioGraph, &graphIsRunning);
@@ -1668,10 +1668,9 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, UInt32 frames) 
             [NSThread sleepForTimeInterval:0.01];
         }
         
-        if ( err != noErr ) {
-            checkResult(err, "AUGraphUpdate");
-        }
+        return err;
     }
+    return noErr;
 }
 
 - (void)setAudioSessionCategory {
