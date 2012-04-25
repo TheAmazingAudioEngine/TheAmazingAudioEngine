@@ -20,8 +20,8 @@
 
 const int kMaximumChannelsPerGroup              = 100;
 const int kMaximumCallbacksPerSource            = 15;
-const int kMessageBufferLength                  = 50;
-const int kIdleMessagingPollDuration            = 0.2;
+const int kMessageBufferLength                  = 8192;
+const int kIdleMessagingPollDuration            = 0.1;
 const int kRenderConversionScratchBufferSize    = 16384;
 const int kInputMonitorScratchBufferSize        = 8192;
 
@@ -148,6 +148,11 @@ typedef struct _message_t {
 - (id)initWithAudioController:(AEAudioController*)audioController;
 @end
 
+@interface AEAudioControllerMessagePollThread : NSThread
+- (id)initWithAudioController:(AEAudioController*)audioController;
+@property (nonatomic, assign) NSTimeInterval pollInterval;
+@end
+
 @interface AEAudioController () {
     AUGraph             _audioGraph;
     AUNode              _ioNode;
@@ -164,7 +169,7 @@ typedef struct _message_t {
     
     TPCircularBuffer    _realtimeThreadMessageBuffer;
     TPCircularBuffer    _mainThreadMessageBuffer;
-    NSTimer            *_responsePollTimer;
+    AEAudioControllerMessagePollThread *_pollThread;
     int                 _pendingResponses;
     
     char               *_renderConversionScratchBuffer;
@@ -595,8 +600,8 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationDidBecomeActive:) name:UIApplicationDidBecomeActiveNotification object:nil];
     
-    TPCircularBufferInit(&_realtimeThreadMessageBuffer, kMessageBufferLength * sizeof(message_t));
-    TPCircularBufferInit(&_mainThreadMessageBuffer, kMessageBufferLength * sizeof(message_t));
+    TPCircularBufferInit(&_realtimeThreadMessageBuffer, kMessageBufferLength);
+    TPCircularBufferInit(&_mainThreadMessageBuffer, kMessageBufferLength);
     
     [self initAudioSession];
     
@@ -615,9 +620,9 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 - (void)dealloc {
-    if ( _responsePollTimer ) {
-        [_responsePollTimer invalidate];
-        [_responsePollTimer release];
+    if ( _pollThread ) {
+        [_pollThread cancel];
+        [_pollThread release];
     }
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [self stop];
@@ -658,12 +663,10 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     // Determine if audio input is available, and the number of input channels available
     [self updateInputDeviceStatus];
     
-    // Start messaging poll timer
-    _responsePollTimer = [[NSTimer scheduledTimerWithTimeInterval:kIdleMessagingPollDuration
-                                                           target:[[[AEAudioControllerProxy alloc] initWithAudioController:self] autorelease] 
-                                                         selector:@selector(pollForMainThreadMessages) 
-                                                         userInfo:nil 
-                                                          repeats:YES] retain];
+    // Start messaging poll thread
+    _pollThread = [[AEAudioControllerMessagePollThread alloc] initWithAudioController:self];
+    OSMemoryBarrier();
+    [_pollThread start];
     
     // Start things up
     checkResult(AudioSessionSetActive(true), "AudioSessionSetActive");
@@ -675,6 +678,9 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         if ( !checkResult(AUGraphStop(_audioGraph), "AUGraphStop") ) return;
         AudioSessionSetActive(false);
     }
+    [_pollThread cancel];
+    [_pollThread release];
+    _pollThread = nil;
 }
 
 #pragma mark - Channel and channel group management
@@ -1186,18 +1192,18 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
         memcpy(message, buffer, messageLength);
         
         TPCircularBufferConsume(&_mainThreadMessageBuffer, messageLength);
-        
+    
         if ( message->responseBlock ) {
             message->responseBlock(message->userInfoLength > 0
-                                        ? (message->userInfoByReference ? message->userInfoByReference : message+1) 
-                                        : NULL, 
+                                   ? (message->userInfoByReference ? message->userInfoByReference : message+1) 
+                                   : NULL, 
                                    message->userInfoLength);
             [message->responseBlock release];
         } else if ( message->handler ) {
             message->handler(self, 
                              message->userInfoLength > 0
-                                ? (message->userInfoByReference ? message->userInfoByReference : message+1) 
-                                : NULL, 
+                             ? (message->userInfoByReference ? message->userInfoByReference : message+1) 
+                             : NULL, 
                              message->userInfoLength);
         }
         
@@ -1205,15 +1211,8 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
         
         _pendingResponses--;
         
-        if ( _pendingResponses == 0 ) {
-            // Replace active poll timer with less demanding idle one
-            [_responsePollTimer invalidate];
-            [_responsePollTimer release];
-            _responsePollTimer = [[NSTimer scheduledTimerWithTimeInterval:kIdleMessagingPollDuration 
-                                                                   target:[[[AEAudioControllerProxy alloc] initWithAudioController:self] autorelease] 
-                                                                 selector:@selector(pollForMainThreadMessages) 
-                                                                 userInfo:nil 
-                                                                  repeats:YES] retain];
+        if ( _pollThread && _pendingResponses == 0 ) {
+            _pollThread.pollInterval = kIdleMessagingPollDuration;
         }
     }
 }
@@ -1224,19 +1223,15 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
                                         responseBlock:(void (^)(void *, int))responseBlock
                                   userInfoByReference:(BOOL)userInfoByReference {
     // Only perform on main thread
+    NSAssert([NSThread isMainThread], @"Must be called on main thread only");
+    
     if ( responseBlock ) {
-        [responseBlock copy];
+        responseBlock = [responseBlock copy];
         _pendingResponses++;
         
-        if ( self.running && _responsePollTimer.timeInterval == kIdleMessagingPollDuration ) {
-            // Replace idle poll timer with more rapid active polling
-            [_responsePollTimer invalidate];
-            [_responsePollTimer release];
-            _responsePollTimer = [[NSTimer scheduledTimerWithTimeInterval:_preferredBufferDuration
-                                                                   target:[[[AEAudioControllerProxy alloc] initWithAudioController:self] autorelease] 
-                                                                 selector:@selector(pollForMainThreadMessages) 
-                                                                 userInfo:nil 
-                                                                  repeats:YES] retain];
+        if ( self.running && _pollThread.pollInterval == kIdleMessagingPollDuration ) {
+            // Perform more rapid active polling while we expect a response
+            _pollThread.pollInterval = _preferredBufferDuration;
         }
     }
     
@@ -1276,7 +1271,6 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
 - (void)performSynchronousMessageExchangeWithHandler:(AEAudioControllerMessageHandler)handler 
                                        userInfoBytes:(void *)userInfo 
                                               length:(int)userInfoLength {
-    // Only perform on main thread
     __block BOOL finished = NO;
     
     [self performAsynchronousMessageExchangeWithHandler:handler 
@@ -1311,6 +1305,11 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController     
     }
     
     TPCircularBufferProduce(&THIS->_mainThreadMessageBuffer, sizeof(message_t) + userInfoLength);
+}
+
+static BOOL AEAudioControllerHasPendingMainThreadMessages(AEAudioController *THIS) {
+    int32_t ignore;
+    return TPCircularBufferTail(&THIS->_mainThreadMessageBuffer, &ignore) != NULL;
 }
 
 #pragma mark - Metering
@@ -1367,7 +1366,7 @@ AudioStreamBasicDescription *AEAudioControllerInputAudioDescription(AEAudioContr
 }
 
 UInt32 AEConvertSecondsToFrames(AEAudioController *THIS, NSTimeInterval seconds) {
-    return seconds * THIS->_audioDescription.mSampleRate;
+    return round(seconds * THIS->_audioDescription.mSampleRate);
 }
 
 NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, UInt32 frames) {
@@ -1494,7 +1493,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, UInt32 frames) 
 
     } else if ( [keyPath isEqualToString:@"playing"] ) {
         channelElement->playing = channel.playing;
-        AudioUnitParameterValue value = channel.playing && !channel.muted;
+        AudioUnitParameterValue value = channel.playing && (![channel respondsToSelector:@selector(muted)] || !channel.muted);
         OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
         checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
         group->channels[index].playing = value;
@@ -2390,5 +2389,26 @@ static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp
 - (void)forwardInvocation:(NSInvocation *)invocation {
     [invocation setTarget:_audioController];
     [invocation invoke];
+}
+@end
+
+@interface AEAudioControllerMessagePollThread () {
+    AEAudioController *_audioController;
+}
+@end
+@implementation AEAudioControllerMessagePollThread
+@synthesize pollInterval = _pollInterval;
+- (id)initWithAudioController:(AEAudioController *)audioController {
+    if ( !(self = [super init]) ) return nil;
+    _audioController = audioController;
+    return self;
+}
+-(void)main {
+    while ( ![self isCancelled] ) {
+        if ( AEAudioControllerHasPendingMainThreadMessages(_audioController) ) {
+            [_audioController performSelectorOnMainThread:@selector(pollForMainThreadMessages) withObject:nil waitUntilDone:YES];
+        }
+        [NSThread sleepForTimeInterval:_pollInterval];
+    }
 }
 @end

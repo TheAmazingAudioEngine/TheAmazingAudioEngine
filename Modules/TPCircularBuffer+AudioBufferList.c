@@ -150,7 +150,14 @@ void TPCircularBufferConsumeNextBufferListPartial(TPCircularBuffer *buffer, int 
     if ( !timestamp ) return;
     
     int bytesToConsume = framesToConsume * audioFormat->mBytesPerFrame;
+    
     AudioBufferList *bufferList = (AudioBufferList*)(((char*)timestamp)+sizeof(AudioTimeStamp)+sizeof(UInt32));
+    
+    if ( bytesToConsume == bufferList->mBuffers[0].mDataByteSize ) {
+        TPCircularBufferConsumeNextBufferList(buffer);
+        return;
+    }
+    
     for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
         bufferList->mBuffers[i].mData = (char*)bufferList->mBuffers[i].mData + bytesToConsume;
         bufferList->mBuffers[i].mDataByteSize -= bytesToConsume;

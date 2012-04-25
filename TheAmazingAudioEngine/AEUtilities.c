@@ -63,7 +63,7 @@ void AEFreeAudioBufferList(AudioBufferList *bufferList ) {
 
 void AEInitAudioBufferList(AudioBufferList *list, int listSize, AudioStreamBasicDescription *audioFormat, void *data, int dataSize) {
     list->mNumberBuffers = audioFormat->mFormatFlags & kAudioFormatFlagIsNonInterleaved ? audioFormat->mChannelsPerFrame : 1;
-    assert(list->mNumberBuffers == 1 || listSize > (sizeof(AudioBufferList)+sizeof(AudioBuffer)) );
+    assert(list->mNumberBuffers == 1 || listSize >= (sizeof(AudioBufferList)+sizeof(AudioBuffer)) );
     
     for ( int i=0; i<list->mNumberBuffers; i++ ) {
         list->mBuffers[0].mNumberChannels = audioFormat->mFormatFlags & kAudioFormatFlagIsNonInterleaved ? 1 : audioFormat->mChannelsPerFrame;

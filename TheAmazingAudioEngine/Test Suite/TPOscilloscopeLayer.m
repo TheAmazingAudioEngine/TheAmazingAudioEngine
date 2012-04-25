@@ -45,6 +45,7 @@ static void audioCallback(id THIS, AEAudioController *audioController, void *sou
     
     if ( NSClassFromString(@"CADisplayLink") ) {
         _timer = [CADisplayLink displayLinkWithTarget:self selector:@selector(setNeedsDisplay)];
+        ((CADisplayLink*)_timer).frameInterval = 2;
         [_timer addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
     } else {
         _timer = [NSTimer scheduledTimerWithTimeInterval:1.0/30.0 target:self selector:@selector(setNeedsLayout) userInfo:nil repeats:YES];
