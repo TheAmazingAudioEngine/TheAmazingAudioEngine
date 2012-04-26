@@ -40,6 +40,7 @@ AudioBufferList *AECopyAudioBufferList(AudioBufferList *original) {
     if ( !audio ) {
         return NULL;
     }
+    audio->mNumberBuffers = original->mNumberBuffers;
     for ( int i=0; i<original->mNumberBuffers; i++ ) {
         audio->mBuffers[i].mData = malloc(original->mBuffers[i].mDataByteSize);
         if ( !audio->mBuffers[i].mData ) {
