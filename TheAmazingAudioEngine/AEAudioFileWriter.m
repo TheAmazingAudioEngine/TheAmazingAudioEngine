@@ -208,4 +208,8 @@ OSStatus AEAudioFileWriterAddAudio(AEAudioFileWriter* THIS, AudioBufferList *buf
     return ExtAudioFileWriteAsync(THIS->_audioFile, lengthInFrames, bufferList);
 }
 
+OSStatus AEAudioFileWriterAddAudioSynchronously(AEAudioFileWriter* THIS, AudioBufferList *bufferList, UInt32 lengthInFrames) {
+    return ExtAudioFileWrite(THIS->_audioFile, lengthInFrames, bufferList);
+}
+
 @end

@@ -25,7 +25,8 @@ enum {
 - (BOOL)beginWritingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType error:(NSError**)error;
 - (void)finishWriting;
 
-OSStatus AEAudioFileWriterAddAudio(AEAudioFileWriter* recorder, AudioBufferList *bufferList, UInt32 lengthInFrames);
+OSStatus AEAudioFileWriterAddAudio(AEAudioFileWriter* writer, AudioBufferList *bufferList, UInt32 lengthInFrames);
+OSStatus AEAudioFileWriterAddAudioSynchronously(AEAudioFileWriter* THIS, AudioBufferList *bufferList, UInt32 lengthInFrames);
 
 @property (nonatomic, retain, readonly) NSString *path;
 @end
