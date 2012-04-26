@@ -46,9 +46,8 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     }
         
     // Get data format
-    AudioStreamBasicDescription fileAudioDescription;
-    UInt32 size = sizeof(fileAudioDescription);
-    status = ExtAudioFileGetProperty(audioFile, kExtAudioFileProperty_FileDataFormat, &size, &fileAudioDescription);
+    UInt32 size = sizeof(audioDescription);
+    status = ExtAudioFileGetProperty(audioFile, kExtAudioFileProperty_FileDataFormat, &size, &audioDescription);
     if ( !checkResult(status, "ExtAudioFileGetProperty") ) {
         if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
                                               userInfo:[NSDictionary dictionaryWithObject:NSLocalizedString(@"Couldn't read the audio file", @"") 
