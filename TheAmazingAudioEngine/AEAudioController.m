@@ -33,10 +33,14 @@ const NSString *kAEAudioControllerUserInfoKey = @"userinfo";
 
 static inline int min(int a, int b) { return a>b ? b : a; }
 
+static inline void AEAudioControllerError(OSStatus result, const char *operation, const char* file, int line) {
+    NSLog(@"%s:%d: %s result %d %08X %4.4s\n", file, line, operation, (int)result, (int)result, (char*)&result); 
+}
+
 #define checkResult(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/')+1,__LINE__))
 static inline BOOL _checkResult(OSStatus result, const char *operation, const char* file, int line) {
     if ( result != noErr ) {
-        NSLog(@"%s:%d: %s result %d %08X %4.4s\n", file, line, operation, (int)result, (int)result, (char*)&result); 
+        AEAudioControllerError(result, operation, file, line);
         return NO;
     }
     return YES;
@@ -1573,10 +1577,12 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 	OSStatus result = NewAUGraph(&_audioGraph);
     if ( !checkResult(result, "NewAUGraph") ) return NO;
 	
+    BOOL useVoiceProcessing = (_voiceProcessingEnabled && _enableInput && (!_voiceProcessingOnlyForSpeakerAndMicrophone || _playingThroughDeviceSpeaker));
+    
     // Input/output unit description
     AudioComponentDescription io_desc = {
         .componentType = kAudioUnitType_Output,
-        .componentSubType = (_voiceProcessingEnabled && _enableInput ? kAudioUnitSubType_VoiceProcessingIO : kAudioUnitSubType_RemoteIO),
+        .componentSubType = useVoiceProcessing ? kAudioUnitSubType_VoiceProcessingIO : kAudioUnitSubType_RemoteIO,
         .componentManufacturer = kAudioUnitManufacturer_Apple,
         .componentFlags = 0,
         .componentFlagsMask = 0
@@ -1609,7 +1615,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
         if ( !checkResult(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_SetInputCallback)") ) return NO;
         
         // If doing voice processing, set its quality
-        if ( _voiceProcessingEnabled ) {
+        if ( useVoiceProcessing ) {
             UInt32 quality = 127;
             result = AudioUnitSetProperty(_ioAudioUnit, kAUVoiceIOProperty_VoiceProcessingQuality, kAudioUnitScope_Global, 1, &quality, sizeof(quality));
             checkResult(result, "AudioUnitSetProperty(kAUVoiceIOProperty_VoiceProcessingQuality)");
@@ -1681,6 +1687,13 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
     } else {
         // Just playback
         audioCategory = kAudioSessionCategory_MediaPlayback;
+    }
+    
+    UInt32 size = sizeof(audioCategory);
+    UInt32 currentCategory;
+    AudioSessionGetProperty(kAudioSessionProperty_AudioCategory, &size, &currentCategory);
+    if ( currentCategory == audioCategory ) {
+        return;
     }
     
     UInt32 allowMixing = YES;
@@ -2030,9 +2043,6 @@ static void configureChannelsInRangeForGroup(AEAudioController *THIS, NSRange ra
                     "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
         
         if ( channel->type == kChannelTypeChannel ) {
-            
-            // Make sure the mixer input isn't connected to anything
-            AUGraphDisconnectNodeInput(THIS->_audioGraph, group->mixerNode, i);
             
             // Set input stream format
             checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, i, &channel->audioDescription, sizeof(channel->audioDescription)),
@@ -2400,6 +2410,7 @@ static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp
 - (id)initWithAudioController:(AEAudioController *)audioController {
     if ( !(self = [super init]) ) return nil;
     _audioController = audioController;
+    self.name = @"com.theamazingaudioengine.AEAudioControllerMessagePollThread";
     return self;
 }
 -(void)main {
