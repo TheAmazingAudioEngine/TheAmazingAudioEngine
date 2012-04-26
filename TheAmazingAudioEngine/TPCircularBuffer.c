@@ -10,7 +10,7 @@
 #include <mach/mach.h>
 #include <stdio.h>
 
-#define checkResult(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/'),__LINE__))
+#define checkResult(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/')+1,__LINE__))
 static inline bool _checkResult(kern_return_t result, const char *operation, const char* file, int line) {
     if ( result != ERR_SUCCESS ) {
         printf("%s:%d: %s: %s\n", file, line, operation, mach_error_string(result)); 
