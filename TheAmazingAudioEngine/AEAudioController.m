@@ -21,7 +21,7 @@
 const int kMaximumChannelsPerGroup              = 100;
 const int kMaximumCallbacksPerSource            = 15;
 const int kMessageBufferLength                  = 8192;
-const int kIdleMessagingPollDuration            = 0.1;
+const NSTimeInterval kIdleMessagingPollDuration = 0.1;
 const int kRenderConversionScratchBufferSize    = 16384;
 const int kInputMonitorScratchBufferSize        = 8192;
 
@@ -669,6 +669,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     // Start messaging poll thread
     _pollThread = [[AEAudioControllerMessagePollThread alloc] initWithAudioController:self];
+    _pollThread.pollInterval = kIdleMessagingPollDuration;
     OSMemoryBarrier();
     [_pollThread start];
     
@@ -2418,7 +2419,7 @@ static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp
         if ( AEAudioControllerHasPendingMainThreadMessages(_audioController) ) {
             [_audioController performSelectorOnMainThread:@selector(pollForMainThreadMessages) withObject:nil waitUntilDone:YES];
         }
-        [NSThread sleepForTimeInterval:_pollInterval];
+        usleep(_pollInterval*1.0e6);
     }
 }
 @end
