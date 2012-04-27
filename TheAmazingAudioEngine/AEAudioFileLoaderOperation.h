@@ -47,13 +47,15 @@
 @interface AEAudioFileLoaderOperation : NSOperation
 
 /*!
- * Get the audio format of a file
+ * Get info for a file
  *
- * @param url URL to the file
- * @param error If not NULL, and an error occurs, this contains the error that occurred
- * @return The AudioStreamBasicDescription describing the audio format in the file
+ * @param url               URL to the file
+ * @param audioDescription  On output, if not NULL, will be filled with the file's audio description
+ * @param lengthInFrames    On output, if not NULL, will indicated the file length in frames
+ * @param error             If not NULL, and an error occurs, this contains the error that occurred
+ * @return YES if file info was loaded successfully
  */
-+ (AudioStreamBasicDescription)audioDescriptionForFileAtURL:(NSURL*)url error:(NSError**)error;
++ (BOOL)infoForFileAtURL:(NSURL*)url audioDescription:(AudioStreamBasicDescription*)audioDescription lengthInFrames:(UInt32*)lengthInFrames error:(NSError**)error;
 
 /*!
  * Initializer
@@ -65,7 +67,15 @@
 - (id)initWithFileURL:(NSURL*)url targetAudioDescription:(AudioStreamBasicDescription)audioDescription;
 
 /*!
- * The loaded audio, once operation has completed
+ * A block to use to receive audio
+ *
+ *  If this is set, then audio will be provided via this block as it is
+ *  loaded, instead of stored within @link bufferList @endlink.
+ */
+@property (nonatomic, copy) void (^audioReceiverBlock)(AudioBufferList *audio, UInt32 lengthInFrames);
+
+/*!
+ * The loaded audio, once operation has completed, unless @link audioReceiverBlock @endlink is set.
  *
  *  You are responsible for freeing both the memory pointed to by each mData pointer,
  *  as well as the buffer list itself. If an error occurred, this will be NULL.

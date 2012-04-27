@@ -7,6 +7,7 @@
 //
 
 #import "AEAudioFileLoaderOperation.h"
+#import "AEUtilities.h"
 
 #define checkResult(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/')+1,__LINE__))
 static inline BOOL _checkResult(OSStatus result, const char *operation, const char* file, int line) {
@@ -17,6 +18,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     return YES;
 }
 
+static const int kIncrementalLoadBufferSize = 4096;
 
 @interface AEAudioFileLoaderOperation ()
 @property (nonatomic, retain) NSURL *url;
@@ -27,11 +29,10 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 @end
 
 @implementation AEAudioFileLoaderOperation
-@synthesize url = _url, targetAudioDescription = _targetAudioDescription, bufferList = _bufferList, lengthInFrames = _lengthInFrames, error = _error;
+@synthesize url = _url, targetAudioDescription = _targetAudioDescription, audioReceiverBlock = _audioReceiverBlock, bufferList = _bufferList, lengthInFrames = _lengthInFrames, error = _error;
 
-+ (AudioStreamBasicDescription)audioDescriptionForFileAtURL:(NSURL*)url error:(NSError **)error {
-    AudioStreamBasicDescription audioDescription;
-    memset(&audioDescription, 0, sizeof(audioDescription));
++ (BOOL)infoForFileAtURL:(NSURL*)url audioDescription:(AudioStreamBasicDescription*)audioDescription lengthInFrames:(UInt32*)lengthInFrames error:(NSError**)error {
+    if ( audioDescription ) memset(audioDescription, 0, sizeof(AudioStreamBasicDescription));
     
     ExtAudioFileRef audioFile;
     OSStatus status;
@@ -42,21 +43,39 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
         if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
                                               userInfo:[NSDictionary dictionaryWithObject:NSLocalizedString(@"Couldn't open the audio file", @"") 
                                                                                    forKey:NSLocalizedDescriptionKey]];
-        return audioDescription;
+        return NO;
     }
         
-    // Get data format
-    UInt32 size = sizeof(audioDescription);
-    status = ExtAudioFileGetProperty(audioFile, kExtAudioFileProperty_FileDataFormat, &size, &audioDescription);
-    if ( !checkResult(status, "ExtAudioFileGetProperty") ) {
-        if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
-                                              userInfo:[NSDictionary dictionaryWithObject:NSLocalizedString(@"Couldn't read the audio file", @"") 
-                                                                                   forKey:NSLocalizedDescriptionKey]];
+    if ( audioDescription ) {
+        // Get data format
+        UInt32 size = sizeof(AudioStreamBasicDescription);
+        status = ExtAudioFileGetProperty(audioFile, kExtAudioFileProperty_FileDataFormat, &size, audioDescription);
+        if ( !checkResult(status, "ExtAudioFileGetProperty") ) {
+            if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
+                                                  userInfo:[NSDictionary dictionaryWithObject:NSLocalizedString(@"Couldn't read the audio file", @"") 
+                                                                                       forKey:NSLocalizedDescriptionKey]];
+            return NO;
+        }
+    }    
+    
+    if ( lengthInFrames ) {
+        // Get length
+        UInt64 fileLengthInFrames = 0;
+        UInt32 size = sizeof(fileLengthInFrames);
+        status = ExtAudioFileGetProperty(audioFile, kExtAudioFileProperty_FileLengthFrames, &size, &fileLengthInFrames);
+        if ( !checkResult(status, "ExtAudioFileGetProperty(kExtAudioFileProperty_FileLengthFrames)") ) {
+            ExtAudioFileDispose(audioFile);
+            if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
+                                                  userInfo:[NSDictionary dictionaryWithObject:NSLocalizedString(@"Couldn't read the audio file", @"") 
+                                                                                       forKey:NSLocalizedDescriptionKey]];
+            return NO;
+        }
+        *lengthInFrames = fileLengthInFrames;
     }
     
     ExtAudioFileDispose(audioFile);
     
-    return audioDescription;
+    return YES;
 }
 
 -(id)initWithFileURL:(NSURL *)url targetAudioDescription:(AudioStreamBasicDescription)audioDescription {
@@ -69,6 +88,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 }
 
 -(void)dealloc {
+    self.audioReceiverBlock = nil;
     self.url = nil;
     self.error = nil;
     [super dealloc];
@@ -127,39 +147,32 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     // Prepare buffers
     int bufferCount = (_targetAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? _targetAudioDescription.mChannelsPerFrame : 1;
     int channelsPerBuffer = (_targetAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? 1 : _targetAudioDescription.mChannelsPerFrame;
-    AudioBufferList *bufferList = (AudioBufferList*)malloc(sizeof(AudioBufferList) + (bufferCount-1)*sizeof(AudioBuffer));
-    bufferList->mNumberBuffers = bufferCount;
-    char* audioDataPtr[bufferCount];
-    for ( int i=0; i<bufferCount; i++ ) {
-        int bufferSize = fileLengthInFrames * _targetAudioDescription.mBytesPerFrame;
-        audioDataPtr[i] = malloc(bufferSize);
-        if ( !audioDataPtr[i] ) {
-            ExtAudioFileDispose(audioFile);
-            for ( int j=0; j<i; j++ ) free(audioDataPtr[j]);
-            free(bufferList);
-            self.error = [NSError errorWithDomain:NSPOSIXErrorDomain code:ENOMEM 
-                                         userInfo:[NSDictionary dictionaryWithObject:NSLocalizedString(@"Not enough memory to open file", @"")
-                                                                              forKey:NSLocalizedDescriptionKey]];
-            return;
-        }
-        
-        bufferList->mBuffers[i].mData = audioDataPtr[i];
-        bufferList->mBuffers[i].mDataByteSize = bufferSize;
-        bufferList->mBuffers[i].mNumberChannels = channelsPerBuffer;
+    AudioBufferList *bufferList = AEAllocateAndInitAudioBufferList(&_targetAudioDescription, _audioReceiverBlock ? kIncrementalLoadBufferSize : fileLengthInFrames);
+    if ( !bufferList ) {
+        ExtAudioFileDispose(audioFile);
+        self.error = [NSError errorWithDomain:NSPOSIXErrorDomain code:ENOMEM 
+                                     userInfo:[NSDictionary dictionaryWithObject:NSLocalizedString(@"Not enough memory to open file", @"")
+                                                                          forKey:NSLocalizedDescriptionKey]];
+        return;
     }
     
-    char audioBufferListSpace[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
-    AudioBufferList *scratchBufferList = (AudioBufferList*)audioBufferListSpace;
-    
-    scratchBufferList->mNumberBuffers = bufferCount;
+    AudioBufferList *scratchBufferList = AEAllocateAndInitAudioBufferList(&_targetAudioDescription, 0);
     
     // Perform read in multiple small chunks (otherwise ExtAudioFileRead crashes when performing sample rate conversion)
-    UInt64 remainingFrames = fileLengthInFrames;
-    while ( remainingFrames > 0 && ![self isCancelled] ) {
-        for ( int i=0; i<scratchBufferList->mNumberBuffers; i++ ) {
-            scratchBufferList->mBuffers[i].mNumberChannels = channelsPerBuffer;
-            scratchBufferList->mBuffers[i].mData = audioDataPtr[i];
-            scratchBufferList->mBuffers[i].mDataByteSize = MIN(16384, remainingFrames * _targetAudioDescription.mBytesPerFrame);
+    UInt64 readFrames = 0;
+    while ( readFrames < fileLengthInFrames && ![self isCancelled] ) {
+        if ( _audioReceiverBlock ) {
+            memcpy(scratchBufferList, bufferList, sizeof(AudioBufferList)+(bufferCount-1)*sizeof(AudioBuffer));
+            for ( int i=0; i<scratchBufferList->mNumberBuffers; i++ ) {
+                scratchBufferList->mBuffers[i].mDataByteSize = MIN(kIncrementalLoadBufferSize * _targetAudioDescription.mBytesPerFrame,
+                                                                   (fileLengthInFrames-readFrames) * _targetAudioDescription.mBytesPerFrame);
+            }
+        } else {
+            for ( int i=0; i<scratchBufferList->mNumberBuffers; i++ ) {
+                scratchBufferList->mBuffers[i].mNumberChannels = channelsPerBuffer;
+                scratchBufferList->mBuffers[i].mData = (char*)bufferList->mBuffers[i].mData + readFrames*_targetAudioDescription.mBytesPerFrame;
+                scratchBufferList->mBuffers[i].mDataByteSize = MIN(16384, (fileLengthInFrames-readFrames) * _targetAudioDescription.mBytesPerFrame);
+            }
         }
         
         // Perform read
@@ -179,20 +192,31 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
             break;
         }
         
-        for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
-            audioDataPtr[i] += numberOfPackets * _targetAudioDescription.mBytesPerFrame;
+        if ( _audioReceiverBlock ) {
+            _audioReceiverBlock(bufferList, numberOfPackets);
         }
-        remainingFrames -= numberOfPackets;
+        
+        readFrames += numberOfPackets;
     }
+    
+    if ( _audioReceiverBlock ) {
+        AEFreeAudioBufferList(bufferList);
+        bufferList = NULL;
+    }
+    
+    free(scratchBufferList);
     
     // Clean up        
     ExtAudioFileDispose(audioFile);
     
     if ( [self isCancelled] ) {
-        for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
-            free(bufferList->mBuffers[i].mData);
+        if ( bufferList ) {
+            for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
+                free(bufferList->mBuffers[i].mData);
+            }
+            free(bufferList);
+            bufferList = NULL;
         }
-        free(bufferList);
     } else {
         _bufferList = bufferList;
         _lengthInFrames = fileLengthInFrames;
