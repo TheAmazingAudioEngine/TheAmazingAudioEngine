@@ -1647,6 +1647,13 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
     // Register a callback to be notified when the main mixer unit renders
     checkResult(AudioUnitAddRenderNotify(_topGroup->mixerAudioUnit, &topRenderNotifyCallback, self), "AudioUnitAddRenderNotify");
     
+    if ( useVoiceProcessing ) {
+        // If we're using voice processing, clamp the buffer duration
+        Float32 preferredBufferSize = MAX(0.01, _preferredBufferDuration);
+        OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
+        checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
+    }
+    
     // Initialize the graph
 	result = AUGraphInitialize(_audioGraph);
     if ( !checkResult(result, "AUGraphInitialize") ) return NO;
