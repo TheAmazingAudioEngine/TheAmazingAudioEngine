@@ -552,11 +552,12 @@
 					"-DTPCircularBufferPrepareEmptyAudioBufferList=AECBPrepareEmptyBL",
 					"-DTPCircularBufferProduceAudioBufferList=AECBProduceBL",
 					"-DTPCircularBufferCopyAudioBufferList=AECBCopyBL",
+					"-DTPCircularBufferCopyAudioBufferListPartial=AECBCopyBLPartial",
 					"-DTPCircularBufferNextBufferList=AECBNextBL",
 					"-DTPCircularBufferNextBufferListAfter=AECBNextBLAfter",
 					"-DTPCircularBufferConsumeNextBufferList=AECBConsumeBL",
 					"-DTPCircularBufferConsumeNextBufferListPartial=AECBConsumeBLPartial",
-					"-DTPCircularBufferConsumeBufferListFrames=AECBConsumeBLFrames",
+					"-DTPCircularBufferDequeueBufferListFrames=AECBDequeueBLFrames",
 					"-DTPCircularBufferPeek=AECBPeek",
 				);
 				OTHER_LDFLAGS = "-ObjC";
@@ -586,11 +587,12 @@
 					"-DTPCircularBufferPrepareEmptyAudioBufferList=AECBPrepareEmptyBL",
 					"-DTPCircularBufferProduceAudioBufferList=AECBProduceBL",
 					"-DTPCircularBufferCopyAudioBufferList=AECBCopyBL",
+					"-DTPCircularBufferCopyAudioBufferListPartial=AECBCopyBLPartial",
 					"-DTPCircularBufferNextBufferList=AECBNextBL",
 					"-DTPCircularBufferNextBufferListAfter=AECBNextBLAfter",
 					"-DTPCircularBufferConsumeNextBufferList=AECBConsumeBL",
 					"-DTPCircularBufferConsumeNextBufferListPartial=AECBConsumeBLPartial",
-					"-DTPCircularBufferConsumeBufferListFrames=AECBConsumeBLFrames",
+					"-DTPCircularBufferDequeueBufferListFrames=AECBDequeueBLFrames",
 					"-DTPCircularBufferPeek=AECBPeek",
 				);
 				OTHER_LDFLAGS = "-ObjC";

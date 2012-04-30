@@ -363,7 +363,7 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
             if ( source->renderCallback ) {
                 source->renderCallback(source->source, frames, bufferList, source->callbackUserinfo);
             } else {
-                TPCircularBufferConsumeBufferListFrames(&source->buffer, &frames, bufferList, NULL, &source->audioDescription);
+                TPCircularBufferDequeueBufferListFrames(&source->buffer, &frames, bufferList, NULL, &source->audioDescription);
             }
             
             *ioLengthInFrames = frames + paddingFrames;

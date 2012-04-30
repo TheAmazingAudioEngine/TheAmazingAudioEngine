@@ -52,7 +52,7 @@ static void inputCallback(id                        receiver,
     UInt32 fillCount = TPCircularBufferPeek(&THIS->_buffer, NULL, AEAudioControllerAudioDescription(audioController));
     if ( fillCount > frames+kAudioBufferMaxLatencyInFrames ) {
         UInt32 skip = fillCount - frames;
-        TPCircularBufferConsumeBufferListFrames(&THIS->_buffer, &skip, NULL, NULL, AEAudioControllerAudioDescription(audioController));
+        TPCircularBufferDequeueBufferListFrames(&THIS->_buffer, &skip, NULL, NULL, AEAudioControllerAudioDescription(audioController));
     }
     
     TPCircularBufferCopyAudioBufferList(&THIS->_buffer, 
@@ -70,7 +70,7 @@ static OSStatus renderCallback(id                        channel,
                                UInt32                    frames,
                                AudioBufferList          *audio) {
     
-    TPCircularBufferConsumeBufferListFrames(&((AEPlaythroughChannel*)channel)->_buffer, 
+    TPCircularBufferDequeueBufferListFrames(&((AEPlaythroughChannel*)channel)->_buffer, 
                                             &frames, 
                                             audio, 
                                             NULL, 

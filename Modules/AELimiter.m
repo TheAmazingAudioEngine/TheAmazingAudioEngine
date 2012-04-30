@@ -108,7 +108,7 @@ static void _AELimiterDequeue(AELimiter *THIS, float** buffers, int numberOfBuff
         bufferList->mBuffers[i].mNumberChannels = 1;
     }
     THIS->_audioDescription.mChannelsPerFrame = numberOfBuffers;
-    TPCircularBufferConsumeBufferListFrames(&THIS->_buffer, ioLength, bufferList, timestamp, &THIS->_audioDescription);
+    TPCircularBufferDequeueBufferListFrames(&THIS->_buffer, ioLength, bufferList, timestamp, &THIS->_audioDescription);
     
     // Now apply limiting
     int frameNumber = 0;
