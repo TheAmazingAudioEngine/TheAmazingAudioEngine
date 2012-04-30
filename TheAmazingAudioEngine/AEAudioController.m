@@ -266,10 +266,11 @@ static void interruptionListener(void *inClientData, UInt32 inInterruption) {
     }
 }
 
-static void audioRouteChangePropertyListener(void *inClientData, AudioSessionPropertyID inID, UInt32 inDataSize, const void *inData) {
+static void audioSessionPropertyListener(void *inClientData, AudioSessionPropertyID inID, UInt32 inDataSize, const void *inData) {
+    AEAudioController *THIS = (AEAudioController *)inClientData;
+    
     if (inID == kAudioSessionProperty_AudioRouteChange) {
         int reason = [[(NSDictionary*)inData objectForKey:(id)kAudioSession_RouteChangeKey_Reason] intValue];
-        AEAudioController *THIS = (AEAudioController *)inClientData;
         
         CFStringRef route;
         UInt32 size = sizeof(route);
@@ -277,13 +278,13 @@ static void audioRouteChangePropertyListener(void *inClientData, AudioSessionPro
         
         BOOL playingThroughSpeaker;
         if ( [(NSString*)route isEqualToString:@"ReceiverAndMicrophone"] ) {
-            checkResult(AudioSessionRemovePropertyListenerWithUserData(kAudioSessionProperty_AudioRouteChange, audioRouteChangePropertyListener, THIS), "AudioSessionRemovePropertyListenerWithUserData");
+            checkResult(AudioSessionRemovePropertyListenerWithUserData(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, THIS), "AudioSessionRemovePropertyListenerWithUserData");
             
             // Re-route audio to the speaker (not the receiver)
             UInt32 newRoute = kAudioSessionOverrideAudioRoute_Speaker;
             checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute,  sizeof(route), &newRoute), "AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute)");
             
-            checkResult(AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audioRouteChangePropertyListener, THIS), "AudioSessionAddPropertyListener");
+            checkResult(AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, THIS), "AudioSessionAddPropertyListener");
             
             playingThroughSpeaker = YES;
         } else if ( [(NSString*)route isEqualToString:@"SpeakerAndMicrophone"] || [(NSString*)route isEqualToString:@"Speaker"] ) {
@@ -307,12 +308,7 @@ static void audioRouteChangePropertyListener(void *inClientData, AudioSessionPro
                 [THIS updateVoiceProcessingSettings];
             }
         }
-    }
-}
-
-static void inputAvailablePropertyListener (void *inClientData, AudioSessionPropertyID inID, UInt32 inDataSize, const void *inData) {
-    AEAudioController *THIS = (AEAudioController *)inClientData;
-    if ( inID == kAudioSessionProperty_AudioInputAvailable ) {
+    } else if ( inID == kAudioSessionProperty_AudioInputAvailable ) {
         [THIS updateInputDeviceStatus];
     }
 }
@@ -1531,10 +1527,10 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
     if ( !checkResult(result, "AudioSessionInitialize") ) return;
     
     // Register property listeners
-    result = AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audioRouteChangePropertyListener, self);
+    result = AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, self);
     checkResult(result, "AudioSessionAddPropertyListener");
     
-    result = AudioSessionAddPropertyListener(kAudioSessionProperty_AudioInputAvailable, inputAvailablePropertyListener, self);
+    result = AudioSessionAddPropertyListener(kAudioSessionProperty_AudioInputAvailable, audioSessionPropertyListener, self);
     checkResult(result, "AudioSessionAddPropertyListener");
     
     // Set preferred buffer size
@@ -1567,9 +1563,33 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
     _audioInputAvailable = inputAvailable;
     
     [self setAudioSessionCategory];
-    
+
     // Start session
     checkResult(AudioSessionSetActive(true), "AudioSessionSetActive");
+    
+    // Determine audio route
+    CFStringRef route;
+    size = sizeof(route);
+    checkResult(AudioSessionGetProperty(kAudioSessionProperty_AudioRoute, &size, &route),
+                "AudioSessionGetProperty(kAudioSessionProperty_AudioRoute)");
+    if ( [(NSString*)route isEqualToString:@"ReceiverAndMicrophone"] ) {
+        checkResult(AudioSessionRemovePropertyListenerWithUserData(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, self), 
+                    "AudioSessionRemovePropertyListenerWithUserData");
+        
+        // Re-route audio to the speaker (not the receiver)
+        UInt32 newRoute = kAudioSessionOverrideAudioRoute_Speaker;
+        checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute,  sizeof(route), &newRoute), 
+                    "AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute)");
+        
+        checkResult(AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, self),
+                    "AudioSessionAddPropertyListener");
+        
+        _playingThroughDeviceSpeaker = YES;
+    } else if ( [(NSString*)route isEqualToString:@"SpeakerAndMicrophone"] || [(NSString*)route isEqualToString:@"Speaker"] ) {
+        _playingThroughDeviceSpeaker = YES;
+    } else {
+        _playingThroughDeviceSpeaker = NO;
+    }
 }
 
 - (BOOL)setup {
