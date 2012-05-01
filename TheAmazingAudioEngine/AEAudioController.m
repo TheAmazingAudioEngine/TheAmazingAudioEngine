@@ -7,6 +7,7 @@
 //
 
 #import "AEAudioController.h"
+#import "AEUtilities.h"
 #import <UIKit/UIKit.h>
 #import <libkern/OSAtomic.h>
 #import "TPCircularBuffer.h"
@@ -659,7 +660,8 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 - (void)start {
-
+    AudioSessionSetActive(true);
+    
     // Determine if audio input is available, and the number of input channels available
     [self updateInputDeviceStatus];
     
@@ -670,7 +672,6 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     [_pollThread start];
     
     // Start things up
-    checkResult(AudioSessionSetActive(true), "AudioSessionSetActive");
     checkResult(AUGraphStart(_audioGraph), "AUGraphStart");
 }
 
@@ -1593,7 +1594,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 }
 
 - (BOOL)setup {
-
+    
     // Create a new AUGraph
 	OSStatus result = NewAUGraph(&_audioGraph);
     if ( !checkResult(result, "NewAUGraph") ) return NO;
@@ -1755,6 +1756,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
         [self stop];
         [self teardown];
         [NSThread sleepForTimeInterval:0.1]; // Sleep for a moment http://prod.lists.apple.com/archives/coreaudio-api/2012/Jan/msg00028.html
+        AudioSessionSetActive(true);
         [self setup];
         [self start];
     }
@@ -1786,7 +1788,9 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
         if ( inputAvailable ) {
             // Check channels on input
             OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &numberOfInputChannels);
-            checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels)");
+            if ( !checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels)") ) {
+                return;
+            }
         }
         
         AudioStreamBasicDescription inputAudioDescription = _audioDescription;
@@ -1806,15 +1810,7 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
         BOOL inputAvailableChanged = _audioInputAvailable != inputAvailable;
         
         if ( !_inputAudioBufferList || memcmp(&inputAudioDescription, &_inputAudioDescription, sizeof(inputAudioDescription)) != 0 ) {
-            int numberOfBuffers = inputAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? inputAudioDescription.mChannelsPerFrame : 1;
-            int channelsPerBuffer = inputAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? 1 : inputAudioDescription.mChannelsPerFrame;
-            
-            inputBufferList = (AudioBufferList*)malloc(sizeof(AudioBufferList) + (numberOfBuffers-1)*sizeof(AudioBuffer));
-            inputBufferList->mNumberBuffers = numberOfBuffers;
-            for ( int i=0; i<numberOfBuffers; i++ ) {
-                inputBufferList->mBuffers[i].mNumberChannels = channelsPerBuffer;
-            }
-            
+            inputBufferList = AEAllocateAndInitAudioBufferList(&inputAudioDescription, 0);
             inputChannelsChanged = YES;
             [self willChangeValueForKey:@"numberOfInputChannels"];
             [self willChangeValueForKey:@"inputAudioDescription"];
@@ -1836,8 +1832,7 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
                                                     length:sizeof(struct callbackTableInfo_t)];
         
         if ( oldInputBuffer && oldInputBuffer != _inputAudioBufferList ) {
-            for ( int i=0; i<oldInputBuffer->mNumberBuffers; i++ ) free(oldInputBuffer->mBuffers[i].mData);
-            free(oldInputBuffer);
+            AEFreeAudioBufferList(oldInputBuffer);
         }
         
         if ( inputChannelsChanged ) {
