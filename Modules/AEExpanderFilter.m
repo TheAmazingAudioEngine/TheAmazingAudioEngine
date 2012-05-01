@@ -211,7 +211,7 @@ static void filterCallback(id                        receiver,
     AudioStreamBasicDescription *asbd = AEAudioControllerAudioDescription(audioController);
     assert(asbd->mFormatFlags & kAudioFormatFlagIsNonInterleaved);
     
-    if ( audio->mNumberBuffers < THIS->_configuredChannels ) {
+    if ( audio->mNumberBuffers > THIS->_configuredChannels ) {
         AEAudioControllerSendAsynchronousMessageToMainThread(audioController, 
                                                              reconfigureChannels, 
                                                              &(struct reconfigureChannels_t){ .filter = THIS, .numberOfChannels = audio->mNumberBuffers}, 
