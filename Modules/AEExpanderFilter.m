@@ -193,7 +193,8 @@ static void reconfigureChannels(AEAudioController *audioController, void *userIn
 
 static void completeCalibration(AEAudioController *audioController, void *userInfo, int len) {
     AEExpanderFilter *THIS = *(AEExpanderFilter**)userInfo;
-    THIS.threshold = min(THIS->_calibrationMaxValue + kCalibrationThresholdOffset + [THIS thresholdOffsetForPreset:THIS->_preset], kMaxAutoThreshold);
+    THIS->_threshold = min(THIS->_calibrationMaxValue + kCalibrationThresholdOffset + [THIS thresholdOffsetForPreset:THIS->_preset],
+                           pow(10.0, kMaxAutoThreshold / 10.0) * INT16_MAX);
     THIS->_calibrateCompletionBlock();
     [THIS->_calibrateCompletionBlock release];
     THIS->_calibrateCompletionBlock = nil;
@@ -222,7 +223,7 @@ static void filterCallback(id                        receiver,
     float max = 0;
     for ( int i=0; i<audio->mNumberBuffers; i++ ) {
         vDSP_vflt16((SInt16*)audio->mBuffers[i].mData, 1, THIS->_scratchBuffer[i], 1, frames);
-        float vmax;
+        float vmax = 0;
         vDSP_maxmgv(THIS->_scratchBuffer[i], 1, &vmax, frames);
         if ( vmax > max ) max = vmax;
     }
