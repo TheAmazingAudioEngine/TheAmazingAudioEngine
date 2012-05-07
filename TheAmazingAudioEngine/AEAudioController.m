@@ -14,6 +14,8 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #import <Accelerate/Accelerate.h>
+#import "AEAudioController+Audiobus.h"
+#import "AEAudioController+AudiobusStub.h"
 
 #ifdef TRIAL
 #import "AETrialModeController.h"
@@ -224,6 +226,9 @@ static void removeCallbackFromTable(AEAudioController *THIS, void *userInfo, int
 - (NSArray*)objectsAssociatedWithCallbacksWithFlags:(uint8_t)flags forChannelGroup:(AEChannelGroupRef)group;
 - (void)setVariableSpeedFilter:(id<AEAudioVariableSpeedFilter>)filter forChannelStruct:(AEChannelRef)channel;
 static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp *inTimeStamp, UInt32 inNumberFrames, AudioBufferList *ioData);
+
+@property (nonatomic, retain) ABInputPort *audiobusInputPort;
+@property (nonatomic, retain) ABOutputPort *audiobusOutputPort;
 @end
 
 @implementation AEAudioController
@@ -237,7 +242,9 @@ static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp
             playingThroughDeviceSpeaker = _playingThroughDeviceSpeaker,
             preferredBufferDuration     = _preferredBufferDuration, 
             inputMode                   = _inputMode, 
-            audioUnit                   = _ioAudioUnit;
+            audioUnit                   = _ioAudioUnit,
+            audiobusInputPort           = _audiobusInputPort,
+            audiobusOutputPort          = _audiobusOutputPort;
 
 @dynamic    running, inputGainAvailable, inputGain, audioDescription, inputAudioDescription;
 
@@ -408,8 +415,9 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
 }
 
 static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
-   
     AEAudioController *THIS = (AEAudioController *)inRefCon;
+    
+    if ( THIS->_audiobusInputPort && !(*ioActionFlags & kAudioUnitRenderAction_IsFromAudiobus) && ABInputPortIsConnected(THIS->_audiobusInputPort) ) return noErr;
 
     for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
         callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
@@ -422,9 +430,13 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
     }
     
     // Render audio into buffer
-    OSStatus err = AudioUnitRender(THIS->_ioAudioUnit, ioActionFlags, inTimeStamp, 1, inNumberFrames, THIS->_inputAudioBufferList);
-    if ( !checkResult(err, "AudioUnitRender") ) { 
-        return err; 
+    if ( *ioActionFlags & kAudioUnitRenderAction_IsFromAudiobus && ABInputPortReceive != NULL ) {
+        ABInputPortReceive(THIS->_audiobusInputPort, nil, THIS->_inputAudioBufferList, &inNumberFrames, NULL, NULL);
+    } else {
+        OSStatus err = AudioUnitRender(THIS->_ioAudioUnit, ioActionFlags, inTimeStamp, 1, inNumberFrames, THIS->_inputAudioBufferList);
+        if ( !checkResult(err, "AudioUnitRender") ) { 
+            return err; 
+        }
     }
     
     // Perform input metering
@@ -507,6 +519,10 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         }
     } else {
         // After render
+        if ( THIS->_audiobusOutputPort ) {
+            ABOutputPortSendAudio(THIS->_audiobusOutputPort, ioData, inNumberFrames, inTimeStamp->mHostTime, NULL);
+        }
+        
         if ( THIS->_muteOutput ) {
             for ( int i=0; i<ioData->mNumberBuffers; i++ ) {
                 memset(ioData->mBuffers[i].mData, 0, ioData->mBuffers[i].mDataByteSize);
@@ -625,6 +641,10 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         [_pollThread cancel];
         [_pollThread release];
     }
+    
+    self.audiobusInputPort = nil;
+    self.audiobusOutputPort = nil;
+    
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [self stop];
     [self teardown];
@@ -1471,9 +1491,83 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
     return &_inputAudioDescription;
 }
 
+-(void)setAudiobusInputPort:(ABInputPort *)audiobusInputPort {
+    if ( _audiobusInputPort ) {
+        _audiobusInputPort.audioInputBlock = nil;
+    }
+    
+    [audiobusInputPort retain];
+    [_audiobusInputPort release];
+    _audiobusInputPort = audiobusInputPort;
+
+    if ( _audiobusInputPort ) {
+        _audiobusInputPort.clientFormat = _audioDescription;
+        UInt32 ioBufferLength = AEConvertSecondsToFrames(self, self.preferredBufferDuration);
+        _audiobusInputPort.audioInputBlock = ^(ABInputPort *inputPort, UInt32 lengthInFrames, uint64_t nextTimestamp, ABPort *sourcePortOrNil) {
+            char bufferListSpace[sizeof(AudioBufferList)+(_audioDescription.mChannelsPerFrame-1)*sizeof(AudioBuffer)];
+            AudioBufferList *bufferList = (AudioBufferList*)&bufferListSpace;
+            AEInitAudioBufferList(bufferList, sizeof(bufferListSpace), &_audioDescription, NULL, 0);
+            
+            static Float64 __sampleTime = 0.0;
+            AudioTimeStamp timestamp;
+            memset(&timestamp, 0, sizeof(timestamp));
+            timestamp.mHostTime = nextTimestamp;
+            timestamp.mSampleTime = __sampleTime;
+            timestamp.mFlags = kAudioTimeStampHostTimeValid;
+            
+            AudioUnitRenderActionFlags flags = kAudioUnitRenderAction_PostRender | kAudioUnitRenderAction_IsFromAudiobus;
+            
+            // Perform in small chunks
+            UInt32 remainingFrames = lengthInFrames;
+            while ( remainingFrames > 0 ) {
+                lengthInFrames = MIN(ioBufferLength, remainingFrames);
+                
+                // Find timestamp for this chunk
+                ABInputPortPeek(inputPort, &timestamp.mHostTime);
+                timestamp.mSampleTime = __sampleTime;
+                __sampleTime += lengthInFrames;
+                
+                for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
+                    bufferList->mBuffers[i].mData = NULL;
+                    bufferList->mBuffers[i].mDataByteSize = 0;
+                    bufferList->mBuffers[i].mNumberChannels = _inputAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? 1 : _inputAudioDescription.mChannelsPerFrame;
+                }
+                
+                inputAvailableCallback(self, &flags, &timestamp, 0, lengthInFrames, bufferList);
+                
+                remainingFrames -= lengthInFrames;
+            }
+        };
+    }
+}
+
+-(void)setAudiobusOutputPort:(ABOutputPort *)audiobusOutputPort {
+    if ( _audiobusOutputPort ) [_audiobusOutputPort removeObserver:self forKeyPath:@"connectedPortAttributes"];
+    
+    [audiobusOutputPort retain];
+    [_audiobusOutputPort release];
+    _audiobusOutputPort = audiobusOutputPort;
+    
+    if ( _audiobusOutputPort ) {
+        AudioStreamBasicDescription outputAudioDescription;
+        UInt32 size = sizeof(outputAudioDescription);
+        if ( checkResult(AudioUnitGetProperty(_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &outputAudioDescription, &size), 
+                         "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)") ) {
+            _audiobusOutputPort.clientFormat = outputAudioDescription;
+        }
+        _muteOutput = _muteOutput || _audiobusOutputPort.connectedPortAttributes & ABInputPortAttributePlaysLiveAudio;
+        [_audiobusOutputPort addObserver:self forKeyPath:@"connectedPortAttributes" options:0 context:NULL];
+    }
+}
+
 #pragma mark - Events
 
 -(void) observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
+    if ( object == _audiobusOutputPort ) {
+        _muteOutput = _audiobusOutputPort.connectedPortAttributes & ABInputPortAttributePlaysLiveAudio;
+        return;
+    }
+    
     id<AEAudioPlayable> channel = (id<AEAudioPlayable>)object;
     
     int index;

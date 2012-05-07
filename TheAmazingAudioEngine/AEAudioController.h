@@ -172,7 +172,7 @@ typedef OSStatus (*AEAudioControllerRenderCallback) (id                        c
  *
  * @param receiver   The receiver object
  * @param audioController The Audio Controller
- * @param source     The source of the audio: @link AEAudioSourceInput @endlink, @link AEAudioSourceMainOutput @endlink, @link AEAudioSourceInputAlternate @endlink, an AEChannelGroupRef or an id<AEAudioPlayable>.
+ * @param source     The source of the audio: @link AEAudioSourceInput @endlink, @link AEAudioSourceMainOutput @endlink, an AEChannelGroupRef or an id<AEAudioPlayable>.
  * @param time       The time the audio was received (for input), or the time it will be played (for output)
  * @param frames     The length of the audio, in frames
  * @param audio      The audio buffer list
