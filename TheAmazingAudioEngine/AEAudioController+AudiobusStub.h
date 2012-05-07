@@ -8,7 +8,6 @@
 
 #import <Foundation/Foundation.h>
 
-#define kAudioUnitRenderAction_IsFromAudiobus (1 << 12)
 @class ABInputPort;
 @class ABOutputPort;
 @class ABPort;

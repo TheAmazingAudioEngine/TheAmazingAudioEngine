@@ -27,6 +27,7 @@ const int kMessageBufferLength                  = 8192;
 const NSTimeInterval kIdleMessagingPollDuration = 0.1;
 const int kRenderConversionScratchBufferSize    = 16384;
 const int kInputMonitorScratchBufferSize        = 8192;
+const int kAudiobusSourceFlag                   = 1<<12;
 
 NSString * AEAudioControllerSessionInterruptionBeganNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionBeganNotification";
 NSString * AEAudioControllerSessionInterruptionEndedNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionEndedNotification";
@@ -417,7 +418,24 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
 static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
     AEAudioController *THIS = (AEAudioController *)inRefCon;
     
-    if ( THIS->_audiobusInputPort && !(*ioActionFlags & kAudioUnitRenderAction_IsFromAudiobus) && ABInputPortIsConnected(THIS->_audiobusInputPort) ) return noErr;
+    if ( THIS->_audiobusInputPort && !(*ioActionFlags & kAudiobusSourceFlag) && ABInputPortIsConnected(THIS->_audiobusInputPort) ) {
+        
+        // If Audiobus is connected, then serve Audiobus queue rather than serving system input queue
+        UInt32 ioBufferLength = AEConvertSecondsToFrames(THIS, THIS->_preferredBufferDuration);
+        AudioTimeStamp timestamp;
+        static Float64 __sampleTime = 0;
+        AudioUnitRenderActionFlags flags = kAudiobusSourceFlag;
+        while ( 1 ) {
+            UInt32 frames = ABInputPortPeek(THIS->_audiobusInputPort, &timestamp.mHostTime);
+            if ( frames < ioBufferLength ) break;
+            frames = MIN(ioBufferLength, frames);
+            timestamp.mSampleTime = __sampleTime;
+            __sampleTime += frames;
+            
+            inputAvailableCallback(THIS, &flags, &timestamp, 0, frames, NULL);
+        }
+        return noErr;
+    }
 
     for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
         callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
@@ -430,7 +448,7 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
     }
     
     // Render audio into buffer
-    if ( *ioActionFlags & kAudioUnitRenderAction_IsFromAudiobus && ABInputPortReceive != NULL ) {
+    if ( *ioActionFlags & kAudiobusSourceFlag && ABInputPortReceive != NULL ) {
         ABInputPortReceive(THIS->_audiobusInputPort, nil, THIS->_inputAudioBufferList, &inNumberFrames, NULL, NULL);
     } else {
         OSStatus err = AudioUnitRender(THIS->_ioAudioUnit, ioActionFlags, inTimeStamp, 1, inNumberFrames, THIS->_inputAudioBufferList);
@@ -1503,43 +1521,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 
     if ( _audiobusInputPort ) {
         _audiobusInputPort.clientFormat = _audioDescription;
-        UInt32 ioBufferLength = AEConvertSecondsToFrames(self, self.preferredBufferDuration);
         [_audiobusInputPort addObserver:self forKeyPath:@"sources" options:0 context:NULL];
-        _audiobusInputPort.audioInputBlock = ^(ABInputPort *inputPort, UInt32 lengthInFrames, uint64_t nextTimestamp, ABPort *sourcePortOrNil) {
-            char bufferListSpace[sizeof(AudioBufferList)+(_audioDescription.mChannelsPerFrame-1)*sizeof(AudioBuffer)];
-            AudioBufferList *bufferList = (AudioBufferList*)&bufferListSpace;
-            AEInitAudioBufferList(bufferList, sizeof(bufferListSpace), &_audioDescription, NULL, 0);
-            
-            static Float64 __sampleTime = 0.0;
-            AudioTimeStamp timestamp;
-            memset(&timestamp, 0, sizeof(timestamp));
-            timestamp.mHostTime = nextTimestamp;
-            timestamp.mSampleTime = __sampleTime;
-            timestamp.mFlags = kAudioTimeStampHostTimeValid;
-            
-            AudioUnitRenderActionFlags flags = kAudioUnitRenderAction_PostRender | kAudioUnitRenderAction_IsFromAudiobus;
-            
-            // Perform in small chunks
-            UInt32 remainingFrames = lengthInFrames;
-            while ( remainingFrames > 0 ) {
-                lengthInFrames = MIN(ioBufferLength, remainingFrames);
-                
-                // Find timestamp for this chunk
-                ABInputPortPeek(inputPort, &timestamp.mHostTime);
-                timestamp.mSampleTime = __sampleTime;
-                __sampleTime += lengthInFrames;
-                
-                for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
-                    bufferList->mBuffers[i].mData = NULL;
-                    bufferList->mBuffers[i].mDataByteSize = 0;
-                    bufferList->mBuffers[i].mNumberChannels = _inputAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? 1 : _inputAudioDescription.mChannelsPerFrame;
-                }
-                
-                inputAvailableCallback(self, &flags, &timestamp, 0, lengthInFrames, bufferList);
-                
-                remainingFrames -= lengthInFrames;
-            }
-        };
         if ( ABInputPortIsConnected(_audiobusInputPort) ) [self updateInputDeviceStatus];
     }
 }
@@ -2524,6 +2506,8 @@ static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp
 }
 
 @end
+
+#pragma mark -
 
 @implementation AEAudioControllerProxy
 - (id)initWithAudioController:(AEAudioController *)audioController {
