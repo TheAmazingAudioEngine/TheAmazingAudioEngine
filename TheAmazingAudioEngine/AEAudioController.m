@@ -1494,6 +1494,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 -(void)setAudiobusInputPort:(ABInputPort *)audiobusInputPort {
     if ( _audiobusInputPort ) {
         _audiobusInputPort.audioInputBlock = nil;
+        [_audiobusInputPort removeObserver:self forKeyPath:@"sources"];
     }
     
     [audiobusInputPort retain];
@@ -1503,6 +1504,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
     if ( _audiobusInputPort ) {
         _audiobusInputPort.clientFormat = _audioDescription;
         UInt32 ioBufferLength = AEConvertSecondsToFrames(self, self.preferredBufferDuration);
+        [_audiobusInputPort addObserver:self forKeyPath:@"sources" options:0 context:NULL];
         _audiobusInputPort.audioInputBlock = ^(ABInputPort *inputPort, UInt32 lengthInFrames, uint64_t nextTimestamp, ABPort *sourcePortOrNil) {
             char bufferListSpace[sizeof(AudioBufferList)+(_audioDescription.mChannelsPerFrame-1)*sizeof(AudioBuffer)];
             AudioBufferList *bufferList = (AudioBufferList*)&bufferListSpace;
@@ -1538,6 +1540,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
                 remainingFrames -= lengthInFrames;
             }
         };
+        if ( ABInputPortIsConnected(_audiobusInputPort) ) [self updateInputDeviceStatus];
     }
 }
 
@@ -1565,6 +1568,10 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 -(void) observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
     if ( object == _audiobusOutputPort ) {
         _muteOutput = _audiobusOutputPort.connectedPortAttributes & ABInputPortAttributePlaysLiveAudio;
+        return;
+    }
+    if ( object == _audiobusInputPort ) {
+        [self updateInputDeviceStatus];
         return;
     }
     
@@ -1859,8 +1866,11 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 struct updateInputDeviceStatusHandler_t { UInt32 numberOfInputChannels; BOOL inputAvailable; AudioStreamBasicDescription *audioDescription; AudioBufferList *audioBufferList; };
 static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userInfo, int length) {
     struct updateInputDeviceStatusHandler_t *arg = userInfo;
-    OSStatus result = AudioUnitSetProperty(THIS->_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, arg->audioDescription, sizeof(AudioStreamBasicDescription));
-    checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
+    
+    if ( !THIS->_audiobusInputPort || !ABInputPortIsConnected(THIS->_audiobusInputPort) ) {
+        OSStatus result = AudioUnitSetProperty(THIS->_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, arg->audioDescription, sizeof(AudioStreamBasicDescription));
+        checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
+    }
     
     THIS->_numberOfInputChannels = arg->numberOfInputChannels;
     THIS->_inputAudioDescription = *arg->audioDescription;
@@ -1873,21 +1883,28 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
     
     if ( _enableInput ) {
         // Determine if audio input is available, and the number of input channels available
-        UInt32 size = sizeof(inputAvailable);
-        OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_AudioInputAvailable, &size, &inputAvailable);
-        checkResult(result, "AudioSessionGetProperty");
-        
+        AudioStreamBasicDescription inputAudioDescription = _audioDescription;
         UInt32 numberOfInputChannels = 0;
-        size = sizeof(numberOfInputChannels);
-        if ( inputAvailable ) {
-            // Check channels on input
-            OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &numberOfInputChannels);
-            if ( !checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels)") ) {
-                return;
+        
+        if ( _audiobusInputPort && ABInputPortIsConnected(_audiobusInputPort) ) {
+            inputAvailable = YES;
+            inputAudioDescription = _audioDescription;
+            numberOfInputChannels = inputAudioDescription.mChannelsPerFrame;
+        } else {
+            UInt32 size = sizeof(inputAvailable);
+            OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_AudioInputAvailable, &size, &inputAvailable);
+            checkResult(result, "AudioSessionGetProperty");
+            
+            numberOfInputChannels = 0;
+            size = sizeof(numberOfInputChannels);
+            if ( inputAvailable ) {
+                // Check channels on input
+                OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &numberOfInputChannels);
+                if ( !checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels)") ) {
+                    return;
+                }
             }
         }
-        
-        AudioStreamBasicDescription inputAudioDescription = _audioDescription;
         
         if ( _inputMode == AEInputModeVariableAudioFormat) {
             // Set the input audio description channels to the number of actual available channels
@@ -1926,12 +1943,16 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
                                                     length:sizeof(struct callbackTableInfo_t)];
         
         if ( oldInputBuffer && oldInputBuffer != _inputAudioBufferList ) {
-            AEFreeAudioBufferList(oldInputBuffer);
+            free(oldInputBuffer);
         }
         
         if ( inputChannelsChanged ) {
             [self didChangeValueForKey:@"inputAudioDescription"];
             [self didChangeValueForKey:@"numberOfInputChannels"];
+            
+            if ( _audiobusInputPort && ABInputPortIsConnected(_audiobusInputPort) && _audiobusInputPort.clientFormat.mChannelsPerFrame != _audioDescription.mChannelsPerFrame ) {
+                _audiobusInputPort.clientFormat = inputAudioDescription;
+            }
         }
         
         if ( inputAvailableChanged ) {
