@@ -29,9 +29,10 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 #define kSourceTimestampIdleThreshold     0.1
 #define kConversionBufferLength           16384
 #define kScratchBufferLength              16384
-#define kSourceBufferLength               16384
+#define kSourceBufferLength               65536
 #define kActionBufferSize                 sizeof(action_t) * 10
 #define kActionMainThreadPollDuration     0.2
+#define kMinimumFrameCount                64
 
 typedef struct {
     AEMixerBufferSource                source;
@@ -244,10 +245,14 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
     // We'll advance the buffer list pointers as we add audio - save the originals to restore later
     void *savedmData[2] = { bufferList ? bufferList->mBuffers[0].mData : NULL, bufferList && bufferList->mNumberBuffers == 2 ? bufferList->mBuffers[1].mData : NULL };
     
-    int framesToGo = *ioLengthInFrames;
+    int framesToGo = MIN(*ioLengthInFrames, bufferList->mBuffers[0].mDataByteSize / THIS->_clientFormat.mBytesPerFrame);
     while ( framesToGo > 0 ) {
         // Process in small blocks so we don't overwhelm the mixer/converter buffers
         UInt32 frames = MIN(framesToGo, 512);
+        
+        for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
+            bufferList->mBuffers[i].mDataByteSize = frames * THIS->_clientFormat.mBytesPerFrame;
+        }
         
         AudioBufferList *intermediateBufferList = bufferList;
     
@@ -271,21 +276,25 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
         audioTimestamp.mFlags = (sliceTimestamp ? kAudioTimeStampHostTimeValid : 0) | kAudioTimeStampSampleTimeValid;
         audioTimestamp.mHostTime = sliceTimestamp;
         audioTimestamp.mSampleTime = THIS->_currentSliceSampleTime;
+        
         OSStatus result = AudioUnitRender(THIS->_mixerUnit, &flags, &audioTimestamp, 0, frames, intermediateBufferList);
-        if ( !checkResult(result, "AudioUnitRender") ) break;
-    
+        if ( !checkResult(result, "AudioUnitRender") ) {
+            break;
+        }
+        
         THIS->_currentSliceSampleTime += frames;
         
         if ( THIS->_audioConverter ) {
             // Convert output into client format
             OSStatus result = AudioConverterConvertComplexBuffer(THIS->_audioConverter, frames, intermediateBufferList, bufferList);
-            if ( !checkResult(result, "AudioConverterConvertComplexBuffer") ) break;
+            if ( !checkResult(result, "AudioConverterConvertComplexBuffer") ) {
+                break;
+            }
         }
         
         // Advance buffers
         for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
             bufferList->mBuffers[i].mData = (uint8_t*)bufferList->mBuffers[i].mData + (frames * THIS->_clientFormat.mBytesPerFrame);
-            bufferList->mBuffers[i].mDataByteSize -= frames * THIS->_clientFormat.mBytesPerFrame;
         }
         
         if ( frames == 0 ) break;
@@ -472,6 +481,11 @@ UInt32 AEMixerBufferPeek(AEMixerBuffer *THIS, uint64_t *outNextTimestamp) {
     
     UInt32 frameCount = round((earliestEndTimestamp - earliestStartTimestamp) * __hostTicksToSeconds * THIS->_clientFormat.mSampleRate);
     if ( frameCount > minFrameCount ) frameCount = minFrameCount;
+    
+    if ( frameCount < kMinimumFrameCount ) {
+        if ( outNextTimestamp ) *outNextTimestamp = 0;
+        return 0;
+    }
     
     if ( outNextTimestamp ) *outNextTimestamp = earliestStartTimestamp;
     return frameCount;
