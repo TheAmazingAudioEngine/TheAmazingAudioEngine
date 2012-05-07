@@ -174,6 +174,7 @@ void AEMixerBufferEnqueue(AEMixerBuffer *THIS, AEMixerBufferSource sourceID, Aud
         source->volume = 1.0;
         source->pan = 0.0;
         source->audioDescription = _clientFormat;
+        source->lastAudioTimestamp = mach_absolute_time();
         [self refreshMixingGraph];
     } else {
         TPCircularBufferCleanup(&source->buffer);
@@ -376,6 +377,10 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
                 }
             }
         }
+    }
+    
+    for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
+        bufferList->mBuffers[i].mDataByteSize = *ioLengthInFrames * source->audioDescription.mBytesPerFrame;
     }
     
     // Mark this source as processed for the current time interval
@@ -713,6 +718,7 @@ static void prepareNewSource(AEMixerBuffer *THIS, AEMixerBufferSource sourceID) 
     source->volume = 1.0;
     source->pan = 0.0;
     source->audioDescription = THIS->_clientFormat;
+    source->lastAudioTimestamp = mach_absolute_time();
     
     TPCircularBufferInit(&source->buffer, kSourceBufferLength);
     
