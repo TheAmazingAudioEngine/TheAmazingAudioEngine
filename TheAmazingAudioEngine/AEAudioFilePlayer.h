@@ -29,10 +29,14 @@
  */
 + (id)audioFilePlayerWithURL:(NSURL*)url audioController:(AEAudioController*)audioController error:(NSError**)error;
 
+@property (nonatomic, retain, readonly) NSURL *url;         //!< Original media URL
+@property (nonatomic, readonly) NSTimeInterval duration;    //!< Length of audio, in seconds
+@property (nonatomic, assign) NSTimeInterval currentTime;   //!< Current playback position, in seconds
 @property (nonatomic, readwrite) BOOL loop;                 //!< Whether to loop this track
 @property (nonatomic, readwrite) float volume;              //!< Track volume
 @property (nonatomic, readwrite) float pan;                 //!< Track pan
-@property (nonatomic, readwrite) BOOL playing;              //!< Whether the track is playing (observable)
+@property (nonatomic, readwrite) BOOL playing;              //!< Whether the track is playing
 @property (nonatomic, readwrite) BOOL muted;                //!< Whether the track is muted
 @property (nonatomic, readwrite) BOOL removeUponFinish;     //!< Whether the track automatically removes itself from the audio controller after playback completes
+@property (nonatomic, copy) void(^completionBlock)();       //!< A block to be called when playback finishes
 @end
