@@ -189,6 +189,7 @@ typedef struct _message_t {
     Float32             _inputPeak;
     Float32             _inputAverage;
     float              *_inputMonitorScratchBuffer;
+    BOOL                _resetNextInputStats;
 }
 
 - (void)pollForMainThreadMessages;
@@ -457,8 +458,27 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
         }
     }
     
+    // Pass audio to input filters, then callbacks
+    for ( int type=kCallbackIsFilterFlag; ; type = kCallbackIsOutputCallbackFlag ) {
+        for ( int i=0; i<THIS->_inputCallbacks.count; i++ ) {
+            callback_t *callback = &THIS->_inputCallbacks.callbacks[i];
+            if ( !(callback->flags & type) ) continue;
+            
+            ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, THIS, AEAudioSourceInput, inTimeStamp, inNumberFrames, THIS->_inputAudioBufferList);
+        }
+        if ( type == kCallbackIsOutputCallbackFlag ) break;
+    }
+    
     // Perform input metering
     if ( THIS->_inputLevelMonitoring && THIS->_inputAudioDescription.mFormatFlags & kAudioFormatFlagIsSignedInteger ) {
+        if ( THIS->_resetNextInputStats ) {
+            THIS->_resetNextInputStats  = NO;
+            THIS->_inputMeanAccumulator = 0;
+            THIS->_inputMeanBlockCount  = 0;
+            THIS->_inputAverage         = 0;
+            THIS->_inputPeak            = 0;
+        }
+        
         UInt32 monitorFrames = min(inNumberFrames, kInputMonitorScratchBufferSize/sizeof(float));
         for ( int i=0; i<THIS->_inputAudioBufferList->mNumberBuffers; i++ ) {
             if ( THIS->_inputAudioDescription.mBitsPerChannel == 16 ) {
@@ -473,17 +493,6 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
             THIS->_inputMeanBlockCount++;
             THIS->_inputAverage = THIS->_inputMeanAccumulator / THIS->_inputMeanBlockCount;
         }
-    }
-    
-    // Pass audio to input filters, then callbacks
-    for ( int type=kCallbackIsFilterFlag; ; type = kCallbackIsOutputCallbackFlag ) {
-        for ( int i=0; i<THIS->_inputCallbacks.count; i++ ) {
-            callback_t *callback = &THIS->_inputCallbacks.callbacks[i];
-            if ( !(callback->flags & type) ) continue;
-            
-            ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, THIS, AEAudioSourceInput, inTimeStamp, inNumberFrames, THIS->_inputAudioBufferList);
-        }
-        if ( type == kCallbackIsOutputCallbackFlag ) break;
     }
     
     return noErr;
@@ -1263,7 +1272,12 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
                                         responseBlock:(void (^)(void *, int))responseBlock
                                   userInfoByReference:(BOOL)userInfoByReference {
     // Only perform on main thread
-    NSAssert([NSThread isMainThread], @"Must be called on main thread only");
+    if ( ![NSThread isMainThread] ) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self performAsynchronousMessageExchangeWithHandler:handler userInfoBytes:userInfo length:userInfoLength responseBlock:responseBlock userInfoByReference:userInfoByReference];
+        });
+        return;
+    }
     
     if ( responseBlock ) {
         responseBlock = [responseBlock copy];
@@ -1375,13 +1389,6 @@ static BOOL AEAudioControllerHasPendingMainThreadMessages(AEAudioController *THI
     }
 }
 
-static void resetInputPowerLevel(AEAudioController *THIS, void *userInfo, int length) {
-    THIS->_inputMeanAccumulator = 0;
-    THIS->_inputMeanBlockCount = 0;
-    THIS->_inputAverage = 0;
-    THIS->_inputPeak    = 0;
-}
-
 - (void)inputAveragePowerLevel:(Float32*)averagePower peakHoldLevel:(Float32*)peakLevel {
     if ( !_inputLevelMonitoring ) {
         _inputMonitorScratchBuffer = malloc(kInputMonitorScratchBufferSize);
@@ -1392,7 +1399,7 @@ static void resetInputPowerLevel(AEAudioController *THIS, void *userInfo, int le
     if ( averagePower ) *averagePower = 10.0 * log10((double)_inputAverage / (_inputAudioDescription.mBitsPerChannel == 16 ? INT16_MAX : INT32_MAX));
     if ( peakLevel ) *peakLevel = 10.0 * log10((double)_inputPeak / (_inputAudioDescription.mBitsPerChannel == 16 ? INT16_MAX : INT32_MAX));;
     
-    [self performAsynchronousMessageExchangeWithHandler:resetInputPowerLevel userInfoBytes:NULL length:0 responseBlock:NULL];
+    _resetNextInputStats = YES;
 }
 
 #pragma mark - Utilities
