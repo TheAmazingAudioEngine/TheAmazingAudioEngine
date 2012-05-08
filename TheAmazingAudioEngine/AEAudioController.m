@@ -166,8 +166,6 @@ typedef struct _message_t {
     AUNode              _ioNode;
     AudioUnit           _ioAudioUnit;
     BOOL                _runningPriorToInterruption;
-    AudioStreamBasicDescription _audioDescription;
-    AudioStreamBasicDescription _inputAudioDescription;
     
     AEChannelGroupRef   _topGroup;
     channel_t           _topChannel;
@@ -245,10 +243,12 @@ static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp
             preferredBufferDuration     = _preferredBufferDuration, 
             inputMode                   = _inputMode, 
             audioUnit                   = _ioAudioUnit,
+            audioDescription            = _audioDescription,
+            inputAudioDescription       = _inputAudioDescription,
             audiobusInputPort           = _audiobusInputPort,
             audiobusOutputPort          = _audiobusOutputPort;
 
-@dynamic    running, inputGainAvailable, inputGain, audioDescription, inputAudioDescription;
+@dynamic    running, inputGainAvailable, inputGain;
 
 #pragma mark - Audio session callbacks
 
@@ -764,7 +764,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         channelElement->volume      = [channel respondsToSelector:@selector(volume)] ? channel.volume : 1.0;
         channelElement->pan         = [channel respondsToSelector:@selector(pan)] ? channel.pan : 0.0;
         channelElement->muted       = [channel respondsToSelector:@selector(muted)] ? channel.muted : NO;
-        channelElement->audioDescription = [channel respondsToSelector:@selector(audioDescription)] ? *channel.audioDescription : _audioDescription;
+        channelElement->audioDescription = [channel respondsToSelector:@selector(audioDescription)] ? channel.audioDescription : _audioDescription;
         channelElement->audioController = self;
     }
     
@@ -1508,14 +1508,6 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
     [self updateVoiceProcessingSettings];
 }
 
--(AudioStreamBasicDescription *)audioDescription {
-    return &_audioDescription;
-}
-
--(AudioStreamBasicDescription *)inputAudioDescription {
-    return &_inputAudioDescription;
-}
-
 -(void)setAudiobusInputPort:(ABInputPort *)audiobusInputPort {
     if ( _audiobusInputPort ) {
         _audiobusInputPort.audioInputBlock = nil;
@@ -1597,7 +1589,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
         checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
         
     } else if ( [keyPath isEqualToString:@"audioDescription"] ) {
-        channelElement->audioDescription = *channel.audioDescription;
+        channelElement->audioDescription = channel.audioDescription;
         OSStatus result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, index, &channelElement->audioDescription, sizeof(AudioStreamBasicDescription));
         checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
         
@@ -1910,7 +1902,7 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
         BOOL inputAvailableChanged = _audioInputAvailable != inputAvailable;
         
         if ( !_inputAudioBufferList || memcmp(&inputAudioDescription, &_inputAudioDescription, sizeof(inputAudioDescription)) != 0 ) {
-            inputBufferList = AEAllocateAndInitAudioBufferList(&inputAudioDescription, 0);
+            inputBufferList = AEAllocateAndInitAudioBufferList(inputAudioDescription, 0);
             inputChannelsChanged = YES;
             [self willChangeValueForKey:@"numberOfInputChannels"];
             [self willChangeValueForKey:@"inputAudioDescription"];

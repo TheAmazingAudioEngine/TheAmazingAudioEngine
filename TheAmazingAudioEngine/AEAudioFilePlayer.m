@@ -33,7 +33,7 @@
     AEAudioFilePlayer *player = [[[AEAudioFilePlayer alloc] init] autorelease];
     player->_volume = 1.0;
     player->_playing = YES;
-    player->_audioDescription = *audioController.audioDescription;
+    player->_audioDescription = audioController.audioDescription;
     player.url = url;
     
     AEAudioFileLoaderOperation *operation = [[AEAudioFileLoaderOperation alloc] initWithFileURL:url targetAudioDescription:player->_audioDescription];

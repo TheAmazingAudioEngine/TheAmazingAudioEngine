@@ -8,10 +8,10 @@
 
 #include "AEUtilities.h"
 
-AudioBufferList *AEAllocateAndInitAudioBufferList(AudioStreamBasicDescription *audioFormat, int frameCount) {
-    int numberOfBuffers = audioFormat->mFormatFlags & kAudioFormatFlagIsNonInterleaved ? audioFormat->mChannelsPerFrame : 1;
-    int channelsPerBuffer = audioFormat->mFormatFlags & kAudioFormatFlagIsNonInterleaved ? 1 : audioFormat->mChannelsPerFrame;
-    int bytesPerBuffer = audioFormat->mBytesPerFrame * frameCount;
+AudioBufferList *AEAllocateAndInitAudioBufferList(AudioStreamBasicDescription audioFormat, int frameCount) {
+    int numberOfBuffers = audioFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? audioFormat.mChannelsPerFrame : 1;
+    int channelsPerBuffer = audioFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? 1 : audioFormat.mChannelsPerFrame;
+    int bytesPerBuffer = audioFormat.mBytesPerFrame * frameCount;
     
     AudioBufferList *audio = malloc(sizeof(AudioBufferList) + (numberOfBuffers-1)*sizeof(AudioBuffer));
     if ( !audio ) {
@@ -62,21 +62,21 @@ void AEFreeAudioBufferList(AudioBufferList *bufferList ) {
     free(bufferList);
 }
 
-void AEInitAudioBufferList(AudioBufferList *list, int listSize, AudioStreamBasicDescription *audioFormat, void *data, int dataSize) {
-    list->mNumberBuffers = audioFormat->mFormatFlags & kAudioFormatFlagIsNonInterleaved ? audioFormat->mChannelsPerFrame : 1;
+void AEInitAudioBufferList(AudioBufferList *list, int listSize, AudioStreamBasicDescription audioFormat, void *data, int dataSize) {
+    list->mNumberBuffers = audioFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? audioFormat.mChannelsPerFrame : 1;
     assert(list->mNumberBuffers == 1 || listSize >= (sizeof(AudioBufferList)+sizeof(AudioBuffer)) );
     
     for ( int i=0; i<list->mNumberBuffers; i++ ) {
-        list->mBuffers[0].mNumberChannels = audioFormat->mFormatFlags & kAudioFormatFlagIsNonInterleaved ? 1 : audioFormat->mChannelsPerFrame;
+        list->mBuffers[0].mNumberChannels = audioFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? 1 : audioFormat.mChannelsPerFrame;
         list->mBuffers[0].mData = (char*)data + (i * (dataSize/list->mNumberBuffers));
         list->mBuffers[0].mDataByteSize = dataSize/list->mNumberBuffers;
     }
 }
 
-int AEGetNumberOfFramesInAudioBufferList(AudioBufferList *list, AudioStreamBasicDescription *audioFormat, int *oNumberOfChannels) {
-    int channelCount = audioFormat->mFormatFlags & kAudioFormatFlagIsNonInterleaved ? list->mNumberBuffers : list->mBuffers[0].mNumberChannels;
+int AEGetNumberOfFramesInAudioBufferList(AudioBufferList *list, AudioStreamBasicDescription audioFormat, int *oNumberOfChannels) {
+    int channelCount = audioFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? list->mNumberBuffers : list->mBuffers[0].mNumberChannels;
     if ( oNumberOfChannels ) {
         *oNumberOfChannels = channelCount;
     }
-    return list->mBuffers[0].mDataByteSize / ((audioFormat->mBitsPerChannel/8) * channelCount);
+    return list->mBuffers[0].mDataByteSize / ((audioFormat.mBitsPerChannel/8) * channelCount);
 }

@@ -21,7 +21,7 @@
 
 - (id)initWithAudioController:(AEAudioController*)audioController {
     if ( !(self = [super init]) ) return nil;
-    _audioDescription = *audioController.audioDescription;
+    _audioDescription = audioController.audioDescription;
     if ( _audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ) {
         for ( int i=0; i<_audioDescription.mChannelsPerFrame; i++ ) {
             _scratchBuffer[i] = malloc(sizeof(SInt16) * kDoubleSpeedFilterBufferLength);

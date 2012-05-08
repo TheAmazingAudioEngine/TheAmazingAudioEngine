@@ -147,7 +147,7 @@ static const int kIncrementalLoadBufferSize = 4096;
     // Prepare buffers
     int bufferCount = (_targetAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? _targetAudioDescription.mChannelsPerFrame : 1;
     int channelsPerBuffer = (_targetAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? 1 : _targetAudioDescription.mChannelsPerFrame;
-    AudioBufferList *bufferList = AEAllocateAndInitAudioBufferList(&_targetAudioDescription, _audioReceiverBlock ? kIncrementalLoadBufferSize : fileLengthInFrames);
+    AudioBufferList *bufferList = AEAllocateAndInitAudioBufferList(_targetAudioDescription, _audioReceiverBlock ? kIncrementalLoadBufferSize : fileLengthInFrames);
     if ( !bufferList ) {
         ExtAudioFileDispose(audioFile);
         self.error = [NSError errorWithDomain:NSPOSIXErrorDomain code:ENOMEM 
@@ -156,7 +156,7 @@ static const int kIncrementalLoadBufferSize = 4096;
         return;
     }
     
-    AudioBufferList *scratchBufferList = AEAllocateAndInitAudioBufferList(&_targetAudioDescription, 0);
+    AudioBufferList *scratchBufferList = AEAllocateAndInitAudioBufferList(_targetAudioDescription, 0);
     
     // Perform read in multiple small chunks (otherwise ExtAudioFileRead crashes when performing sample rate conversion)
     UInt64 readFrames = 0;

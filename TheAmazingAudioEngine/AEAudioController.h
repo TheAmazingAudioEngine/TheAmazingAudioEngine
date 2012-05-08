@@ -143,7 +143,7 @@ typedef OSStatus (*AEAudioControllerRenderCallback) (id                        c
 /*
  * The audio format for this channel
  */
-@property (nonatomic, readonly) AudioStreamBasicDescription *audioDescription;
+@property (nonatomic, readonly) AudioStreamBasicDescription audioDescription;
 
 @end
 
@@ -1122,12 +1122,12 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  *
  *      See also @link inputMode @endlink
  */
-@property (nonatomic, readonly) AudioStreamBasicDescription *inputAudioDescription;
+@property (nonatomic, readonly) AudioStreamBasicDescription inputAudioDescription;
 
 /*!
  * The audio description that the audio controller was setup with
  */
-@property (nonatomic, readonly) AudioStreamBasicDescription *audioDescription;
+@property (nonatomic, readonly) AudioStreamBasicDescription audioDescription;
 
 /*!
  * The Remote IO audio unit used for input and output

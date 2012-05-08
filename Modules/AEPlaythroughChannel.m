@@ -82,7 +82,7 @@ static OSStatus renderCallback(id                        channel,
     return renderCallback;
 }
 
--(AudioStreamBasicDescription *)audioDescription {
+-(AudioStreamBasicDescription)audioDescription {
     return _audioController.inputAudioDescription;
 }
 
