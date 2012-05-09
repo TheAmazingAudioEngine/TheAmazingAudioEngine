@@ -25,22 +25,24 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 }
 
 #define kMaxSources                       10
-#define kSourceTimestampThreshold         0.0025
-#define kSourceTimestampIdleThreshold     0.1
+#define kResyncTimestampThreshold         0.03
+#define kSourceTimestampIdleThreshold     1.5
 #define kConversionBufferLength           16384
 #define kScratchBufferLength              16384
 #define kSourceBufferLength               65536
 #define kActionBufferSize                 sizeof(action_t) * 10
 #define kActionMainThreadPollDuration     0.2
 #define kMinimumFrameCount                64
+#define kNoValue                          INT64_MAX
 
 typedef struct {
-    AEMixerBufferSource                source;
-    AEMixerBufferSourcePeekCallback    peekCallback;
-    AEMixerBufferSourceRenderCallback  renderCallback;
+    AEMixerBufferSource                     source;
+    AEMixerBufferSourcePeekCallback         peekCallback;
+    AEMixerBufferSourceRenderCallback       renderCallback;
     void                                   *callbackUserinfo;
     TPCircularBuffer                        buffer;
     uint64_t                                lastAudioTimestamp;
+    BOOL                                    synced;
     BOOL                                    processedForCurrentTimeSlice;
     AudioStreamBasicDescription             audioDescription;
     float                                   volume;
@@ -71,6 +73,7 @@ typedef struct {
     BOOL                        _audioConverterHasBuffer;
     uint8_t                    *_scratchBuffer;
     BOOL                        _graphReady;
+    BOOL                        _rendering;
     TPCircularBuffer            _mainThreadActionBuffer;
     NSTimer                    *_mainThreadActionPollTimer;
 }
@@ -157,6 +160,7 @@ void AEMixerBufferEnqueue(AEMixerBuffer *THIS, AEMixerBufferSource sourceID, Aud
     memset(&audioTimestamp, 0, sizeof(audioTimestamp));
     audioTimestamp.mFlags = kAudioTimeStampHostTimeValid;
     audioTimestamp.mHostTime = hostTime;
+    
     if ( !TPCircularBufferCopyAudioBufferList(&source->buffer, audio, &audioTimestamp) ) {
 #ifdef DEBUG
         printf("Out of buffer space in AEMixerBuffer\n");  
@@ -220,6 +224,12 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
                 AEMixerBufferDequeueSingleSource(THIS, THIS->_table[i].source, NULL, ioLengthInFrames);
             }
         }
+        // Reset time slice info
+        THIS->_currentSliceFrameCount = 0;
+        THIS->_currentSliceTimestamp = kNoValue;
+        for ( int i=0; i<kMaxSources; i++ ) {
+            if ( THIS->_table[i].source ) THIS->_table[i].processedForCurrentTimeSlice = NO;
+        }
         return;
     }
     
@@ -239,12 +249,19 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
     if ( numberOfSources == 1 && memcmp(&firstSourceEntry->audioDescription, &THIS->_clientFormat, sizeof(AudioStreamBasicDescription)) == 0 ) {
         // Just one source, with the same audio format - pull straight from it
         AEMixerBufferDequeueSingleSource(THIS, firstSource, bufferList, ioLengthInFrames);
+        // Reset time slice info
+        THIS->_currentSliceFrameCount = 0;
+        THIS->_currentSliceTimestamp = kNoValue;
+        for ( int i=0; i<kMaxSources; i++ ) {
+            if ( THIS->_table[i].source ) THIS->_table[i].processedForCurrentTimeSlice = NO;
+        }
         return;
     }
     
     // We'll advance the buffer list pointers as we add audio - save the originals to restore later
     void *savedmData[2] = { bufferList ? bufferList->mBuffers[0].mData : NULL, bufferList && bufferList->mNumberBuffers == 2 ? bufferList->mBuffers[1].mData : NULL };
     
+    THIS->_rendering = YES;
     int framesToGo = MIN(*ioLengthInFrames, bufferList->mBuffers[0].mDataByteSize / THIS->_clientFormat.mBytesPerFrame);
     while ( framesToGo > 0 ) {
         // Process in small blocks so we don't overwhelm the mixer/converter buffers
@@ -283,6 +300,8 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
         }
         
         THIS->_currentSliceSampleTime += frames;
+        THIS->_currentSliceTimestamp += ((double)frames/THIS->_clientFormat.mSampleRate) * __secondsToHostTicks;
+        THIS->_currentSliceFrameCount -= frames;
         
         if ( THIS->_audioConverter ) {
             // Convert output into client format
@@ -301,8 +320,16 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
         
         framesToGo -= frames;
     }
+    THIS->_rendering = NO;
     
     *ioLengthInFrames -= framesToGo;
+    
+    // Reset time slice info
+    THIS->_currentSliceFrameCount = 0;
+    THIS->_currentSliceTimestamp = kNoValue;
+    for ( int i=0; i<kMaxSources; i++ ) {
+        if ( THIS->_table[i].source ) THIS->_table[i].processedForCurrentTimeSlice = NO;
+    }
     
     // Restore buffers
     if ( bufferList ) {
@@ -320,7 +347,7 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
     uint64_t sliceTimestamp = THIS->_currentSliceTimestamp;
     UInt32 sliceFrameCount = THIS->_currentSliceFrameCount;
     
-    if ( sliceTimestamp == 0 ) {
+    if ( sliceTimestamp == kNoValue ) {
         // Determine how many frames are available globally
         sliceFrameCount = AEMixerBufferPeek(THIS, &sliceTimestamp);
         THIS->_currentSliceTimestamp = sliceTimestamp;
@@ -348,10 +375,16 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
     if ( sourceFrameCount > 0 ) {
         int paddingFrames = 0;
         void *savedmData[2] = { bufferList ? bufferList->mBuffers[0].mData : NULL, bufferList && bufferList->mNumberBuffers == 2 ? bufferList->mBuffers[1].mData : NULL };
-        if ( sourceTimestamp > sliceTimestamp + (kSourceTimestampThreshold*__secondsToHostTicks) ) {
+        if ( sourceTimestamp > sliceTimestamp + ((!source->synced ? 0.0001 : kResyncTimestampThreshold)*__secondsToHostTicks) ) {
             // This source is ahead. We'll pad with silence
             paddingFrames = (sourceTimestamp - sliceTimestamp) * __hostTicksToSeconds * source->audioDescription.mSampleRate;
             if ( paddingFrames > *ioLengthInFrames ) paddingFrames = *ioLengthInFrames;
+            
+#ifdef DEBUG
+            if ( source->synced ) {
+                printf("Warning: Mixer buffer padding with silence due to %0.4lfs discrepancy\n", (sourceTimestamp - sliceTimestamp) * __hostTicksToSeconds);
+            }
+#endif
             
             if ( bufferList ) {
                 // Pad
@@ -363,6 +396,9 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
                     bufferList->mBuffers[i].mData = ((uint8_t*)bufferList->mBuffers[i].mData) + paddingFrames * source->audioDescription.mBytesPerFrame;
                 }
             }
+            
+        } else {
+            source->synced = YES;
         }
         
         // Consume the audio
@@ -394,30 +430,33 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
         }
     }
     
-    // Mark this source as processed for the current time interval
-    source->processedForCurrentTimeSlice = YES;
-    
-    // Determine if we've processed all sources for the current interval
-    BOOL allSourcesProcessedForCurrentTimeSlice = YES;
-    for ( int i=0; i<kMaxSources; i++ ) {
-        if ( THIS->_table[i].source && !THIS->_table[i].processedForCurrentTimeSlice ) {
-            allSourcesProcessedForCurrentTimeSlice = NO;
-            break;
-        }
-    }
-    
-    if ( allSourcesProcessedForCurrentTimeSlice ) {
-        // Reset time slice info
-        THIS->_currentSliceFrameCount = 0;
-        THIS->_currentSliceTimestamp = 0;
+    if ( !THIS->_rendering ) {
+        // If we're pulling the sources individually...
+        
+        // Mark this source as processed for the current time interval
+        source->processedForCurrentTimeSlice = YES;
+        
+        // Determine if we've processed all sources for the current interval
+        BOOL allSourcesProcessedForCurrentTimeSlice = YES;
         for ( int i=0; i<kMaxSources; i++ ) {
-            if ( THIS->_table[i].source ) THIS->_table[i].processedForCurrentTimeSlice = NO;
+            if ( THIS->_table[i].source && !THIS->_table[i].processedForCurrentTimeSlice ) {
+                allSourcesProcessedForCurrentTimeSlice = NO;
+                break;
+            }
+        }
+        
+        if ( allSourcesProcessedForCurrentTimeSlice ) {
+            // Reset time slice info
+            THIS->_currentSliceFrameCount = 0;
+            THIS->_currentSliceTimestamp = kNoValue;
+            for ( int i=0; i<kMaxSources; i++ ) {
+                if ( THIS->_table[i].source ) THIS->_table[i].processedForCurrentTimeSlice = NO;
+            }
         }
     }
 }
 
 UInt32 AEMixerBufferPeek(AEMixerBuffer *THIS, uint64_t *outNextTimestamp) {
-    uint64_t now = 0;
     
     // Make sure we have at least one source
     BOOL hasSources = NO;
@@ -435,9 +474,11 @@ UInt32 AEMixerBufferPeek(AEMixerBuffer *THIS, uint64_t *outNextTimestamp) {
     
     // Determine lowest buffer fill count, excluding drained sources that we aren't receiving from (for those, we'll return silence),
     // and address sources that are behind the timeline
+    uint64_t now = mach_absolute_time();
     uint64_t earliestEndTimestamp = UINT64_MAX;
     uint64_t earliestStartTimestamp = UINT64_MAX;
     UInt32 minFrameCount = UINT32_MAX;
+    
     for ( int i=0; i<kMaxSources; i++ ) {
         if ( THIS->_table[i].source ) {
             source_t *source = &THIS->_table[i];
@@ -454,8 +495,7 @@ UInt32 AEMixerBufferPeek(AEMixerBuffer *THIS, uint64_t *outNextTimestamp) {
             }
             
             if ( frameCount == 0 ) {
-                if ( !now ) now = mach_absolute_time();
-                if ( (now - source->lastAudioTimestamp) > (kSourceTimestampIdleThreshold*__secondsToHostTicks) ) {
+                if ( (now - source->lastAudioTimestamp) * __hostTicksToSeconds > kSourceTimestampIdleThreshold ) {
                     // Not receiving audio - ignore this empty source
                     continue;
                 }
@@ -465,7 +505,7 @@ UInt32 AEMixerBufferPeek(AEMixerBuffer *THIS, uint64_t *outNextTimestamp) {
                 return 0;
             } else {
                 if ( frameCount < minFrameCount ) minFrameCount = frameCount;
-                source->lastAudioTimestamp = timestamp ? timestamp : (now ? now : (now=mach_absolute_time()));
+                source->lastAudioTimestamp = now;
             }
             
             uint64_t endTimestamp = timestamp + (((double)frameCount / source->audioDescription.mSampleRate) * __secondsToHostTicks);
@@ -730,7 +770,6 @@ static void prepareNewSource(AEMixerBuffer *THIS, AEMixerBufferSource sourceID) 
     if ( !source ) return;
     
     memset(source, 0, sizeof(source_t));
-    source->source = sourceID;
     source->volume = 1.0;
     source->pan = 0.0;
     source->audioDescription = THIS->_clientFormat;
@@ -739,6 +778,7 @@ static void prepareNewSource(AEMixerBuffer *THIS, AEMixerBufferSource sourceID) 
     TPCircularBufferInit(&source->buffer, kSourceBufferLength);
     
     OSMemoryBarrier();
+    source->source = sourceID;
     [THIS refreshMixingGraph];
 }
 

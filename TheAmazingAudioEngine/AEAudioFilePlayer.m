@@ -92,15 +92,21 @@ static void notifyPlaybackStopped(AEAudioController *audioController, void *user
     }
     
     if ( THIS.completionBlock ) THIS.completionBlock();
+    
+    THIS->_playhead = 0;
 }
 
 static OSStatus renderCallback(AEAudioFilePlayer *THIS, AEAudioController *audioController, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
     int32_t playhead = THIS->_playhead;
     int32_t originalPlayhead = playhead;
     
+    if ( !THIS->_playing ) return noErr;
+    
     if ( !THIS->_loop && playhead == THIS->_lengthInFrames ) {
-        // At the end of playback - silence whole buffer and return
-        for ( int i=0; i<audio->mNumberBuffers; i++ ) memset(audio->mBuffers[i].mData, 0, audio->mBuffers[i].mDataByteSize);
+        // Notify main thread that playback has finished
+        AEAudioControllerSendAsynchronousMessageToMainThread(audioController, notifyPlaybackStopped, &THIS, sizeof(AEAudioFilePlayer*));
+        
+        THIS->_playing = NO;
         return noErr;
     }
     
@@ -135,9 +141,6 @@ static OSStatus renderCallback(AEAudioFilePlayer *THIS, AEAudioController *audio
             if ( THIS->_loop ) {
                 playhead = 0;
             } else {
-                // Silence remainder of buffer
-                for ( int i=0; i<audio->mNumberBuffers; i++ ) memset(audioPtrs[i], 0, remainingFrames * bytesPerFrame);
-                
                 // Notify main thread that playback has finished
                 AEAudioControllerSendAsynchronousMessageToMainThread(audioController, notifyPlaybackStopped, &THIS, sizeof(AEAudioFilePlayer*));
                 break;
