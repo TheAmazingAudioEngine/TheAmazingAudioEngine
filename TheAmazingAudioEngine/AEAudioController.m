@@ -213,14 +213,14 @@ static void removeChannelsFromGroup(AEAudioController *THIS, void *userInfo, int
 - (void)releaseResourcesForGroup:(AEChannelGroupRef)group;
 - (void)markGroupTorndown:(AEChannelGroupRef)group;
 
-struct callbackTableInfo_t { void *callback; void *userInfo; int flags; callback_table_t *table; };
+struct callbackTableInfo_t { void *callback; void *userInfo; int flags; callback_table_t *table; BOOL found; };
 static void addCallbackToTable(AEAudioController *THIS, void *userInfo, int length);
 static void removeCallbackFromTable(AEAudioController *THIS, void *userInfo, int length);
 - (NSArray *)objectsAssociatedWithCallbacksFromTable:(callback_table_t*)table matchingFlag:(uint8_t)flag;
 - (void)addCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannel:(id<AEAudioPlayable>)channelObj;
 - (void)addCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannelGroup:(AEChannelGroupRef)group;
-- (void)removeCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<AEAudioPlayable>)channelObj;
-- (void)removeCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(AEChannelGroupRef)group;
+- (BOOL)removeCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<AEAudioPlayable>)channelObj;
+- (BOOL)removeCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(AEChannelGroupRef)group;
 - (NSArray*)objectsAssociatedWithCallbacksWithFlags:(uint8_t)flags;
 - (NSArray*)objectsAssociatedWithCallbacksWithFlags:(uint8_t)flags forChannel:(id<AEAudioPlayable>)channelObj;
 - (NSArray*)objectsAssociatedWithCallbacksWithFlags:(uint8_t)flags forChannelGroup:(AEChannelGroupRef)group;
@@ -1025,28 +1025,34 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 - (void)removeFilter:(id<AEAudioFilter>)filter {
-    [self removeCallback:filter.filterCallback userInfo:filter fromChannelGroup:_topGroup];
-    [filter release];
+    if ( [self removeCallback:filter.filterCallback userInfo:filter fromChannelGroup:_topGroup] ) {
+        [filter release];
+    }
 }
 
 - (void)removeFilter:(id<AEAudioFilter>)filter fromChannel:(id<AEAudioPlayable>)channel {
-    [self removeCallback:filter.filterCallback userInfo:filter fromChannel:channel];
-    [filter release];
+    if ( [self removeCallback:filter.filterCallback userInfo:filter fromChannel:channel] ) {
+        [filter release];
+    }
 }
 
 - (void)removeFilter:(id<AEAudioFilter>)filter fromChannelGroup:(AEChannelGroupRef)group {
-    [self removeCallback:filter.filterCallback userInfo:filter fromChannelGroup:group];
-    [filter release];
+    if ( [self removeCallback:filter.filterCallback userInfo:filter fromChannelGroup:group] ) {
+        [filter release];
+    }
 }
 
 - (void)removeInputFilter:(id<AEAudioFilter>)filter {
+    struct callbackTableInfo_t arg = {
+        .callback = filter.filterCallback,
+        .userInfo = filter,
+        .table = &_inputCallbacks };
     [self performSynchronousMessageExchangeWithHandler:removeCallbackFromTable
-                                         userInfoBytes:&(struct callbackTableInfo_t){
-                                             .callback = filter.filterCallback,
-                                             .userInfo = filter,
-                                             .table = &_inputCallbacks }
+                                         userInfoBytes:&arg
                                                 length:sizeof(struct callbackTableInfo_t)];
-    [filter release];
+    if ( arg.found ) {
+        [filter release];
+    }
 }
 
 - (NSArray*)filters {
@@ -1110,18 +1116,21 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 - (void)removeOutputReceiver:(id<AEAudioReceiver>)receiver {
-    [self removeCallback:receiver.receiverCallback userInfo:receiver fromChannelGroup:_topGroup];
-    [receiver release];
+    if ( [self removeCallback:receiver.receiverCallback userInfo:receiver fromChannelGroup:_topGroup] ) {
+        [receiver release];
+    }
 }
 
 - (void)removeOutputReceiver:(id<AEAudioReceiver>)receiver fromChannel:(id<AEAudioPlayable>)channel {
-    [self removeCallback:receiver.receiverCallback userInfo:receiver fromChannel:channel];
-    [receiver release];
+    if ( [self removeCallback:receiver.receiverCallback userInfo:receiver fromChannel:channel] ) {
+        [receiver release];
+    }
 }
 
 - (void)removeOutputReceiver:(id<AEAudioReceiver>)receiver fromChannelGroup:(AEChannelGroupRef)group {
-    [self removeCallback:receiver.receiverCallback userInfo:receiver fromChannelGroup:group];
-    [receiver release];
+    if ( [self removeCallback:receiver.receiverCallback userInfo:receiver fromChannelGroup:group] ) {
+        [receiver release];
+    }
 }
 
 - (NSArray*)outputReceivers {
@@ -1156,13 +1165,16 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 - (void)removeInputReceiver:(id<AEAudioReceiver>)receiver {
+    struct callbackTableInfo_t arg = {
+        .callback = receiver.receiverCallback,
+        .userInfo = receiver,
+        .table = &_inputCallbacks };
     [self performSynchronousMessageExchangeWithHandler:removeCallbackFromTable
-                                         userInfoBytes:&(struct callbackTableInfo_t){
-                                             .callback = receiver.receiverCallback,
-                                             .userInfo = receiver,
-                                             .table = &_inputCallbacks }
+                                         userInfoBytes:&arg
                                                 length:sizeof(struct callbackTableInfo_t)];
-    [receiver release];
+    if ( arg.found ) {
+        [receiver release];
+    }
 }
 
 -(NSArray *)inputReceivers {
@@ -1188,14 +1200,16 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 - (void)removeTimingReceiver:(id<AEAudioTimingReceiver>)receiver {
+    struct callbackTableInfo_t arg = {
+        .callback = receiver.timingReceiverCallback,
+        .userInfo = receiver,
+        .table = &_timingCallbacks };
     [self performSynchronousMessageExchangeWithHandler:removeCallbackFromTable
-                                         userInfoBytes:&(struct callbackTableInfo_t){
-                                             .callback = receiver.timingReceiverCallback,
-                                             .userInfo = receiver,
-                                             .table = &_timingCallbacks }
+                                         userInfoBytes:&arg
                                                 length:sizeof(struct callbackTableInfo_t)];
-
-    [receiver release];
+    if ( arg.found ) {
+        [receiver release];
+    }
 }
 
 -(NSArray *)timingReceivers {
@@ -2343,15 +2357,17 @@ void removeCallbackFromTable(AEAudioController *THIS, void *userInfo, int length
     struct callbackTableInfo_t *arg = userInfo;
     
     callback_table_t* table = arg->table;
+    arg->found = NO;
     
     // Find the item in our fixed array
     int index = 0;
     for ( index=0; index<table->count; index++ ) {
         if ( table->callbacks[index].callback == arg->callback && table->callbacks[index].userInfo == arg->userInfo ) {
+            arg->found = YES;
             break;
         }
     }
-    if ( index < table->count ) {
+    if ( arg->found ) {
         // Now shuffle the later elements backwards one space
         table->count--;
         for ( int i=index; i<table->count; i++ ) {
@@ -2407,28 +2423,33 @@ void removeCallbackFromTable(AEAudioController *THIS, void *userInfo, int length
     configureGraphStateOfGroupChannel(self, group->channel, parentGroup, index);
 }
 
-- (void)removeCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<AEAudioPlayable>)channelObj {
+- (BOOL)removeCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<AEAudioPlayable>)channelObj {
     int index=0;
     AEChannelGroupRef parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:channelObj index:&index];
     NSAssert(parentGroup != NULL, @"Channel not found");
     
     AEChannelRef channel = &parentGroup->channels[index];
     
+    struct callbackTableInfo_t arg = {
+        .callback = callback,
+        .userInfo = userInfo,
+        .table = &channel->callbacks };
     [self performSynchronousMessageExchangeWithHandler:removeCallbackFromTable
-                                         userInfoBytes:&(struct callbackTableInfo_t){
-                                             .callback = callback,
-                                             .userInfo = userInfo,
-                                             .table = &channel->callbacks }
+                                         userInfoBytes:&arg
                                                 length:sizeof(struct callbackTableInfo_t)];
+    return arg.found;
 }
 
-- (void)removeCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(AEChannelGroupRef)group {
+- (BOOL)removeCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(AEChannelGroupRef)group {
+    struct callbackTableInfo_t arg = {
+        .callback = callback,
+        .userInfo = userInfo,
+        .table = &group->channel->callbacks };
     [self performSynchronousMessageExchangeWithHandler:removeCallbackFromTable
-                                         userInfoBytes:&(struct callbackTableInfo_t){
-                                             .callback = callback,
-                                             .userInfo = userInfo,
-                                             .table = &group->channel->callbacks }
+                                         userInfoBytes:&arg
                                                 length:sizeof(struct callbackTableInfo_t)];
+    
+    if ( !arg.found ) return NO;
     
     AEChannelGroupRef parentGroup = NULL;
     int index=0;
@@ -2438,6 +2459,8 @@ void removeCallbackFromTable(AEAudioController *THIS, void *userInfo, int length
     }
     
     configureGraphStateOfGroupChannel(self, group->channel, parentGroup, index);
+    
+    return YES;
 }
 
 - (NSArray*)objectsAssociatedWithCallbacksWithFlags:(uint8_t)flags {
@@ -2462,14 +2485,16 @@ void removeCallbackFromTable(AEAudioController *THIS, void *userInfo, int length
     for ( int i=0; i<channel->callbacks.count; i++ ) {
         if ( (channel->callbacks.callbacks[i].flags & kCallbackIsVariableSpeedFilterFlag ) ) {
             // Remove the old callback
+            struct callbackTableInfo_t arg = {
+                .callback = channel->callbacks.callbacks[i].callback,
+                .userInfo = channel->callbacks.callbacks[i].userInfo,
+                .table = &channel->callbacks };
             [self performSynchronousMessageExchangeWithHandler:removeCallbackFromTable
-                                                 userInfoBytes:&(struct callbackTableInfo_t){
-                                                     .callback = channel->callbacks.callbacks[i].callback,
-                                                     .userInfo = channel->callbacks.callbacks[i].userInfo,
-                                                     .table = &channel->callbacks }
+                                                 userInfoBytes:&arg
                                                         length:sizeof(struct callbackTableInfo_t)];
-            break;
-            [(id)(long)channel->callbacks.callbacks[i].userInfo release];
+            if ( arg.found ) {
+                [(id)(long)channel->callbacks.callbacks[i].userInfo autorelease];
+            }
         }
     }
     
