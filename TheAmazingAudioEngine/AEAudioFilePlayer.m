@@ -86,7 +86,7 @@
 static void notifyPlaybackStopped(AEAudioController *audioController, void *userInfo, int length) {
     AEAudioFilePlayer *THIS = *(AEAudioFilePlayer**)userInfo;
     THIS.playing = NO;
-    
+
     if ( THIS->_removeUponFinish ) {
         [audioController removeChannels:[NSArray arrayWithObject:THIS]];
     }
@@ -105,7 +105,6 @@ static OSStatus renderCallback(AEAudioFilePlayer *THIS, AEAudioController *audio
     if ( !THIS->_loop && playhead == THIS->_lengthInFrames ) {
         // Notify main thread that playback has finished
         AEAudioControllerSendAsynchronousMessageToMainThread(audioController, notifyPlaybackStopped, &THIS, sizeof(AEAudioFilePlayer*));
-        
         THIS->_playing = NO;
         return noErr;
     }
@@ -143,6 +142,7 @@ static OSStatus renderCallback(AEAudioFilePlayer *THIS, AEAudioController *audio
             } else {
                 // Notify main thread that playback has finished
                 AEAudioControllerSendAsynchronousMessageToMainThread(audioController, notifyPlaybackStopped, &THIS, sizeof(AEAudioFilePlayer*));
+                THIS->_playing = NO;
                 break;
             }
         }
