@@ -53,9 +53,10 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 #pragma mark - Core types
 
 enum {
-    kCallbackIsFilterFlag               = 1<<0,
-    kCallbackIsOutputCallbackFlag       = 1<<1,
-    kCallbackIsVariableSpeedFilterFlag  = 1<<2
+    kFilterFlag               = 1<<0,
+    kReceiverFlag             = 1<<1,
+    kVariableSpeedFilterFlag  = 1<<2,
+    kAudiobusOutputPortFlag   = 1<<3
 };
 
 /*!
@@ -97,6 +98,7 @@ typedef struct {
     AudioStreamBasicDescription audioDescription;
     callback_table_t callbacks;
     AEAudioController *audioController;
+    ABOutputPort    *audiobusOutputPort;
 } channel_t, *AEChannelRef;
 
 /*!
@@ -216,14 +218,14 @@ static void removeChannelsFromGroup(AEAudioController *THIS, void *userInfo, int
 struct callbackTableInfo_t { void *callback; void *userInfo; int flags; callback_table_t *table; BOOL found; };
 static void addCallbackToTable(AEAudioController *THIS, void *userInfo, int length);
 static void removeCallbackFromTable(AEAudioController *THIS, void *userInfo, int length);
-- (NSArray *)objectsAssociatedWithCallbacksFromTable:(callback_table_t*)table matchingFlag:(uint8_t)flag;
+- (NSArray *)associatedObjectsFromTable:(callback_table_t*)table matchingFlag:(uint8_t)flag;
 - (void)addCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannel:(id<AEAudioPlayable>)channelObj;
 - (void)addCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannelGroup:(AEChannelGroupRef)group;
 - (BOOL)removeCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<AEAudioPlayable>)channelObj;
 - (BOOL)removeCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(AEChannelGroupRef)group;
-- (NSArray*)objectsAssociatedWithCallbacksWithFlags:(uint8_t)flags;
-- (NSArray*)objectsAssociatedWithCallbacksWithFlags:(uint8_t)flags forChannel:(id<AEAudioPlayable>)channelObj;
-- (NSArray*)objectsAssociatedWithCallbacksWithFlags:(uint8_t)flags forChannelGroup:(AEChannelGroupRef)group;
+- (NSArray*)associatedObjectsWithFlags:(uint8_t)flags;
+- (NSArray*)associatedObjectsWithFlags:(uint8_t)flags forChannel:(id<AEAudioPlayable>)channelObj;
+- (NSArray*)associatedObjectsWithFlags:(uint8_t)flags forChannelGroup:(AEChannelGroupRef)group;
 - (void)setVariableSpeedFilter:(id<AEAudioVariableSpeedFilter>)filter forChannelStruct:(AEChannelRef)channel;
 static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp *inTimeStamp, UInt32 inNumberFrames, AudioBufferList *ioData);
 
@@ -375,6 +377,15 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
         }
     }
     
+    if ( channel->audiobusOutputPort ) {
+        // Send via Audiobus
+        ABOutputPortSendAudio(channel->audiobusOutputPort, audio, frames, arg->inTimeStamp.mHostTime, NULL);
+        if ( ABOutputPortGetConnectedPortAttributes(channel->audiobusOutputPort) == ABInputPortAttributePlaysLiveAudio ) {
+            // Silence output after sending
+            for ( int i=0; i<audio->mNumberBuffers; i++ ) memset(audio->mBuffers[i].mData, 0, audio->mBuffers[i].mDataByteSize);
+        }
+    }
+    
     // Advance the sample time, to make sure we continue to render if we're called again with the same arguments
     arg->inTimeStamp.mSampleTime += frames;
     
@@ -396,7 +407,7 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     void * varispeedFilterUserinfo = NULL;
     for ( int i=0; i<channel->callbacks.count; i++ ) {
         callback_t *callback = &channel->callbacks.callbacks[i];
-        if ( callback->flags & kCallbackIsVariableSpeedFilterFlag ) {
+        if ( callback->flags & kVariableSpeedFilterFlag ) {
             varispeedFilter = callback->callback;
             varispeedFilterUserinfo = callback->userInfo;
         }
@@ -459,14 +470,14 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
     }
     
     // Pass audio to input filters, then callbacks
-    for ( int type=kCallbackIsFilterFlag; ; type = kCallbackIsOutputCallbackFlag ) {
+    for ( int type=kFilterFlag; ; type = kReceiverFlag ) {
         for ( int i=0; i<THIS->_inputCallbacks.count; i++ ) {
             callback_t *callback = &THIS->_inputCallbacks.callbacks[i];
             if ( !(callback->flags & type) ) continue;
             
             ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, THIS, AEAudioSourceInput, inTimeStamp, inNumberFrames, THIS->_inputAudioBufferList);
         }
-        if ( type == kCallbackIsOutputCallbackFlag ) break;
+        if ( type == kReceiverFlag ) break;
     }
     
     // Perform input metering
@@ -805,11 +816,11 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 - (void)removeChannels:(NSArray*)channels fromChannelGroup:(AEChannelGroupRef)group {
-    // Get a list of all the callback objects for these channels
-    NSMutableArray *callbackObjects = [NSMutableArray array];
+    // Get a list of all the associated objects for these channels
+    NSMutableArray *associatedObjects = [NSMutableArray array];
     for ( id<AEAudioPlayable> channel in channels ) {
-        NSArray *objects = [self objectsAssociatedWithCallbacksWithFlags:0 forChannel:channel];
-        [callbackObjects addObjectsFromArray:objects];
+        NSArray *objects = [self associatedObjectsWithFlags:0 forChannel:channel];
+        [associatedObjects addObjectsFromArray:objects];
     }
     
     // Remove the channels from the tables, on the core audio thread
@@ -835,8 +846,8 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     }
     [channels makeObjectsPerformSelector:@selector(release)];
     
-    // And release the associated callback objects
-    [callbackObjects makeObjectsPerformSelector:@selector(release)];
+    // Release the associated callback objects
+    [associatedObjects makeObjectsPerformSelector:@selector(release)];
 }
 
 
@@ -850,15 +861,15 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     NSMutableArray *channelsWithinGroup = [NSMutableArray array];
     [self gatherChannelsFromGroup:group intoArray:channelsWithinGroup];
     
-    // Get a list of all the callback objects for these channels
-    NSMutableArray *channelCallbackObjects = [NSMutableArray array];
+    // Get a list of all the associated objects for these channels
+    NSMutableArray *channelObjects = [NSMutableArray array];
     for ( id<AEAudioPlayable> channel in channelsWithinGroup ) {
-        NSArray *objects = [self objectsAssociatedWithCallbacksWithFlags:0 forChannel:channel];
-        [channelCallbackObjects addObjectsFromArray:objects];
+        NSArray *objects = [self associatedObjectsWithFlags:0 forChannel:channel];
+        [channelObjects addObjectsFromArray:objects];
     }
     
-    // Get a list of callback objects for this group
-    NSArray *groupCallbackObjects = [self objectsAssociatedWithCallbacksWithFlags:0 forChannelGroup:group];
+    // Get a list of associated objects for this group
+    NSArray *groupObjects = [self associatedObjectsWithFlags:0 forChannelGroup:group];
     
     if ( parentGroup ) {
         // Remove the group from the parent group's table, on the core audio thread
@@ -875,10 +886,10 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     // Release channel resources
     [channelsWithinGroup makeObjectsPerformSelector:@selector(release)];
-    [channelCallbackObjects makeObjectsPerformSelector:@selector(release)];
+    [channelObjects makeObjectsPerformSelector:@selector(release)];
     
     // Release group resources
-    [groupCallbackObjects makeObjectsPerformSelector:@selector(release)];
+    [groupObjects makeObjectsPerformSelector:@selector(release)];
     
     // Release subgroup resources
     for ( int i=0; i<group->channelCount; i++ ) {
@@ -1000,17 +1011,17 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 
 - (void)addFilter:(id<AEAudioFilter>)filter {
     [filter retain];
-    [self addCallback:filter.filterCallback userInfo:filter flags:kCallbackIsFilterFlag forChannelGroup:_topGroup];
+    [self addCallback:filter.filterCallback userInfo:filter flags:kFilterFlag forChannelGroup:_topGroup];
 }
 
 - (void)addFilter:(id<AEAudioFilter>)filter toChannel:(id<AEAudioPlayable>)channel {
     [filter retain];
-    [self addCallback:filter.filterCallback userInfo:filter flags:kCallbackIsFilterFlag forChannel:channel];
+    [self addCallback:filter.filterCallback userInfo:filter flags:kFilterFlag forChannel:channel];
 }
 
 - (void)addFilter:(id<AEAudioFilter>)filter toChannelGroup:(AEChannelGroupRef)group {
     [filter retain];
-    [self addCallback:filter.filterCallback userInfo:filter flags:kCallbackIsFilterFlag forChannelGroup:group];
+    [self addCallback:filter.filterCallback userInfo:filter flags:kFilterFlag forChannelGroup:group];
 }
 
 - (void)addInputFilter:(id<AEAudioFilter>)filter {
@@ -1019,7 +1030,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
                                          userInfoBytes:&(struct callbackTableInfo_t){
                                              .callback = filter.filterCallback,
                                              .userInfo = filter,
-                                             .flags = kCallbackIsFilterFlag,
+                                             .flags = kFilterFlag,
                                              .table = &_inputCallbacks }
                                                 length:sizeof(struct callbackTableInfo_t)];
 }
@@ -1056,19 +1067,19 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 - (NSArray*)filters {
-    return [self objectsAssociatedWithCallbacksWithFlags:kCallbackIsFilterFlag];
+    return [self associatedObjectsWithFlags:kFilterFlag];
 }
 
 - (NSArray*)filtersForChannel:(id<AEAudioPlayable>)channel {
-    return [self objectsAssociatedWithCallbacksWithFlags:kCallbackIsFilterFlag forChannel:channel];
+    return [self associatedObjectsWithFlags:kFilterFlag forChannel:channel];
 }
 
 - (NSArray*)filtersForChannelGroup:(AEChannelGroupRef)group {
-    return [self objectsAssociatedWithCallbacksWithFlags:kCallbackIsFilterFlag forChannelGroup:group];
+    return [self associatedObjectsWithFlags:kFilterFlag forChannelGroup:group];
 }
 
 -(NSArray *)inputFilters {
-    return [self objectsAssociatedWithCallbacksFromTable:&_inputCallbacks matchingFlag:kCallbackIsFilterFlag];
+    return [self associatedObjectsFromTable:&_inputCallbacks matchingFlag:kFilterFlag];
 }
 
 - (void)setVariableSpeedFilter:(id<AEAudioVariableSpeedFilter>)filter {
@@ -1102,17 +1113,17 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 
 - (void)addOutputReceiver:(id<AEAudioReceiver>)receiver {
     [receiver retain];
-    [self addCallback:receiver.receiverCallback userInfo:receiver flags:kCallbackIsOutputCallbackFlag forChannelGroup:_topGroup];
+    [self addCallback:receiver.receiverCallback userInfo:receiver flags:kReceiverFlag forChannelGroup:_topGroup];
 }
 
 - (void)addOutputReceiver:(id<AEAudioReceiver>)receiver forChannel:(id<AEAudioPlayable>)channel {
     [receiver retain];
-    [self addCallback:receiver.receiverCallback userInfo:receiver flags:kCallbackIsOutputCallbackFlag forChannel:channel];
+    [self addCallback:receiver.receiverCallback userInfo:receiver flags:kReceiverFlag forChannel:channel];
 }
 
 - (void)addOutputReceiver:(id<AEAudioReceiver>)receiver forChannelGroup:(AEChannelGroupRef)group {
     [receiver retain];
-    [self addCallback:receiver.receiverCallback userInfo:receiver flags:kCallbackIsOutputCallbackFlag forChannelGroup:group];
+    [self addCallback:receiver.receiverCallback userInfo:receiver flags:kReceiverFlag forChannelGroup:group];
 }
 
 - (void)removeOutputReceiver:(id<AEAudioReceiver>)receiver {
@@ -1134,15 +1145,15 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 - (NSArray*)outputReceivers {
-    return [self objectsAssociatedWithCallbacksWithFlags:kCallbackIsOutputCallbackFlag];
+    return [self associatedObjectsWithFlags:kReceiverFlag];
 }
 
 - (NSArray*)outputReceiversForChannel:(id<AEAudioPlayable>)channel {
-    return [self objectsAssociatedWithCallbacksWithFlags:kCallbackIsOutputCallbackFlag forChannel:channel];
+    return [self associatedObjectsWithFlags:kReceiverFlag forChannel:channel];
 }
 
 - (NSArray*)outputReceiversForChannelGroup:(AEChannelGroupRef)group {
-    return [self objectsAssociatedWithCallbacksWithFlags:kCallbackIsOutputCallbackFlag forChannelGroup:group];
+    return [self associatedObjectsWithFlags:kReceiverFlag forChannelGroup:group];
 }
 
 #pragma mark - Input receivers
@@ -1159,7 +1170,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
                                          userInfoBytes:&(struct callbackTableInfo_t){
                                              .callback = receiver.receiverCallback,
                                              .userInfo = receiver,
-                                             .flags = kCallbackIsOutputCallbackFlag,
+                                             .flags = kReceiverFlag,
                                              .table = &_inputCallbacks }
                                                 length:sizeof(struct callbackTableInfo_t)];
 }
@@ -1178,7 +1189,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 -(NSArray *)inputReceivers {
-    return [self objectsAssociatedWithCallbacksFromTable:&_inputCallbacks matchingFlag:kCallbackIsOutputCallbackFlag];
+    return [self associatedObjectsFromTable:&_inputCallbacks matchingFlag:kReceiverFlag];
 }
 
 #pragma mark - Timing receivers
@@ -1213,7 +1224,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 -(NSArray *)timingReceivers {
-    return [self objectsAssociatedWithCallbacksFromTable:&_timingCallbacks matchingFlag:0];
+    return [self associatedObjectsFromTable:&_timingCallbacks matchingFlag:0];
 }
 
 #pragma mark - Main thread-realtime thread message sending
@@ -1558,6 +1569,33 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
     }
 }
 
+static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, void *userInfo, int length) {
+    (*((AEChannelRef*)userInfo))->audiobusOutputPort = nil;
+}
+
+-(void)setAudiobusOutputPort:(ABOutputPort *)audiobusOutputPort forChannelElement:(AEChannelRef)channelElement {
+    if ( channelElement->audiobusOutputPort == audiobusOutputPort ) return;
+    if ( channelElement->audiobusOutputPort ) [channelElement->audiobusOutputPort autorelease];
+    
+    if ( audiobusOutputPort == nil ) {
+        [self performSynchronousMessageExchangeWithHandler:removeAudiobusOutputPortFromChannelElement userInfoBytes:&channelElement length:sizeof(AEChannelRef)];
+    } else {
+        audiobusOutputPort.clientFormat = channelElement->audioDescription;
+        channelElement->audiobusOutputPort = [audiobusOutputPort retain];
+    }
+}
+
+-(void)setAudiobusOutputPort:(ABOutputPort *)outputPort forChannel:(id<AEAudioPlayable>)channel {
+    int index;
+    AEChannelGroupRef group = [self searchForGroupContainingChannelMatchingPtr:channel.renderCallback userInfo:channel index:&index];
+    if ( !group ) return;
+    [self setAudiobusOutputPort:outputPort forChannelElement:&group->channels[index]];
+}
+
+-(void)setAudiobusOutputPort:(ABOutputPort *)outputPort forChannelGroup:(AEChannelGroupRef)channelGroup {
+    [self setAudiobusOutputPort:outputPort forChannelElement:channelGroup->channel];
+}
+
 #pragma mark - Events
 
 -(void) observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
@@ -1606,7 +1644,9 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
         channelElement->audioDescription = channel.audioDescription;
         OSStatus result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, index, &channelElement->audioDescription, sizeof(AudioStreamBasicDescription));
         checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
-        
+        if ( channelElement->audiobusOutputPort ) {
+            channelElement->audiobusOutputPort.clientFormat = channel.audioDescription;
+        }
     }
 }
 
@@ -1984,6 +2024,7 @@ static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannelRef channel
         // Try to set mixer's output stream format
         group->converterRequired = NO;
         result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &THIS->_audioDescription, sizeof(THIS->_audioDescription));
+        channel->audioDescription = THIS->_audioDescription;
         
         if ( result == kAudioUnitErr_FormatNotSupported ) {
             // The mixer only supports a subset of formats. If it doesn't support this one, then we'll convert manually
@@ -2000,6 +2041,8 @@ static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannelRef channel
             
             checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &mixerFormat, sizeof(mixerFormat)), 
                         "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat");
+            
+            channel->audioDescription = mixerFormat;
             
         } else {
             checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
@@ -2033,9 +2076,9 @@ static void configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannel
     
     BOOL outputCallbacks=NO, filters=NO;
     for ( int i=0; i<channel->callbacks.count && (!outputCallbacks || !filters); i++ ) {
-        if ( channel->callbacks.callbacks[i].flags & (kCallbackIsFilterFlag | kCallbackIsVariableSpeedFilterFlag) ) {
+        if ( channel->callbacks.callbacks[i].flags & (kFilterFlag | kVariableSpeedFilterFlag) ) {
             filters = YES;
-        } else if ( channel->callbacks.callbacks[i].flags & kCallbackIsOutputCallbackFlag ) {
+        } else if ( channel->callbacks.callbacks[i].flags & kReceiverFlag ) {
             outputCallbacks = YES;
         }
     }
@@ -2312,7 +2355,7 @@ static void removeChannelsFromGroup(AEAudioController *THIS, void *userInfo, int
         group->mixerAudioUnit = NULL;
     }
     
-    NSArray *callbackObjects = [self objectsAssociatedWithCallbacksWithFlags:0 forChannelGroup:group];
+    NSArray *callbackObjects = [self associatedObjectsWithFlags:0 forChannelGroup:group];
     [callbackObjects makeObjectsPerformSelector:@selector(release)];
     
     // Release subgroup resources too
@@ -2376,7 +2419,7 @@ void removeCallbackFromTable(AEAudioController *THIS, void *userInfo, int length
     }
 }
 
-- (NSArray *)objectsAssociatedWithCallbacksFromTable:(callback_table_t*)table matchingFlag:(uint8_t)flag {
+- (NSArray *)associatedObjectsFromTable:(callback_table_t*)table matchingFlag:(uint8_t)flag {
     // Construct NSArray response
     NSMutableArray *result = [NSMutableArray array];
     for ( int i=0; i<table->count; i++ ) {
@@ -2463,27 +2506,39 @@ void removeCallbackFromTable(AEAudioController *THIS, void *userInfo, int length
     return YES;
 }
 
-- (NSArray*)objectsAssociatedWithCallbacksWithFlags:(uint8_t)flags {
-    return [self objectsAssociatedWithCallbacksFromTable:&_topChannel.callbacks matchingFlag:flags];
+- (NSArray*)associatedObjectsWithFlags:(uint8_t)flags {
+    NSArray *objects = [self associatedObjectsFromTable:&_topChannel.callbacks matchingFlag:flags];
+    if ( (flags == 0 || flags & kAudiobusOutputPortFlag) && _topChannel.audiobusOutputPort ) {
+        objects = [objects arrayByAddingObject:_topChannel.audiobusOutputPort];
+    }
+    return objects;
 }
 
-- (NSArray*)objectsAssociatedWithCallbacksWithFlags:(uint8_t)flags forChannel:(id<AEAudioPlayable>)channelObj {
+- (NSArray*)associatedObjectsWithFlags:(uint8_t)flags forChannel:(id<AEAudioPlayable>)channelObj {
     int index=0;
     AEChannelGroupRef parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:channelObj index:&index];
     NSAssert(parentGroup != NULL, @"Channel not found");
     
     AEChannelRef channel = &parentGroup->channels[index];
     
-    return [self objectsAssociatedWithCallbacksFromTable:&channel->callbacks matchingFlag:flags];
+    NSArray *objects = [self associatedObjectsFromTable:&channel->callbacks matchingFlag:flags];
+    if ( (flags == 0 || flags & kAudiobusOutputPortFlag) && channel->audiobusOutputPort ) {
+        objects = [objects arrayByAddingObject:channel->audiobusOutputPort];
+    }
+    return objects;
 }
 
-- (NSArray*)objectsAssociatedWithCallbacksWithFlags:(uint8_t)flags forChannelGroup:(AEChannelGroupRef)group {
-    return [self objectsAssociatedWithCallbacksFromTable:&group->channel->callbacks matchingFlag:flags];
+- (NSArray*)associatedObjectsWithFlags:(uint8_t)flags forChannelGroup:(AEChannelGroupRef)group {
+    NSArray *objects = [self associatedObjectsFromTable:&group->channel->callbacks matchingFlag:flags];
+    if ( (flags == 0 || flags & kAudiobusOutputPortFlag) && group->channel->audiobusOutputPort ) {
+        objects = [objects arrayByAddingObject:group->channel->audiobusOutputPort];
+    }
+    return objects;
 }
 
 - (void)setVariableSpeedFilter:(id<AEAudioVariableSpeedFilter>)filter forChannelStruct:(AEChannelRef)channel {
     for ( int i=0; i<channel->callbacks.count; i++ ) {
-        if ( (channel->callbacks.callbacks[i].flags & kCallbackIsVariableSpeedFilterFlag ) ) {
+        if ( (channel->callbacks.callbacks[i].flags & kVariableSpeedFilterFlag ) ) {
             // Remove the old callback
             struct callbackTableInfo_t arg = {
                 .callback = channel->callbacks.callbacks[i].callback,
@@ -2504,7 +2559,7 @@ void removeCallbackFromTable(AEAudioController *THIS, void *userInfo, int length
                                              userInfoBytes:&(struct callbackTableInfo_t){
                                                  .callback = filter.filterCallback,
                                                  .userInfo = filter,
-                                                 .flags = kCallbackIsVariableSpeedFilterFlag,
+                                                 .flags = kVariableSpeedFilterFlag,
                                                  .table = &channel->callbacks }
                                                     length:sizeof(struct callbackTableInfo_t)];
         
@@ -2515,7 +2570,7 @@ static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp
     // Pass audio to filters
     for ( int i=0; i<channel->callbacks.count; i++ ) {
         callback_t *callback = &channel->callbacks.callbacks[i];
-        if ( callback->flags & kCallbackIsFilterFlag ) {
+        if ( callback->flags & kFilterFlag ) {
             ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, channel->audioController, channel->userInfo, inTimeStamp, inNumberFrames, ioData);
         }
     }
@@ -2523,7 +2578,7 @@ static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp
     // And finally pass to output callbacks
     for ( int i=0; i<channel->callbacks.count; i++ ) {
         callback_t *callback = &channel->callbacks.callbacks[i];
-        if ( callback->flags & kCallbackIsOutputCallbackFlag ) {
+        if ( callback->flags & kReceiverFlag ) {
             ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, channel->audioController, channel->userInfo, inTimeStamp, inNumberFrames, ioData);
         }
     }

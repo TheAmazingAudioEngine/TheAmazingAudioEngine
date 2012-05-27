@@ -12,11 +12,12 @@
 @class ABOutputPort;
 @class ABPort;
 #define ABMetadataBlockList void*
+typedef NSUInteger ABInputPortAttributes;
 void ABInputPortReceive(ABInputPort *inputPort, ABPort *sourcePortOrNil, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, uint64_t *outTimestamp, ABMetadataBlockList *ioMetadataBlockList);
 UInt32 ABInputPortPeek(ABInputPort *inputPort, uint64_t *outNextTimestamp);
 BOOL ABInputPortIsConnected(ABInputPort *inputPort);
 BOOL ABOutputPortSendAudio(ABOutputPort* outputPort, const AudioBufferList *audio, UInt32 lengthInFrames, UInt64 hostTime, ABMetadataBlockList *metadata);
-
+ABInputPortAttributes ABOutputPortGetConnectedPortAttributes(ABOutputPort *outputPort);
 typedef void (^ABInputPortAudioInputBlock)(ABInputPort *inputPort, UInt32 lengthInFrames, uint64_t nextTimestamp, ABPort *sourcePortOrNil);
 
 @interface ABInputPort : NSObject
