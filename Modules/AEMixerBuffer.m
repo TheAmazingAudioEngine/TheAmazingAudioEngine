@@ -139,7 +139,7 @@ static void prepareNewSource(AEMixerBuffer *THIS, AEMixerBufferSource sourceID);
     [super dealloc];
 }
 
-void AEMixerBufferEnqueue(AEMixerBuffer *THIS, AEMixerBufferSource sourceID, AudioBufferList *audio, UInt32 lengthInFrames, UInt64 hostTime) {
+void AEMixerBufferEnqueue(AEMixerBuffer *THIS, AEMixerBufferSource sourceID, AudioBufferList *audio, UInt32 lengthInFrames, uint64_t hostTime) {
     source_t *source = sourceWithID(THIS, sourceID, NULL);
     if ( !source ) {
         if ( pthread_main_np() != 0 ) {
@@ -190,7 +190,7 @@ void AEMixerBufferEnqueue(AEMixerBuffer *THIS, AEMixerBufferSource sourceID, Aud
     source->callbackUserinfo = userInfo;
 }
 
-void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt32 *ioLengthInFrames) {
+void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, uint64_t *outTimestamp) {
     if ( !THIS->_graphReady ) {
         *ioLengthInFrames = 0;
         return;
@@ -221,7 +221,7 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
         // Just consume frames
         for ( int i=0; i<kMaxSources; i++ ) {
             if ( THIS->_table[i].source ) {
-                AEMixerBufferDequeueSingleSource(THIS, THIS->_table[i].source, NULL, ioLengthInFrames);
+                AEMixerBufferDequeueSingleSource(THIS, THIS->_table[i].source, NULL, ioLengthInFrames, outTimestamp);
             }
         }
         // Reset time slice info
@@ -248,7 +248,7 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
     
     if ( numberOfSources == 1 && memcmp(&firstSourceEntry->audioDescription, &THIS->_clientFormat, sizeof(AudioStreamBasicDescription)) == 0 ) {
         // Just one source, with the same audio format - pull straight from it
-        AEMixerBufferDequeueSingleSource(THIS, firstSource, bufferList, ioLengthInFrames);
+        AEMixerBufferDequeueSingleSource(THIS, firstSource, bufferList, ioLengthInFrames, outTimestamp);
         // Reset time slice info
         THIS->_currentSliceFrameCount = 0;
         THIS->_currentSliceTimestamp = kNoValue;
@@ -257,6 +257,8 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
         }
         return;
     }
+    
+    if ( outTimestamp ) *outTimestamp = THIS->_currentSliceTimestamp;
     
     // We'll advance the buffer list pointers as we add audio - save the originals to restore later
     void *savedmData[2] = { bufferList ? bufferList->mBuffers[0].mData : NULL, bufferList && bufferList->mNumberBuffers == 2 ? bufferList->mBuffers[1].mData : NULL };
@@ -341,7 +343,7 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
 }
 
 
-void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource sourceID, AudioBufferList *bufferList, UInt32 *ioLengthInFrames) {
+void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource sourceID, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, uint64_t *outTimestamp) {
     source_t *source = sourceWithID(THIS, sourceID, NULL);
     
     uint64_t sliceTimestamp = THIS->_currentSliceTimestamp;
@@ -370,6 +372,8 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
         if ( sourceFrameCount > sliceFrameCount ) sourceFrameCount = sliceFrameCount;
     }
     
+    if ( outTimestamp ) *outTimestamp = sourceTimestamp;
+
     *ioLengthInFrames = MIN(*ioLengthInFrames, sliceFrameCount);
     
     if ( sourceFrameCount > 0 ) {
@@ -627,7 +631,7 @@ static OSStatus sourceInputCallback(void *inRefCon, AudioUnitRenderActionFlags *
     source_t *source = &THIS->_table[inBusNumber];
     
     if ( source->source ) {
-        AEMixerBufferDequeueSingleSource(THIS, source->source, ioData, &inNumberFrames);
+        AEMixerBufferDequeueSingleSource(THIS, source->source, ioData, &inNumberFrames, NULL);
     }
     
     return noErr;
