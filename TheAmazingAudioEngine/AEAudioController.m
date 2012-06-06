@@ -2571,7 +2571,7 @@ static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp
     for ( int i=0; i<channel->callbacks.count; i++ ) {
         callback_t *callback = &channel->callbacks.callbacks[i];
         if ( callback->flags & kFilterFlag ) {
-            ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, channel->audioController, channel->userInfo, inTimeStamp, inNumberFrames, ioData);
+            ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, channel->audioController, channel->ptr, inTimeStamp, inNumberFrames, ioData);
         }
     }
     
@@ -2579,7 +2579,7 @@ static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp
     for ( int i=0; i<channel->callbacks.count; i++ ) {
         callback_t *callback = &channel->callbacks.callbacks[i];
         if ( callback->flags & kReceiverFlag ) {
-            ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, channel->audioController, channel->userInfo, inTimeStamp, inNumberFrames, ioData);
+            ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, channel->audioController, channel->ptr, inTimeStamp, inNumberFrames, ioData);
         }
     }
 }

@@ -83,7 +83,7 @@ BOOL AELimiterEnqueue(AELimiter *THIS, float** buffers, int numberOfBuffers, UIn
         bufferList->mBuffers[i].mNumberChannels = 1;
     }
     
-    return TPCircularBufferCopyAudioBufferList(&THIS->_buffer, bufferList, timestamp);
+    return TPCircularBufferCopyAudioBufferList(&THIS->_buffer, bufferList, timestamp, UINT32_MAX, NULL);
 }
 
 void AELimiterDequeue(AELimiter *THIS, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {

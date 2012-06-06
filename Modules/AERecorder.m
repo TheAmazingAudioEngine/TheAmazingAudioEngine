@@ -95,7 +95,7 @@ static void audioCallback(id                        receiver,
         THIS->_buffer->mBuffers[i].mDataByteSize = 0;
     }
     
-    AEMixerBufferDequeue(THIS->_mixer, THIS->_buffer, &bufferLength);
+    AEMixerBufferDequeue(THIS->_mixer, THIS->_buffer, &bufferLength, NULL);
     
     if ( bufferLength > 0 ) {
         OSStatus status = AEAudioFileWriterAddAudio(THIS->_writer, THIS->_buffer, bufferLength);

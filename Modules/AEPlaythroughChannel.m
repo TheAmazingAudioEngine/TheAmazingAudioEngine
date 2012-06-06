@@ -57,7 +57,9 @@ static void inputCallback(id                        receiver,
     
     TPCircularBufferCopyAudioBufferList(&THIS->_buffer, 
                                         audio, 
-                                        time);
+                                        time,
+                                        UINT32_MAX,
+                                        NULL);
 }
 
 -(AEAudioControllerAudioCallback)receiverCallback {

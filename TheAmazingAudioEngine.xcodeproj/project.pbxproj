@@ -566,13 +566,13 @@
 					"-DTPCircularBufferPrepareEmptyAudioBufferList=AECBPrepareEmptyBL",
 					"-DTPCircularBufferProduceAudioBufferList=AECBProduceBL",
 					"-DTPCircularBufferCopyAudioBufferList=AECBCopyBL",
-					"-DTPCircularBufferCopyAudioBufferListPartial=AECBCopyBLPartial",
 					"-DTPCircularBufferNextBufferList=AECBNextBL",
 					"-DTPCircularBufferNextBufferListAfter=AECBNextBLAfter",
 					"-DTPCircularBufferConsumeNextBufferList=AECBConsumeBL",
 					"-DTPCircularBufferConsumeNextBufferListPartial=AECBConsumeBLPartial",
 					"-DTPCircularBufferDequeueBufferListFrames=AECBDequeueBLFrames",
 					"-DTPCircularBufferPeek=AECBPeek",
+					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
 				);
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -601,13 +601,13 @@
 					"-DTPCircularBufferPrepareEmptyAudioBufferList=AECBPrepareEmptyBL",
 					"-DTPCircularBufferProduceAudioBufferList=AECBProduceBL",
 					"-DTPCircularBufferCopyAudioBufferList=AECBCopyBL",
-					"-DTPCircularBufferCopyAudioBufferListPartial=AECBCopyBLPartial",
 					"-DTPCircularBufferNextBufferList=AECBNextBL",
 					"-DTPCircularBufferNextBufferListAfter=AECBNextBLAfter",
 					"-DTPCircularBufferConsumeNextBufferList=AECBConsumeBL",
 					"-DTPCircularBufferConsumeNextBufferListPartial=AECBConsumeBLPartial",
 					"-DTPCircularBufferDequeueBufferListFrames=AECBDequeueBLFrames",
 					"-DTPCircularBufferPeek=AECBPeek",
+					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
 				);
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -646,6 +646,7 @@
 					"-DTPCircularBufferConsumeNextBufferListPartial=AECBConsumeBLPartial",
 					"-DTPCircularBufferConsumeBufferListFrames=AECBConsumeBLFrames",
 					"-DTPCircularBufferPeek=AECBPeek",
+					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
 				);
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -684,6 +685,7 @@
 					"-DTPCircularBufferConsumeNextBufferListPartial=AECBConsumeBLPartial",
 					"-DTPCircularBufferConsumeBufferListFrames=AECBConsumeBLFrames",
 					"-DTPCircularBufferPeek=AECBPeek",
+					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
 				);
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";

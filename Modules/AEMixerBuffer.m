@@ -161,7 +161,7 @@ void AEMixerBufferEnqueue(AEMixerBuffer *THIS, AEMixerBufferSource sourceID, Aud
     audioTimestamp.mFlags = kAudioTimeStampHostTimeValid;
     audioTimestamp.mHostTime = hostTime;
     
-    if ( !TPCircularBufferCopyAudioBufferList(&source->buffer, audio, &audioTimestamp) ) {
+    if ( !TPCircularBufferCopyAudioBufferList(&source->buffer, audio, &audioTimestamp, lengthInFrames, &source->audioDescription) ) {
 #ifdef DEBUG
         printf("Out of buffer space in AEMixerBuffer\n");  
 #endif
@@ -609,11 +609,6 @@ UInt32 AEMixerBufferPeek(AEMixerBuffer *THIS, uint64_t *outNextTimestamp) {
     source->source = NULL;
     
     [self refreshMixingGraph];
-    
-    // Wait a little longer for good measure - it's not made clear in the documentation 
-    // whether after a synchronous AUGraphUpdate, it's guaranteed that the Core Audio thread
-    // is out of the render routine. So, wait to be sure.
-    [[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
 
     if ( !source->renderCallback ) {
         TPCircularBufferCleanup(&source->buffer);
@@ -690,10 +685,10 @@ static OSStatus sourceInputCallback(void *inRefCon, AudioUnitRenderActionFlags *
     } else {
         for ( int retries=3; retries > 0; retries-- ) {
             Boolean isUpdated = false;
-            if ( checkResult(AUGraphUpdate(_graph, &isUpdated), "AUGraphUpdate") ) {
+            if ( checkResult(AUGraphUpdate(_graph, &isUpdated), "AUGraphUpdate") && isUpdated ) {
                 break;
             }
-            [[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
+            [NSThread sleepForTimeInterval:0.01];
         }
     }
 }
