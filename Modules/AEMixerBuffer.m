@@ -265,9 +265,14 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
     
     THIS->_rendering = YES;
     int framesToGo = MIN(*ioLengthInFrames, bufferList->mBuffers[0].mDataByteSize / THIS->_clientFormat.mBytesPerFrame);
+    
+    // Process in small blocks so we don't overwhelm the mixer/converter buffers
+    int blockSize = framesToGo;
+    while ( blockSize > 512 ) blockSize /= 2;
+    
     while ( framesToGo > 0 ) {
-        // Process in small blocks so we don't overwhelm the mixer/converter buffers
-        UInt32 frames = MIN(framesToGo, 512);
+        
+        UInt32 frames = MIN(framesToGo, blockSize);
         
         for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
             bufferList->mBuffers[i].mDataByteSize = frames * THIS->_clientFormat.mBytesPerFrame;
