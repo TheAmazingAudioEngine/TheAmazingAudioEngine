@@ -16,6 +16,10 @@
 #import <Accelerate/Accelerate.h>
 #import "AEAudioController+Audiobus.h"
 #import "AEAudioController+AudiobusStub.h"
+#import <mach/mach_time.h>
+
+static double __hostTicksToSeconds = 0.0;
+static double __secondsToHostTicks = 0.0;
 
 #ifdef TRIAL
 #import "AETrialModeController.h"
@@ -334,6 +338,11 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
     
     OSStatus status = noErr;
     
+    if ( channel->audiobusOutputPort && ABOutputPortGetConnectedPortAttributes(channel->audiobusOutputPort) & ABInputPortAttributePlaysLiveAudio ) {
+        // We're sending via the output port, and the receiver plays live - offset the timestamp by the reported latency
+        arg->inTimeStamp.mHostTime += ABOutputPortGetAverageLatency(channel->audiobusOutputPort)*__secondsToHostTicks;
+    }
+    
     if ( channel->type == kChannelTypeChannel ) {
         AEAudioControllerRenderCallback callback = (AEAudioControllerRenderCallback) channel->ptr;
         id<AEAudioPlayable> channelObj = (id<AEAudioPlayable>) channel->userInfo;
@@ -380,7 +389,7 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
     if ( channel->audiobusOutputPort ) {
         // Send via Audiobus
         ABOutputPortSendAudio(channel->audiobusOutputPort, audio, frames, arg->inTimeStamp.mHostTime, NULL);
-        if ( ABOutputPortGetConnectedPortAttributes(channel->audiobusOutputPort) == ABInputPortAttributePlaysLiveAudio ) {
+        if ( ABOutputPortGetConnectedPortAttributes(channel->audiobusOutputPort) & ABInputPortAttributePlaysLiveAudio ) {
             // Silence output after sending
             for ( int i=0; i<audio->mNumberBuffers; i++ ) memset(audio->mBuffers[i].mData, 0, audio->mBuffers[i].mDataByteSize);
         }
@@ -574,6 +583,14 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 #pragma mark - Setup and start/stop
+
++(void)initialize {
+    mach_timebase_info_data_t tinfo;
+    mach_timebase_info(&tinfo);
+    __hostTicksToSeconds = ((double)tinfo.numer / tinfo.denom) * 1.0e-9;
+    __secondsToHostTicks = 1.0 / __hostTicksToSeconds;
+}
+
 
 + (AudioStreamBasicDescription)interleaved16BitStereoAudioDescription {
     AudioStreamBasicDescription audioDescription;

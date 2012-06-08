@@ -191,7 +191,7 @@ void TPCircularBufferDequeueBufferListFrames(TPCircularBuffer *buffer, UInt32 *i
     UInt32 bytesToGo = *ioLengthInFrames * audioFormat->mBytesPerFrame;
     UInt32 bytesCopied = 0;
     while ( bytesToGo > 0 ) {
-        AudioBufferList *bufferList = TPCircularBufferNextBufferList(buffer, hasTimestamp ? outTimestamp : NULL);
+        AudioBufferList *bufferList = TPCircularBufferNextBufferList(buffer, !hasTimestamp ? outTimestamp : NULL);
         hasTimestamp = true;
         if ( !bufferList ) break;
         
