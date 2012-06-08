@@ -192,4 +192,14 @@ UInt32 AEMixerBufferPeek(AEMixerBuffer *mixerBuffer, uint64_t *outNextTimestamp)
  */
 - (void)unregisterSource:(AEMixerBufferSource)source;
 
+/*!
+ * How long to wait for empty sources before assuming they are idle
+ *
+ *  AEMixerBufferDequeue will return 0 frames for this duration if any sources are
+ *  currently empty, before assuming the source is idle and continuing.
+ *
+ *  Set to 0.0 to avoid waiting on idle sources.
+ */
+@property (nonatomic, assign) NSTimeInterval sourceIdleThreshold;
+
 @end
