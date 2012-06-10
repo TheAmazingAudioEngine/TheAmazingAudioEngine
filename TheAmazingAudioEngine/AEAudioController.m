@@ -131,6 +131,9 @@ typedef struct _channel_group_t {
     AudioStreamBasicDescription audioConverterSourceFormat;
     int                 graphState;
     BOOL                meteringEnabled;
+    Float32             averagePower;
+    Float32             peakLevel;
+    BOOL                resetMeterStats;
 } channel_group_t;
 
 /*!
@@ -384,6 +387,14 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
             status = AudioConverterConvertComplexBuffer(group->audioConverter, frames, bufferList, audio);
             checkResult(status, "AudioConverterConvertComplexBuffer");
         }
+        
+        if ( group->meteringEnabled && group->resetMeterStats ) {
+            checkResult(AudioUnitGetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_PostAveragePower, kAudioUnitScope_Output, 0, &group->averagePower), 
+                        "AudioUnitGetParameter(kMultiChannelMixerParam_PostAveragePower)");
+
+            checkResult(AudioUnitGetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_PostPeakHoldLevel, kAudioUnitScope_Output, 0, &group->peakLevel), 
+                        "AudioUnitGetParameter(kMultiChannelMixerParam_PostAveragePower)");
+        }
     }
     
     if ( channel->audiobusOutputPort ) {
@@ -566,6 +577,14 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         }
     } else {
         // After render
+        if ( THIS->_topGroup->meteringEnabled && THIS->_topGroup->resetMeterStats ) {
+            checkResult(AudioUnitGetParameter(THIS->_topGroup->mixerAudioUnit, kMultiChannelMixerParam_PostAveragePower, kAudioUnitScope_Output, 0, &THIS->_topGroup->averagePower), 
+                        "AudioUnitGetParameter(kMultiChannelMixerParam_PostAveragePower)");
+            
+            checkResult(AudioUnitGetParameter(THIS->_topGroup->mixerAudioUnit, kMultiChannelMixerParam_PostPeakHoldLevel, kAudioUnitScope_Output, 0, &THIS->_topGroup->peakLevel), 
+                        "AudioUnitGetParameter(kMultiChannelMixerParam_PostAveragePower)");
+        }
+        
         if ( THIS->_audiobusOutputPort ) {
             ABOutputPortSendAudio(THIS->_audiobusOutputPort, ioData, inNumberFrames, inTimeStamp->mHostTime, NULL);
         }
@@ -1273,6 +1292,7 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
 }
 
 -(void)pollForMainThreadMessages {
+    NSAssert([NSThread isMainThread], @"Must be called on main thread");
     while ( 1 ) {
         int32_t availableBytes;
         message_t *buffer = TPCircularBufferTail(&_mainThreadMessageBuffer, &availableBytes);
@@ -1414,21 +1434,25 @@ static BOOL AEAudioControllerHasPendingMainThreadMessages(AEAudioController *THI
     return [self averagePowerLevel:averagePower peakHoldLevel:peakLevel forGroup:_topGroup];
 }
 
+static void enableMetering(AEAudioController *THIS, void *userInfo, int length) {
+    AEChannelGroupRef group = *(AEChannelGroupRef*)userInfo;
+    UInt32 enable = YES;
+    checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_MeteringMode, kAudioUnitScope_Output, 0, &enable, sizeof(enable)), 
+                "AudioUnitSetProperty(kAudioUnitProperty_MeteringMode)");
+    group->meteringEnabled = YES;
+    
+}
+
 - (void)averagePowerLevel:(Float32*)averagePower peakHoldLevel:(Float32*)peakLevel forGroup:(AEChannelGroupRef)group {
     if ( !group->meteringEnabled ) {
-        UInt32 enable = YES;
-        checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_MeteringMode, kAudioUnitScope_Output, 0, &enable, sizeof(enable)), 
-                    "AudioUnitSetProperty(kAudioUnitProperty_MeteringMode)");
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self performSynchronousMessageExchangeWithHandler:enableMetering userInfoBytes:(void*)&group length:sizeof(AEChannelGroupRef*)];
+        });
     }
     
-    if ( averagePower ) {
-        checkResult(AudioUnitGetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_PostAveragePower, kAudioUnitScope_Output, 0, averagePower), 
-                    "AudioUnitGetParameter(kMultiChannelMixerParam_PostAveragePower)");
-    }
-    if ( peakLevel ) {
-        checkResult(AudioUnitGetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_PostPeakHoldLevel, kAudioUnitScope_Output, 0, peakLevel), 
-                    "AudioUnitGetParameter(kMultiChannelMixerParam_PostAveragePower)");
-    }
+    if ( averagePower ) *averagePower = group->averagePower;
+    if ( peakLevel )    *peakLevel    = group->peakLevel;
+    group->resetMeterStats = YES;
 }
 
 - (void)inputAveragePowerLevel:(Float32*)averagePower peakHoldLevel:(Float32*)peakLevel {
