@@ -2243,22 +2243,7 @@ static void configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannel
 static void configureChannelsInRangeForGroup(AEAudioController *THIS, NSRange range, AEChannelGroupRef group) {
     for ( int i = range.location; i < range.location+range.length; i++ ) {
         AEChannelRef channel = &group->channels[i];
-        
-        // Set volume
-        AudioUnitParameterValue volumeValue = channel->volume;
-        checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, i, volumeValue, 0),
-                    "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
-        
-        // Set pan
-        AudioUnitParameterValue panValue = channel->pan;
-        checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, i, panValue, 0),
-                    "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)");
-        
-        // Set enabled
-        AudioUnitParameterValue enabledValue = channel->playing && !channel->muted;
-        checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, i, enabledValue, 0),
-                    "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
-        
+
         if ( channel->type == kChannelTypeChannel ) {
             
             // Set input stream format
@@ -2280,6 +2265,23 @@ static void configureChannelsInRangeForGroup(AEAudioController *THIS, NSRange ra
             // Recursively initialise this channel group
             initialiseGroupChannel(THIS, channel, group, i);
         }
+        
+        // Set volume
+        AudioUnitParameterValue volumeValue = channel->volume;
+        checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, i, volumeValue, 0),
+                    "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
+        
+        // Set pan
+        AudioUnitParameterValue panValue = channel->pan;
+        if ( panValue == -1.0 ) panValue = -0.999; // Workaround for pan limits bug
+        if ( panValue == 1.0 ) panValue = 0.999;
+        checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, i, panValue, 0),
+                    "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)");
+        
+        // Set enabled
+        AudioUnitParameterValue enabledValue = channel->playing && !channel->muted;
+        checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, i, enabledValue, 0),
+                    "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
     }
 }
 
