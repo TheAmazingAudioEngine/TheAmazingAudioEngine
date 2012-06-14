@@ -49,6 +49,7 @@ typedef struct {
     AudioStreamBasicDescription             audioDescription;
     float                                   volume;
     float                                   pan;
+    BOOL                                    started;
 } source_t;
 
 typedef void(*AEMixerBufferAction)(AEMixerBuffer *buffer, void *userInfo);
@@ -473,40 +474,44 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
             }
             
             if ( !source->synced ) {
-#ifdef DEBUG
-                printf("Mixer buffer source %p synced\n", source->source);
-#endif
-                
-                if ( bufferList && source->audioDescription.mBitsPerChannel == 16 ) {
-                    // Microfade in
-                    UInt32 microfade = MIN(frames, kPadMicrofadeDuration);
-                                        
-                    // Apply microfade, and store result in buffer
-                    for ( int i=0; i<source->audioDescription.mChannelsPerFrame; i++ ) {
-                        if ( source->audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ) {
-                            vDSP_vflt16(bufferList->mBuffers[i].mData, 1, THIS->_microfadeBuffer[i], 1, microfade);
-                        } else {
-                            vDSP_vflt16((SInt16*)bufferList->mBuffers[0].mData+i, source->audioDescription.mChannelsPerFrame, THIS->_microfadeBuffer[i], 1, microfade);
+                if ( source->started ) {
+    #ifdef DEBUG
+                    printf("Mixer buffer source %p synced\n", source->source);
+    #endif
+                    
+                    if ( bufferList && source->audioDescription.mBitsPerChannel == 16 ) {
+                        // Microfade in
+                        UInt32 microfade = MIN(frames, kPadMicrofadeDuration);
+                                            
+                        // Apply microfade, and store result in buffer
+                        for ( int i=0; i<source->audioDescription.mChannelsPerFrame; i++ ) {
+                            if ( source->audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ) {
+                                vDSP_vflt16(bufferList->mBuffers[i].mData, 1, THIS->_microfadeBuffer[i], 1, microfade);
+                            } else {
+                                vDSP_vflt16((SInt16*)bufferList->mBuffers[0].mData+i, source->audioDescription.mChannelsPerFrame, THIS->_microfadeBuffer[i], 1, microfade);
+                            }
                         }
-                    }
-                    float start = 0.0;
-                    float step = 1.0 / (float)microfade;
-                    if ( source->audioDescription.mChannelsPerFrame == 2 ) {
-                        vDSP_vrampmul2(THIS->_microfadeBuffer[0], THIS->_microfadeBuffer[1], 1, &start, &step, THIS->_microfadeBuffer[0], THIS->_microfadeBuffer[1], 1, microfade);
-                    } else {
-                        vDSP_vrampmul(THIS->_microfadeBuffer[0], 1, &start, &step, THIS->_microfadeBuffer[0], 1, microfade);
-                    }
-                    for ( int i=0; i<source->audioDescription.mChannelsPerFrame; i++ ) {
-                        if ( source->audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ) {
-                            vDSP_vfix16(THIS->_microfadeBuffer[i], 1, bufferList->mBuffers[i].mData, 1, microfade);
+                        float start = 0.0;
+                        float step = 1.0 / (float)microfade;
+                        if ( source->audioDescription.mChannelsPerFrame == 2 ) {
+                            vDSP_vrampmul2(THIS->_microfadeBuffer[0], THIS->_microfadeBuffer[1], 1, &start, &step, THIS->_microfadeBuffer[0], THIS->_microfadeBuffer[1], 1, microfade);
                         } else {
-                            vDSP_vfix16(THIS->_microfadeBuffer[i], 1, (SInt16*)bufferList->mBuffers[0].mData+i, source->audioDescription.mChannelsPerFrame, microfade);
+                            vDSP_vrampmul(THIS->_microfadeBuffer[0], 1, &start, &step, THIS->_microfadeBuffer[0], 1, microfade);
+                        }
+                        for ( int i=0; i<source->audioDescription.mChannelsPerFrame; i++ ) {
+                            if ( source->audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ) {
+                                vDSP_vfix16(THIS->_microfadeBuffer[i], 1, bufferList->mBuffers[i].mData, 1, microfade);
+                            } else {
+                                vDSP_vfix16(THIS->_microfadeBuffer[i], 1, (SInt16*)bufferList->mBuffers[0].mData+i, source->audioDescription.mChannelsPerFrame, microfade);
+                            }
                         }
                     }
                 }
                 
                 source->synced = YES;
             }
+            
+            source->started = YES;
             
             *ioLengthInFrames = frames + paddingFrames;
         }
