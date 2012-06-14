@@ -129,6 +129,23 @@ static const int kIncrementalLoadBufferSize = 4096;
         return;
     }
     
+    if ( _targetAudioDescription.mChannelsPerFrame > fileAudioDescription.mChannelsPerFrame ) {
+        // More channels in target format than file format - set up a map to duplicate channel
+        SInt32 channelMap[8];
+        AudioConverterRef converter;
+        checkResult(ExtAudioFileGetProperty(audioFile, kExtAudioFileProperty_AudioConverter, &size, &converter),
+                    "ExtAudioFileGetProperty(kExtAudioFileProperty_AudioConverter)");
+        for ( int outChannel=0, inChannel=0; outChannel < _targetAudioDescription.mChannelsPerFrame; outChannel++ ) {
+            channelMap[outChannel] = inChannel;
+            if ( inChannel+1 < fileAudioDescription.mChannelsPerFrame ) inChannel++;
+        }
+        checkResult(AudioConverterSetProperty(converter, kAudioConverterChannelMap, sizeof(SInt32)*_targetAudioDescription.mChannelsPerFrame, &channelMap),
+                    "AudioConverterSetProperty(kAudioConverterChannelMap)");
+        CFArrayRef config = NULL;
+        checkResult(ExtAudioFileSetProperty(audioFile, kExtAudioFileProperty_ConverterConfig, sizeof(CFArrayRef), &config),
+                    "ExtAudioFileSetProperty(kExtAudioFileProperty_ConverterConfig)");
+    }
+    
     // Determine length in frames (in original file's sample rate)
     UInt64 fileLengthInFrames;
     size = sizeof(fileLengthInFrames);

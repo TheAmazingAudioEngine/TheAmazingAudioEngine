@@ -197,6 +197,21 @@ void AEMixerBufferEnqueue(AEMixerBuffer *THIS, AEMixerBufferSource sourceID, Aud
     source->callbackUserinfo = userInfo;
 }
 
+struct fillComplexBufferInputProc_t { AudioBufferList *bufferList; UInt32 frames;  };
+static OSStatus fillComplexBufferInputProc(AudioConverterRef             inAudioConverter,
+                                           UInt32                        *ioNumberDataPackets,
+                                           AudioBufferList               *ioData,
+                                           AudioStreamPacketDescription  **outDataPacketDescription,
+                                           void                          *inUserData) {
+    struct fillComplexBufferInputProc_t *arg = inUserData;
+    for ( int i=0; i<ioData->mNumberBuffers; i++ ) {
+        ioData->mBuffers[i].mData = arg->bufferList->mBuffers[i].mData;
+        ioData->mBuffers[i].mDataByteSize = arg->bufferList->mBuffers[i].mDataByteSize;
+    }
+    *ioNumberDataPackets = arg->frames;
+    return noErr;
+}
+
 void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, uint64_t *outTimestamp) {
     if ( !THIS->_graphReady ) {
         *ioLengthInFrames = 0;
@@ -319,7 +334,12 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
         
         if ( THIS->_audioConverter ) {
             // Convert output into client format
-            OSStatus result = AudioConverterConvertComplexBuffer(THIS->_audioConverter, frames, intermediateBufferList, bufferList);
+            OSStatus result = AudioConverterFillComplexBuffer(THIS->_audioConverter, 
+                                                              fillComplexBufferInputProc, 
+                                                              &(struct fillComplexBufferInputProc_t) { .bufferList = intermediateBufferList, .frames = frames }, 
+                                                              &frames, 
+                                                              bufferList, 
+                                                              NULL);
             if ( !checkResult(result, "AudioConverterConvertComplexBuffer") ) {
                 break;
             }

@@ -289,7 +289,7 @@ static void audioSessionPropertyListener(void *inClientData, AudioSessionPropert
     AEAudioController *THIS = (AEAudioController *)inClientData;
     
     if (inID == kAudioSessionProperty_AudioRouteChange) {
-        int reason = [[(NSDictionary*)inData objectForKey:(id)kAudioSession_RouteChangeKey_Reason] intValue];
+        int reason = [[(NSDictionary*)inData objectForKey:[NSString stringWithCString:kAudioSession_AudioRouteChangeKey_Reason encoding:NSUTF8StringEncoding]] intValue];
         
         CFStringRef route;
         UInt32 size = sizeof(route);
@@ -334,6 +334,21 @@ static void audioSessionPropertyListener(void *inClientData, AudioSessionPropert
 
 #pragma mark -
 #pragma mark Input and render callbacks
+
+struct fillComplexBufferInputProc_t { AudioBufferList *bufferList; UInt32 frames;  };
+static OSStatus fillComplexBufferInputProc(AudioConverterRef             inAudioConverter,
+                                           UInt32                        *ioNumberDataPackets,
+                                           AudioBufferList               *ioData,
+                                           AudioStreamPacketDescription  **outDataPacketDescription,
+                                           void                          *inUserData) {
+    struct fillComplexBufferInputProc_t *arg = inUserData;
+    for ( int i=0; i<ioData->mNumberBuffers; i++ ) {
+        ioData->mBuffers[i].mData = arg->bufferList->mBuffers[i].mData;
+        ioData->mBuffers[i].mDataByteSize = arg->bufferList->mBuffers[i].mDataByteSize;
+    }
+    *ioNumberDataPackets = arg->frames;
+    return noErr;
+}
 
 static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UInt32 frames) {
     channel_producer_arg_t *arg = (channel_producer_arg_t*)userInfo;
@@ -384,8 +399,13 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
         
         if ( group->converterRequired ) {
             // Perform conversion
-            status = AudioConverterConvertComplexBuffer(group->audioConverter, frames, bufferList, audio);
-            checkResult(status, "AudioConverterConvertComplexBuffer");
+            status = AudioConverterFillComplexBuffer(group->audioConverter, 
+                                                     fillComplexBufferInputProc, 
+                                                     &(struct fillComplexBufferInputProc_t) { .bufferList = bufferList, .frames = frames }, 
+                                                     &frames, 
+                                                     audio, 
+                                                     NULL);
+            checkResult(status, "AudioConverterFillComplexBuffer");
         }
         
         if ( group->meteringEnabled && group->resetMeterStats ) {
@@ -549,8 +569,13 @@ static OSStatus groupRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionF
             }
             
             // Perform conversion
-            if ( !checkResult(AudioConverterConvertComplexBuffer(group->audioConverter, inNumberFrames, ioData, bufferList),
-                              "AudioConverterConvertComplexBuffer") ) {
+            OSStatus result = AudioConverterFillComplexBuffer(group->audioConverter, 
+                                                              fillComplexBufferInputProc, 
+                                                              &(struct fillComplexBufferInputProc_t) { .bufferList = ioData, .frames = inNumberFrames }, 
+                                                              &inNumberFrames, 
+                                                              bufferList, 
+                                                              NULL);
+            if ( !checkResult(result, "AudioConverterConvertComplexBuffer") ) {
                 return noErr;
             }
             
