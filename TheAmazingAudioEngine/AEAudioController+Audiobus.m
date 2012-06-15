@@ -32,3 +32,8 @@ __attribute__((weak)) ABInputPortAttributes ABOutputPortGetConnectedPortAttribut
     printf("ABOutputPortGetConnectedPortAttributes stub called\n");
     return 0;
 }
+
+__attribute__((weak)) NSTimeInterval ABOutputPortGetAverageLatency(ABOutputPort *outputPort) {
+    printf("ABOutputPortGetAverageLatency stub called\n");
+    return 0;
+}
