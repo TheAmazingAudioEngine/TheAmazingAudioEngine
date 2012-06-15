@@ -69,10 +69,10 @@ void TPCircularBufferProduceAudioBufferList(TPCircularBuffer *buffer) {
     int32_t availableBytes;
     AudioTimeStamp *timestamp = (AudioTimeStamp*)TPCircularBufferHead(buffer, &availableBytes);
     UInt32 *totalLengthInBytes = (UInt32*)(timestamp+1);
-
     AudioBufferList *list = (AudioBufferList*)(totalLengthInBytes+1);
+    
     UInt32 calculatedLength = ((char*)list->mBuffers[list->mNumberBuffers-1].mData + list->mBuffers[list->mNumberBuffers-1].mDataByteSize) - (char*)list;
-    assert(calculatedLength < *totalLengthInBytes && sizeof(AudioTimeStamp)+sizeof(UInt32)+calculatedLength <= availableBytes);
+    assert(calculatedLength <= *totalLengthInBytes && sizeof(AudioTimeStamp)+sizeof(UInt32)+calculatedLength <= availableBytes);
     
     *totalLengthInBytes = calculatedLength;
     
@@ -82,12 +82,12 @@ void TPCircularBufferProduceAudioBufferList(TPCircularBuffer *buffer) {
                             *totalLengthInBytes);
 }
 
-bool TPCircularBufferCopyAudioBufferList(TPCircularBuffer *buffer, const AudioBufferList *bufferList, const AudioTimeStamp *inTimestamp, UInt32 frames, AudioStreamBasicDescription *audioDescription) {
-    int bufferListSize = sizeof(AudioBufferList) + ((bufferList->mNumberBuffers-1) * sizeof(AudioBuffer));
+bool TPCircularBufferCopyAudioBufferList(TPCircularBuffer *buffer, const AudioBufferList *inBufferList, const AudioTimeStamp *inTimestamp, UInt32 frames, AudioStreamBasicDescription *audioDescription) {
+    int bufferListSize = sizeof(AudioBufferList) + ((inBufferList->mNumberBuffers-1) * sizeof(AudioBuffer));
     
     int32_t availableBytes;
     AudioTimeStamp *timestamp = (AudioTimeStamp*)TPCircularBufferHead(buffer, &availableBytes);
-    if ( availableBytes < sizeof(AudioTimeStamp) + bufferListSize ) return false;
+    if ( availableBytes < sizeof(AudioTimeStamp) + sizeof(UInt32) + bufferListSize ) return false;
     
     // Store timestamp, followed by buffer list
     if ( inTimestamp ) {
@@ -98,18 +98,18 @@ bool TPCircularBufferCopyAudioBufferList(TPCircularBuffer *buffer, const AudioBu
     
     UInt32 *totalLengthInBytes = (UInt32*)(timestamp+1);
     
-    AudioBufferList *list = (AudioBufferList*)(totalLengthInBytes+1);
+    AudioBufferList *bufferList = (AudioBufferList*)(totalLengthInBytes+1);
     
-    memcpy(list, bufferList, bufferListSize);
+    memcpy(bufferList, inBufferList, bufferListSize);
     
-    int byteCount = bufferList->mBuffers[0].mDataByteSize;
-    if ( frames != UINT32_MAX ) {
+    int byteCount = inBufferList->mBuffers[0].mDataByteSize;
+    if ( frames != kTPCircularBufferCopyAll ) {
         byteCount = frames * audioDescription->mBytesPerFrame;
-        assert(byteCount <= bufferList->mBuffers[0].mDataByteSize);
+        assert(byteCount <= inBufferList->mBuffers[0].mDataByteSize);
     }
     
-    char *dataPtr = (char*)list + bufferListSize;
-    for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
+    char *dataPtr = (char*)bufferList + bufferListSize;
+    for ( int i=0; i<inBufferList->mNumberBuffers; i++ ) {
         // Find the next 16-byte aligned memory area
         dataPtr = (char*)align16bit((long)dataPtr);
         
@@ -117,17 +117,17 @@ bool TPCircularBufferCopyAudioBufferList(TPCircularBuffer *buffer, const AudioBu
             return false;
         }
         
-        assert(bufferList->mBuffers[i].mData != NULL);
+        assert(inBufferList->mBuffers[i].mData != NULL);
         
-        list->mBuffers[i].mData = dataPtr;
-        list->mBuffers[i].mDataByteSize = byteCount;
+        bufferList->mBuffers[i].mData = dataPtr;
+        bufferList->mBuffers[i].mDataByteSize = byteCount;
         
-        memcpy(dataPtr, bufferList->mBuffers[i].mData, byteCount);
+        memcpy(dataPtr, inBufferList->mBuffers[i].mData, byteCount);
         
         dataPtr += byteCount;
     }
     
-    *totalLengthInBytes = (dataPtr-(char*)list);
+    *totalLengthInBytes = (dataPtr-(char*)bufferList);
     
     TPCircularBufferProduce(buffer, dataPtr-(char*)timestamp);
     
@@ -160,9 +160,10 @@ void TPCircularBufferConsumeNextBufferListPartial(TPCircularBuffer *buffer, int 
     AudioTimeStamp *timestamp = TPCircularBufferTail(buffer, &dontcare);
     if ( !timestamp ) return;
     
+    UInt32 *totalLengthInBytes = (UInt32*)(timestamp+1);
+    AudioBufferList *bufferList = (AudioBufferList*)(totalLengthInBytes+1);
+
     int bytesToConsume = framesToConsume * audioFormat->mBytesPerFrame;
-    
-    AudioBufferList *bufferList = (AudioBufferList*)(((char*)timestamp)+sizeof(AudioTimeStamp)+sizeof(UInt32));
     
     if ( bytesToConsume == bufferList->mBuffers[0].mDataByteSize ) {
         TPCircularBufferConsumeNextBufferList(buffer);
@@ -170,12 +171,15 @@ void TPCircularBufferConsumeNextBufferListPartial(TPCircularBuffer *buffer, int 
     }
     
     for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
+        assert(bytesToConsume < bufferList->mBuffers[i].mDataByteSize && (char*)bufferList->mBuffers[i].mData + bytesToConsume < (char*)bufferList+*totalLengthInBytes);
+        
         bufferList->mBuffers[i].mData = (char*)bufferList->mBuffers[i].mData + bytesToConsume;
-        assert(bytesToConsume <= bufferList->mBuffers[i].mDataByteSize);
         bufferList->mBuffers[i].mDataByteSize -= bytesToConsume;
     }
     
-    if ( timestamp->mFlags & kAudioTimeStampSampleTimeValid ) timestamp->mSampleTime += framesToConsume;
+    if ( timestamp->mFlags & kAudioTimeStampSampleTimeValid ) {
+        timestamp->mSampleTime += framesToConsume;
+    }
     if ( timestamp->mFlags & kAudioTimeStampHostTimeValid ) {
         if ( !__secondsToHostTicks ) {
             mach_timebase_info_data_t tinfo;
@@ -192,6 +196,7 @@ void TPCircularBufferDequeueBufferListFrames(TPCircularBuffer *buffer, UInt32 *i
     UInt32 bytesCopied = 0;
     while ( bytesToGo > 0 ) {
         AudioBufferList *bufferList = TPCircularBufferNextBufferList(buffer, !hasTimestamp ? outTimestamp : NULL);
+        UInt32 *totalSize = bufferList ? ((UInt32*)bufferList)-1 : NULL;
         hasTimestamp = true;
         if ( !bufferList ) break;
         
@@ -199,15 +204,14 @@ void TPCircularBufferDequeueBufferListFrames(TPCircularBuffer *buffer, UInt32 *i
         
         if ( outputBufferList ) {
             for ( int i=0; i<outputBufferList->mNumberBuffers; i++ ) {
+                assert((char*)outputBufferList->mBuffers[i].mData + bytesCopied + bytesToCopy <= (char*)outputBufferList->mBuffers[i].mData + outputBufferList->mBuffers[i].mDataByteSize);
+                assert((char*)bufferList->mBuffers[i].mData + bytesToCopy <= (char*)bufferList+*totalSize);
+                
                 memcpy((char*)outputBufferList->mBuffers[i].mData + bytesCopied, bufferList->mBuffers[i].mData, bytesToCopy);
             }
         }
         
-        if ( bytesToCopy == bufferList->mBuffers[0].mDataByteSize ) {
-            TPCircularBufferConsumeNextBufferList(buffer);
-        } else {
-            TPCircularBufferConsumeNextBufferListPartial(buffer, bytesToCopy/audioFormat->mBytesPerFrame, audioFormat);
-        }
+        TPCircularBufferConsumeNextBufferListPartial(buffer, bytesToCopy/audioFormat->mBytesPerFrame, audioFormat);
         
         bytesToGo -= bytesToCopy;
         bytesCopied += bytesToCopy;
