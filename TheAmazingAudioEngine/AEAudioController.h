@@ -1116,6 +1116,13 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
 @property (nonatomic, readonly) NSUInteger numberOfInputChannels;
 
 /*!
+ * The name of the current audio route
+ *
+ *      Note: This property is observable
+ */
+@property (nonatomic, retain, readonly) NSString *audioRoute;
+
+/*!
  * The audio description defining the input audio format
  * 
  *      Note: This property is observable

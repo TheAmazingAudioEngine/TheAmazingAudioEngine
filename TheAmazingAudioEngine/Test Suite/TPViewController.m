@@ -217,7 +217,9 @@
     [super viewWillAppear:animated];
     
     [_audioController addObserver:self forKeyPath:@"numberOfInputChannels" options:0 context:NULL];
-    _channelCountLabel.text = [NSString stringWithFormat:@"%d input channels", _audioController.numberOfInputChannels];
+    [_audioController addObserver:self forKeyPath:@"audioRoute" options:0 context:NULL];
+    
+    _channelCountLabel.text = [NSString stringWithFormat:@"%@: %d input channels", _audioController.audioRoute, _audioController.numberOfInputChannels];
     [_channelCountLabel sizeToFit];
     _channelCountLabel.frame = CGRectOffset(_channelCountLabel.frame, 10, 10);
     
@@ -231,6 +233,7 @@
     self.levelsTimer = nil;
     
     [_audioController removeObserver:self forKeyPath:@"numberOfInputChannels"];
+    [_audioController removeObserver:self forKeyPath:@"audioRoute"];
 }
 
 -(NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
@@ -555,7 +558,7 @@ static inline float translate(float val, float min, float max) {
         self.player = nil;
         _playButton.selected = NO;
     } else if ( object == _audioController ) {
-        _channelCountLabel.text = [NSString stringWithFormat:@"%d channels", _audioController.numberOfInputChannels];
+        _channelCountLabel.text = [NSString stringWithFormat:@"%@: %d input channels", _audioController.audioRoute, _audioController.numberOfInputChannels];
         [_channelCountLabel sizeToFit];
     }
 }

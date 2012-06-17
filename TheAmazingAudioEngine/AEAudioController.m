@@ -239,6 +239,7 @@ static void removeCallbackFromTable(AEAudioController *THIS, void *userInfo, int
 - (void)setVariableSpeedFilter:(id<AEAudioVariableSpeedFilter>)filter forChannelStruct:(AEChannelRef)channel;
 static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp *inTimeStamp, UInt32 inNumberFrames, AudioBufferList *ioData);
 
+@property (nonatomic, retain, readwrite) NSString *audioRoute;
 @property (nonatomic, retain) ABInputPort *audiobusInputPort;
 @property (nonatomic, retain) ABOutputPort *audiobusOutputPort;
 @end
@@ -256,6 +257,7 @@ static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp
             inputMode                   = _inputMode, 
             audioUnit                   = _ioAudioUnit,
             audioDescription            = _audioDescription,
+            audioRoute                  = _audioRoute,
             inputAudioDescription       = _inputAudioDescription,
             audiobusInputPort           = _audiobusInputPort,
             audiobusOutputPort          = _audiobusOutputPort;
@@ -297,6 +299,8 @@ static void audioSessionPropertyListener(void *inClientData, AudioSessionPropert
         CFStringRef route;
         UInt32 size = sizeof(route);
         if ( !checkResult(AudioSessionGetProperty(kAudioSessionProperty_AudioRoute, &size, &route), "AudioSessionGetProperty(kAudioSessionProperty_AudioRoute)") ) return;
+        
+        THIS.audioRoute = [[(NSString*)route copy] autorelease];
         
         BOOL playingThroughSpeaker;
         if ( [(NSString*)route isEqualToString:@"ReceiverAndMicrophone"] ) {
@@ -779,6 +783,8 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [self stop];
     [self teardown];
+    
+    self.audioRoute = nil;
     
     NSArray *channels = [self channels];
     for ( NSObject *channel in channels ) {
@@ -1709,34 +1715,53 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     AEChannelRef channelElement = &group->channels[index];
     
     if ( [keyPath isEqualToString:@"volume"] ) {
-        AudioUnitParameterValue value = channelElement->volume = channel.volume;
-        OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, index, value, 0);
-        checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
+        channelElement->volume = channel.volume;
+        
+        if ( group->mixerAudioUnit ) {
+            AudioUnitParameterValue value = channelElement->volume;
+            OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, index, value, 0);
+            checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
+        }
         
     } else if ( [keyPath isEqualToString:@"pan"] ) {
-        AudioUnitParameterValue value = channelElement->pan = channel.pan;
-        if ( value == -1.0 ) value = -0.999; // Workaround for pan limits bug
-        if ( value == 1.0 ) value = 0.999;
-        OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, index, value, 0);
-        checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)");
+        channelElement->pan = channel.pan;
+        
+        if ( group->mixerAudioUnit ) {
+            AudioUnitParameterValue value = channelElement->pan;
+            if ( value == -1.0 ) value = -0.999; // Workaround for pan limits bug
+            if ( value == 1.0 ) value = 0.999;
+            OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, index, value, 0);
+            checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)");
+        }
 
     } else if ( [keyPath isEqualToString:@"playing"] ) {
         channelElement->playing = channel.playing;
         AudioUnitParameterValue value = channel.playing && (![channel respondsToSelector:@selector(muted)] || !channel.muted);
-        OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
-        checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
+        
+        if ( group->mixerAudioUnit ) {
+            OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
+            checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
+        }
+        
         group->channels[index].playing = value;
         
     }  else if ( [keyPath isEqualToString:@"muted"] ) {
         channelElement->muted = channel.muted;
-        AudioUnitParameterValue value = ([channel respondsToSelector:@selector(playing)] ? channel.playing : YES) && !channel.muted;
-        OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
-        checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
+        
+        if ( group->mixerAudioUnit ) {
+            AudioUnitParameterValue value = ([channel respondsToSelector:@selector(playing)] ? channel.playing : YES) && !channel.muted;
+            OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
+            checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
+        }
         
     } else if ( [keyPath isEqualToString:@"audioDescription"] ) {
         channelElement->audioDescription = channel.audioDescription;
-        OSStatus result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, index, &channelElement->audioDescription, sizeof(AudioStreamBasicDescription));
-        checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
+        
+        if ( group->mixerAudioUnit ) {
+            OSStatus result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, index, &channelElement->audioDescription, sizeof(AudioStreamBasicDescription));
+            checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
+        }
+        
         if ( channelElement->audiobusOutputPort ) {
             channelElement->audiobusOutputPort.clientFormat = channel.audioDescription;
         }
@@ -1800,25 +1825,29 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     // Determine audio route
     CFStringRef route;
     size = sizeof(route);
-    checkResult(AudioSessionGetProperty(kAudioSessionProperty_AudioRoute, &size, &route),
-                "AudioSessionGetProperty(kAudioSessionProperty_AudioRoute)");
-    if ( [(NSString*)route isEqualToString:@"ReceiverAndMicrophone"] ) {
-        checkResult(AudioSessionRemovePropertyListenerWithUserData(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, self), 
-                    "AudioSessionRemovePropertyListenerWithUserData");
+    if ( checkResult(AudioSessionGetProperty(kAudioSessionProperty_AudioRoute, &size, &route),
+                     "AudioSessionGetProperty(kAudioSessionProperty_AudioRoute)") ) {
         
-        // Re-route audio to the speaker (not the receiver)
-        UInt32 newRoute = kAudioSessionOverrideAudioRoute_Speaker;
-        checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute,  sizeof(route), &newRoute), 
-                    "AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute)");
+        self.audioRoute = [[(NSString*)route copy] autorelease];
         
-        checkResult(AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, self),
-                    "AudioSessionAddPropertyListener");
-        
-        _playingThroughDeviceSpeaker = YES;
-    } else if ( [(NSString*)route isEqualToString:@"SpeakerAndMicrophone"] || [(NSString*)route isEqualToString:@"Speaker"] ) {
-        _playingThroughDeviceSpeaker = YES;
-    } else {
-        _playingThroughDeviceSpeaker = NO;
+        if ( [(NSString*)route isEqualToString:@"ReceiverAndMicrophone"] ) {
+            checkResult(AudioSessionRemovePropertyListenerWithUserData(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, self), 
+                        "AudioSessionRemovePropertyListenerWithUserData");
+            
+            // Re-route audio to the speaker (not the receiver)
+            UInt32 newRoute = kAudioSessionOverrideAudioRoute_Speaker;
+            checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute,  sizeof(route), &newRoute), 
+                        "AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute)");
+            
+            checkResult(AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, self),
+                        "AudioSessionAddPropertyListener");
+            
+            _playingThroughDeviceSpeaker = YES;
+        } else if ( [(NSString*)route isEqualToString:@"SpeakerAndMicrophone"] || [(NSString*)route isEqualToString:@"Speaker"] ) {
+            _playingThroughDeviceSpeaker = YES;
+        } else {
+            _playingThroughDeviceSpeaker = NO;
+        }
     }
 }
 
