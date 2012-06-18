@@ -813,6 +813,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 - (void)start {
+    NSLog(@"TAAE: Starting Engine");
     AudioSessionSetActive(true);
     
     // Determine if audio input is available, and the number of input channels available
@@ -829,6 +830,8 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 - (void)stop {
+    NSLog(@"TAAE: Stopping Engine");
+    
     if ( self.running ) {
         if ( !checkResult(AUGraphStop(_audioGraph), "AUGraphStop") ) return;
         AudioSessionSetActive(false);
@@ -1777,6 +1780,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
 #pragma mark - Graph and audio session configuration
 
 - (void)initAudioSession {
+    NSMutableString *extraInfo = [NSMutableString string];
     
     // Initialise the audio session
     OSStatus result = AudioSessionInitialize(NULL, NULL, interruptionListener, self);
@@ -1793,6 +1797,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     Float32 preferredBufferSize = [self usingVPIO] ? MAX(kMaxBufferDurationWithVPIO, _preferredBufferDuration) : _preferredBufferDuration;
     result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
     checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
+    [extraInfo appendFormat:@"Buffer duration %g", preferredBufferSize];
     
     // Set sample rate
     Float64 sampleRate = _audioDescription.mSampleRate;
@@ -1807,6 +1812,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     if ( achievedSampleRate != sampleRate ) {
         NSLog(@"Warning: Delivered sample rate is %f", achievedSampleRate);
         _audioDescription.mSampleRate = achievedSampleRate;
+        [extraInfo appendFormat:@", sample rate %0.2g", achievedSampleRate];
     }
     
     UInt32 inputAvailable = NO;
@@ -1815,6 +1821,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
         UInt32 size = sizeof(inputAvailable);
         OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_AudioInputAvailable, &size, &inputAvailable);
         checkResult(result, "AudioSessionGetProperty");
+        if ( inputAvailable ) [extraInfo appendFormat:@", input available"];
     }
     _audioInputAvailable = inputAvailable;
     
@@ -1830,7 +1837,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
                      "AudioSessionGetProperty(kAudioSessionProperty_AudioRoute)") ) {
         
         self.audioRoute = [[(NSString*)route copy] autorelease];
-        
+        [extraInfo appendFormat:@", audio route '%@'", _audioRoute];
         if ( [(NSString*)route isEqualToString:@"ReceiverAndMicrophone"] ) {
             checkResult(AudioSessionRemovePropertyListenerWithUserData(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, self), 
                         "AudioSessionRemovePropertyListenerWithUserData");
@@ -1850,10 +1857,11 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
             _playingThroughDeviceSpeaker = NO;
         }
     }
+    
+    NSLog(@"TAAE: Audio session initialized (%@)", extraInfo);
 }
 
 - (BOOL)setup {
-    
     // Create a new AUGraph
 	OSStatus result = NewAUGraph(&_audioGraph);
     if ( !checkResult(result, "NewAUGraph") ) return NO;
@@ -1938,6 +1946,8 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
 	result = AUGraphInitialize(_audioGraph);
     if ( !checkResult(result, "AUGraphInitialize") ) return NO;
     
+    NSLog(@"TAAE: Engine setup");
+    
     return YES;
 }
 
@@ -2002,6 +2012,8 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
         return;
     }
     
+    NSLog(@"TAAE: Set audio session category to %@", audioCategory == kAudioSessionCategory_PlayAndRecord ? @"Play and record" : @"Media playback");
+    
     UInt32 allowMixing = YES;
     checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof (audioCategory), &audioCategory), "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory");
     checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing), "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
@@ -2015,7 +2027,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
 - (void)updateVoiceProcessingSettings {
     
     BOOL useVoiceProcessing = [self usingVPIO];
-    
+
     AudioComponentDescription target_io_desc = {
         .componentType = kAudioUnitType_Output,
         .componentSubType = useVoiceProcessing ? kAudioUnitSubType_VoiceProcessingIO : kAudioUnitSubType_RemoteIO,
@@ -2029,6 +2041,13 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
         return;
     
     if ( io_desc.componentSubType != target_io_desc.componentSubType ) {
+        
+        if( useVoiceProcessing ) {
+            NSLog(@"TAAE: Restarting audio system to use VPIO");
+        } else {
+            NSLog(@"TAAE: Restarting audio system to use normal input unit");
+        }
+        
         // Replace audio unit
         [self stop];
         [self teardown];
@@ -2202,6 +2221,14 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
         
         if ( inputAvailableChanged ) {
             [self didChangeValueForKey:@"audioInputAvailable"];
+        }
+        
+        if ( inputChannelsChanged || inputAvailableChanged || oldConverter != converter || (oldInputBuffer && oldInputBuffer != _inputAudioBufferList) || (oldScratchBuffer && oldScratchBuffer != scratchBuffer) ) {
+            NSLog(@"TAAE: Input status updated (%lu channel, %@%@%@)",
+                  numberOfInputChannels,
+                  inputAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? @"non-interleaved" : @"interleaved",
+                  useVoiceProcessing ? @", using voice processing" : @"",
+                  converter ? @", with converter" : @"");
         }
     }
     
