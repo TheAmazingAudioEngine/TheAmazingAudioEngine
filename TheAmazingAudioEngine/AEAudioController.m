@@ -1645,9 +1645,8 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
     _audiobusInputPort = audiobusInputPort;
 
     if ( _audiobusInputPort ) {
-        _audiobusInputPort.clientFormat = _audioDescription;
         [_audiobusInputPort addObserver:self forKeyPath:@"sources" options:0 context:NULL];
-        if ( ABInputPortIsConnected(_audiobusInputPort) ) [self updateInputDeviceStatus];
+        [self updateInputDeviceStatus];
     }
 }
 
@@ -2045,6 +2044,7 @@ struct updateInputDeviceStatusHandler_t {
     BOOL inputAvailable; 
     AudioStreamBasicDescription *audioDescription;
     AudioBufferList *audioBufferList;
+    BOOL bufferIsAllocated;
     AudioStreamBasicDescription *rawAudioDescription;
     AudioConverterRef audioConverter;
     AudioBufferList *scratchBuffer;
@@ -2068,10 +2068,9 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
     THIS->_inputAudioDescription    = *arg->audioDescription;
     THIS->_audioInputAvailable      = arg->inputAvailable;
     THIS->_inputAudioBufferList     = arg->audioBufferList;
+    THIS->_inputAudioBufferListBuffersAreAllocated = arg->bufferIsAllocated;
     THIS->_inputAudioConverter      = arg->audioConverter;
     THIS->_inputAudioScratchBufferList = arg->scratchBuffer;
-    THIS->_inputAudioBufferListBuffersAreAllocated = arg->audioBufferList->mBuffers[0].mData != NULL;
-
 }
 
 - (void)updateInputDeviceStatus {
@@ -2085,7 +2084,7 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
         if ( _audiobusInputPort && ABInputPortIsConnected(_audiobusInputPort) ) {
             inputAvailable = YES;
             inputAudioDescription = _audioDescription;
-            numberOfInputChannels = inputAudioDescription.mChannelsPerFrame;
+            numberOfInputChannels = 2;
         } else {
             UInt32 size = sizeof(inputAvailable);
             OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_AudioInputAvailable, &size, &inputAvailable);
@@ -2102,7 +2101,7 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
             }
         }
         
-        if ( _inputMode == AEInputModeVariableAudioFormat) {
+        if ( _inputMode == AEInputModeVariableAudioFormat ) {
             // Set the input audio description channels to the number of actual available channels
             if ( !(inputAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ) {
                 inputAudioDescription.mBytesPerFrame *= (float)numberOfInputChannels / inputAudioDescription.mChannelsPerFrame;
@@ -2112,6 +2111,8 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
         }
         
         AudioBufferList *inputBufferList = _inputAudioBufferList;
+        BOOL bufferIsAllocated = _inputAudioBufferListBuffersAreAllocated;
+        
         BOOL inputBufferListBuffersWereAllocated = _inputAudioBufferListBuffersAreAllocated;
         
         AudioStreamBasicDescription rawAudioDescription = inputAudioDescription;
@@ -2140,6 +2141,7 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
                 checkResult(AudioConverterNew(&rawAudioDescription, &inputAudioDescription, &converter), "AudioConverterNew");
                 scratchBuffer = AEAllocateAndInitAudioBufferList(rawAudioDescription, 0);
                 inputBufferList = AEAllocateAndInitAudioBufferList(inputAudioDescription, kInputAudioBufferBytes / inputAudioDescription.mBytesPerFrame);
+                bufferIsAllocated = YES;
             }
         }
         
@@ -2149,6 +2151,7 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
         if ( !_inputAudioBufferList || memcmp(&inputAudioDescription, &_inputAudioDescription, sizeof(inputAudioDescription)) != 0 ) {
             if ( !converter ) {
                 inputBufferList = AEAllocateAndInitAudioBufferList(inputAudioDescription, 0);
+                bufferIsAllocated = NO;
             }
             inputChannelsChanged = YES;
             [self willChangeValueForKey:@"numberOfInputChannels"];
@@ -2168,6 +2171,7 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
                                                  .inputAvailable = inputAvailable,
                                                  .audioDescription = &inputAudioDescription,
                                                  .audioBufferList = inputBufferList,
+                                                 .bufferIsAllocated = bufferIsAllocated ,
                                                  .rawAudioDescription = &rawAudioDescription,
                                                  .audioConverter = converter,
                                                  .scratchBuffer = scratchBuffer }
@@ -2190,10 +2194,10 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
         if ( inputChannelsChanged ) {
             [self didChangeValueForKey:@"inputAudioDescription"];
             [self didChangeValueForKey:@"numberOfInputChannels"];
-            
-            if ( _audiobusInputPort && ABInputPortIsConnected(_audiobusInputPort) && _audiobusInputPort.clientFormat.mChannelsPerFrame != _audioDescription.mChannelsPerFrame ) {
-                _audiobusInputPort.clientFormat = inputAudioDescription;
-            }
+        }
+        
+        if ( _audiobusInputPort && _audiobusInputPort.clientFormat.mChannelsPerFrame != _audioDescription.mChannelsPerFrame ) {
+            _audiobusInputPort.clientFormat = inputAudioDescription;
         }
         
         if ( inputAvailableChanged ) {
