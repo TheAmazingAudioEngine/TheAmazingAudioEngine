@@ -33,6 +33,7 @@ const int kRenderConversionScratchBufferSize    = 16384;
 const int kInputAudioBufferBytes                = 8192;
 const int kInputMonitorScratchBufferSize        = 8192;
 const int kAudiobusSourceFlag                   = 1<<12;
+const NSTimeInterval kMaxBufferDurationWithVPIO = 0.01;
 
 NSString * AEAudioControllerSessionInterruptionBeganNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionBeganNotification";
 NSString * AEAudioControllerSessionInterruptionEndedNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionEndedNotification";
@@ -881,7 +882,8 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     // Configure each channel
     configureChannelsInRangeForGroup(self, NSMakeRange(group->channelCount - [channels count], [channels count]), group);
     
-    checkResult([self updateGraph], "Update graph");
+    result = [self updateGraph];
+    if ( result != kAUGraphErr_InvalidConnection /* Ignore this error */ ) checkResult(result, "Update graph");
 }
 
 - (void)removeChannels:(NSArray *)channels {
@@ -1615,7 +1617,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 -(void)setPreferredBufferDuration:(float)preferredBufferDuration {
     _preferredBufferDuration = preferredBufferDuration;
 
-    Float32 preferredBufferSize = _preferredBufferDuration;
+    Float32 preferredBufferSize = [self usingVPIO] ? MAX(kMaxBufferDurationWithVPIO, _preferredBufferDuration) : _preferredBufferDuration;
     OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
     checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
 }
@@ -1789,7 +1791,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     checkResult(result, "AudioSessionAddPropertyListener");
     
     // Set preferred buffer size
-    Float32 preferredBufferSize = _preferredBufferDuration;
+    Float32 preferredBufferSize = [self usingVPIO] ? MAX(kMaxBufferDurationWithVPIO, _preferredBufferDuration) : _preferredBufferDuration;
     result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
     checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
     
@@ -1857,7 +1859,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
 	OSStatus result = NewAUGraph(&_audioGraph);
     if ( !checkResult(result, "NewAUGraph") ) return NO;
 	
-    BOOL useVoiceProcessing = (_voiceProcessingEnabled && _enableInput && (!_voiceProcessingOnlyForSpeakerAndMicrophone || _playingThroughDeviceSpeaker));
+    BOOL useVoiceProcessing = [self usingVPIO];
     
     // Input/output unit description
     AudioComponentDescription io_desc = {
@@ -1928,7 +1930,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     
     if ( useVoiceProcessing ) {
         // If we're using voice processing, clamp the buffer duration
-        Float32 preferredBufferSize = MAX(0.01, _preferredBufferDuration);
+        Float32 preferredBufferSize = MAX(kMaxBufferDurationWithVPIO, _preferredBufferDuration);
         OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
         checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
     }
@@ -2013,7 +2015,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
 
 - (void)updateVoiceProcessingSettings {
     
-    BOOL useVoiceProcessing = (_voiceProcessingEnabled && _enableInput && (!_voiceProcessingOnlyForSpeakerAndMicrophone || _playingThroughDeviceSpeaker));
+    BOOL useVoiceProcessing = [self usingVPIO];
     
     AudioComponentDescription target_io_desc = {
         .componentType = kAudioUnitType_Output,
@@ -2120,7 +2122,7 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
         AudioBufferList *oldScratchBuffer = scratchBuffer;
         
         // Determine if conversion is required
-        BOOL useVoiceProcessing = (_voiceProcessingEnabled && _enableInput && (!_voiceProcessingOnlyForSpeakerAndMicrophone || _playingThroughDeviceSpeaker));
+        BOOL useVoiceProcessing = [self usingVPIO];
         if ( useVoiceProcessing && (_audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) && [[[UIDevice currentDevice] systemVersion] floatValue] < 5.0 ) {
             // iOS 4 cannot handle non-interleaved audio and voice processing. Use interleaved audio and a converter.
             rawAudioDescription.mFormatFlags &= ~kAudioFormatFlagIsNonInterleaved;
@@ -2512,7 +2514,7 @@ static void removeChannelsFromGroup(AEAudioController *THIS, void *userInfo, int
     if ( result == kAUGraphErr_CannotDoInCurrentContext ) {
         // Complete the refresh on the main thread
         AEAudioControllerSendAsynchronousMessageToMainThread(THIS, updateGroupDelayed, &args->group, sizeof(AEChannelGroupRef));
-    } else if ( checkResult(result, "AUGraphUpdate") ) {
+    } else if ( result == kAUGraphErr_InvalidConnection /* Ignore this error */ || checkResult(result, "AUGraphUpdate") ) {
         configureChannelsInRangeForGroup(THIS, NSMakeRange(0, args->group->channelCount), args->group);
     }
 }
@@ -2587,6 +2589,10 @@ static void removeChannelsFromGroup(AEAudioController *THIS, void *userInfo, int
             [self markGroupTorndown:(AEChannelGroupRef)channel->ptr];
         }
     }
+}
+
+- (BOOL)usingVPIO {
+    return _voiceProcessingEnabled && _enableInput && (!_voiceProcessingOnlyForSpeakerAndMicrophone || _playingThroughDeviceSpeaker);
 }
 
 #pragma mark - Callback management
