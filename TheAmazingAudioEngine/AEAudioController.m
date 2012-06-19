@@ -2215,8 +2215,11 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
             [self didChangeValueForKey:@"numberOfInputChannels"];
         }
         
-        if ( _audiobusInputPort && _audiobusInputPort.clientFormat.mChannelsPerFrame != _audioDescription.mChannelsPerFrame ) {
-            _audiobusInputPort.clientFormat = inputAudioDescription;
+        if ( _audiobusInputPort ) {
+            AudioStreamBasicDescription clientFormat = _audiobusInputPort.clientFormat;
+            if ( memcmp(&clientFormat, &inputAudioDescription, sizeof(AudioStreamBasicDescription)) != 0 ) {
+                _audiobusInputPort.clientFormat = inputAudioDescription;
+            }
         }
         
         if ( inputAvailableChanged ) {
