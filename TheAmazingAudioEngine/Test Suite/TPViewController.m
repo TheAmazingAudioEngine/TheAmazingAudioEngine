@@ -236,6 +236,10 @@
     [_audioController removeObserver:self forKeyPath:@"audioRoute"];
 }
 
+-(BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation {
+    return YES;
+}
+
 -(NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
     return 4;
 }

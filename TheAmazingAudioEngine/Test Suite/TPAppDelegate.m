@@ -28,7 +28,8 @@
     self.window = [[[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]] autorelease];
     
     // Create an instance of the audio controller, set it up and start it running
-    self.audioController = [[[AEAudioController alloc] initWithAudioDescription:[AEAudioController nonInterleaved16BitStereoAudioDescription] inputEnabled:YES useVoiceProcessing:NO] autorelease];
+    self.audioController = [[[AEAudioController alloc] initWithAudioDescription:[AEAudioController nonInterleaved16BitStereoAudioDescription] inputEnabled:YES useVoiceProcessing:YES] autorelease];
+    _audioController.preferredBufferDuration = 0.0025;
     _audioController.inputMode = AEInputModeVariableAudioFormat;
     [_audioController start];
     
