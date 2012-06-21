@@ -305,17 +305,17 @@ static element_t findNextTriggerValueInRange(AELimiter *THIS, AudioBufferList *d
                 float *end = (float*)((char*)buffer->mBuffers[i].mData + buffer->mBuffers[i].mDataByteSize);
                 end = MIN(end, start + ((range.location+range.length) - framesSeen));
                 float *v=start;
-                for ( ; v<end && *v < THIS->_level; v++ );
+                for ( ; v<end && fabsf(*v) < THIS->_level; v++ );
                 if ( v != end ) {
-                    return (element_t){ .value = *v, .index = framesSeen + (v-start) };
+                    return (element_t){ .value = fabsf(*v), .index = framesSeen + (v-start) };
                 }
             }
             framesSeen += (buffer->mBuffers[0].mDataByteSize / sizeof(float)) - bufferOffset;
         }
         
         buffer = buffer == dequeuedBufferList 
-        ? TPCircularBufferNextBufferList(&THIS->_buffer, NULL) :
-        TPCircularBufferNextBufferListAfter(&THIS->_buffer, buffer, NULL);
+            ? TPCircularBufferNextBufferList(&THIS->_buffer, NULL) :
+              TPCircularBufferNextBufferListAfter(&THIS->_buffer, buffer, NULL);
     }
     
     return (element_t) {0, 0};
@@ -344,7 +344,7 @@ static element_t findMaxValueInRange(AELimiter *THIS, AudioBufferList *dequeuedB
                 vDSP_Length buffer_max_index;
                 float buffer_max = max;
                 for ( int i=0; i<buffer->mNumberBuffers; i++ ) {
-                    vDSP_maxvi(position, 1, &buffer_max, &buffer_max_index, length);
+                    vDSP_maxmgvi(position, 1, &buffer_max, &buffer_max_index, length);
                 }
                 
                 if ( buffer_max > max ) {
@@ -356,8 +356,8 @@ static element_t findMaxValueInRange(AELimiter *THIS, AudioBufferList *dequeuedB
         }
         
         buffer = buffer == dequeuedBufferList 
-        ? TPCircularBufferNextBufferList(&THIS->_buffer, NULL) :
-        TPCircularBufferNextBufferListAfter(&THIS->_buffer, buffer, NULL);
+            ? TPCircularBufferNextBufferList(&THIS->_buffer, NULL) :
+              TPCircularBufferNextBufferListAfter(&THIS->_buffer, buffer, NULL);
     }
     
     return (element_t) { .value = max, .index = index};
