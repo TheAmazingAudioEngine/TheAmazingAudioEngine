@@ -11,6 +11,7 @@
 #import "TPCircularBuffer+AudioBufferList.h"
 #import <libkern/OSAtomic.h>
 #import <mach/mach_time.h>
+#import <pthread.h>
 #import <Accelerate/Accelerate.h>
 
 static double __hostTicksToSeconds = 0.0;

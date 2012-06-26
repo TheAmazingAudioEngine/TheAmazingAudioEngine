@@ -572,10 +572,10 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
             } else if ( THIS->_inputAudioDescription.mBitsPerChannel == 32 ) {
                 vDSP_vflt32(THIS->_inputAudioBufferList->mBuffers[i].mData, 1, THIS->_inputMonitorScratchBuffer, 1, monitorFrames);
             }
-            float peak;
+            float peak = 0.0;
             vDSP_maxmgv(THIS->_inputMonitorScratchBuffer, 1, &peak, monitorFrames);
             if ( peak > THIS->_inputPeak ) THIS->_inputPeak = peak;
-            float avg;
+            float avg = 0.0;
             vDSP_meamgv(THIS->_inputMonitorScratchBuffer, 1, &avg, monitorFrames);
             THIS->_inputMeanAccumulator += avg;
             THIS->_inputMeanBlockCount++;
