@@ -186,7 +186,8 @@ void TPCircularBufferConsumeNextBufferListPartial(TPCircularBuffer *buffer, int 
             mach_timebase_info(&tinfo);
             __secondsToHostTicks = 1.0 / (((double)tinfo.numer / tinfo.denom) * 1.0e-9);
         }
-        timestamp->mHostTime += ((double)framesToConsume / audioFormat->mSampleRate) * __secondsToHostTicks;
+        uint64_t lengthInTicks = ((double)framesToConsume / audioFormat->mSampleRate) * __secondsToHostTicks;
+        timestamp->mHostTime = timestamp->mHostTime + lengthInTicks;
     }
 }
 
@@ -221,8 +222,6 @@ void TPCircularBufferDequeueBufferListFrames(TPCircularBuffer *buffer, UInt32 *i
 }
 
 static UInt32 _TPCircularBufferPeek(TPCircularBuffer *buffer, AudioTimeStamp *outTimestamp, AudioStreamBasicDescription *audioFormat, bool contiguous) {
-    UInt32 frameCount = 0;
-    
     int32_t availableBytes;
     AudioTimeStamp *timestamp = TPCircularBufferTail(buffer, &availableBytes);
     if ( timestamp && outTimestamp ) {
@@ -233,19 +232,20 @@ static UInt32 _TPCircularBufferPeek(TPCircularBuffer *buffer, AudioTimeStamp *ou
     
     void *end = (char*)timestamp + availableBytes;
     
+    UInt32 byteCount = 0;
+    
     while ( 1 ) {
         UInt32 *lengthInBytes = (UInt32*)(timestamp+1);
         AudioBufferList *bufferList = (AudioBufferList*)(lengthInBytes+1);
-        UInt32 lengthInFrames = bufferList->mBuffers[0].mDataByteSize / audioFormat->mBytesPerFrame;
-        frameCount += lengthInFrames;
+        byteCount += bufferList->mBuffers[0].mDataByteSize;
         AudioTimeStamp *nextTimestamp = (AudioTimeStamp*)((char*)(lengthInBytes+1) + *lengthInBytes);
-        if ( (void*)nextTimestamp >= end || (contiguous && nextTimestamp->mSampleTime != timestamp->mSampleTime + lengthInFrames) ) {
+        if ( (void*)nextTimestamp >= end || (contiguous && nextTimestamp->mSampleTime != timestamp->mSampleTime + (bufferList->mBuffers[0].mDataByteSize / audioFormat->mBytesPerFrame)) ) {
             break;
         }
         timestamp = nextTimestamp;
     }
     
-    return frameCount;
+    return byteCount / audioFormat->mBytesPerFrame;
 }
 
 UInt32 TPCircularBufferPeek(TPCircularBuffer *buffer, AudioTimeStamp *outTimestamp, AudioStreamBasicDescription *audioFormat) {
