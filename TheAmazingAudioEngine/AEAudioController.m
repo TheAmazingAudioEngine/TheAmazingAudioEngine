@@ -44,7 +44,8 @@ const NSString *kAEAudioControllerUserInfoKey = @"userinfo";
 static inline int min(int a, int b) { return a>b ? b : a; }
 
 static inline void AEAudioControllerError(OSStatus result, const char *operation, const char* file, int line) {
-    NSLog(@"%s:%d: %s result %d %08X %4.4s\n", file, line, operation, (int)result, (int)result, (char*)&result); 
+    int fourCC = CFSwapInt32HostToBig(result);
+    NSLog(@"%s:%d: %s result %d %08X %4.4s\n", file, line, operation, (int)result, (int)result, (char*)&fourCC); 
 }
 
 #define checkResult(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/')+1,__LINE__))

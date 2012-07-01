@@ -123,8 +123,9 @@ static const int kIncrementalLoadBufferSize = 4096;
     status = ExtAudioFileSetProperty(audioFile, kExtAudioFileProperty_ClientDataFormat, sizeof(_targetAudioDescription), &_targetAudioDescription);
     if ( !checkResult(status, "ExtAudioFileSetProperty(kExtAudioFileProperty_ClientDataFormat)") ) {
         ExtAudioFileDispose(audioFile);
+        int fourCC = CFSwapInt32HostToBig(status);
         self.error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
-                                     userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't convert the audio file (error %d)", @""), status]
+                                     userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't convert the audio file (error %d/%4.4s)", @""), status, (char*)&fourCC]
                                                                           forKey:NSLocalizedDescriptionKey]];
         return;
     }
@@ -198,8 +199,9 @@ static const int kIncrementalLoadBufferSize = 4096;
         
         if ( status != noErr ) {
             ExtAudioFileDispose(audioFile);
+            int fourCC = CFSwapInt32HostToBig(status);
             self.error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
-                                         userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't read the audio file (error %d)", @""), status]
+                                         userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't read the audio file (error %d/%4.4s)", @""), status, (char*)&fourCC]
                                                                               forKey:NSLocalizedDescriptionKey]];
             return;
         }

@@ -121,9 +121,10 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
         size = sizeof(destinationFormat);
         status = AudioFormatGetProperty(kAudioFormatProperty_FormatInfo, 0, NULL, &size, &destinationFormat);
         if ( !checkResult(status, "AudioFormatGetProperty(kAudioFormatProperty_FormatInfo") ) {
+            int fourCC = CFSwapInt32HostToBig(status);
             if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain 
                                                       code:status 
-                                                  userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't prepare the output format (error %d)", @""), status] 
+                                                  userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't prepare the output format (error %d/%4.4s)", @""), status, (char*)&fourCC] 
                                                                                        forKey:NSLocalizedDescriptionKey]];
             return NO;
         }
@@ -137,9 +138,10 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
                                            &_audioFile);
         
         if ( !checkResult(status, "ExtAudioFileCreateWithURL") ) {
+            int fourCC = CFSwapInt32HostToBig(status);
             if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain 
                                                       code:status 
-                                                  userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't open the output file (error %d)", @""), status] 
+                                                  userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't open the output file (error %d/%4.4s)", @""), status, (char*)&fourCC] 
                                                                                        forKey:NSLocalizedDescriptionKey]];
             return NO;
         }
@@ -163,9 +165,10 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
                                            &_audioFile);
         
         if ( !checkResult(status, "ExtAudioFileCreateWithURL") ) {
+            int fourCC = CFSwapInt32HostToBig(status);
             if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain 
                                                       code:status 
-                                                  userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't open the output file (error %d)", @""), status] 
+                                                  userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't open the output file (error %d/%4.4s)", @""), status, (char*)&fourCC] 
                                                                                        forKey:NSLocalizedDescriptionKey]];
             return NO;
         }
@@ -174,9 +177,10 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     // Set up the converter
     status = ExtAudioFileSetProperty(_audioFile, kExtAudioFileProperty_ClientDataFormat, sizeof(AudioStreamBasicDescription), &_audioDescription);
     if ( !checkResult(status, "ExtAudioFileSetProperty(kExtAudioFileProperty_ClientDataFormat") ) {
+        int fourCC = CFSwapInt32HostToBig(status);
         if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain 
                                                   code:status 
-                                              userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't configure the converter (error %d)", @""), status] 
+                                              userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't configure the converter (error %d/%4.4s)", @""), status, (char*)&fourCC] 
                                                                                    forKey:NSLocalizedDescriptionKey]];
         ExtAudioFileDispose(_audioFile);
         return NO;
