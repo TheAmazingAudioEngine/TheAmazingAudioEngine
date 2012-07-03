@@ -92,6 +92,16 @@ typedef enum {
 } ChannelType;
 
 /*!
+ * Group graph state
+ */
+enum {
+    kGraphStateUninitialized         = 0,
+    kGraphStateNodeConnected         = 1<<0,
+    kGraphStateRenderNotificationSet = 1<<1,
+    kGraphStateRenderCallbackSet     = 1<<2
+};
+
+/*!
  * Channel
  */
 typedef struct {
@@ -104,19 +114,10 @@ typedef struct {
     BOOL             muted;
     AudioStreamBasicDescription audioDescription;
     callback_table_t callbacks;
+    int              graphState;
     AEAudioController *audioController;
     ABOutputPort    *audiobusOutputPort;
 } channel_t, *AEChannelRef;
-
-/*!
- * Group graph state
- */
-enum {
-    kGroupGraphStateUninitialized         = 0,
-    kGroupGraphStateNodeConnected         = 1<<0,
-    kGroupGraphStateRenderNotificationSet = 1<<1,
-    kGroupGraphStateRenderCallbackSet     = 1<<2
-};
 
 /*!
  * Channel group
@@ -132,7 +133,6 @@ typedef struct _channel_group_t {
     char               *audioConverterScratchBuffer;
     AudioStreamBasicDescription audioConverterTargetFormat;
     AudioStreamBasicDescription audioConverterSourceFormat;
-    int                 graphState;
     BOOL                meteringEnabled;
     Float32             averagePower;
     Float32             peakLevel;
@@ -883,11 +883,12 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     OSStatus result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &busCount, sizeof(busCount));
     if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) return;
     
+    checkResult([self updateGraph], "Update graph");
+    
     // Configure each channel
     configureChannelsInRangeForGroup(self, NSMakeRange(group->channelCount - [channels count], [channels count]), group);
     
-    result = [self updateGraph];
-    if ( result != kAUGraphErr_InvalidConnection /* Ignore this error */ ) checkResult(result, "Update graph");
+    checkResult([self updateGraph], "Update graph");
 }
 
 - (void)removeChannels:(NSArray *)channels {
@@ -2358,7 +2359,7 @@ static void configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannel
     
     if ( filters ) {
         // We need to use our own render callback, because the audio will be being converted and modified
-        if ( group->graphState & kGroupGraphStateNodeConnected ) {
+        if ( channel->graphState & kGraphStateNodeConnected ) {
             if ( !parentGroup && !graphStopped ) {
                 // Stop the graph first, because we're going to modify the root
                 if ( checkResult(AUGraphStop(THIS->_audioGraph), "AUGraphStop") ) {
@@ -2367,15 +2368,15 @@ static void configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannel
             }
             // Remove the node connection
             if ( checkResult(AUGraphDisconnectNodeInput(THIS->_audioGraph, parentGroup ? parentGroup->mixerNode : THIS->_ioNode, parentGroup ? index : 0), "AUGraphDisconnectNodeInput") ) {
-                group->graphState &= ~kGroupGraphStateNodeConnected;
+                channel->graphState &= ~kGraphStateNodeConnected;
                 checkResult(AUGraphUpdate(THIS->_audioGraph, NULL), "AUGraphUpdate");
             }
         }
         
-        if ( group->graphState & kGroupGraphStateRenderNotificationSet ) {
+        if ( channel->graphState & kGraphStateRenderNotificationSet ) {
             // Remove render notification callback
             if ( checkResult(AudioUnitRemoveRenderNotify(group->mixerAudioUnit, &groupRenderNotifyCallback, channel), "AudioUnitRemoveRenderNotify") ) {
-                group->graphState &= ~kGroupGraphStateRenderNotificationSet;
+                channel->graphState &= ~kGraphStateRenderNotificationSet;
             }
         }
 
@@ -2383,42 +2384,42 @@ static void configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannel
         checkResult(AudioUnitSetProperty(parentGroup ? parentGroup->mixerAudioUnit : THIS->_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, parentGroup ? index : 0, &THIS->_audioDescription, sizeof(THIS->_audioDescription)),
                     "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
         
-        if ( !(group->graphState & kGroupGraphStateRenderCallbackSet) ) {
+        if ( !(channel->graphState & kGraphStateRenderCallbackSet) ) {
             // Add the render callback
             AURenderCallbackStruct rcbs;
             rcbs.inputProc = &renderCallback;
             rcbs.inputProcRefCon = channel;
             if ( checkResult(AUGraphSetNodeInputCallback(THIS->_audioGraph, parentGroup ? parentGroup->mixerNode : THIS->_ioNode, parentGroup ? index : 0, &rcbs), "AUGraphSetNodeInputCallback") ) {
-                group->graphState |= kGroupGraphStateRenderCallbackSet;
+                channel->graphState |= kGraphStateRenderCallbackSet;
                 updateGraph = YES;
             }
         }
         
-    } else if ( group->graphState & kGroupGraphStateRenderCallbackSet ) {
+    } else if ( channel->graphState & kGraphStateRenderCallbackSet ) {
         // Expermentation reveals that once the render callback has been set, no further connections or render callbacks can be established.
         // So, we leave the node in this state, regardless of whether we have callbacks or not
     } else {
-        if ( !(group->graphState & kGroupGraphStateNodeConnected) ) {
+        if ( !(channel->graphState & kGraphStateNodeConnected) ) {
             // Connect output of mixer directly to the parent mixer
             if ( checkResult(AUGraphConnectNodeInput(THIS->_audioGraph, group->mixerNode, 0, parentGroup ? parentGroup->mixerNode : THIS->_ioNode, parentGroup ? index : 0), "AUGraphConnectNodeInput") ) {
-                group->graphState |= kGroupGraphStateNodeConnected;
+                channel->graphState |= kGraphStateNodeConnected;
                 updateGraph = YES;
             }
         }
         
         if ( outputCallbacks ) {
             // We need to register a callback to be notified when the mixer renders, to pass on the audio
-            if ( !(group->graphState & kGroupGraphStateRenderNotificationSet) ) {
+            if ( !(channel->graphState & kGraphStateRenderNotificationSet) ) {
                 // Add render notification callback
                 if ( checkResult(AudioUnitAddRenderNotify(group->mixerAudioUnit, &groupRenderNotifyCallback, channel), "AudioUnitRemoveRenderNotify") ) {
-                    group->graphState |= kGroupGraphStateRenderNotificationSet;
+                    channel->graphState |= kGraphStateRenderNotificationSet;
                 }
             }
         } else {
-            if ( group->graphState & kGroupGraphStateRenderNotificationSet ) {
+            if ( channel->graphState & kGraphStateRenderNotificationSet ) {
                 // Remove render notification callback
                 if ( checkResult(AudioUnitRemoveRenderNotify(group->mixerAudioUnit, &groupRenderNotifyCallback, channel), "AudioUnitRemoveRenderNotify") ) {
-                    group->graphState &= ~kGroupGraphStateRenderNotificationSet;
+                    channel->graphState &= ~kGraphStateRenderNotificationSet;
                 }
             }
         }
@@ -2433,7 +2434,7 @@ static void configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannel
         checkResult(AUGraphStart(THIS->_audioGraph), "AUGraphStart");
     }
     
-    if ( !outputCallbacks && !filters && group->audioConverter && !(group->graphState & kGroupGraphStateRenderCallbackSet) ) {
+    if ( !outputCallbacks && !filters && group->audioConverter && !(channel->graphState & kGraphStateRenderCallbackSet) ) {
         // Cleanup audio converter
         AudioConverterDispose(group->audioConverter);
         group->audioConverter = NULL;
@@ -2450,16 +2451,21 @@ static void configureChannelsInRangeForGroup(AEAudioController *THIS, NSRange ra
             checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, i, &channel->audioDescription, sizeof(channel->audioDescription)),
                         "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
             
+            if ( channel->graphState & kGraphStateRenderCallbackSet || channel->graphState & kGraphStateNodeConnected ) {
+                checkResult(AUGraphDisconnectNodeInput(THIS->_audioGraph, group->mixerNode, i), "AUGraphDisconnectNodeInput");
+                channel->graphState = kGraphStateUninitialized;
+            }
+            
             // Setup render callback struct
             AURenderCallbackStruct rcbs;
             rcbs.inputProc = &renderCallback;
             rcbs.inputProcRefCon = channel;
             
             // Set a callback for the specified node's specified input
-            checkResult(AUGraphSetNodeInputCallback(THIS->_audioGraph, group->mixerNode, i, &rcbs), 
-                        "AUGraphSetNodeInputCallback");
-
-
+            if ( checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, i, &rcbs, sizeof(AURenderCallbackStruct)),
+                             "AudioUnitSetProperty(kAudioUnitProperty_SetRenderCallback)") ) {
+                channel->graphState = kGraphStateRenderCallbackSet;
+            }
             
         } else if ( channel->type == kChannelTypeGroup ) {
             // Recursively initialise this channel group
@@ -2488,11 +2494,7 @@ static void configureChannelsInRangeForGroup(AEAudioController *THIS, NSRange ra
 static void updateGroupDelayed(AEAudioController *THIS, void *userInfo, int length) {
     AEChannelGroupRef group = *(AEChannelGroupRef*)userInfo;
     OSStatus result = AUGraphUpdate(THIS->_audioGraph, NULL);
-    if ( result == kAUGraphErr_InvalidConnection && group->channelCount == 0 ) {
-        // Ignore this error
-    } else {
-        checkResult(result, "AUGraphUpdate");
-    }
+    checkResult(result, "AUGraphUpdate");
     configureChannelsInRangeForGroup(THIS, NSMakeRange(0, group->channelCount), group);
 }
 
@@ -2503,24 +2505,8 @@ static void removeChannelsFromGroup(AEAudioController *THIS, void *userInfo, int
     UInt32 busCount = args->group->channelCount - args->count;
     assert(busCount >= 0);
     
-    if ( busCount == 0 ) busCount = 1; // Note: Mixer must have at least 1 channel. It'll just be silent.
     if ( !checkResult(AudioUnitSetProperty(args->group->mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &busCount, sizeof(busCount)),
                       "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) return;
-    
-    if ( args->group->channelCount - args->count == 0 ) {
-        // Remove render callback and disconnect channel 0, as the mixer must have at least 1 channel, and we want to leave it disconnected
-        
-        // Remove any render callback
-        AURenderCallbackStruct rcbs;
-        rcbs.inputProc = NULL;
-        rcbs.inputProcRefCon = NULL;
-        checkResult(AUGraphSetNodeInputCallback(THIS->_audioGraph, args->group->mixerNode, 0, &rcbs),
-                    "AUGraphSetNodeInputCallback");
-        
-        // Make sure the mixer input isn't connected to anything
-        checkResult(AUGraphDisconnectNodeInput(THIS->_audioGraph, args->group->mixerNode, 0), 
-                    "AUGraphDisconnectNodeInput");
-    }
     
     for ( int i=0; i < args->count; i++ ) {
         
@@ -2536,8 +2522,16 @@ static void removeChannelsFromGroup(AEAudioController *THIS, void *userInfo, int
             args->group->channelCount--;
             
             if ( index < args->group->channelCount ) {
-                // Shuffle the later elements backwards one space
+                // Shuffle the later elements backwards one space, disconnecting as we go
+                int graphState = args->group->channels[index].graphState;
+                
+                if ( graphState & kGraphStateNodeConnected || graphState & kGraphStateRenderCallbackSet ) {
+                    if ( index < busCount ) checkResult(AUGraphDisconnectNodeInput(THIS->_audioGraph, args->group->mixerNode, index), "AUGraphDisconnectNodeInput");
+                    graphState &= ~(kGraphStateNodeConnected | kGraphStateRenderCallbackSet);
+                }
+                
                 memmove(&args->group->channels[index], &args->group->channels[index+1], (args->group->channelCount-index) * sizeof(channel_t));
+                args->group->channels[index].graphState = graphState;
             }
             
             // Zero out the now-unused space
@@ -2549,7 +2543,7 @@ static void removeChannelsFromGroup(AEAudioController *THIS, void *userInfo, int
     if ( result == kAUGraphErr_CannotDoInCurrentContext ) {
         // Complete the refresh on the main thread
         AEAudioControllerSendAsynchronousMessageToMainThread(THIS, updateGroupDelayed, &args->group, sizeof(AEChannelGroupRef));
-    } else if ( result == kAUGraphErr_InvalidConnection /* Ignore this error */ || checkResult(result, "AUGraphUpdate") ) {
+    } else if ( checkResult(result, "AUGraphUpdate") ) {
         configureChannelsInRangeForGroup(THIS, NSMakeRange(0, args->group->channelCount), args->group);
     }
 }
@@ -2614,12 +2608,13 @@ static void removeChannelsFromGroup(AEAudioController *THIS, void *userInfo, int
 }
 
 - (void)markGroupTorndown:(AEChannelGroupRef)group {
-    group->graphState = kGroupGraphStateUninitialized;
+    group->channel->graphState = kGraphStateUninitialized;
     group->mixerNode = 0;
     group->mixerAudioUnit = NULL;
     group->meteringEnabled = NO;
     for ( int i=0; i<group->channelCount; i++ ) {
         AEChannelRef channel = &group->channels[i];
+        channel->graphState = kGraphStateUninitialized;
         if ( channel->type == kChannelTypeGroup ) {
             [self markGroupTorndown:(AEChannelGroupRef)channel->ptr];
         }
