@@ -17,6 +17,13 @@ extern "C" {
 #include <AudioToolbox/AudioToolbox.h>
 
 #define kTPCircularBufferCopyAll UINT32_MAX
+
+typedef struct {
+    AudioTimeStamp timestamp;
+    UInt32 totalLength;
+    AudioBufferList bufferList;
+} TPCircularBufferABLBlockHeader;
+
     
 /*!
  * Prepare an empty buffer list, stored on the circular buffer
@@ -61,12 +68,12 @@ bool TPCircularBufferCopyAudioBufferList(TPCircularBuffer *buffer, const AudioBu
  */
 static __inline__ __attribute__((always_inline)) AudioBufferList *TPCircularBufferNextBufferList(TPCircularBuffer *buffer, AudioTimeStamp *outTimestamp) {
     int32_t dontcare; // Length of segment is contained within buffer list, so we can ignore this
-    AudioTimeStamp *timestamp = TPCircularBufferTail(buffer, &dontcare);
-    if ( !timestamp ) return NULL;
+    TPCircularBufferABLBlockHeader *block = TPCircularBufferTail(buffer, &dontcare);
+    if ( !block ) return NULL;
     if ( outTimestamp ) {
-        *outTimestamp = *timestamp;
+        memcpy(outTimestamp, &block->timestamp, sizeof(AudioTimeStamp));
     }
-    return (AudioBufferList*)(((char*)timestamp)+sizeof(AudioTimeStamp)+sizeof(UInt32));
+    return &block->bufferList;
 }
 
 /*!
@@ -86,10 +93,9 @@ AudioBufferList *TPCircularBufferNextBufferListAfter(TPCircularBuffer *buffer, A
  */
 static __inline__ __attribute__((always_inline)) void TPCircularBufferConsumeNextBufferList(TPCircularBuffer *buffer) {
     int32_t dontcare;
-    AudioTimeStamp *timestamp = TPCircularBufferTail(buffer, &dontcare);
-    if ( !timestamp ) return;
-    UInt32 *totalLengthInBytes = (UInt32*)(timestamp+1);
-    TPCircularBufferConsume(buffer, sizeof(AudioTimeStamp)+sizeof(UInt32)+*totalLengthInBytes);
+    TPCircularBufferABLBlockHeader *block = TPCircularBufferTail(buffer, &dontcare);
+    if ( !block ) return;
+    TPCircularBufferConsume(buffer, block->totalLength);
 }
 
 /*!

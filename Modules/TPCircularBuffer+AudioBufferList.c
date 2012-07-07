@@ -23,190 +23,139 @@ static inline long min(long a, long b) {
 }
 
 AudioBufferList *TPCircularBufferPrepareEmptyAudioBufferList(TPCircularBuffer *buffer, int numberOfBuffers, int bytesPerBuffer, const AudioTimeStamp *inTimestamp) {
-    int bufferListSize = sizeof(AudioBufferList) + ((numberOfBuffers-1) * sizeof(AudioBuffer));
-    
     int32_t availableBytes;
-    AudioTimeStamp *timestamp = (AudioTimeStamp*)TPCircularBufferHead(buffer, &availableBytes);
-    if ( availableBytes < sizeof(AudioTimeStamp) + sizeof(UInt32) + bufferListSize ) return NULL;
+    TPCircularBufferABLBlockHeader *block = (TPCircularBufferABLBlockHeader*)TPCircularBufferHead(buffer, &availableBytes);
+    if ( availableBytes < sizeof(TPCircularBufferABLBlockHeader)+((numberOfBuffers-1)*sizeof(AudioBuffer))+(numberOfBuffers*bytesPerBuffer) ) return NULL;
     
-    assert(!((unsigned long)timestamp & 0xF) /* Beware unaligned accesses */);
+    assert(!((unsigned long)block & 0xF) /* Beware unaligned accesses */);
     
     // Store timestamp, followed by a UInt32 defining the number of bytes from the start of the buffer list to the end of the segment, then the buffer list
     if ( inTimestamp ) {
-        memcpy(timestamp, inTimestamp, sizeof(AudioTimeStamp));
+        memcpy(&block->timestamp, inTimestamp, sizeof(AudioTimeStamp));
     } else {
-        memset(timestamp, 0, sizeof(AudioTimeStamp));
+        memset(&block->timestamp, 0, sizeof(AudioTimeStamp));
     }
     
-    UInt32 *totalLengthInBytes = (UInt32*)(timestamp+1);
+    memset(&block->bufferList, 0, sizeof(AudioBufferList)+((numberOfBuffers-1)*sizeof(AudioBuffer)));
+    block->bufferList.mNumberBuffers = numberOfBuffers;
     
-    AudioBufferList *bufferList = (AudioBufferList*)(totalLengthInBytes+1);
-    
-    memset(bufferList, 0, bufferListSize);
-    
-    bufferList->mNumberBuffers = numberOfBuffers;
-    
-    char *dataPtr = (char*)bufferList + bufferListSize;
+    char *dataPtr = (char*)&block->bufferList + sizeof(AudioBufferList)+((numberOfBuffers-1)*sizeof(AudioBuffer));
     for ( int i=0; i<numberOfBuffers; i++ ) {
         // Find the next 16-byte aligned memory area
         dataPtr = (char*)align16byte((long)dataPtr);
         
-        if ( (dataPtr + bytesPerBuffer) - (char*)timestamp > availableBytes ) {
+        if ( (dataPtr + bytesPerBuffer) - (char*)block > availableBytes ) {
             return NULL;
         }
         
-        bufferList->mBuffers[i].mData = dataPtr;
-        bufferList->mBuffers[i].mDataByteSize = bytesPerBuffer;
-        bufferList->mBuffers[i].mNumberChannels = 1;
+        block->bufferList.mBuffers[i].mData = dataPtr;
+        block->bufferList.mBuffers[i].mDataByteSize = bytesPerBuffer;
+        block->bufferList.mBuffers[i].mNumberChannels = 1;
         
         dataPtr += bytesPerBuffer;
     }
     
     // Make sure whole buffer (including timestamp and length value) is 16-byte aligned in length
-    *totalLengthInBytes = align16byte((dataPtr - (char*)bufferList) + sizeof(AudioTimeStamp) + sizeof(UInt32)) - sizeof(AudioTimeStamp) - sizeof(UInt32);
-    if ( ((char*)bufferList + *totalLengthInBytes) - (char*)timestamp > availableBytes ) {
+    block->totalLength = align16byte(dataPtr - (char*)block);
+    if ( block->totalLength > availableBytes ) {
         return NULL;
     }
     
-    return bufferList;
+    return &block->bufferList;
 }
 
 void TPCircularBufferProduceAudioBufferList(TPCircularBuffer *buffer) {
     int32_t availableBytes;
-    AudioTimeStamp *timestamp = (AudioTimeStamp*)TPCircularBufferHead(buffer, &availableBytes);
+    TPCircularBufferABLBlockHeader *block = (TPCircularBufferABLBlockHeader*)TPCircularBufferHead(buffer, &availableBytes);
     
-    assert(!((unsigned long)timestamp & 0xF) /* Beware unaligned accesses */);
+    assert(!((unsigned long)block & 0xF) /* Beware unaligned accesses */);
     
-    UInt32 *totalLengthInBytes = (UInt32*)(timestamp+1);
-    AudioBufferList *list = (AudioBufferList*)(totalLengthInBytes+1);
-    
-    UInt32 calculatedLength = ((char*)list->mBuffers[list->mNumberBuffers-1].mData + list->mBuffers[list->mNumberBuffers-1].mDataByteSize) - (char*)list;
+    UInt32 calculatedLength = ((char*)block->bufferList.mBuffers[block->bufferList.mNumberBuffers-1].mData + block->bufferList.mBuffers[block->bufferList.mNumberBuffers-1].mDataByteSize) - (char*)block;
+
     // Make sure whole buffer (including timestamp and length value) is 16-byte aligned in length
-    calculatedLength = align16byte(calculatedLength + sizeof(AudioTimeStamp) + sizeof(UInt32)) - sizeof(AudioTimeStamp) - sizeof(UInt32);
+    calculatedLength = align16byte(calculatedLength);
     
-    assert(calculatedLength <= *totalLengthInBytes && sizeof(AudioTimeStamp)+sizeof(UInt32)+calculatedLength <= availableBytes);
+    assert(calculatedLength <= block->totalLength && calculatedLength <= availableBytes);
     
-    *totalLengthInBytes = calculatedLength;
+    block->totalLength = calculatedLength;
     
-    TPCircularBufferProduce(buffer, sizeof(AudioTimeStamp) + sizeof(UInt32) + *totalLengthInBytes);
+    TPCircularBufferProduce(buffer, block->totalLength);
 }
 
 bool TPCircularBufferCopyAudioBufferList(TPCircularBuffer *buffer, const AudioBufferList *inBufferList, const AudioTimeStamp *inTimestamp, UInt32 frames, AudioStreamBasicDescription *audioDescription) {
-    int bufferListSize = sizeof(AudioBufferList) + ((inBufferList->mNumberBuffers-1) * sizeof(AudioBuffer));
-    
-    int32_t availableBytes;
-    AudioTimeStamp *timestamp = (AudioTimeStamp*)TPCircularBufferHead(buffer, &availableBytes);
-    if ( availableBytes < sizeof(AudioTimeStamp) + sizeof(UInt32) + bufferListSize ) return false;
-    
-    assert(!((unsigned long)timestamp & 0xF) /* Beware unaligned accesses */);
-    
-    // Store timestamp, followed by buffer list
-    if ( inTimestamp ) {
-        memcpy(timestamp, inTimestamp, sizeof(AudioTimeStamp));
-    } else {
-        memset(timestamp, 0, sizeof(AudioTimeStamp));
-    }
-    
-    UInt32 *totalLengthInBytes = (UInt32*)(timestamp+1);
-    
-    AudioBufferList *bufferList = (AudioBufferList*)(totalLengthInBytes+1);
-    
-    memcpy(bufferList, inBufferList, bufferListSize);
-    
+
     int byteCount = inBufferList->mBuffers[0].mDataByteSize;
     if ( frames != kTPCircularBufferCopyAll ) {
         byteCount = frames * audioDescription->mBytesPerFrame;
         assert(byteCount <= inBufferList->mBuffers[0].mDataByteSize);
     }
     
-    char *dataPtr = (char*)bufferList + bufferListSize;
-    for ( int i=0; i<inBufferList->mNumberBuffers; i++ ) {
-        // Find the next 16-byte aligned memory area
-        dataPtr = (char*)align16byte((long)dataPtr);
-        
-        if ( (dataPtr + byteCount) - (char*)timestamp > availableBytes ) {
-            return false;
-        }
-        
-        assert(inBufferList->mBuffers[i].mData != NULL);
-        
-        bufferList->mBuffers[i].mData = dataPtr;
-        bufferList->mBuffers[i].mDataByteSize = byteCount;
-        
-        memcpy(dataPtr, inBufferList->mBuffers[i].mData, byteCount);
-        
-        dataPtr += byteCount;
+    AudioBufferList *bufferList = TPCircularBufferPrepareEmptyAudioBufferList(buffer, inBufferList->mNumberBuffers, byteCount, inTimestamp);
+    if ( !bufferList ) return false;
+    
+    for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
+        memcpy(bufferList->mBuffers[i].mData, inBufferList->mBuffers[i].mData, byteCount);
     }
     
-    // Make sure whole buffer (including timestamp and length value) is 16-byte aligned in length
-    *totalLengthInBytes = align16byte((dataPtr - (char*)bufferList) + sizeof(AudioTimeStamp) + sizeof(UInt32)) - sizeof(AudioTimeStamp) - sizeof(UInt32);
-    if ( ((char*)bufferList + *totalLengthInBytes) - (char*)timestamp > availableBytes ) {
-        return NULL;
-    }
-    
-    TPCircularBufferProduce(buffer, sizeof(AudioTimeStamp) + sizeof(UInt32) + *totalLengthInBytes);
+    TPCircularBufferProduceAudioBufferList(buffer);
     
     return true;
 }
 
 AudioBufferList *TPCircularBufferNextBufferListAfter(TPCircularBuffer *buffer, AudioBufferList *bufferList, AudioTimeStamp *outTimestamp) {
     int32_t availableBytes;
-    AudioTimeStamp *firstTimestamp = TPCircularBufferTail(buffer, &availableBytes);
-    assert(!((unsigned long)firstTimestamp & 0xF) /* Beware unaligned accesses */);
-    void *end = (char*)firstTimestamp + availableBytes;
+    void *tail = TPCircularBufferTail(buffer, &availableBytes);
+    void *end = (char*)tail + availableBytes;
+    assert((void*)bufferList > (void*)tail && (void*)bufferList < end);
     
-    assert((void*)bufferList > (void*)firstTimestamp && (void*)bufferList < end);
+    TPCircularBufferABLBlockHeader *originalBlock = (TPCircularBufferABLBlockHeader*)((char*)bufferList - offsetof(TPCircularBufferABLBlockHeader, bufferList));
+    assert(!((unsigned long)originalBlock & 0xF) /* Beware unaligned accesses */);
     
-    UInt32 *len = ((UInt32*)bufferList)-1;
     
-    AudioTimeStamp *timestamp = (AudioTimeStamp*)((char*)bufferList + *len);
-    if ( (void*)timestamp >= end ) return NULL;
-    
-    assert(!((unsigned long)timestamp & 0xF) /* Beware unaligned accesses */);
+    TPCircularBufferABLBlockHeader *nextBlock = (TPCircularBufferABLBlockHeader*)((char*)originalBlock + originalBlock->totalLength);
+    if ( (void*)nextBlock >= end ) return NULL;
+    assert(!((unsigned long)nextBlock & 0xF) /* Beware unaligned accesses */);
     
     if ( outTimestamp ) {
-        *outTimestamp = *timestamp;
+        memcpy(outTimestamp, &nextBlock->timestamp, sizeof(AudioTimeStamp));
     }
     
-    return (AudioBufferList*)(((char*)timestamp)+sizeof(AudioTimeStamp)+sizeof(UInt32));
+    return &nextBlock->bufferList;
 }
 
 void TPCircularBufferConsumeNextBufferListPartial(TPCircularBuffer *buffer, int framesToConsume, AudioStreamBasicDescription *audioFormat) {
     assert(framesToConsume >= 0);
     
     int32_t dontcare;
-    AudioTimeStamp *timestamp = TPCircularBufferTail(buffer, &dontcare);
-    if ( !timestamp ) return;
-    assert(!((unsigned long)timestamp & 0xF)); // Beware unaligned accesses
+    TPCircularBufferABLBlockHeader *block = (TPCircularBufferABLBlockHeader*)TPCircularBufferTail(buffer, &dontcare);
+    if ( !block ) return;
+    assert(!((unsigned long)block & 0xF)); // Beware unaligned accesses
     
-    UInt32 *totalLengthInBytes = (UInt32*)(timestamp+1);
-    AudioBufferList *bufferList = (AudioBufferList*)(totalLengthInBytes+1);
-
     int bytesToConsume = framesToConsume * audioFormat->mBytesPerFrame;
     
-    if ( bytesToConsume == bufferList->mBuffers[0].mDataByteSize ) {
+    if ( bytesToConsume == block->bufferList.mBuffers[0].mDataByteSize ) {
         TPCircularBufferConsumeNextBufferList(buffer);
         return;
     }
     
-    for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
-        assert(bytesToConsume <= bufferList->mBuffers[i].mDataByteSize && (char*)bufferList->mBuffers[i].mData + bytesToConsume <= (char*)bufferList+*totalLengthInBytes);
+    for ( int i=0; i<block->bufferList.mNumberBuffers; i++ ) {
+        assert(bytesToConsume <= block->bufferList.mBuffers[i].mDataByteSize && (char*)block->bufferList.mBuffers[i].mData + bytesToConsume <= (char*)block+block->totalLength);
         
-        bufferList->mBuffers[i].mData = (char*)bufferList->mBuffers[i].mData + bytesToConsume;
-        bufferList->mBuffers[i].mDataByteSize -= bytesToConsume;
+        block->bufferList.mBuffers[i].mData = (char*)block->bufferList.mBuffers[i].mData + bytesToConsume;
+        block->bufferList.mBuffers[i].mDataByteSize -= bytesToConsume;
     }
     
-    if ( timestamp->mFlags & kAudioTimeStampSampleTimeValid ) {
-        timestamp->mSampleTime += framesToConsume;
+    if ( block->timestamp.mFlags & kAudioTimeStampSampleTimeValid ) {
+        block->timestamp.mSampleTime += framesToConsume;
     }
-    if ( timestamp->mFlags & kAudioTimeStampHostTimeValid ) {
+    if ( block->timestamp.mFlags & kAudioTimeStampHostTimeValid ) {
         if ( !__secondsToHostTicks ) {
             mach_timebase_info_data_t tinfo;
             mach_timebase_info(&tinfo);
             __secondsToHostTicks = 1.0 / (((double)tinfo.numer / tinfo.denom) * 1.0e-9);
         }
 
-        timestamp->mHostTime += ((double)framesToConsume / audioFormat->mSampleRate) * __secondsToHostTicks;
+        block->timestamp.mHostTime += ((double)framesToConsume / audioFormat->mSampleRate) * __secondsToHostTicks;
     }
 }
 
@@ -242,29 +191,26 @@ void TPCircularBufferDequeueBufferListFrames(TPCircularBuffer *buffer, UInt32 *i
 
 static UInt32 _TPCircularBufferPeek(TPCircularBuffer *buffer, AudioTimeStamp *outTimestamp, AudioStreamBasicDescription *audioFormat, bool contiguous) {
     int32_t availableBytes;
-    AudioTimeStamp *timestamp = TPCircularBufferTail(buffer, &availableBytes);
-    if ( timestamp && outTimestamp ) {
-        memcpy(outTimestamp, timestamp, sizeof(AudioTimeStamp));
+    TPCircularBufferABLBlockHeader *block = (TPCircularBufferABLBlockHeader*)TPCircularBufferTail(buffer, &availableBytes);
+    if ( !block ) return 0;
+    assert(!((unsigned long)block & 0xF) /* Beware unaligned accesses */);
+    
+    if ( outTimestamp ) {
+        memcpy(outTimestamp, &block->timestamp, sizeof(AudioTimeStamp));
     }
     
-    if ( !timestamp ) return 0;
-    
-    assert(!((unsigned long)timestamp & 0xF) /* Beware unaligned accesses */);
-    
-    void *end = (char*)timestamp + availableBytes;
+    void *end = (char*)block + availableBytes;
     
     UInt32 byteCount = 0;
     
     while ( 1 ) {
-        UInt32 *lengthInBytes = (UInt32*)(timestamp+1);
-        AudioBufferList *bufferList = (AudioBufferList*)(lengthInBytes+1);
-        byteCount += bufferList->mBuffers[0].mDataByteSize;
-        AudioTimeStamp *nextTimestamp = (AudioTimeStamp*)((char*)(lengthInBytes+1) + *lengthInBytes);
-        if ( (void*)nextTimestamp >= end || (contiguous && nextTimestamp->mSampleTime != timestamp->mSampleTime + (bufferList->mBuffers[0].mDataByteSize / audioFormat->mBytesPerFrame)) ) {
+        byteCount += block->bufferList.mBuffers[0].mDataByteSize;
+        TPCircularBufferABLBlockHeader *nextBlock = (TPCircularBufferABLBlockHeader*)((char*)block + block->totalLength);
+        if ( (void*)nextBlock >= end || (contiguous && nextBlock->timestamp.mSampleTime != block->timestamp.mSampleTime + (block->bufferList.mBuffers[0].mDataByteSize / audioFormat->mBytesPerFrame)) ) {
             break;
         }
-        assert(!((unsigned long)nextTimestamp & 0xF) /* Beware unaligned accesses */);
-        timestamp = nextTimestamp;
+        assert(!((unsigned long)nextBlock & 0xF) /* Beware unaligned accesses */);
+        block = nextBlock;
     }
     
     return byteCount / audioFormat->mBytesPerFrame;
