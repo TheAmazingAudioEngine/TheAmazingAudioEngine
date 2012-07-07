@@ -1077,6 +1077,24 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
 @property (nonatomic, assign) AEInputMode inputMode;
 
 /*!
+ * Input channel selection
+ *
+ *      When there are more than one input channel, you may specify which of the
+ *      available channels are actually used as input. This is an array of NSIntegers,
+ *      each referring to a channel (starting with the number 0 for the first channel).
+ *      
+ *      Specified input channels will be mapped to output chanels in the order they appear
+ *      in this array, so the first channel specified will be mapped to the first output
+ *      channel (the only output channel, if output is mono, or the left channel for stereo
+ *      output), the second input to the second output (the right channel). Only the first
+ *      two channels will ever be used.
+ *
+ *      By default, the first two inputs will be used, for devices with more than 1 input
+ *      channel.
+ */
+@property (nonatomic, retain) NSArray *inputChannelSelection;
+
+/*!
  * Preferred buffer duration (in seconds)
  *
  *      Set this to low values for better latency, but more processing overhead, or higher
@@ -1111,6 +1129,11 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
 /*!
  * The number of audio channels that the current audio input device provides
  *
+ *      Note that this will not necessarily be the same as the number of audio channels
+ *      your app will receive, depending on the @link inputMode @endlink and
+ *      @link inputChannelSelection @endlink properties. Use @link inputAudioDescription @endlink
+ *      to obtain an AudioStreamBasicDescription representing the actual incoming audio.
+ *
  *      Note: This property is observable
  */
 @property (nonatomic, readonly) NSUInteger numberOfInputChannels;
@@ -1127,7 +1150,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  * 
  *      Note: This property is observable
  *
- *      See also @link inputMode @endlink
+ *      See also @link inputMode @endlink and @link inputChannelSelection @endlink
  */
 @property (nonatomic, readonly) AudioStreamBasicDescription inputAudioDescription;
 

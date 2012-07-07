@@ -215,9 +215,9 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS);
 - (void)updateVoiceProcessingSettings;
 - (void)updateInputDeviceStatus;
 
-static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannelRef channel, AEChannelGroupRef parentGroup, int index);
-static void configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannelRef channel, AEChannelGroupRef parentGroup, int index);
-static void configureChannelsInRangeForGroup(AEAudioController *THIS, NSRange range, AEChannelGroupRef group);
+static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannelRef channel, AEChannelGroupRef parentGroup, int index, BOOL *updateRequired);
+static void configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannelRef channel, AEChannelGroupRef parentGroup, int index, BOOL *updateRequired);
+static void configureChannelsInRangeForGroup(AEAudioController *THIS, NSRange range, AEChannelGroupRef group, BOOL *updateRequired);
 
 struct removeChannelsFromGroup_t { void **ptrs; void **userInfos; int count; AEChannelGroupRef group; };
 static void removeChannelsFromGroup(AEAudioController *THIS, void *userInfo, int userInfoLength);
@@ -257,6 +257,7 @@ static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp
             playingThroughDeviceSpeaker = _playingThroughDeviceSpeaker,
             preferredBufferDuration     = _preferredBufferDuration, 
             inputMode                   = _inputMode, 
+            inputChannelSelection       = _inputChannelSelection,
             audioUnit                   = _ioAudioUnit,
             audioDescription            = _audioDescription,
             audioRoute                  = _audioRoute,
@@ -788,6 +789,8 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     self.audioRoute = nil;
     
+    self.inputChannelSelection = nil;
+    
     NSArray *channels = [self channels];
     for ( NSObject *channel in channels ) {
         for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", @"playing", @"muted", @"audioDescription", nil] ) {
@@ -883,12 +886,13 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     OSStatus result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &busCount, sizeof(busCount));
     if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) return;
     
-    checkResult([self updateGraph], "Update graph");
-    
     // Configure each channel
-    configureChannelsInRangeForGroup(self, NSMakeRange(group->channelCount - [channels count], [channels count]), group);
+    BOOL updateRequired = NO;
+    configureChannelsInRangeForGroup(self, NSMakeRange(group->channelCount - [channels count], [channels count]), group, &updateRequired);
     
-    checkResult([self updateGraph], "Update graph");
+    if ( updateRequired ) {
+        checkResult([self updateGraph], "Update graph");
+    }
 }
 
 - (void)removeChannels:(NSArray *)channels {
@@ -1002,8 +1006,6 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     }
     
     free(group);
-    
-    checkResult([self updateGraph], "Update graph");
 }
 
 -(NSArray *)channels {
@@ -1054,9 +1056,12 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     parentGroup->channelCount++;    
 
     // Initialise group
-    initialiseGroupChannel(self, channel, parentGroup, groupIndex);
+    BOOL updateRequired = NO;
+    initialiseGroupChannel(self, channel, parentGroup, groupIndex, &updateRequired);
 
-    checkResult([self updateGraph], "Update graph");
+    if ( updateRequired ) {
+        checkResult([self updateGraph], "Update graph");
+    }
     
     return group;
 }
@@ -1207,7 +1212,11 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         NSAssert(parentGroup != NULL, @"Channel group not found");
     }
     
-    configureGraphStateOfGroupChannel(self, group->channel, parentGroup, index);
+    BOOL updateRequired = NO;
+    configureGraphStateOfGroupChannel(self, group->channel, parentGroup, index, &updateRequired);
+    if ( updateRequired ) {
+        checkResult([self updateGraph], "AUGraphUpdate");
+    }
 }
 
 #pragma mark - Output receivers
@@ -1619,6 +1628,14 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
     [self updateInputDeviceStatus];
 }
 
+-(void)setInputChannelSelection:(NSArray *)inputChannelSelection {
+    [inputChannelSelection retain];
+    [_inputChannelSelection release];
+    _inputChannelSelection = inputChannelSelection;
+    
+    [self updateInputDeviceStatus];
+}
+
 -(void)setPreferredBufferDuration:(float)preferredBufferDuration {
     _preferredBufferDuration = preferredBufferDuration;
 
@@ -1932,7 +1949,8 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     }
     
     // Initialise group
-    initialiseGroupChannel(self, &_topChannel, NULL, 0);
+    BOOL unused;
+    initialiseGroupChannel(self, &_topChannel, NULL, 0, &unused);
     
     // Register a callback to be notified when the main mixer unit renders
     checkResult(AudioUnitAddRenderNotify(_topGroup->mixerAudioUnit, &topRenderNotifyCallback, self), "AudioUnitAddRenderNotify");
@@ -1988,7 +2006,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
         OSStatus err;
         for ( int retry=0; retry<6; retry++ ) {
             err = AUGraphUpdate(_audioGraph, NULL);
-            if ( err == noErr ) break;
+            if ( err != kAUGraphErr_CannotDoInCurrentContext ) break;
             [NSThread sleepForTimeInterval:0.01];
         }
         
@@ -2099,13 +2117,13 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
     
     if ( _enableInput ) {
         // Determine if audio input is available, and the number of input channels available
-        AudioStreamBasicDescription inputAudioDescription = _audioDescription;
-        UInt32 numberOfInputChannels = 0;
+        AudioStreamBasicDescription rawAudioDescription = _audioDescription;
+        UInt32 numberOfInputChannels = rawAudioDescription.mChannelsPerFrame;
         
         if ( _audiobusInputPort && ABInputPortIsConnected(_audiobusInputPort) ) {
             inputAvailable = YES;
-            inputAudioDescription = _audioDescription;
-            numberOfInputChannels = 2;
+            rawAudioDescription = _audioDescription;
+            numberOfInputChannels = _audioDescription.mChannelsPerFrame;
         } else {
             UInt32 size = sizeof(inputAvailable);
             OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_AudioInputAvailable, &size, &inputAvailable);
@@ -2124,11 +2142,23 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
         
         if ( _inputMode == AEInputModeVariableAudioFormat ) {
             // Set the input audio description channels to the number of actual available channels
-            if ( !(inputAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ) {
-                inputAudioDescription.mBytesPerFrame *= (float)numberOfInputChannels / inputAudioDescription.mChannelsPerFrame;
-                inputAudioDescription.mBytesPerPacket *= (float)numberOfInputChannels / inputAudioDescription.mChannelsPerFrame;
+            if ( !(rawAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ) {
+                rawAudioDescription.mBytesPerFrame *= (float)numberOfInputChannels / rawAudioDescription.mChannelsPerFrame;
+                rawAudioDescription.mBytesPerPacket *= (float)numberOfInputChannels / rawAudioDescription.mChannelsPerFrame;
             }
-            inputAudioDescription.mChannelsPerFrame = numberOfInputChannels;
+            rawAudioDescription.mChannelsPerFrame = numberOfInputChannels;
+        }
+        
+        AudioStreamBasicDescription inputAudioDescription = rawAudioDescription;
+
+        if ( [_inputChannelSelection count] > 0 && _inputMode == AEInputModeVariableAudioFormat ) {
+            // Set the target input audio description channels to the number of selected channels
+            int channels = MIN(2, [_inputChannelSelection count]);
+            if ( !(inputAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ) {
+                inputAudioDescription.mBytesPerFrame *= (float)channels / inputAudioDescription.mChannelsPerFrame;
+                inputAudioDescription.mBytesPerPacket *= (float)channels / inputAudioDescription.mChannelsPerFrame;
+            }
+            inputAudioDescription.mChannelsPerFrame = channels;
         }
         
         AudioBufferList *inputBufferList = _inputAudioBufferList;
@@ -2136,34 +2166,88 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
         
         BOOL inputBufferListBuffersWereAllocated = _inputAudioBufferListBuffersAreAllocated;
         
-        AudioStreamBasicDescription rawAudioDescription = inputAudioDescription;
-        
         AudioConverterRef converter = _inputAudioConverter;
         AudioBufferList *scratchBuffer = _inputAudioScratchBufferList;
         AudioConverterRef oldConverter = converter;
         AudioBufferList *oldScratchBuffer = scratchBuffer;
         
         // Determine if conversion is required
+        BOOL channelMapRequired = inputAudioDescription.mChannelsPerFrame != numberOfInputChannels || (_inputChannelSelection && [_inputChannelSelection count] != inputAudioDescription.mChannelsPerFrame);
+        if ( !channelMapRequired && _inputChannelSelection ) {
+            for ( int i=0; i<[_inputChannelSelection count]; i++ ) {
+                if ( [[_inputChannelSelection objectAtIndex:i] intValue] != i ) {
+                    channelMapRequired = YES;
+                    break;
+                }
+            }
+        }
+        
+        if ( !channelMapRequired ) {
+            // Just change the audio unit's input stream format
+            rawAudioDescription = inputAudioDescription;
+        }
+        
         BOOL useVoiceProcessing = [self usingVPIO];
+        BOOL converterForiOS4Required = NO;
         if ( useVoiceProcessing && (_audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) && [[[UIDevice currentDevice] systemVersion] floatValue] < 5.0 ) {
             // iOS 4 cannot handle non-interleaved audio and voice processing. Use interleaved audio and a converter.
-            rawAudioDescription.mFormatFlags &= ~kAudioFormatFlagIsNonInterleaved;
-            rawAudioDescription.mBytesPerFrame *= rawAudioDescription.mChannelsPerFrame;
-            rawAudioDescription.mBytesPerPacket *= rawAudioDescription.mChannelsPerFrame;
+            converterForiOS4Required = YES;
+        }
+        
+        if ( channelMapRequired || converterForiOS4Required ) {
+            if ( converterForiOS4Required ) {
+                rawAudioDescription.mFormatFlags &= ~kAudioFormatFlagIsNonInterleaved;
+                rawAudioDescription.mBytesPerFrame *= rawAudioDescription.mChannelsPerFrame;
+                rawAudioDescription.mBytesPerPacket *= rawAudioDescription.mChannelsPerFrame;
+            }
             
             AudioStreamBasicDescription converterFormat;
-            UInt32 size = sizeof(converterFormat);
+            UInt32 formatSize = sizeof(converterFormat);
+            
+            UInt32 mappingSize = 0;
             if ( converter ) {
-                checkResult(AudioConverterGetProperty(converter, kAudioConverterCurrentInputStreamDescription, &size, &converterFormat),
+                checkResult(AudioConverterGetPropertyInfo(converter, kAudioConverterChannelMap, &mappingSize, NULL),
+                            "AudioConverterGetPropertyInfo(kAudioConverterChannelMap)");
+            }
+            SInt32 *mapping = (SInt32*)(mappingSize != 0 ? malloc(mappingSize) : NULL);
+            
+            if ( converter ) {
+                checkResult(AudioConverterGetProperty(converter, kAudioConverterChannelMap, &formatSize, &converterFormat),
+                            "AudioConverterGetProperty(kAudioConverterCurrentInputStreamDescription)");
+                checkResult(AudioConverterGetProperty(converter, kAudioConverterChannelMap, &mappingSize, mapping),
                             "AudioConverterGetProperty(kAudioConverterCurrentInputStreamDescription)");
             }
             
-            if ( !converter || memcmp(&converterFormat, &rawAudioDescription, sizeof(AudioStreamBasicDescription)) != 0 ) {
+            UInt32 targetMappingSize = sizeof(SInt32) * inputAudioDescription.mChannelsPerFrame;
+            SInt32 *targetMapping = (SInt32*)malloc(targetMappingSize);
+            
+            for ( int i=0; i<inputAudioDescription.mChannelsPerFrame; i++ ) {
+                if ( [_inputChannelSelection count] > 0 ) {
+                    targetMapping[i] = min(numberOfInputChannels-1, 
+                                           [_inputChannelSelection count] > i 
+                                                ? [[_inputChannelSelection objectAtIndex:i] intValue] 
+                                                : [[_inputChannelSelection lastObject] intValue]);
+                } else {
+                    targetMapping[i] = min(numberOfInputChannels-1, i);
+                }
+            }
+            
+            if ( !converter 
+                    || memcmp(&converterFormat, &rawAudioDescription, sizeof(AudioStreamBasicDescription)) != 0
+                    || (mappingSize != targetMappingSize || memcmp(mapping, targetMapping, targetMappingSize)) ) {
                 checkResult(AudioConverterNew(&rawAudioDescription, &inputAudioDescription, &converter), "AudioConverterNew");
                 scratchBuffer = AEAllocateAndInitAudioBufferList(rawAudioDescription, 0);
                 inputBufferList = AEAllocateAndInitAudioBufferList(inputAudioDescription, kInputAudioBufferBytes / inputAudioDescription.mBytesPerFrame);
                 bufferIsAllocated = YES;
+                
+                checkResult(AudioConverterSetProperty(converter, kAudioConverterChannelMap, targetMappingSize, targetMapping), "AudioConverterSetProperty(kAudioConverterChannelMap");
             }
+            
+            if ( targetMapping) free(targetMapping);
+            if ( mapping ) free(mapping);
+        } else {
+            converter = NULL;
+            scratchBuffer = NULL;
         }
         
         BOOL inputChannelsChanged = _numberOfInputChannels != numberOfInputChannels;
@@ -2240,7 +2324,7 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
     [self setAudioSessionCategory];
 }
 
-static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannelRef channel, AEChannelGroupRef parentGroup, int index) {
+static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannelRef channel, AEChannelGroupRef parentGroup, int index, BOOL *updateRequired) {
     AEChannelGroupRef group = (AEChannelGroupRef)channel->ptr;
     
     OSStatus result;
@@ -2297,6 +2381,8 @@ static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannelRef channel
         // Set the mixer unit to handle up to 4096 frames per slice to keep rendering during screen lock
         UInt32 maxFPS = 4096;
         AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFPS, sizeof(maxFPS));
+        
+        *updateRequired = YES;
     }
     
     // Set bus count
@@ -2305,15 +2391,15 @@ static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannelRef channel
     if ( !checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) return NO;
     
     // Configure graph state
-    configureGraphStateOfGroupChannel(THIS, channel, parentGroup, index);
+    configureGraphStateOfGroupChannel(THIS, channel, parentGroup, index, updateRequired);
     
     // Configure inputs
-    configureChannelsInRangeForGroup(THIS, NSMakeRange(0, busCount), group);
+    configureChannelsInRangeForGroup(THIS, NSMakeRange(0, busCount), group, updateRequired);
     
     return YES;
 }
 
-static void configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannelRef channel, AEChannelGroupRef parentGroup, int index) {
+static void configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannelRef channel, AEChannelGroupRef parentGroup, int index, BOOL *updateRequired) {
     AEChannelGroupRef group = (AEChannelGroupRef)channel->ptr;
     
     BOOL outputCallbacks=NO, filters=NO;
@@ -2330,7 +2416,6 @@ static void configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannel
     OSStatus result = AUGraphIsRunning(THIS->_audioGraph, &wasRunning);
     checkResult(result, "AUGraphIsRunning");
 
-    BOOL updateGraph = NO;
     BOOL graphStopped = !wasRunning;
     
     if ( (outputCallbacks || filters) && group->converterRequired && !group->audioConverter ) {
@@ -2370,6 +2455,7 @@ static void configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannel
             if ( checkResult(AUGraphDisconnectNodeInput(THIS->_audioGraph, parentGroup ? parentGroup->mixerNode : THIS->_ioNode, parentGroup ? index : 0), "AUGraphDisconnectNodeInput") ) {
                 channel->graphState &= ~kGraphStateNodeConnected;
                 checkResult(AUGraphUpdate(THIS->_audioGraph, NULL), "AUGraphUpdate");
+                *updateRequired = YES;
             }
         }
         
@@ -2391,7 +2477,7 @@ static void configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannel
             rcbs.inputProcRefCon = channel;
             if ( checkResult(AUGraphSetNodeInputCallback(THIS->_audioGraph, parentGroup ? parentGroup->mixerNode : THIS->_ioNode, parentGroup ? index : 0, &rcbs), "AUGraphSetNodeInputCallback") ) {
                 channel->graphState |= kGraphStateRenderCallbackSet;
-                updateGraph = YES;
+                *updateRequired = YES;
             }
         }
         
@@ -2403,7 +2489,7 @@ static void configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannel
             // Connect output of mixer directly to the parent mixer
             if ( checkResult(AUGraphConnectNodeInput(THIS->_audioGraph, group->mixerNode, 0, parentGroup ? parentGroup->mixerNode : THIS->_ioNode, parentGroup ? index : 0), "AUGraphConnectNodeInput") ) {
                 channel->graphState |= kGraphStateNodeConnected;
-                updateGraph = YES;
+                *updateRequired = YES;
             }
         }
         
@@ -2425,11 +2511,6 @@ static void configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannel
         }
     }
     
-    if ( updateGraph ) {
-        Boolean updated;
-        AUGraphUpdate(THIS->_audioGraph, &updated);
-    }
-    
     if ( graphStopped && wasRunning ) {
         checkResult(AUGraphStart(THIS->_audioGraph), "AUGraphStart");
     }
@@ -2441,7 +2522,7 @@ static void configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannel
     }
 }
 
-static void configureChannelsInRangeForGroup(AEAudioController *THIS, NSRange range, AEChannelGroupRef group) {
+static void configureChannelsInRangeForGroup(AEAudioController *THIS, NSRange range, AEChannelGroupRef group, BOOL *updateRequired) {
     for ( int i = range.location; i < range.location+range.length; i++ ) {
         AEChannelRef channel = &group->channels[i];
 
@@ -2454,6 +2535,7 @@ static void configureChannelsInRangeForGroup(AEAudioController *THIS, NSRange ra
             if ( channel->graphState & kGraphStateRenderCallbackSet || channel->graphState & kGraphStateNodeConnected ) {
                 checkResult(AUGraphDisconnectNodeInput(THIS->_audioGraph, group->mixerNode, i), "AUGraphDisconnectNodeInput");
                 channel->graphState = kGraphStateUninitialized;
+                *updateRequired = YES;
             }
             
             // Setup render callback struct
@@ -2469,7 +2551,7 @@ static void configureChannelsInRangeForGroup(AEAudioController *THIS, NSRange ra
             
         } else if ( channel->type == kChannelTypeGroup ) {
             // Recursively initialise this channel group
-            initialiseGroupChannel(THIS, channel, group, i);
+            initialiseGroupChannel(THIS, channel, group, i, updateRequired);
         }
         
         // Set volume
@@ -2493,9 +2575,19 @@ static void configureChannelsInRangeForGroup(AEAudioController *THIS, NSRange ra
 
 static void updateGroupDelayed(AEAudioController *THIS, void *userInfo, int length) {
     AEChannelGroupRef group = *(AEChannelGroupRef*)userInfo;
-    OSStatus result = AUGraphUpdate(THIS->_audioGraph, NULL);
-    checkResult(result, "AUGraphUpdate");
-    configureChannelsInRangeForGroup(THIS, NSMakeRange(0, group->channelCount), group);
+    
+    BOOL updateRequired = NO;
+    configureChannelsInRangeForGroup(THIS, NSMakeRange(0, group->channelCount), group, &updateRequired);
+    if ( updateRequired ) {
+        checkResult(AUGraphUpdate(THIS->_audioGraph, NULL), "AUGraphUpdate");
+    }
+}
+
+static void updateGraphDelayed(AEAudioController *THIS, void *userInfo, int length) {
+    OSStatus result = [THIS updateGraph];
+    if ( result != kAUGraphErr_NodeNotFound /* Ignore this error, it's mysterious and seems to have no consequences */ ) {
+        checkResult(result, "AUGraphUpdate");
+    }
 }
 
 static void removeChannelsFromGroup(AEAudioController *THIS, void *userInfo, int userInfoLength) {
@@ -2508,43 +2600,56 @@ static void removeChannelsFromGroup(AEAudioController *THIS, void *userInfo, int
     if ( !checkResult(AudioUnitSetProperty(args->group->mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &busCount, sizeof(busCount)),
                       "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) return;
     
+    BOOL updateRequired = NO;
+    
     for ( int i=0; i < args->count; i++ ) {
         
         // Find the channel in our fixed array
         int index = 0;
         for ( index=0; index < args->group->channelCount; index++ ) {
             if ( args->group->channels[index].ptr == args->ptrs[i] && args->group->channels[index].userInfo == args->userInfos[i] ) {
-                break;
-            }
-        }
-        
-        if ( index < args->group->channelCount ) {
-            args->group->channelCount--;
-            
-            if ( index < args->group->channelCount ) {
-                // Shuffle the later elements backwards one space, disconnecting as we go
-                int graphState = args->group->channels[index].graphState;
+                args->group->channelCount--;
                 
-                if ( graphState & kGraphStateNodeConnected || graphState & kGraphStateRenderCallbackSet ) {
-                    if ( index < busCount ) checkResult(AUGraphDisconnectNodeInput(THIS->_audioGraph, args->group->mixerNode, index), "AUGraphDisconnectNodeInput");
-                    graphState &= ~(kGraphStateNodeConnected | kGraphStateRenderCallbackSet);
+                // Shuffle the later elements backwards one space, disconnecting as we go
+                for ( int j=index; j<args->group->channelCount; j++ ) {
+                     int graphState = args->group->channels[j].graphState;
+                     
+                     if ( graphState & kGraphStateNodeConnected || graphState & kGraphStateRenderCallbackSet ) {
+                         if ( j < busCount ) {
+                             checkResult(AUGraphDisconnectNodeInput(THIS->_audioGraph, args->group->mixerNode, j), "AUGraphDisconnectNodeInput");
+                             updateRequired = YES;
+                         }
+                         graphState &= ~(kGraphStateNodeConnected | kGraphStateRenderCallbackSet);
+                     }
+                     
+                     memcpy(&args->group->channels[j], &args->group->channels[j+1], sizeof(channel_t));
+                     args->group->channels[j].graphState = graphState;
                 }
                 
-                memmove(&args->group->channels[index], &args->group->channels[index+1], (args->group->channelCount-index) * sizeof(channel_t));
-                args->group->channels[index].graphState = graphState;
+                // Zero out the now-unused space
+                memset(&args->group->channels[args->group->channelCount], 0, sizeof(channel_t));
             }
-            
-            // Zero out the now-unused space
-            memset(&args->group->channels[args->group->channelCount], 0, sizeof(channel_t));
         }
     }
     
-    OSStatus result = AUGraphUpdate(THIS->_audioGraph, NULL);
-    if ( result == kAUGraphErr_CannotDoInCurrentContext ) {
-        // Complete the refresh on the main thread
-        AEAudioControllerSendAsynchronousMessageToMainThread(THIS, updateGroupDelayed, &args->group, sizeof(AEChannelGroupRef));
-    } else if ( checkResult(result, "AUGraphUpdate") ) {
-        configureChannelsInRangeForGroup(THIS, NSMakeRange(0, args->group->channelCount), args->group);
+    if ( updateRequired ) {
+        OSStatus result = AUGraphUpdate(THIS->_audioGraph, NULL);
+        if ( result == kAUGraphErr_CannotDoInCurrentContext ) {
+            // Complete the refresh on the main thread
+            AEAudioControllerSendAsynchronousMessageToMainThread(THIS, updateGroupDelayed, &args->group, sizeof(AEChannelGroupRef));
+            return;
+        } else {
+            checkResult(result, "AUGraphUpdate");
+        }
+    }
+    
+    updateRequired = NO;
+    configureChannelsInRangeForGroup(THIS, NSMakeRange(0, args->group->channelCount), args->group, &updateRequired);
+    if ( updateRequired ) {
+        OSStatus result = AUGraphUpdate(THIS->_audioGraph, NULL);
+        if ( result == kAUGraphErr_CannotDoInCurrentContext ) {
+            AEAudioControllerSendAsynchronousMessageToMainThread(THIS, updateGraphDelayed, &args->group, sizeof(AEChannelGroupRef));
+        }
     }
 }
 
@@ -2704,8 +2809,12 @@ void removeCallbackFromTable(AEAudioController *THIS, void *userInfo, int length
         parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
         NSAssert(parentGroup != NULL, @"Channel group not found");
     }
-
-    configureGraphStateOfGroupChannel(self, group->channel, parentGroup, index);
+    
+    BOOL updateRequired = NO;
+    configureGraphStateOfGroupChannel(self, group->channel, parentGroup, index, &updateRequired);
+    if ( updateRequired ) {
+        checkResult([self updateGraph], "AUGraphUpdate");
+    }
 }
 
 - (BOOL)removeCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<AEAudioPlayable>)channelObj {
@@ -2743,7 +2852,11 @@ void removeCallbackFromTable(AEAudioController *THIS, void *userInfo, int length
         NSAssert(parentGroup != NULL, @"Channel group not found");
     }
     
-    configureGraphStateOfGroupChannel(self, group->channel, parentGroup, index);
+    BOOL updateRequired = NO;
+    configureGraphStateOfGroupChannel(self, group->channel, parentGroup, index, &updateRequired);
+    if ( updateRequired ) {
+        checkResult([self updateGraph], "AUGraphUpdate");
+    }
     
     return YES;
 }
