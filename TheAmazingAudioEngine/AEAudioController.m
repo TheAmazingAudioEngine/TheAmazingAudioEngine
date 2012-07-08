@@ -202,6 +202,8 @@ typedef struct _message_t {
     Float32             _inputAverage;
     float              *_inputMonitorScratchBuffer;
     BOOL                _resetNextInputStats;
+    
+    BOOL                _playingThroughAirTunes;
 }
 
 - (void)pollForMainThreadMessages;
@@ -321,6 +323,8 @@ static void audioSessionPropertyListener(void *inClientData, AudioSessionPropert
             playingThroughSpeaker = NO;
         }
         
+        THIS->_playingThroughAirTunes = [(NSString*)route isEqualToString:@"AirTunes"];
+        
         CFRelease(route);
         
         BOOL updatedVP = NO;
@@ -370,7 +374,12 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
     
     if ( channel->audiobusOutputPort && ABOutputPortGetConnectedPortAttributes(channel->audiobusOutputPort) & ABInputPortAttributePlaysLiveAudio ) {
         // We're sending via the output port, and the receiver plays live - offset the timestamp by the reported latency
-        arg->inTimeStamp.mHostTime += ABOutputPortGetAverageLatency(channel->audiobusOutputPort)*__secondsToHostTicks;
+        if ( channel->audioController->_playingThroughAirTunes ) {
+            // AirTunes messes with the timestamps horribly - just use the host time instead
+            arg->inTimeStamp.mHostTime = mach_absolute_time() + ABOutputPortGetAverageLatency(channel->audiobusOutputPort)*__secondsToHostTicks;
+        } else {
+            arg->inTimeStamp.mHostTime += ABOutputPortGetAverageLatency(channel->audiobusOutputPort)*__secondsToHostTicks;
+        }
     }
     
     if ( channel->type == kChannelTypeChannel ) {
@@ -1911,6 +1920,8 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
         } else {
             _playingThroughDeviceSpeaker = NO;
         }
+        
+        _playingThroughAirTunes = [(NSString*)route isEqualToString:@"AirTunes"];
     }
     
     NSLog(@"TAAE: Audio session initialized (%@)", extraInfo);
