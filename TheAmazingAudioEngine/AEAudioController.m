@@ -262,10 +262,9 @@ static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp
             audioDescription            = _audioDescription,
             audioRoute                  = _audioRoute,
             inputAudioDescription       = _inputAudioDescription,
-            audiobusInputPort           = _audiobusInputPort,
-            audiobusOutputPort          = _audiobusOutputPort;
+            audiobusInputPort           = _audiobusInputPort;
 
-@dynamic    running, inputGainAvailable, inputGain;
+@dynamic    running, inputGainAvailable, inputGain, audiobusOutputPort;
 
 #pragma mark - Audio session callbacks
 
@@ -387,7 +386,7 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
     } else if ( channel->type == kChannelTypeGroup ) {
         AEChannelGroupRef group = (AEChannelGroupRef)channel->ptr;
         
-        AudioBufferList *bufferList;
+        AudioBufferList *bufferList = audio;
         
         char audioBufferListSpace[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
 
@@ -400,10 +399,6 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
                 bufferList->mBuffers[i].mData           = group->audioConverterScratchBuffer + (i * kRenderConversionScratchBufferSize/bufferList->mNumberBuffers);
                 bufferList->mBuffers[i].mDataByteSize   = group->audioConverterSourceFormat.mBytesPerFrame * frames;
             }
-            
-        } else {
-            // We can render straight to the buffer, as audio format is the same
-            bufferList = audio;
         }
         
         // Tell mixer to render into bufferList
@@ -647,10 +642,6 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
             
             checkResult(AudioUnitGetParameter(THIS->_topGroup->mixerAudioUnit, kMultiChannelMixerParam_PostPeakHoldLevel, kAudioUnitScope_Output, 0, &THIS->_topGroup->peakLevel), 
                         "AudioUnitGetParameter(kMultiChannelMixerParam_PostAveragePower)");
-        }
-        
-        if ( THIS->_audiobusOutputPort ) {
-            ABOutputPortSendAudio(THIS->_audiobusOutputPort, ioData, inNumberFrames, inTimeStamp->mHostTime, NULL);
         }
         
         if ( THIS->_muteOutput ) {
@@ -1600,6 +1591,22 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
     checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryEnableBluetoothInput)");
 }
 
+-(NSString*)audioRoute {
+    if ( _topChannel.audiobusOutputPort && ABOutputPortGetConnectedPortAttributes(_topChannel.audiobusOutputPort) & ABInputPortAttributePlaysLiveAudio ) {
+        return @"Audiobus";
+    } else {
+        return _audioRoute;
+    }
+}
+
+-(BOOL)playingThroughDeviceSpeaker {
+    if ( _topChannel.audiobusOutputPort && ABOutputPortGetConnectedPortAttributes(_topChannel.audiobusOutputPort) & ABInputPortAttributePlaysLiveAudio ) {
+        return NO;
+    } else {
+        return _playingThroughDeviceSpeaker;
+    }
+}
+
 -(BOOL)inputGainAvailable {
     UInt32 inputGainAvailable = NO;
     UInt32 size = sizeof(inputGainAvailable);
@@ -1673,22 +1680,28 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 }
 
 -(void)setAudiobusOutputPort:(ABOutputPort *)audiobusOutputPort {
-    if ( _audiobusOutputPort ) [_audiobusOutputPort removeObserver:self forKeyPath:@"connectedPortAttributes"];
+    if ( _topChannel.audiobusOutputPort == audiobusOutputPort ) return;
     
-    [audiobusOutputPort retain];
-    [_audiobusOutputPort release];
-    _audiobusOutputPort = audiobusOutputPort;
-    
-    if ( _audiobusOutputPort ) {
-        AudioStreamBasicDescription outputAudioDescription;
-        UInt32 size = sizeof(outputAudioDescription);
-        if ( checkResult(AudioUnitGetProperty(_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &outputAudioDescription, &size), 
-                         "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)") ) {
-            _audiobusOutputPort.clientFormat = outputAudioDescription;
-        }
-        _muteOutput = _muteOutput || _audiobusOutputPort.connectedPortAttributes & ABInputPortAttributePlaysLiveAudio;
-        [_audiobusOutputPort addObserver:self forKeyPath:@"connectedPortAttributes" options:0 context:NULL];
+    if ( _topChannel.audiobusOutputPort ) {
+        [_topChannel.audiobusOutputPort removeObserver:self forKeyPath:@"destinations"];
+        [_topChannel.audiobusOutputPort removeObserver:self forKeyPath:@"connectedPortAttributes"];
     }
+    
+    [self willChangeValueForKey:@"audioRoute"];
+    [self willChangeValueForKey:@"playingThroughDeviceSpeaker"];
+    [self setAudiobusOutputPort:audiobusOutputPort forChannelElement:&_topChannel];
+    [self didChangeValueForKey:@"audioRoute"];
+    [self didChangeValueForKey:@"playingThroughDeviceSpeaker"];
+    
+    
+    if ( _topChannel.audiobusOutputPort ) {
+        [_topChannel.audiobusOutputPort addObserver:self forKeyPath:@"destinations" options:NSKeyValueObservingOptionPrior context:NULL];
+        [_topChannel.audiobusOutputPort addObserver:self forKeyPath:@"connectedPortAttributes" options:NSKeyValueObservingOptionPrior context:NULL];
+    }
+}
+
+- (ABOutputPort*)audiobusOutputPort {
+    return _topChannel.audiobusOutputPort;
 }
 
 static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, void *userInfo, int length) {
@@ -1704,6 +1717,21 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     } else {
         audiobusOutputPort.clientFormat = channelElement->audioDescription;
         channelElement->audiobusOutputPort = [audiobusOutputPort retain];
+        
+        if ( channelElement->type == kChannelTypeGroup ) {
+            AEChannelGroupRef parentGroup = NULL;
+            int index=0;
+            if ( channelElement->ptr != _topGroup ) {
+                parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelElement->ptr userInfo:NULL index:&index];
+                NSAssert(parentGroup != NULL, @"Channel group not found");
+            }
+            
+            BOOL updateRequired = NO;
+            configureGraphStateOfGroupChannel(self, channelElement, parentGroup, index, &updateRequired);
+            if ( updateRequired ) {
+                checkResult([self updateGraph], "AUGraphUpdate");
+            }
+        }
     }
 }
 
@@ -1721,12 +1749,20 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
 #pragma mark - Events
 
 -(void) observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
-    if ( object == _audiobusOutputPort ) {
-        _muteOutput = _audiobusOutputPort.connectedPortAttributes & ABInputPortAttributePlaysLiveAudio;
-        return;
-    }
+
     if ( object == _audiobusInputPort ) {
         [self updateInputDeviceStatus];
+        return;
+    }
+    
+    if ( object == _topChannel.audiobusOutputPort ) {
+        if ( [change objectForKey:NSKeyValueChangeNotificationIsPriorKey] ) {
+            [self willChangeValueForKey:@"audioRoute"];
+            [self willChangeValueForKey:@"playingThroughDeviceSpeaker"];
+        } else {
+            [self didChangeValueForKey:@"audioRoute"];
+            [self didChangeValueForKey:@"playingThroughDeviceSpeaker"];
+        }
         return;
     }
     
@@ -2349,8 +2385,8 @@ static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannelRef channel
         
         // Try to set mixer's output stream format
         group->converterRequired = NO;
-        result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &THIS->_audioDescription, sizeof(THIS->_audioDescription));
         channel->audioDescription = THIS->_audioDescription;
+        result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &THIS->_audioDescription, sizeof(THIS->_audioDescription));
         
         if ( result == kAudioUnitErr_FormatNotSupported ) {
             // The mixer only supports a subset of formats. If it doesn't support this one, then we'll convert manually
@@ -2366,9 +2402,7 @@ static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannelRef channel
             mixerFormat.mSampleRate = THIS->_audioDescription.mSampleRate;
             
             checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &mixerFormat, sizeof(mixerFormat)), 
-                        "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat");
-            
-            channel->audioDescription = mixerFormat;
+                        "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat");            
             
         } else {
             checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
@@ -2418,7 +2452,7 @@ static void configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannel
 
     BOOL graphStopped = !wasRunning;
     
-    if ( (outputCallbacks || filters) && group->converterRequired && !group->audioConverter ) {
+    if ( (outputCallbacks || filters || channel->audiobusOutputPort) && group->converterRequired && !group->audioConverter ) {
         // Initialise audio converter if necessary
         
         // Get mixer's output stream format
@@ -2434,7 +2468,6 @@ static void configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannel
         if ( !checkResult(AudioConverterNew(&mixerFormat, &THIS->_audioDescription, &group->audioConverter), 
                           "AudioConverterNew") ) return;
         
-        
         if ( !THIS->_renderConversionScratchBuffer ) {
             // Allocate temporary conversion buffer
             THIS->_renderConversionScratchBuffer = (char*)malloc(kRenderConversionScratchBufferSize);
@@ -2442,8 +2475,8 @@ static void configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannel
         group->audioConverterScratchBuffer = THIS->_renderConversionScratchBuffer;
     }
     
-    if ( filters ) {
-        // We need to use our own render callback, because the audio will be being converted and modified
+    if ( filters || channel->audiobusOutputPort ) {
+        // We need to use our own render callback, because we're either filtering, or sending via Audiobus (and we may need to adjust timestamp)
         if ( channel->graphState & kGraphStateNodeConnected ) {
             if ( !parentGroup && !graphStopped ) {
                 // Stop the graph first, because we're going to modify the root
@@ -2638,7 +2671,7 @@ static void removeChannelsFromGroup(AEAudioController *THIS, void *userInfo, int
             // Complete the refresh on the main thread
             AEAudioControllerSendAsynchronousMessageToMainThread(THIS, updateGroupDelayed, &args->group, sizeof(AEChannelGroupRef));
             return;
-        } else {
+        } else if ( result != kAUGraphErr_NodeNotFound ) {
             checkResult(result, "AUGraphUpdate");
         }
     }
