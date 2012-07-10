@@ -2052,7 +2052,8 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
         }
     }
     
-    checkResult(AUGraphUpdate(_audioGraph, NULL), "AUGraphUpdate");
+    OSStatus result = AUGraphUpdate(_audioGraph, NULL);
+    if ( result != kAUGraphErr_NodeNotFound /* Ignore this error */ ) checkResult(result, "AUGraphUpdate");
 
     [self updateInputDeviceStatus];
     
