@@ -212,7 +212,8 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS);
 - (void)teardown;
 - (OSStatus)updateGraph;
 - (void)setAudioSessionCategory;
-- (void)updateVoiceProcessingSettings;
+- (BOOL)mustUpdateVoiceProcessingSettings;
+- (void)replaceIONode;
 - (void)updateInputDeviceStatus;
 
 static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannelRef channel, AEChannelGroupRef parentGroup, int index, BOOL *updateRequired);
@@ -330,8 +331,10 @@ static void audioSessionPropertyListener(void *inClientData, AudioSessionPropert
             [THIS didChangeValueForKey:@"playingThroughDeviceSpeaker"];
             
             if ( THIS->_voiceProcessingEnabled && THIS->_voiceProcessingOnlyForSpeakerAndMicrophone ) {
-                [THIS updateVoiceProcessingSettings];
-                updatedVP = YES;
+                if ( [THIS mustUpdateVoiceProcessingSettings] ) {
+                    [THIS replaceIONode];
+                    updatedVP = YES;
+                }
             }
         }
         
@@ -1567,10 +1570,54 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 }
 
 -(void)setEnableInput:(BOOL)enableInput {
-    if ( _enableInput == enableInput ) return;
     _enableInput = enableInput;
     
-    [self replaceIONode];
+    if ( !_ioAudioUnit ) return;
+    
+    if ( [self mustUpdateVoiceProcessingSettings] ) {
+        [self replaceIONode];
+        return;
+    }
+    
+    [self setAudioSessionCategory];
+        
+    if ( _enableInput ) {
+        // Enable input
+        UInt32 enableInputFlag = 1;
+        OSStatus result = AudioUnitSetProperty(_ioAudioUnit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &enableInputFlag, sizeof(enableInputFlag));
+        checkResult(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_EnableIO)");
+        
+        // Register a callback to receive audio
+        AURenderCallbackStruct inRenderProc;
+        inRenderProc.inputProc = &inputAvailableCallback;
+        inRenderProc.inputProcRefCon = self;
+        result = AudioUnitSetProperty(_ioAudioUnit, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 1, &inRenderProc, sizeof(inRenderProc));
+        checkResult(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_SetInputCallback)");
+        
+        [self updateInputDeviceStatus];
+    } else {
+        // Disable input
+        UInt32 enableInputFlag = 0;
+        OSStatus result = AudioUnitSetProperty(_ioAudioUnit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &enableInputFlag, sizeof(enableInputFlag));
+        checkResult(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_EnableIO)");
+    }
+    
+    if ( [self usingVPIO] ) {
+        // Set quality
+        UInt32 quality = 127;
+        OSStatus result = AudioUnitSetProperty(_ioAudioUnit, kAUVoiceIOProperty_VoiceProcessingQuality, kAudioUnitScope_Global, 1, &quality, sizeof(quality));
+        checkResult(result, "AudioUnitSetProperty(kAUVoiceIOProperty_VoiceProcessingQuality)");
+        
+        // If we're using voice processing, clamp the buffer duration
+        Float32 preferredBufferSize = MAX(kMaxBufferDurationWithVPIO, _preferredBufferDuration);
+        result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
+        checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
+    } else {
+        // Set the buffer duration
+        Float32 preferredBufferSize = _preferredBufferDuration;
+        OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
+        checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
+    }
 }
 
 -(void)setEnableBluetoothInput:(BOOL)enableBluetoothInput {
@@ -1646,12 +1693,16 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
     if ( _voiceProcessingEnabled == voiceProcessingEnabled ) return;
     
     _voiceProcessingEnabled = voiceProcessingEnabled;
-    [self updateVoiceProcessingSettings];
+    if ( [self mustUpdateVoiceProcessingSettings] ) {
+        [self replaceIONode];
+    }
 }
 
 -(void)setVoiceProcessingOnlyForSpeakerAndMicrophone:(BOOL)voiceProcessingOnlyForSpeakerAndMicrophone {
     _voiceProcessingOnlyForSpeakerAndMicrophone = voiceProcessingOnlyForSpeakerAndMicrophone;
-    [self updateVoiceProcessingSettings];
+    if ( [self mustUpdateVoiceProcessingSettings] ) {
+        [self replaceIONode];
+    }
 }
 
 -(void)setAudiobusInputPort:(ABInputPort *)audiobusInputPort {
@@ -1931,33 +1982,11 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
 	result = AUGraphOpen(_audioGraph);
 	if ( !checkResult(result, "AUGraphOpen") ) return NO;
     
-    // Get reference to input audio unit
+    // Get reference to IO audio unit
     result = AUGraphNodeInfo(_audioGraph, _ioNode, NULL, &_ioAudioUnit);
     if ( !checkResult(result, "AUGraphNodeInfo") ) return NO;
 
-    if ( _enableInput ) {
-        
-        // Enable input
-        UInt32 enableInputFlag = 1;
-        result = AudioUnitSetProperty(_ioAudioUnit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &enableInputFlag, sizeof(enableInputFlag));
-        if ( !checkResult(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_EnableIO)") ) return NO;
-        
-        // Register a callback to receive audio
-        AURenderCallbackStruct inRenderProc;
-        inRenderProc.inputProc = &inputAvailableCallback;
-        inRenderProc.inputProcRefCon = self;
-        result = AudioUnitSetProperty(_ioAudioUnit, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 1, &inRenderProc, sizeof(inRenderProc));
-        if ( !checkResult(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_SetInputCallback)") ) return NO;
-        
-        if ( useVoiceProcessing ) {
-            // Set quality
-            UInt32 quality = 127;
-            result = AudioUnitSetProperty(_ioAudioUnit, kAUVoiceIOProperty_VoiceProcessingQuality, kAudioUnitScope_Global, 1, &quality, sizeof(quality));
-            checkResult(result, "AudioUnitSetProperty(kAUVoiceIOProperty_VoiceProcessingQuality)");
-        }
-        
-        [self updateInputDeviceStatus];
-    }
+    [self setEnableInput:_enableInput];
 
     if ( !_topGroup ) {
         // Allocate top-level group
@@ -1981,13 +2010,6 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     
     // Register a callback to be notified when the main mixer unit renders
     checkResult(AudioUnitAddRenderNotify(_topGroup->mixerAudioUnit, &topRenderNotifyCallback, self), "AudioUnitAddRenderNotify");
-    
-    if ( useVoiceProcessing ) {
-        // If we're using voice processing, clamp the buffer duration
-        Float32 preferredBufferSize = MAX(kMaxBufferDurationWithVPIO, _preferredBufferDuration);
-        OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
-        checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
-    }
     
     // Initialize the graph
 	result = AUGraphInitialize(_audioGraph);
@@ -2021,36 +2043,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     // Get reference to input audio unit
     if ( !checkResult(AUGraphNodeInfo(_audioGraph, _ioNode, NULL, &_ioAudioUnit), "AUGraphNodeInfo") ) return;
     
-    if ( _enableInput ) {
-        // Enable input
-        UInt32 enableInputFlag = 1;
-        OSStatus result = AudioUnitSetProperty(_ioAudioUnit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &enableInputFlag, sizeof(enableInputFlag));
-        checkResult(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_EnableIO)");
-        
-        // Register a callback to receive audio
-        AURenderCallbackStruct inRenderProc;
-        inRenderProc.inputProc = &inputAvailableCallback;
-        inRenderProc.inputProcRefCon = self;
-        result = AudioUnitSetProperty(_ioAudioUnit, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 1, &inRenderProc, sizeof(inRenderProc));
-        checkResult(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_SetInputCallback)");
-        
-        if ( useVoiceProcessing ) {
-            // Set quality
-            UInt32 quality = 127;
-            result = AudioUnitSetProperty(_ioAudioUnit, kAUVoiceIOProperty_VoiceProcessingQuality, kAudioUnitScope_Global, 1, &quality, sizeof(quality));
-            checkResult(result, "AudioUnitSetProperty(kAUVoiceIOProperty_VoiceProcessingQuality)");
-            
-            // If we're using voice processing, clamp the buffer duration
-            Float32 preferredBufferSize = MAX(kMaxBufferDurationWithVPIO, _preferredBufferDuration);
-            OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
-            checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
-        } else {
-            // Set the buffer duration
-            Float32 preferredBufferSize = _preferredBufferDuration;
-            OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
-            checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
-        }
-    }
+    [self setEnableInput:_enableInput];
     
     OSStatus result = AUGraphUpdate(_audioGraph, NULL);
     if ( result != kAUGraphErr_NodeNotFound /* Ignore this error */ ) checkResult(result, "AUGraphUpdate");
@@ -2121,11 +2114,9 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     UInt32 size = sizeof(audioCategory);
     UInt32 currentCategory;
     AudioSessionGetProperty(kAudioSessionProperty_AudioCategory, &size, &currentCategory);
-    if ( currentCategory == audioCategory ) {
-        return;
+    if ( currentCategory != audioCategory ) {
+        NSLog(@"TAAE: Set audio session category to %@", audioCategory == kAudioSessionCategory_PlayAndRecord ? @"Play and record" : @"Media playback");
     }
-    
-    NSLog(@"TAAE: Set audio session category to %@", audioCategory == kAudioSessionCategory_PlayAndRecord ? @"Play and record" : @"Media playback");
     
     UInt32 allowMixing = YES;
     checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof (audioCategory), &audioCategory), "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory");
@@ -2137,7 +2128,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     }
 }
 
-- (void)updateVoiceProcessingSettings {
+- (BOOL)mustUpdateVoiceProcessingSettings {
     
     BOOL useVoiceProcessing = [self usingVPIO];
 
@@ -2151,7 +2142,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     
     AudioComponentDescription io_desc;
     if ( !checkResult(AUGraphNodeInfo(_audioGraph, _ioNode, &io_desc, NULL), "AUGraphNodeInfo(ioNode)") )
-        return;
+        return NO;
     
     if ( io_desc.componentSubType != target_io_desc.componentSubType ) {
         
@@ -2161,8 +2152,10 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
             NSLog(@"TAAE: Restarting audio system to use normal input unit");
         }
         
-        [self replaceIONode];
+        return YES;
     }
+    
+    return NO;
 }
 
 struct updateInputDeviceStatusHandler_t { 
