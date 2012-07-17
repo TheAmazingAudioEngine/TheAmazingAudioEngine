@@ -732,6 +732,10 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     return [self initWithAudioDescription:audioDescription inputEnabled:NO useVoiceProcessing:NO];
 }
 
+- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput {
+    return [self initWithAudioDescription:audioDescription inputEnabled:enableInput useVoiceProcessing:NO];
+}
+
 - (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing {
     if ( !(self = [super init]) ) return nil;
     
@@ -1661,6 +1665,36 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
     return inputGain;
 }
 
+-(NSUInteger)numberOfInputChannels {
+    if ( _numberOfInputChannels != 0 ) {
+        return _numberOfInputChannels;
+    }
+
+    UInt32 originalAudioCategory;
+    UInt32 size = sizeof(originalAudioCategory);
+    AudioSessionGetProperty(kAudioSessionProperty_AudioCategory, &size, &originalAudioCategory);
+    
+    if ( originalAudioCategory != kAudioSessionCategory_PlayAndRecord ) {
+        // Switch to play and record to get access to input info
+        UInt32 category = kAudioSessionCategory_PlayAndRecord;
+        checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof (category), &category), "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory");
+        UInt32 allowMixing = YES;
+        checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing), "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
+        
+        // Check channels on input
+        UInt32 numberOfInputChannels;
+        OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &numberOfInputChannels);
+        if ( checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels)") ) {
+            _numberOfInputChannels = numberOfInputChannels;
+        }
+        
+        // Switch back to other category
+        checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof (originalAudioCategory), &originalAudioCategory), "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory");
+    }
+    
+    return _numberOfInputChannels;
+}
+
 -(void)setInputGain:(float)inputGain {
     Float32 inputGainScaler = inputGain;
     OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_InputGainScalar, sizeof(inputGainScaler), &inputGainScaler);
@@ -2197,7 +2231,7 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
     
     // Determine if audio input is available, and the number of input channels available
     AudioStreamBasicDescription rawAudioDescription = _audioDescription;
-    UInt32 numberOfInputChannels = rawAudioDescription.mChannelsPerFrame;
+    UInt32 numberOfInputChannels = 0;
     
     if ( _audiobusInputPort && ABInputPortIsConnected(_audiobusInputPort) ) {
         inputAvailable = YES;
@@ -2208,12 +2242,14 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
         OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_AudioInputAvailable, &size, &inputAvailable);
         checkResult(result, "AudioSessionGetProperty");
         
-        numberOfInputChannels = 0;
         size = sizeof(numberOfInputChannels);
         if ( inputAvailable ) {
             // Check channels on input
-            OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &numberOfInputChannels);
-            if ( !checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels)") ) {
+            UInt32 channels = 0;
+            OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &channels);
+            if ( result == noErr ) {
+                numberOfInputChannels = channels;
+            } else if ( result != kAudioSessionIncompatibleCategory && !checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels)") ) {
                 return;
             }
         }

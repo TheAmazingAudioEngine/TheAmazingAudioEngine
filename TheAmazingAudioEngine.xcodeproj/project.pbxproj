@@ -172,6 +172,9 @@
 		4C215CED1523A7D500D36CAD /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				4C23245915AC5FE800038EC0 /* QuartzCore.framework */,
+				4C23245515AC5FDA00038EC0 /* Accelerate.framework */,
+				4C23245615AC5FDA00038EC0 /* AudioToolbox.framework */,
 				4C215CEE1523A7D500D36CAD /* Foundation.framework */,
 				4C23241F15AC5E2600038EC0 /* UIKit.framework */,
 				4C23242215AC5E2600038EC0 /* CoreGraphics.framework */,
@@ -244,9 +247,6 @@
 		4CE501811493F82600F23607 = {
 			isa = PBXGroup;
 			children = (
-				4C23245915AC5FE800038EC0 /* QuartzCore.framework */,
-				4C23245515AC5FDA00038EC0 /* Accelerate.framework */,
-				4C23245615AC5FDA00038EC0 /* AudioToolbox.framework */,
 				4CE501911493F82600F23607 /* TheAmazingAudioEngine */,
 				4C8A0F401540BBD700307CB6 /* Modules */,
 				4C23242415AC5E2600038EC0 /* TheEngineSample */,
@@ -776,6 +776,7 @@
 				4C23243215AC5E2600038EC0 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		4CE501861493F82600F23607 /* Build configuration list for PBXProject "TheAmazingAudioEngine" */ = {
 			isa = XCConfigurationList;

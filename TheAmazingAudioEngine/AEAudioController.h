@@ -459,6 +459,16 @@ typedef void (*AEAudioControllerMessageHandler)(AEAudioController *audioControll
  *
  * @param audioDescription    Audio description to use for all audio
  * @param enableInput         Whether to enable audio input from the microphone or another input device
+ */
+- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput;
+
+/*!
+ * Initialize the audio controller system, with the audio description you provide.
+ *
+ *      Creates and configures the input/output audio unit and initial mixer audio unit.
+ *
+ * @param audioDescription    Audio description to use for all audio
+ * @param enableInput         Whether to enable audio input from the microphone or another input device
  * @param useVoiceProcessing  Whether to use the voice processing unit (see @link voiceProcessingEnabled @endlink and @link voiceProcessingAvailable @endlink).
  */
 - (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing;
