@@ -144,6 +144,10 @@ static void prepareNewSource(AEMixerBuffer *THIS, AEMixerBufferSource sourceID);
         }
     }
     
+    free(_scratchBuffer);
+    free(_microfadeBuffer[0]);
+    free(_microfadeBuffer[1]);
+    
     [super dealloc];
 }
 
@@ -229,7 +233,7 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
     }
     
     // Determine how many frames are available globally
-    uint64_t sliceTimestamp = sliceTimestamp;
+    uint64_t sliceTimestamp;
     UInt32 sliceFrameCount = AEMixerBufferPeek(THIS, &sliceTimestamp);
     THIS->_currentSliceTimestamp = sliceTimestamp;
     THIS->_currentSliceFrameCount = sliceFrameCount;
