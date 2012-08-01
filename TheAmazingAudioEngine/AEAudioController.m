@@ -28,6 +28,7 @@ static double __secondsToHostTicks = 0.0;
 const int kMaximumChannelsPerGroup              = 100;
 const int kMaximumCallbacksPerSource            = 15;
 const int kMessageBufferLength                  = 8192;
+const int kMaxMessageDataSize                   = 2048;
 const NSTimeInterval kIdleMessagingPollDuration = 0.1;
 const int kRenderConversionScratchBufferSize    = 16384;
 const int kInputAudioBufferBytes                = 8192;
@@ -1343,24 +1344,45 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
     int32_t availableBytes;
     message_t *message = TPCircularBufferTail(&THIS->_realtimeThreadMessageBuffer, &availableBytes);
     void *end = (char*)message + availableBytes;
+    
+    message_t messageBuffer;
+    uint8_t messageDataBuffer[kMaxMessageDataSize];
+    
     while ( (void*)message < (void*)end ) {
-        if ( message->handler ) {
-            message->handler(THIS, 
-                             message->userInfoLength > 0
-                                ? (message->userInfoByReference ? message->userInfoByReference : message+1) 
-                                : NULL, 
-                             message->userInfoLength);
-        }        
-
-        int messageLength = sizeof(message_t) + (message->userInfoLength && !message->userInfoByReference ? message->userInfoLength : 0);
-        if ( message->responseBlock ) {
-            TPCircularBufferProduceBytes(&THIS->_mainThreadMessageBuffer, message, messageLength);
+        memcpy(&messageBuffer, message, sizeof(messageBuffer));
+        
+        int dataLength = messageBuffer.userInfoLength && !messageBuffer.userInfoByReference ? messageBuffer.userInfoLength : 0;
+        
+        if ( dataLength > 0 ) {
+            memcpy(messageDataBuffer, message+1, messageBuffer.userInfoLength);
         }
         
-        message = (message_t*)((char*)message + messageLength);
+        TPCircularBufferConsume(&THIS->_realtimeThreadMessageBuffer, sizeof(message_t) + dataLength);
+        
+        if ( messageBuffer.handler ) {
+            messageBuffer.handler(THIS, 
+                                  messageBuffer.userInfoLength > 0
+                                    ? (messageBuffer.userInfoByReference ? messageBuffer.userInfoByReference : messageDataBuffer) 
+                                    : NULL, 
+                                  messageBuffer.userInfoLength);
+        }        
+
+        if ( messageBuffer.responseBlock ) {
+            int32_t space;
+            uint8_t *head = TPCircularBufferHead(&THIS->_mainThreadMessageBuffer, &space);
+            if ( space < sizeof(message_t) + dataLength ) {
+                printf("Insufficient buffer space when storing message reply\n");
+            } else {
+                memcpy(head, &messageBuffer, sizeof(message_t));
+                if ( dataLength > 0 ) {
+                    memcpy(head + sizeof(message_t), messageDataBuffer, dataLength);
+                }
+                TPCircularBufferProduce(&THIS->_mainThreadMessageBuffer, sizeof(message_t) + dataLength);
+            }
+        }
+        
+        message = (message_t*)((char*)message + sizeof(message_t) + dataLength);
     }
-    
-    TPCircularBufferConsume(&THIS->_realtimeThreadMessageBuffer, availableBytes);
 }
 
 -(void)pollForMainThreadMessages {
@@ -1405,6 +1427,12 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
                                                length:(int)userInfoLength
                                         responseBlock:(void (^)(void *, int))responseBlock
                                   userInfoByReference:(BOOL)userInfoByReference {
+    
+    if ( !userInfoByReference && userInfoLength > kMaxMessageDataSize ) {
+        NSLog(@"Message data passed by value must be less than %d bytes (%d bytes provided)", kMaxMessageDataSize, userInfoLength);
+        return;
+    }
+    
     // Only perform on main thread
     if ( ![NSThread isMainThread] ) {
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -1468,10 +1496,19 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
                                     userInfoByReference:YES];
     
     // Wait for response
-    while ( !finished ) {
+    uint64_t giveUpTime = mach_absolute_time() + (1.0 * __secondsToHostTicks);
+    while ( !finished && mach_absolute_time() < giveUpTime ) {
+        @autoreleasepool {
+            [self pollForMainThreadMessages];
+            if ( finished ) break;
+            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:_preferredBufferDuration]];
+        }
+    }
+    
+    if ( !finished ) {
+        NSLog(@"TAAE: Timed out while performing message exchange");
+        processPendingMessagesOnRealtimeThread(self);
         [self pollForMainThreadMessages];
-        if ( finished ) break;
-        [NSThread sleepForTimeInterval:_preferredBufferDuration];
     }
 }
 
