@@ -178,6 +178,7 @@ typedef struct _message_t {
     AUGraph             _audioGraph;
     AUNode              _ioNode;
     AudioUnit           _ioAudioUnit;
+    BOOL                _interrupted;
     BOOL                _runningPriorToInterruption;
     
     AEChannelGroupRef   _topGroup;
@@ -212,7 +213,7 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS);
 - (BOOL)setup;
 - (void)teardown;
 - (OSStatus)updateGraph;
-- (void)setAudioSessionCategory;
+- (void)updateAudioSessionCategory;
 - (BOOL)mustUpdateVoiceProcessingSettings;
 - (void)replaceIONode;
 - (void)updateInputDeviceStatus;
@@ -274,23 +275,32 @@ static void interruptionListener(void *inClientData, UInt32 inInterruption) {
 	AEAudioController *THIS = (AEAudioController *)inClientData;
     
 	if (inInterruption == kAudioSessionEndInterruption) {
+        NSLog(@"TAAE: Audio session interruption ended");
+        THIS->_interrupted = NO;
+        
         if ( [[UIApplication sharedApplication] applicationState] != UIApplicationStateBackground || THIS->_runningPriorToInterruption ) {
             // make sure we are again the active session
             checkResult(AudioSessionSetActive(true), "AudioSessionSetActive");
         }
         
-        if ( THIS->_runningPriorToInterruption ) {
+        if ( THIS->_runningPriorToInterruption && ![THIS running] ) {
             [THIS start];
         }
         
         [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionEndedNotification object:THIS];
 	} else if (inInterruption == kAudioSessionBeginInterruption) {
+        NSLog(@"TAAE: Audio session interrupted");
+        
         THIS->_runningPriorToInterruption = THIS.running;
         if ( THIS->_runningPriorToInterruption ) {
             [THIS stop];
         }
         
+        THIS->_interrupted = YES;
+
         [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionBeganNotification object:THIS];
+        
+        processPendingMessagesOnRealtimeThread(THIS);
     }
 }
 
@@ -822,26 +832,35 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     // Determine if audio input is available, and the number of input channels available
     [self updateInputDeviceStatus];
     
-    // Start messaging poll thread
-    _pollThread = [[AEAudioControllerMessagePollThread alloc] initWithAudioController:self];
-    _pollThread.pollInterval = kIdleMessagingPollDuration;
-    OSMemoryBarrier();
-    [_pollThread start];
+    if ( !_pollThread ) {
+        // Start messaging poll thread
+        _pollThread = [[AEAudioControllerMessagePollThread alloc] initWithAudioController:self];
+        _pollThread.pollInterval = kIdleMessagingPollDuration;
+        OSMemoryBarrier();
+        [_pollThread start];
+    }
     
-    // Start things up
-    checkResult(AUGraphStart(_audioGraph), "AUGraphStart");
+    if ( !self.running ) {
+        // Start things up
+        checkResult(AUGraphStart(_audioGraph), "AUGraphStart");
+    }
 }
 
 - (void)stop {
     NSLog(@"TAAE: Stopping Engine");
     
     if ( self.running ) {
-        if ( !checkResult(AUGraphStop(_audioGraph), "AUGraphStop") ) return;
+        checkResult(AUGraphStop(_audioGraph), "AUGraphStop");
         AudioSessionSetActive(false);
+        
+        processPendingMessagesOnRealtimeThread(self);
     }
-    [_pollThread cancel];
-    [_pollThread release];
-    _pollThread = nil;
+    
+    if ( _pollThread ) {
+        [_pollThread cancel];
+        [_pollThread release];
+        _pollThread = nil;
+    }
 }
 
 #pragma mark - Channel and channel group management
@@ -1516,6 +1535,7 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController     
                                                           AEAudioControllerMessageHandler    handler, 
                                                           void                              *userInfo,
                                                           int                                userInfoLength) {
+    
     int32_t availableBytes;
     message_t *message = TPCircularBufferHead(&THIS->_mainThreadMessageBuffer, &availableBytes);
     assert(availableBytes >= sizeof(message_t) + userInfoLength);
@@ -1600,6 +1620,8 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 - (BOOL)running {
     if ( !_audioGraph ) return NO;
     
+    if ( _interrupted ) return NO;
+    
     Boolean isRunning = false;
     
     OSStatus result = AUGraphIsRunning(_audioGraph, &isRunning);
@@ -1617,11 +1639,17 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
     
     if ( !_ioAudioUnit ) return;
     
-    [self setAudioSessionCategory];
+    [self updateAudioSessionCategory];
     
-    [self replaceIONode];
+    UInt32 enableInputFlag;
+    UInt32 size = sizeof(enableInputFlag);
+    OSStatus result = AudioUnitGetProperty(_ioAudioUnit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &enableInputFlag, &size);
+    checkResult(result, "AudioUnitGetProperty(kAudioOutputUnitProperty_EnableIO)");
     
-    [self updateInputDeviceStatus];
+    if ( !enableInputFlag && enableInput ) {
+        [self replaceIONode];
+        [self updateInputDeviceStatus];
+    }
 }
 
 -(void)setEnableBluetoothInput:(BOOL)enableBluetoothInput {
@@ -1844,18 +1872,22 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
 
 -(void) observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
 
-    if ( object == _audiobusInputPort ) {
+    if ( [object isKindOfClass:[ABInputPort class]] || [object isKindOfClass:[ABOutputPort class]] ) {
+        [self updateAudioSessionCategory];
         [self updateInputDeviceStatus];
-        return;
-    }
+        if ( !self.running ) {
+            _interrupted = NO;
+            [self start];
+        }
     
-    if ( object == _topChannel.audiobusOutputPort ) {
-        if ( [change objectForKey:NSKeyValueChangeNotificationIsPriorKey] ) {
-            [self willChangeValueForKey:@"audioRoute"];
-            [self willChangeValueForKey:@"playingThroughDeviceSpeaker"];
-        } else {
-            [self didChangeValueForKey:@"audioRoute"];
-            [self didChangeValueForKey:@"playingThroughDeviceSpeaker"];
+        if ( object == _topChannel.audiobusOutputPort ) {
+            if ( [change objectForKey:NSKeyValueChangeNotificationIsPriorKey] ) {
+                [self willChangeValueForKey:@"audioRoute"];
+                [self willChangeValueForKey:@"playingThroughDeviceSpeaker"];
+            } else {
+                [self didChangeValueForKey:@"audioRoute"];
+                [self didChangeValueForKey:@"playingThroughDeviceSpeaker"];
+            }
         }
         return;
     }
@@ -1974,7 +2006,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     }
     _audioInputAvailable = inputAvailable;
     
-    [self setAudioSessionCategory];
+    [self updateAudioSessionCategory];
 
     // Start session
     checkResult(AudioSessionSetActive(true), "AudioSessionSetActive");
@@ -2193,9 +2225,9 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     return noErr;
 }
 
-- (void)setAudioSessionCategory {
+- (void)updateAudioSessionCategory {
     UInt32 audioCategory;
-    if ( _audioInputAvailable && _enableInput ) {
+    if ( _audioInputAvailable && _enableInput && !(_audiobusInputPort && ABInputPortIsConnected(_audiobusInputPort)) ) {
         // Set the audio session category for simultaneous play and record
         audioCategory = kAudioSessionCategory_PlayAndRecord;
     } else {
@@ -2497,7 +2529,7 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
               converter ? @", with converter" : @"");
     }
     
-    [self setAudioSessionCategory];
+    [self updateAudioSessionCategory];
 }
 
 static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannelRef channel, AEChannelGroupRef parentGroup, int index, BOOL *updateRequired) {
