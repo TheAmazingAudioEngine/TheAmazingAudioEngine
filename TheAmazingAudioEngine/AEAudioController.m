@@ -314,7 +314,7 @@ static void audioSessionPropertyListener(void *inClientData, AudioSessionPropert
         UInt32 size = sizeof(route);
         if ( !checkResult(AudioSessionGetProperty(kAudioSessionProperty_AudioRoute, &size, &route), "AudioSessionGetProperty(kAudioSessionProperty_AudioRoute)") ) return;
         
-        THIS.audioRoute = [[(NSString*)route copy] autorelease];
+        THIS.audioRoute = [NSString stringWithString:(NSString*)route];
         
         BOOL playingThroughSpeaker;
         if ( [(NSString*)route isEqualToString:@"ReceiverAndMicrophone"] ) {
