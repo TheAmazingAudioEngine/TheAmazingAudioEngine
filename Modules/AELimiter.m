@@ -71,7 +71,7 @@ static element_t findNextTriggerValueInRange(AELimiter *THIS, AudioBufferList *d
     return self;
 }
 
-BOOL AELimiterEnqueue(AELimiter *THIS, float** buffers, int numberOfBuffers, UInt32 length, AudioTimeStamp *timestamp) {
+BOOL AELimiterEnqueue(AELimiter *THIS, float** buffers, int numberOfBuffers, UInt32 length, const AudioTimeStamp *timestamp) {
     assert(numberOfBuffers <= 2);
     
     char audioBufferListBytes[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
@@ -87,7 +87,7 @@ BOOL AELimiterEnqueue(AELimiter *THIS, float** buffers, int numberOfBuffers, UIn
 }
 
 void AELimiterDequeue(AELimiter *THIS, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
-    *ioLength = min(*ioLength, AELimiterFillCount(THIS, NULL));
+    *ioLength = min(*ioLength, AELimiterFillCount(THIS, NULL, NULL));
     _AELimiterDequeue(THIS, buffers, numberOfBuffers, ioLength, timestamp);
 }
 
@@ -251,13 +251,15 @@ static void _AELimiterDequeue(AELimiter *THIS, float** buffers, int numberOfBuff
     }
 }
 
-UInt32 AELimiterFillCount(AELimiter *THIS, AudioTimeStamp *timestamp) {
+UInt32 AELimiterFillCount(AELimiter *THIS, AudioTimeStamp *timestamp, UInt32 *trueFillCount) {
+    if ( timestamp ) memset(timestamp, 0, sizeof(AudioTimeStamp));
     int fillCount = 0;
     AudioBufferList *bufferList = TPCircularBufferNextBufferList(&THIS->_buffer, timestamp);
     while ( bufferList ) {
         fillCount += bufferList->mBuffers[0].mDataByteSize / sizeof(float);
         bufferList = TPCircularBufferNextBufferListAfter(&THIS->_buffer, bufferList, NULL);
     }
+    if ( trueFillCount ) *trueFillCount = fillCount;
     return MAX(0, fillCount - (int)THIS->_attack);
 }
 

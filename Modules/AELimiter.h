@@ -11,9 +11,9 @@
 
 @interface AELimiter : NSObject
 
-BOOL AELimiterEnqueue(AELimiter *limiter, float** buffers, int numberOfBuffers, UInt32 length, AudioTimeStamp *timestamp);
+BOOL AELimiterEnqueue(AELimiter *limiter, float** buffers, int numberOfBuffers, UInt32 length, const AudioTimeStamp *timestamp);
 void AELimiterDequeue(AELimiter *limiter, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp);
-UInt32 AELimiterFillCount(AELimiter *limiter, AudioTimeStamp *timestamp);
+UInt32 AELimiterFillCount(AELimiter *limiter, AudioTimeStamp *timestamp, UInt32 *trueFillCount);
 void AELimiterDrain(AELimiter *limiter, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp);
 void AELimiterReset(AELimiter *limiter);
 
