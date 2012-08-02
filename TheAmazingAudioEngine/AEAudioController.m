@@ -545,6 +545,9 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
         
         if ( THIS->_inputAudioConverter ) {
             // Perform conversion
+            assert(THIS->_inputAudioScratchBufferList->mBuffers[0].mData && THIS->_inputAudioScratchBufferList->mBuffers[0].mDataByteSize > 0);
+            assert(THIS->_inputAudioBufferList->mBuffers[0].mData && THIS->_inputAudioBufferList->mBuffers[0].mDataByteSize > 0);
+            
             OSStatus result = AudioConverterFillComplexBuffer(THIS->_inputAudioConverter, 
                                                               fillComplexBufferInputProc, 
                                                               &(struct fillComplexBufferInputProc_t) { .bufferList = THIS->_inputAudioScratchBufferList, .frames = inNumberFrames }, 
@@ -2367,21 +2370,17 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
         inputAudioDescription.mChannelsPerFrame = channels;
     }
     
-    AudioBufferList *inputBufferList = _inputAudioBufferList;
-    BOOL bufferIsAllocated = _inputAudioBufferListBuffersAreAllocated;
+    AudioBufferList *inputBufferList    = _inputAudioBufferList;
+    BOOL bufferIsAllocated              = _inputAudioBufferListBuffersAreAllocated;
+    AudioConverterRef converter         = _inputAudioConverter;
+    AudioBufferList *scratchBuffer      = _inputAudioScratchBufferList;
     
-    BOOL inputBufferListBuffersWereAllocated = _inputAudioBufferListBuffersAreAllocated;
-    
-    AudioConverterRef converter = _inputAudioConverter;
-    AudioBufferList *scratchBuffer = _inputAudioScratchBufferList;
-    AudioConverterRef oldConverter = converter;
-    AudioBufferList *oldScratchBuffer = scratchBuffer;
-    
-    BOOL useVoiceProcessing = [self usingVPIO];
+    BOOL useVoiceProcessing             = [self usingVPIO];
 
     if ( _enableInput ) {
         // Determine if conversion is required
-        BOOL channelMapRequired = _inputMode == AEInputModeVariableAudioFormat && (inputAudioDescription.mChannelsPerFrame != numberOfInputChannels || (_inputChannelSelection && [_inputChannelSelection count] != inputAudioDescription.mChannelsPerFrame));
+        BOOL channelMapRequired = inputAudioDescription.mChannelsPerFrame != numberOfInputChannels
+                                    || (_inputChannelSelection && [_inputChannelSelection count] != inputAudioDescription.mChannelsPerFrame);
         if ( !channelMapRequired && _inputChannelSelection ) {
             for ( int i=0; i<[_inputChannelSelection count]; i++ ) {
                 if ( [[_inputChannelSelection objectAtIndex:i] intValue] != i ) {
@@ -2409,10 +2408,11 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
                 rawAudioDescription.mBytesPerPacket *= rawAudioDescription.mChannelsPerFrame;
             }
             
-            AudioStreamBasicDescription converterFormat;
-            UInt32 formatSize = sizeof(converterFormat);
-            
+            AudioStreamBasicDescription converterInputFormat;
+            AudioStreamBasicDescription converterOutputFormat;
+            UInt32 formatSize = sizeof(converterOutputFormat);
             UInt32 mappingSize = 0;
+            
             if ( converter ) {
                 checkResult(AudioConverterGetPropertyInfo(converter, kAudioConverterChannelMap, &mappingSize, NULL),
                             "AudioConverterGetPropertyInfo(kAudioConverterChannelMap)");
@@ -2420,10 +2420,12 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
             SInt32 *mapping = (SInt32*)(mappingSize != 0 ? malloc(mappingSize) : NULL);
             
             if ( converter ) {
-                checkResult(AudioConverterGetProperty(converter, kAudioConverterChannelMap, &formatSize, &converterFormat),
+                checkResult(AudioConverterGetProperty(converter, kAudioConverterCurrentInputStreamDescription, &formatSize, &converterInputFormat),
                             "AudioConverterGetProperty(kAudioConverterCurrentInputStreamDescription)");
+                checkResult(AudioConverterGetProperty(converter, kAudioConverterCurrentOutputStreamDescription, &formatSize, &converterOutputFormat),
+                            "AudioConverterGetProperty(kAudioConverterCurrentOutputStreamDescription)");
                 checkResult(AudioConverterGetProperty(converter, kAudioConverterChannelMap, &mappingSize, mapping),
-                            "AudioConverterGetProperty(kAudioConverterCurrentInputStreamDescription)");
+                            "AudioConverterGetProperty(kAudioConverterChannelMap)");
             }
             
             UInt32 targetMappingSize = sizeof(SInt32) * inputAudioDescription.mChannelsPerFrame;
@@ -2441,7 +2443,8 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
             }
             
             if ( !converter 
-                    || memcmp(&converterFormat, &rawAudioDescription, sizeof(AudioStreamBasicDescription)) != 0
+                    || memcmp(&converterInputFormat, &rawAudioDescription, sizeof(AudioStreamBasicDescription)) != 0
+                    || memcmp(&converterOutputFormat, &inputAudioDescription, sizeof(AudioStreamBasicDescription)) != 0
                     || (mappingSize != targetMappingSize || memcmp(mapping, targetMapping, targetMappingSize)) ) {
                 checkResult(AudioConverterNew(&rawAudioDescription, &inputAudioDescription, &converter), "AudioConverterNew");
                 scratchBuffer = AEAllocateAndInitAudioBufferList(rawAudioDescription, 0);
@@ -2476,7 +2479,10 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
         [self willChangeValueForKey:@"audioInputAvailable"];
     }
     
-    AudioBufferList *oldInputBuffer = _inputAudioBufferList;
+    AudioBufferList *oldInputBuffer     = _inputAudioBufferList;
+    BOOL existingBufferWasAllocated     = _inputAudioBufferListBuffersAreAllocated;
+    AudioConverterRef oldConverter      = _inputAudioConverter;
+    AudioBufferList *oldScratchBuffer   = _inputAudioScratchBufferList;
     
     // Set input stream format and update the properties
     [self performSynchronousMessageExchangeWithHandler:updateInputDeviceStatusHandler
@@ -2491,8 +2497,8 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
                                              .scratchBuffer = scratchBuffer }
                                                 length:sizeof(struct callbackTableInfo_t)];
     
-    if ( oldInputBuffer && oldInputBuffer != _inputAudioBufferList ) {
-        if ( inputBufferListBuffersWereAllocated ) {
+    if ( oldInputBuffer && oldInputBuffer != inputBufferList ) {
+        if ( existingBufferWasAllocated ) {
             AEFreeAudioBufferList(oldInputBuffer);
         } else {
             free(oldInputBuffer);
