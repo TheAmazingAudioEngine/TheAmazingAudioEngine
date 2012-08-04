@@ -11,6 +11,7 @@
 @class ABInputPort;
 @class ABOutputPort;
 @class ABPort;
+
 #define ABMetadataBlockList void*
 typedef NSUInteger ABInputPortAttributes;
 void ABInputPortReceive(ABInputPort *inputPort, ABPort *sourcePortOrNil, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, uint64_t *outTimestamp, ABMetadataBlockList *ioMetadataBlockList);
@@ -21,9 +22,11 @@ ABInputPortAttributes ABOutputPortGetConnectedPortAttributes(ABOutputPort *outpu
 NSTimeInterval ABOutputPortGetAverageLatency(ABOutputPort *outputPort);
 typedef void (^ABInputPortAudioInputBlock)(ABInputPort *inputPort, UInt32 lengthInFrames, uint64_t nextTimestamp, ABPort *sourcePortOrNil);
 
-@interface ABInputPort : NSObject
-@property (nonatomic, copy) ABInputPortAudioInputBlock audioInputBlock;
-@property (nonatomic, assign) AudioStreamBasicDescription clientFormat;
+@interface NSObject ()
+- (AudioStreamBasicDescription)clientFormat;
+- (void)setClientFormat:(AudioStreamBasicDescription)clientFormat;
+- (void)setAudioInputBlock:(ABInputPortAudioInputBlock)audioInputBlock;
+- (void)setConnectedPortAttributes:(NSInteger)connectedPortAttributes;
 @end
 
 enum {
@@ -31,8 +34,3 @@ enum {
     ABInputPortAttributePlaysLiveAudio  = 0x1  //!< The receiver will play the received audio out loud, live.
                                                //!< Connected senders should mute their output.
 };
-
-@interface ABOutputPort : NSObject
-@property (nonatomic, assign) AudioStreamBasicDescription clientFormat;
-@property (nonatomic, readonly) NSInteger connectedPortAttributes;
-@end

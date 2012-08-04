@@ -58,6 +58,8 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     return YES;
 }
 
+
+
 #pragma mark - Core types
 
 enum {
@@ -1789,7 +1791,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 
 -(void)setAudiobusInputPort:(ABInputPort *)audiobusInputPort {
     if ( _audiobusInputPort ) {
-        _audiobusInputPort.audioInputBlock = nil;
+        [_audiobusInputPort setAudioInputBlock:nil];
         [_audiobusInputPort removeObserver:self forKeyPath:@"sources"];
     }
     
@@ -1839,7 +1841,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     if ( audiobusOutputPort == nil ) {
         [self performSynchronousMessageExchangeWithHandler:removeAudiobusOutputPortFromChannelElement userInfoBytes:&channelElement length:sizeof(AEChannelRef)];
     } else {
-        audiobusOutputPort.clientFormat = channelElement->audioDescription;
+        [audiobusOutputPort setClientFormat:channelElement->audioDescription];
         channelElement->audiobusOutputPort = [audiobusOutputPort retain];
         
         if ( channelElement->type == kChannelTypeGroup ) {
@@ -1874,7 +1876,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
 
 -(void) observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
 
-    if ( [object isKindOfClass:[ABInputPort class]] || [object isKindOfClass:[ABOutputPort class]] ) {
+    if ( [NSStringFromClass([object class]) isEqualToString:@"ABInputPort"] || [NSStringFromClass([object class]) isEqualToString:@"ABOutputPort"] )  {
         [self updateAudioSessionCategory];
         [self updateInputDeviceStatus];
         if ( !self.running ) {
@@ -1950,7 +1952,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
         }
         
         if ( channelElement->audiobusOutputPort ) {
-            channelElement->audiobusOutputPort.clientFormat = channel.audioDescription;
+            [channelElement->audiobusOutputPort setClientFormat:channel.audioDescription];
         }
     }
 }
@@ -2513,9 +2515,9 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
     }
     
     if ( _audiobusInputPort ) {
-        AudioStreamBasicDescription clientFormat = _audiobusInputPort.clientFormat;
+        AudioStreamBasicDescription clientFormat = [_audiobusInputPort clientFormat];
         if ( memcmp(&clientFormat, &inputAudioDescription, sizeof(AudioStreamBasicDescription)) != 0 ) {
-            _audiobusInputPort.clientFormat = inputAudioDescription;
+            [_audiobusInputPort setClientFormat:inputAudioDescription];
         }
     }
     
