@@ -2347,17 +2347,14 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
         }
     }
     
-    if ( _inputMode == AEInputModeVariableAudioFormat ) {
-        int channels = numberOfInputChannels == 0 ? _audioDescription.mChannelsPerFrame : numberOfInputChannels;
-        // Set the input audio description channels to the number of actual available channels
-        if ( !(rawAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ) {
-            rawAudioDescription.mBytesPerFrame *= (float)channels / rawAudioDescription.mChannelsPerFrame;
-            rawAudioDescription.mBytesPerPacket *= (float)channels / rawAudioDescription.mChannelsPerFrame;
-        }
-        rawAudioDescription.mChannelsPerFrame = channels;
+    int channels = numberOfInputChannels == 0 ? _audioDescription.mChannelsPerFrame : numberOfInputChannels;
+    if ( !(rawAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ) {
+        rawAudioDescription.mBytesPerFrame *= (float)channels / rawAudioDescription.mChannelsPerFrame;
+        rawAudioDescription.mBytesPerPacket *= (float)channels / rawAudioDescription.mChannelsPerFrame;
     }
+    rawAudioDescription.mChannelsPerFrame = channels;
     
-    AudioStreamBasicDescription inputAudioDescription = rawAudioDescription;
+    AudioStreamBasicDescription inputAudioDescription = _inputMode == AEInputModeFixedAudioFormat ? _audioDescription : rawAudioDescription;
 
     if ( [_inputChannelSelection count] > 0 && _inputMode == AEInputModeVariableAudioFormat ) {
         // Set the target input audio description channels to the number of selected channels
