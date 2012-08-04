@@ -1636,13 +1636,12 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 }
 
 -(void)setEnableInput:(BOOL)enableInput {
-    if ( _enableInput == enableInput ) return;
+    [self updateAudioSessionCategory];
     
+    if ( _enableInput == enableInput ) return;
     _enableInput = enableInput;
     
     if ( !_ioAudioUnit ) return;
-    
-    [self updateAudioSessionCategory];
     
     UInt32 enableInputFlag;
     UInt32 size = sizeof(enableInputFlag);
