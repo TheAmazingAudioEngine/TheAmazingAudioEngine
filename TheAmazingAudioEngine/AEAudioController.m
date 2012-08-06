@@ -2468,6 +2468,9 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
             bufferIsAllocated = NO;
         }
         inputChannelsChanged = YES;
+    }
+    
+    if ( inputChannelsChanged ) {
         [self willChangeValueForKey:@"numberOfInputChannels"];
         [self willChangeValueForKey:@"inputAudioDescription"];
     }
