@@ -25,14 +25,14 @@
 @end
 
 @implementation AEAudioFilePlayer
-@synthesize url = _url, loop=_loop, volume=_volume, pan=_pan, playing=_playing, muted=_muted, removeUponFinish=_removeUponFinish, completionBlock = _completionBlock;
+@synthesize url = _url, loop=_loop, volume=_volume, pan=_pan, channelIsPlaying=_channelIsPlaying, channelIsMuted=_channelIsMuted, removeUponFinish=_removeUponFinish, completionBlock = _completionBlock;
 @dynamic duration, currentTime;
 
 + (id)audioFilePlayerWithURL:(NSURL*)url audioController:(AEAudioController *)audioController error:(NSError **)error {
     
     AEAudioFilePlayer *player = [[[AEAudioFilePlayer alloc] init] autorelease];
     player->_volume = 1.0;
-    player->_playing = YES;
+    player->_channelIsPlaying = YES;
     player->_audioDescription = audioController.audioDescription;
     player.url = url;
     
@@ -85,7 +85,7 @@
 
 static void notifyPlaybackStopped(AEAudioController *audioController, void *userInfo, int length) {
     AEAudioFilePlayer *THIS = *(AEAudioFilePlayer**)userInfo;
-    THIS.playing = NO;
+    THIS.channelIsPlaying = NO;
 
     if ( THIS->_removeUponFinish ) {
         [audioController removeChannels:[NSArray arrayWithObject:THIS]];
@@ -100,12 +100,12 @@ static OSStatus renderCallback(AEAudioFilePlayer *THIS, AEAudioController *audio
     int32_t playhead = THIS->_playhead;
     int32_t originalPlayhead = playhead;
     
-    if ( !THIS->_playing ) return noErr;
+    if ( !THIS->_channelIsPlaying ) return noErr;
     
     if ( !THIS->_loop && playhead == THIS->_lengthInFrames ) {
         // Notify main thread that playback has finished
         AEAudioControllerSendAsynchronousMessageToMainThread(audioController, notifyPlaybackStopped, &THIS, sizeof(AEAudioFilePlayer*));
-        THIS->_playing = NO;
+        THIS->_channelIsPlaying = NO;
         return noErr;
     }
     
@@ -142,7 +142,7 @@ static OSStatus renderCallback(AEAudioFilePlayer *THIS, AEAudioController *audio
             } else {
                 // Notify main thread that playback has finished
                 AEAudioControllerSendAsynchronousMessageToMainThread(audioController, notifyPlaybackStopped, &THIS, sizeof(AEAudioFilePlayer*));
-                THIS->_playing = NO;
+                THIS->_channelIsPlaying = NO;
                 break;
             }
         }

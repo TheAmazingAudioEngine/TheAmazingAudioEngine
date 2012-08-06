@@ -120,7 +120,7 @@ typedef OSStatus (*AEAudioControllerRenderCallback) (id                        c
 @property (nonatomic, readonly) float pan;
 
 /*
- * Whether track is currently playing
+ * Whether channel is currently playing
  *
  *      If this is NO, then the track will be silenced and no further render callbacks
  *      will be performed until set to YES again.
@@ -128,17 +128,17 @@ typedef OSStatus (*AEAudioControllerRenderCallback) (id                        c
  *      Changes are tracked by Key-Value Observing, so be sure to send KVO notifications
  *      when the value changes (or use a readwrite property).
  */
-@property (nonatomic, readonly) BOOL playing;
+@property (nonatomic, readonly) BOOL channelIsPlaying;
 
 /*
- * Whether track is muted
+ * Whether channel is muted
  *
  *      If YES, track will be silenced, but render callbacks will continue to be performed.
  *      
  *      Changes are tracked by Key-Value Observing, so be sure to send KVO notifications
  *      when the value changes (or use a readwrite property).
  */
-@property (nonatomic, readonly) BOOL muted;
+@property (nonatomic, readonly) BOOL channelIsMuted;
 
 /*
  * The audio format for this channel

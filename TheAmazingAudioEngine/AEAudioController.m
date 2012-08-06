@@ -807,7 +807,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     NSArray *channels = [self channels];
     for ( NSObject *channel in channels ) {
-        for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", @"playing", @"muted", @"audioDescription", nil] ) {
+        for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", @"channelIsPlaying", @"channelIsMuted", @"audioDescription", nil] ) {
             [channel removeObserver:self forKeyPath:property];
         }
     }
@@ -887,7 +887,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         
         [channel retain];
         
-        for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", @"playing", @"muted", @"audioDescription", nil] ) {
+        for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", @"channelIsPlaying", @"channelIsMuted", @"audioDescription", nil] ) {
             [(NSObject*)channel addObserver:self forKeyPath:property options:0 context:NULL];
         }
         
@@ -896,10 +896,10 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         channelElement->type        = kChannelTypeChannel;
         channelElement->ptr         = channel.renderCallback;
         channelElement->userInfo    = channel;
-        channelElement->playing     = [channel respondsToSelector:@selector(playing)] ? channel.playing : YES;
+        channelElement->playing     = [channel respondsToSelector:@selector(channelIsPlaying)] ? channel.channelIsPlaying : YES;
         channelElement->volume      = [channel respondsToSelector:@selector(volume)] ? channel.volume : 1.0;
         channelElement->pan         = [channel respondsToSelector:@selector(pan)] ? channel.pan : 0.0;
-        channelElement->muted       = [channel respondsToSelector:@selector(muted)] ? channel.muted : NO;
+        channelElement->muted       = [channel respondsToSelector:@selector(channelIsMuted)] ? channel.channelIsMuted : NO;
         channelElement->audioDescription = [channel respondsToSelector:@selector(audioDescription)] ? channel.audioDescription : _audioDescription;
         channelElement->audioController = self;
     }
@@ -968,7 +968,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     // Finally, stop observing and release channels
     for ( NSObject *channel in channels ) {
-        for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", @"playing", @"muted", @"audioDescription", nil] ) {
+        for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", @"channelIsPlaying", @"channelIsMuted", @"audioDescription", nil] ) {
             [(NSObject*)channel removeObserver:self forKeyPath:property];
         }
     }
@@ -1922,9 +1922,9 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
             checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)");
         }
 
-    } else if ( [keyPath isEqualToString:@"playing"] ) {
-        channelElement->playing = channel.playing;
-        AudioUnitParameterValue value = channel.playing && (![channel respondsToSelector:@selector(muted)] || !channel.muted);
+    } else if ( [keyPath isEqualToString:@"channelIsPlaying"] ) {
+        channelElement->playing = channel.channelIsPlaying;
+        AudioUnitParameterValue value = channel.channelIsPlaying && (![channel respondsToSelector:@selector(channelIsMuted)] || !channel.channelIsMuted);
         
         if ( group->mixerAudioUnit ) {
             OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
@@ -1933,11 +1933,11 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
         
         group->channels[index].playing = value;
         
-    }  else if ( [keyPath isEqualToString:@"muted"] ) {
-        channelElement->muted = channel.muted;
+    }  else if ( [keyPath isEqualToString:@"channelIsMuted"] ) {
+        channelElement->muted = channel.channelIsMuted;
         
         if ( group->mixerAudioUnit ) {
-            AudioUnitParameterValue value = ([channel respondsToSelector:@selector(playing)] ? channel.playing : YES) && !channel.muted;
+            AudioUnitParameterValue value = ([channel respondsToSelector:@selector(channelIsPlaying)] ? channel.channelIsPlaying : YES) && !channel.channelIsMuted;
             OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
             checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
         }
