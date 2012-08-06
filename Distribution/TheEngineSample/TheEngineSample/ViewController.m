@@ -67,14 +67,14 @@
                                            audioController:_audioController
                                                      error:NULL];
     _loop1.volume = 1.0;
-    _loop1.muted = YES;
+    _loop1.channelIsMuted = YES;
     _loop1.loop = YES;
     
     self.loop2 = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Organ" withExtension:@"m4a"]
                                            audioController:_audioController
                                                      error:NULL];
     _loop2.volume = 1.0;
-    _loop2.muted = YES;
+    _loop2.channelIsMuted = YES;
     _loop2.loop = YES;
         
     [_audioController addChannels:[NSArray arrayWithObjects:_loop1, _loop2, nil]];
@@ -240,7 +240,7 @@
             switch ( indexPath.row ) {
                 case 0: {
                     cell.textLabel.text = @"Drums";
-                    ((UISwitch*)cell.accessoryView).on = !_loop1.muted;
+                    ((UISwitch*)cell.accessoryView).on = !_loop1.channelIsMuted;
                     slider.value = _loop1.volume;
                     [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(loop1SwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     [slider addTarget:self action:@selector(loop1VolumeChanged:) forControlEvents:UIControlEventValueChanged];
@@ -248,7 +248,7 @@
                 }
                 case 1: {
                     cell.textLabel.text = @"Organ";
-                    ((UISwitch*)cell.accessoryView).on = !_loop2.muted;
+                    ((UISwitch*)cell.accessoryView).on = !_loop2.channelIsMuted;
                     slider.value = _loop2.volume;
                     [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(loop2SwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     [slider addTarget:self action:@selector(loop2VolumeChanged:) forControlEvents:UIControlEventValueChanged];
@@ -306,7 +306,7 @@
 }
 
 - (void)loop1SwitchChanged:(UISwitch*)sender {
-    _loop1.muted = !sender.isOn;
+    _loop1.channelIsMuted = !sender.isOn;
 }
 
 - (void)loop1VolumeChanged:(UISlider*)sender {
@@ -314,7 +314,7 @@
 }
 
 - (void)loop2SwitchChanged:(UISwitch*)sender {
-    _loop2.muted = !sender.isOn;
+    _loop2.channelIsMuted = !sender.isOn;
 }
 
 - (void)loop2VolumeChanged:(UISlider*)sender {
