@@ -383,9 +383,9 @@
     } else {
         self.recorder = [[[AERecorder alloc] initWithAudioController:_audioController] autorelease];
         NSArray *documentsFolders = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-        NSString *path = [[documentsFolders objectAtIndex:0] stringByAppendingPathComponent:@"Recording.m4a"];
+        NSString *path = [[documentsFolders objectAtIndex:0] stringByAppendingPathComponent:@"Recording.aiff"];
         NSError *error = nil;
-        if ( ![_recorder beginRecordingToFileAtPath:path fileType:kAudioFileM4AType error:&error] ) {
+        if ( ![_recorder beginRecordingToFileAtPath:path fileType:kAudioFileAIFFType error:&error] ) {
             [[[[UIAlertView alloc] initWithTitle:@"Error" 
                                          message:[NSString stringWithFormat:@"Couldn't start recording: %@", [error localizedDescription]]
                                         delegate:nil
@@ -409,7 +409,7 @@
         _playButton.selected = NO;
     } else {
         NSArray *documentsFolders = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-        NSString *path = [[documentsFolders objectAtIndex:0] stringByAppendingPathComponent:@"Recording.m4a"];
+        NSString *path = [[documentsFolders objectAtIndex:0] stringByAppendingPathComponent:@"Recording.aiff"];
         
         if ( ![[NSFileManager defaultManager] fileExistsAtPath:path] ) return;
         

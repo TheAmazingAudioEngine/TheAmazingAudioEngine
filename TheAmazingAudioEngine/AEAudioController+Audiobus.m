@@ -39,4 +39,3 @@ __attribute__((weak)) NSTimeInterval ABOutputPortGetAverageLatency(ABOutputPort 
 }
 
 __attribute__((weak)) NSString * ABConnectionsChangedNotification = @"ABConnectionsChangedNotification";
-__attribute__((weak)) NSString * ABIsAllowedToUseRecordCategoryKey = @"isAllowedToUseRecordCategory";

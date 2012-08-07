@@ -469,10 +469,9 @@ typedef void (*AEAudioControllerMessageHandler)(AEAudioController *audioControll
  *
  * @param audioDescription    Audio description to use for all audio
  * @param enableInput         Whether to enable audio input from the microphone or another input device
- * @param inputStartsEnabled  Whether to enable audio input straight away. Set to NO if you intend to use audio input at some time after your app has started.
  * @param useVoiceProcessing  Whether to use the voice processing unit (see @link voiceProcessingEnabled @endlink and @link voiceProcessingAvailable @endlink).
  */
-- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput inputStartsEnabled:(BOOL)inputStartsEnabled useVoiceProcessing:(BOOL)useVoiceProcessing;
+- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing;
 
 /*!
  * Start audio engine
@@ -1006,18 +1005,6 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
 
 ///@}
 #pragma mark - Properties
-
-/*!
- * Enable audio input
- *
- *      Set to YES to enable recording from an input device.
- *
- *      Note that setting this parameter will cause the entire audio system to be shut down and 
- *      restarted with the new setting, which will result in a break in audio playback.
- *
- *      Default is NO.
- */
-@property (nonatomic, assign) BOOL enableInput;
 
 /*! 
  * Mute output

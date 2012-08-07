@@ -13,7 +13,6 @@
 @class ABPort;
 
 extern NSString * ABConnectionsChangedNotification;
-extern NSString * ABIsAllowedToUseRecordCategoryKey;
 
 #define ABMetadataBlockList void*
 typedef NSUInteger ABInputPortAttributes;
@@ -30,7 +29,6 @@ typedef void (^ABInputPortAudioInputBlock)(ABInputPort *inputPort, UInt32 length
 - (void)setClientFormat:(AudioStreamBasicDescription)clientFormat;
 - (void)setAudioInputBlock:(ABInputPortAudioInputBlock)audioInputBlock;
 - (void)setConnectedPortAttributes:(NSInteger)connectedPortAttributes;
-- (BOOL)isAllowedToUseRecordCategory;
 @end
 
 enum {
