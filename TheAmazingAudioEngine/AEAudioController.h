@@ -1010,8 +1010,8 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  * Audio session category to use
  *
  *      See discussion at http://developer.apple.com/library/ios/#documentation/Audio/Conceptual/AudioSessionProgrammingGuide/AudioSessionCategories/AudioSessionCategories.html
- *      The default value is kAudioSessionCategory_MediaPlayback with mixing with other apps enabled. This
- *      allows playback and recording, without causing any interruptions to other apps.
+ *      The default value is kAudioSessionCategory_PlayAndRecord if audio input is enabled, or 
+ *      kAudioSessionCategory_MediaPlayback otherwise, with mixing with other apps enabled.
  */
 @property (nonatomic, assign) UInt32 audioSessionCategory;
 

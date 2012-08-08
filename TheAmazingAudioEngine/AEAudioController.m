@@ -735,7 +735,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     NSAssert(audioDescription.mChannelsPerFrame <= 2, @"Only mono or stereo audio supported");
     NSAssert(audioDescription.mFormatID == kAudioFormatLinearPCM, @"Only linear PCM supported");
 
-    _audioSessionCategory = kAudioSessionCategory_MediaPlayback;
+    _audioSessionCategory = enableInput ? kAudioSessionCategory_PlayAndRecord : kAudioSessionCategory_MediaPlayback;
     _audioDescription = audioDescription;
     _inputAudioDescription = audioDescription;
     _inputEnabled = enableInput;
@@ -1621,6 +1621,15 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 #pragma mark - Setters, getters
 
 -(void)setAudioSessionCategory:(UInt32)audioSessionCategory {
+    NSLog(@"TAAE: Setting audio session category to %@",
+          audioSessionCategory == kAudioSessionCategory_MediaPlayback ? @"MediaPlayback":
+          audioSessionCategory == kAudioSessionCategory_PlayAndRecord ? @"PlayAndRecord":
+          audioSessionCategory == kAudioSessionCategory_LiveAudio ? @"LiveAudio":
+          audioSessionCategory == kAudioSessionCategory_RecordAudio ? @"RecordAudio":
+          audioSessionCategory == kAudioSessionCategory_AmbientSound ? @"AmbientSound":
+          audioSessionCategory == kAudioSessionCategory_SoloAmbientSound ? @"SoloAmbientSound":
+          @"(other)");
+    
     _audioSessionCategory = audioSessionCategory;
     UInt32 category = _audioSessionCategory;
     checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof(category), &category),
@@ -1972,14 +1981,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     _audioInputAvailable = inputAvailable;
     
     // Set category
-    UInt32 category = _audioSessionCategory;
-    checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof(category), &category),
-                "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory)");
-    if ( category == kAudioSessionCategory_MediaPlayback || category == kAudioSessionCategory_PlayAndRecord ) {
-        UInt32 allowMixing = YES;
-        checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing),
-                    "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
-    }
+    [self setAudioSessionCategory:_audioSessionCategory];
     
     // Start session
     checkResult(AudioSessionSetActive(true), "AudioSessionSetActive");
@@ -2294,10 +2296,7 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
                 AudioSessionGetProperty(kAudioSessionProperty_AudioCategory, &size, &originalAudioCategory);
                 
                 // Switch to play and record to get access to input info
-                UInt32 category = kAudioSessionCategory_PlayAndRecord;
-                checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof (category), &category), "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory");
-                UInt32 allowMixing = YES;
-                checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing), "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
+                self.audioSessionCategory = kAudioSessionCategory_PlayAndRecord;
                 
                 // Check channels on input
                 OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &numberOfInputChannels);
@@ -2306,10 +2305,7 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
                 }
                 
                 // Switch back to other category
-                checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof(originalAudioCategory), &originalAudioCategory), "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory");
-                if ( originalAudioCategory == kAudioSessionCategory_PlayAndRecord ) {
-                    checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing), "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
-                }
+                self.audioSessionCategory = originalAudioCategory;
             } else if ( !checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels)") ) {
                 numberOfInputChannels = _audioDescription.mChannelsPerFrame;
             }
