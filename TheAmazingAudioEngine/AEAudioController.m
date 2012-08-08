@@ -260,7 +260,8 @@ static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferLi
 @end
 
 @implementation AEAudioController
-@synthesize audioInputAvailable         = _audioInputAvailable, 
+@synthesize audioSessionCategory        = _audioSessionCategory,
+            audioInputAvailable         = _audioInputAvailable,
             numberOfInputChannels       = _numberOfInputChannels, 
             muteOutput                  = _muteOutput,
             enableBluetoothInput        = _enableBluetoothInput,
@@ -734,6 +735,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     NSAssert(audioDescription.mChannelsPerFrame <= 2, @"Only mono or stereo audio supported");
     NSAssert(audioDescription.mFormatID == kAudioFormatLinearPCM, @"Only linear PCM supported");
 
+    _audioSessionCategory = kAudioSessionCategory_MediaPlayback;
     _audioDescription = audioDescription;
     _inputAudioDescription = audioDescription;
     _inputEnabled = enableInput;
@@ -1618,6 +1620,18 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 
 #pragma mark - Setters, getters
 
+-(void)setAudioSessionCategory:(UInt32)audioSessionCategory {
+    _audioSessionCategory = audioSessionCategory;
+    UInt32 category = _audioSessionCategory;
+    checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof(category), &category),
+                "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory)");
+    if ( category == kAudioSessionCategory_MediaPlayback || category == kAudioSessionCategory_PlayAndRecord ) {
+        UInt32 allowMixing = YES;
+        checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing),
+                    "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
+    }
+}
+
 - (BOOL)running {
     if ( !_audioGraph ) return NO;
     
@@ -1957,14 +1971,16 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     }
     _audioInputAvailable = inputAvailable;
     
-    // Set MediaPlayback category (note: this works with recording as well)
-    UInt32 category = kAudioSessionCategory_MediaPlayback;
+    // Set category
+    UInt32 category = _audioSessionCategory;
     checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof(category), &category),
-                "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, kAudioSessionCategory_MediaPlayback)");
-    UInt32 allowMixing = YES;
-    checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing),
-                "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
-
+                "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory)");
+    if ( category == kAudioSessionCategory_MediaPlayback || category == kAudioSessionCategory_PlayAndRecord ) {
+        UInt32 allowMixing = YES;
+        checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing),
+                    "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
+    }
+    
     // Start session
     checkResult(AudioSessionSetActive(true), "AudioSessionSetActive");
     
