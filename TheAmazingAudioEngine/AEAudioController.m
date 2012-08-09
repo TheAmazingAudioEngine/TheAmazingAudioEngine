@@ -334,6 +334,12 @@ static void audioSessionPropertyListener(void *inClientData, AudioSessionPropert
             UInt32 newRoute = kAudioSessionOverrideAudioRoute_Speaker;
             checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute,  sizeof(route), &newRoute), "AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute)");
             
+            if ( THIS->_audioSessionCategory == kAudioSessionCategory_MediaPlayback || THIS->_audioSessionCategory == kAudioSessionCategory_PlayAndRecord ) {
+                UInt32 allowMixing = YES;
+                checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing),
+                            "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
+            }
+            
             checkResult(AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, THIS), "AudioSessionAddPropertyListener");
             
             playingThroughSpeaker = YES;
@@ -1638,6 +1644,18 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
     UInt32 category = _audioSessionCategory;
     checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof(category), &category),
                 "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory)");
+    
+    if ( category == kAudioSessionCategory_PlayAndRecord ) {
+        UInt32 toSpeaker = YES;
+        checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryDefaultToSpeaker, sizeof (toSpeaker), &toSpeaker), "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryDefaultToSpeaker)");
+    }
+    
+    if ( category == kAudioSessionCategory_PlayAndRecord || category == kAudioSessionCategory_RecordAudio ) {
+        UInt32 allowBluetoothInput = _enableBluetoothInput;
+        OSStatus result = AudioSessionSetProperty (kAudioSessionProperty_OverrideCategoryEnableBluetoothInput, sizeof (allowBluetoothInput), &allowBluetoothInput);
+        checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryEnableBluetoothInput)");
+    }
+    
     if ( category == kAudioSessionCategory_MediaPlayback || category == kAudioSessionCategory_PlayAndRecord ) {
         UInt32 allowMixing = YES;
         checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing),
@@ -1656,10 +1674,18 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 -(void)setEnableBluetoothInput:(BOOL)enableBluetoothInput {
     _enableBluetoothInput = enableBluetoothInput;
 
-    // Enable/disable bluetooth input
-    UInt32 allowBluetoothInput = _enableBluetoothInput;
-    OSStatus result = AudioSessionSetProperty (kAudioSessionProperty_OverrideCategoryEnableBluetoothInput, sizeof (allowBluetoothInput), &allowBluetoothInput);
-    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryEnableBluetoothInput)");
+    if ( _audioSessionCategory == kAudioSessionCategory_PlayAndRecord || _audioSessionCategory == kAudioSessionCategory_RecordAudio ) {
+        // Enable/disable bluetooth input
+        UInt32 allowBluetoothInput = _enableBluetoothInput;
+        OSStatus result = AudioSessionSetProperty (kAudioSessionProperty_OverrideCategoryEnableBluetoothInput, sizeof (allowBluetoothInput), &allowBluetoothInput);
+        checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryEnableBluetoothInput)");
+    }
+    
+    if ( _audioSessionCategory == kAudioSessionCategory_MediaPlayback || _audioSessionCategory == kAudioSessionCategory_PlayAndRecord ) {
+        UInt32 allowMixing = YES;
+        checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing),
+                    "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
+    }
 }
 
 -(NSString*)audioRoute {
@@ -2006,6 +2032,12 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
             UInt32 newRoute = kAudioSessionOverrideAudioRoute_Speaker;
             checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute,  sizeof(route), &newRoute), 
                         "AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute)");
+            
+            if ( _audioSessionCategory == kAudioSessionCategory_MediaPlayback || _audioSessionCategory == kAudioSessionCategory_PlayAndRecord ) {
+                UInt32 allowMixing = YES;
+                checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing),
+                            "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
+            }
             
             checkResult(AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, self),
                         "AudioSessionAddPropertyListener");
