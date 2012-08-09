@@ -1563,21 +1563,25 @@ static BOOL AEAudioControllerHasPendingMainThreadMessages(AEAudioController *THI
 
 - (void)averagePowerLevel:(Float32*)averagePower peakHoldLevel:(Float32*)peakLevel forGroup:(AEChannelGroupRef)group {
     if ( !group->level_monitor_data.monitoringEnabled ) {
-        group->level_monitor_data.scratchBuffer = malloc(kLevelMonitorScratchBufferSize);
-        OSMemoryBarrier();
-        group->level_monitor_data.monitoringEnabled = YES;
-        
-        AEChannelGroupRef parentGroup = NULL;
-        int index=0;
-        if ( group != _topGroup ) {
-            parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
-            NSAssert(parentGroup != NULL, @"Channel group not found");
-        }
-        
-        BOOL updateRequired = NO;
-        configureGraphStateOfGroupChannel(self, group->channel, parentGroup, index, &updateRequired);
-        if ( updateRequired ) {
-            checkResult([self updateGraph], "AUGraphUpdate");
+        if ( ![NSThread isMainThread] ) {
+            dispatch_async(dispatch_get_main_queue(), ^{ [self averagePowerLevel:NULL peakHoldLevel:NULL forGroup:group]; });
+        } else {
+            group->level_monitor_data.scratchBuffer = malloc(kLevelMonitorScratchBufferSize);
+            OSMemoryBarrier();
+            group->level_monitor_data.monitoringEnabled = YES;
+            
+            AEChannelGroupRef parentGroup = NULL;
+            int index=0;
+            if ( group != _topGroup ) {
+                parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
+                NSAssert(parentGroup != NULL, @"Channel group not found");
+            }
+            
+            BOOL updateRequired = NO;
+            configureGraphStateOfGroupChannel(self, group->channel, parentGroup, index, &updateRequired);
+            if ( updateRequired ) {
+                checkResult([self updateGraph], "AUGraphUpdate");
+            }
         }
     }
     
