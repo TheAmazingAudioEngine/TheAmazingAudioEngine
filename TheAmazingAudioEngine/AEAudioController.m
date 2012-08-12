@@ -722,8 +722,8 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         free(machine);
     }
     
-    // These devices aren't fast enough to do low latency audio
-    NSArray *badDevices = [NSArray arrayWithObjects:@"iPhone1,2", @"iPod1,1", @"iPod2,1", @"iPod3,1", nil];
+    // These devices aren't fast enough to do voice processing effectively
+    NSArray *badDevices = [NSArray arrayWithObjects:@"iPhone1,1", @"iPhone1,2", @"iPhone2,1", @"iPod1,1", @"iPod2,1", @"iPod3,1", nil];
     return ![badDevices containsObject:platform];
 }
 
