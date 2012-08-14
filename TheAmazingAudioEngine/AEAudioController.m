@@ -2050,6 +2050,8 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
         }
     }
     
+    CFRelease(route);
+    
     NSLog(@"TAAE: Audio session initialized (%@)", extraInfo);
 }
 
