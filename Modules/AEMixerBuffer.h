@@ -118,9 +118,9 @@ void AEMixerBufferEnqueue(AEMixerBuffer *mixerBuffer, AEMixerBufferSource source
  *                          number of frames.
  * @param ioLengthInFrames  On input, the number of frames of audio to dequeue. On output, 
  *                          the number of frames returned.
- * @param outTimestamp      On output, the timestamp of the first audio sample
+ * @param outHostTime       On output, the timestamp of the first audio sample
  */
-void AEMixerBufferDequeue(AEMixerBuffer *mixerBuffer, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, uint64_t *outTimestamp);
+void AEMixerBufferDequeue(AEMixerBuffer *mixerBuffer, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, uint64_t *outHostTime);
 
 /*!
  * Dequeue a single source
@@ -137,9 +137,9 @@ void AEMixerBufferDequeue(AEMixerBuffer *mixerBuffer, AudioBufferList *bufferLis
  *                          may be NULL, in which case an internal buffer will be provided.
  * @param ioLengthInFrames  On input, the number of frames of audio to dequeue. On output, 
  *                          the number of frames returned.
- * @param outTimestamp      On output, the timestamp of the first audio sample
+ * @param outHostTime       On output, the timestamp of the first audio sample
  */
-void AEMixerBufferDequeueSingleSource(AEMixerBuffer *mixerBuffer, AEMixerBufferSource source, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, uint64_t *outTimestamp);
+void AEMixerBufferDequeueSingleSource(AEMixerBuffer *mixerBuffer, AEMixerBufferSource source, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, uint64_t *outHostTime);
 
 /*!
  * Peek the audio buffer

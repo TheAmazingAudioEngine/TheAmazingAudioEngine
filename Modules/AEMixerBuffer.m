@@ -11,7 +11,6 @@
 #import "TPCircularBuffer+AudioBufferList.h"
 #import <libkern/OSAtomic.h>
 #import <mach/mach_time.h>
-#import <pthread.h>
 #import <Accelerate/Accelerate.h>
 
 static double __hostTicksToSeconds = 0.0;
@@ -217,7 +216,7 @@ static OSStatus fillComplexBufferInputProc(AudioConverterRef             inAudio
     return noErr;
 }
 
-void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, uint64_t *outTimestamp) {
+void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, uint64_t *outHostTime) {
     if ( !THIS->_graphReady ) {
         *ioLengthInFrames = 0;
         return;
@@ -248,7 +247,7 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
         // Just consume frames
         for ( int i=0; i<kMaxSources; i++ ) {
             if ( THIS->_table[i].source ) {
-                AEMixerBufferDequeueSingleSource(THIS, THIS->_table[i].source, NULL, ioLengthInFrames, outTimestamp);
+                AEMixerBufferDequeueSingleSource(THIS, THIS->_table[i].source, NULL, ioLengthInFrames, outHostTime);
             }
         }
         // Reset time slice info
@@ -275,7 +274,7 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
     
     if ( numberOfSources == 1 && memcmp(&firstSourceEntry->audioDescription, &THIS->_clientFormat, sizeof(AudioStreamBasicDescription)) == 0 ) {
         // Just one source, with the same audio format - pull straight from it
-        AEMixerBufferDequeueSingleSource(THIS, firstSource, bufferList, ioLengthInFrames, outTimestamp);
+        AEMixerBufferDequeueSingleSource(THIS, firstSource, bufferList, ioLengthInFrames, outHostTime);
         // Reset time slice info
         THIS->_currentSliceFrameCount = 0;
         THIS->_currentSliceTimestamp = kNoValue;
@@ -285,7 +284,7 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
         return;
     }
     
-    if ( outTimestamp ) *outTimestamp = THIS->_currentSliceTimestamp;
+    if ( outHostTime ) *outHostTime = THIS->_currentSliceTimestamp;
     
     // We'll advance the buffer list pointers as we add audio - save the originals to restore later
     void *savedmData[2] = { bufferList ? bufferList->mBuffers[0].mData : NULL, bufferList && bufferList->mNumberBuffers == 2 ? bufferList->mBuffers[1].mData : NULL };
@@ -380,7 +379,7 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
 }
 
 
-void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource sourceID, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, uint64_t *outTimestamp) {
+void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource sourceID, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, uint64_t *outHostTime) {
     source_t *source = sourceWithID(THIS, sourceID, NULL);
     
     uint64_t sliceTimestamp = THIS->_currentSliceTimestamp;
@@ -409,7 +408,7 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
         if ( sourceFrameCount > sliceFrameCount ) sourceFrameCount = sliceFrameCount;
     }
     
-    if ( outTimestamp ) *outTimestamp = sourceTimestamp;
+    if ( outHostTime ) *outHostTime = sourceTimestamp;
 
     *ioLengthInFrames = MIN(*ioLengthInFrames, sliceFrameCount);
     
