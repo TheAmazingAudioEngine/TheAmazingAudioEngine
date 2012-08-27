@@ -14,15 +14,6 @@
 static double __hostTicksToSeconds = 0.0;
 static double __secondsToHostTicks = 0.0;
 
-#define checkResult(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/')+1,__LINE__))
-static inline BOOL _checkResult(OSStatus result, const char *operation, const char* file, int line) {
-    if ( result != noErr ) {
-        NSLog(@"%s:%d: %s result %d %08X %4.4s\n", file, line, operation, (int)result, (int)result, (char*)&result); 
-        return NO;
-    }
-    return YES;
-}
-
 typedef enum {
     kStateClosed,
     kStateOpening,
@@ -31,8 +22,10 @@ typedef enum {
 } AEExpanderFilterState;
 
 static inline int min(int a, int b) { return (a>b ? b : a); }
+static inline double ratio_from_db(float db) { return pow(10.0, db / 10.0); };
+static inline double db_from_ratio(float value) { return 10.0 * log10(value); };
+static inline double db_from_value(UInt16 value) { return db_from_ratio((double)value / INT16_MAX); };
 
-#define AEExpanderFilterPresetNone -1
 #define kScratchBufferSize 8192
 #define kCalibrationTime 2.0
 #define kCalibrationThresholdOffset 3.0 // dB
@@ -47,14 +40,14 @@ typedef void (^AECalibrateCompletionBlock)(void);
     int          _configuredChannels;
     UInt16       _threshold;
     UInt16       _offThreshold;
-    float        _hysteresis_db;
+    double       _thresholdOffset;
+    double       _hysteresis_db;
     AEExpanderFilterPreset _preset;
     float        _multiplier;
     AEExpanderFilterState  _state;
     int          _calibrationMaxValue;
     uint64_t     _calibrationStartTime;
 }
-- (int)thresholdOffsetForPreset:(int)preset;
 
 @property (nonatomic, copy) AECalibrateCompletionBlock calibrateCompletionBlock;
 @end
@@ -93,12 +86,12 @@ typedef void (^AECalibrateCompletionBlock)(void);
 }
 
 - (void)assignPreset:(AEExpanderFilterPreset)preset {
-    int lastPreset = _preset;
-    
+    _preset = preset;
     switch ( _preset ) {
         case AEExpanderFilterPresetSmooth:
             _ratio = 1.0/3.0;
             _hysteresis_db = 5.0;
+            _thresholdOffset = ratio_from_db(10);
             self.attack = 0.005;
             self.decay = 0.05;
             break;
@@ -106,6 +99,7 @@ typedef void (^AECalibrateCompletionBlock)(void);
         case AEExpanderFilterPresetMedium:
             _ratio = 1.0/8.0;
             _hysteresis_db = 5.0;
+            _thresholdOffset = ratio_from_db(0);
             self.attack = 0.005;
             self.decay = 0.1;
             break;
@@ -113,13 +107,15 @@ typedef void (^AECalibrateCompletionBlock)(void);
         case AEExpanderFilterPresetPercussive:
             _ratio = AEExpanderFilterRatioGateMode;
             _hysteresis_db = 5.0;
+            _thresholdOffset = ratio_from_db(0);
             self.attack = 0.001;
             self.decay = 0.175;
             break;
+            
+        case AEExpanderFilterPresetNone:
+            _thresholdOffset = ratio_from_db(0);
+            break;
     }
-    
-    _preset = preset;
-    self.threshold = min(kMaxAutoThreshold, self.threshold - [self thresholdOffsetForPreset:lastPreset] + [self thresholdOffsetForPreset:_preset]);
 }
 
 - (void)startCalibratingWithCompletionBlock:(void (^)(void))block {
@@ -145,34 +141,28 @@ typedef void (^AECalibrateCompletionBlock)(void);
 }
 
 -(void)setThreshold:(double)threshold {
-    _threshold = pow(10.0, threshold / 10.0) * INT16_MAX;
-    _offThreshold = pow(10.0, (threshold - _hysteresis_db) / 10.0) * INT16_MAX;
+    _thresholdOffset = ratio_from_db(0);
+    _threshold = ratio_from_db(threshold) * INT16_MAX;
+    _offThreshold = ratio_from_db(threshold - _hysteresis_db) * INT16_MAX;
 }
 
 -(double)threshold {
-    return 10.0 * log10((double)_threshold / INT16_MAX);
+    double value = db_from_value(_threshold);
+    if ( _thresholdOffset != 1.0 ) {
+        value = MIN(kMaxAutoThreshold, value + db_from_ratio(_thresholdOffset));
+    }
+    return value;
 }
 
 -(void)setHysteresis:(double)hysteresis {
     _hysteresis_db = hysteresis;
-    _offThreshold = pow(10.0, (self.threshold - _hysteresis_db) / 10.0) * INT16_MAX;
+    double threshold = db_from_value(_threshold);
+    _offThreshold = ratio_from_db(threshold - _hysteresis_db) * INT16_MAX;
     _preset = AEExpanderFilterPresetNone;
 }
 
 -(double)hysteresis {
     return _hysteresis_db;
-}
-
-- (int)thresholdOffsetForPreset:(int)preset {
-    switch ( preset ) {
-        case AEExpanderFilterPresetSmooth:
-            return 10.0;
-            break;
-            
-        default:
-            return 0.0;
-            break;
-    }
 }
 
 struct reconfigureChannels_t { AEExpanderFilter *filter; int numberOfChannels; };
@@ -193,8 +183,11 @@ static void reconfigureChannels(AEAudioController *audioController, void *userIn
 
 static void completeCalibration(AEAudioController *audioController, void *userInfo, int len) {
     AEExpanderFilter *THIS = *(AEExpanderFilter**)userInfo;
-    THIS->_threshold = min(THIS->_calibrationMaxValue + kCalibrationThresholdOffset + [THIS thresholdOffsetForPreset:THIS->_preset],
-                           pow(10.0, kMaxAutoThreshold / 10.0) * INT16_MAX);
+    THIS->_threshold = min((THIS->_calibrationMaxValue + kCalibrationThresholdOffset),
+                           ratio_from_db(kMaxAutoThreshold) * INT16_MAX) * THIS->_thresholdOffset;
+    double threshold_db = db_from_value(THIS->_threshold);
+    THIS->_offThreshold = ratio_from_db(threshold_db - THIS->_hysteresis_db) * INT16_MAX;
+    
     THIS->_calibrateCompletionBlock();
     [THIS->_calibrateCompletionBlock release];
     THIS->_calibrateCompletionBlock = nil;
@@ -244,14 +237,14 @@ static void filterCallback(id                        receiver,
     switch ( THIS->_state ) {
         case kStateClosed:
         case kStateClosing:
-            if ( max > THIS->_threshold ) {
+            if ( max > THIS->_threshold / THIS->_thresholdOffset ) {
                 THIS->_state = kStateOpening;
             }
             break;
             
         case kStateOpen:
         case kStateOpening:
-            if ( max < THIS->_offThreshold ) {
+            if ( max < THIS->_offThreshold / THIS->_thresholdOffset ) {
                 THIS->_state = kStateClosing;
             }
             break;
