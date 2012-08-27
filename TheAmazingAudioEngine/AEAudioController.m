@@ -320,7 +320,7 @@ static void audioSessionPropertyListener(void *inClientData, AudioSessionPropert
     if (inID == kAudioSessionProperty_AudioRouteChange) {
         int reason = [[(NSDictionary*)inData objectForKey:[NSString stringWithCString:kAudioSession_AudioRouteChangeKey_Reason encoding:NSUTF8StringEncoding]] intValue];
         
-        CFStringRef route;
+        CFStringRef route = NULL;
         UInt32 size = sizeof(route);
         if ( !checkResult(AudioSessionGetProperty(kAudioSessionProperty_AudioRoute, &size, &route), "AudioSessionGetProperty(kAudioSessionProperty_AudioRoute)") ) return;
         
@@ -1524,7 +1524,7 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
         @autoreleasepool {
             [self pollForMainThreadMessages];
             if ( finished ) break;
-            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:_preferredBufferDuration]];
+            [NSThread sleepForTimeInterval:_preferredBufferDuration];
         }
     }
     
@@ -3225,10 +3225,10 @@ static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferLi
 - (id)initWithAudioController:(AEAudioController *)audioController {
     if ( !(self = [super init]) ) return nil;
     _audioController = audioController;
-    self.name = @"com.theamazingaudioengine.AEAudioControllerMessagePollThread";
     return self;
 }
 -(void)main {
+    pthread_setname_np("com.theamazingaudioengine.AEAudioControllerMessagePollThread");
     while ( ![self isCancelled] ) {
         if ( AEAudioControllerHasPendingMainThreadMessages(_audioController) ) {
             [_audioController performSelectorOnMainThread:@selector(pollForMainThreadMessages) withObject:nil waitUntilDone:YES];
