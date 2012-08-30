@@ -12,13 +12,13 @@
 #import <libkern/OSAtomic.h>
 #import <mach/mach_time.h>
 #import <Accelerate/Accelerate.h>
+#import <pthread.h>
 
 static double __hostTicksToSeconds = 0.0;
 static double __secondsToHostTicks = 0.0;
 
-#define checkResult(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/')+1,__LINE__,_cmd))
-#define checkResultC(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/')+1,__LINE__,NULL))
-static inline BOOL _checkResult(OSStatus result, const char *operation, const char* file, int line, SEL _cmd) {
+#define checkResult(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/')+1,__LINE__))
+static inline BOOL _checkResult(OSStatus result, const char *operation, const char* file, int line) {
     if ( result != noErr ) {
         NSLog(@"%s:%d: %s result %d %08X %4.4s\n", file, line, operation, (int)result, (int)result, (char*)&result); 
         return NO;
@@ -332,7 +332,7 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
         audioTimestamp.mSampleTime = THIS->_currentSliceSampleTime;
         
         OSStatus result = AudioUnitRender(THIS->_mixerUnit, &flags, &audioTimestamp, 0, frames, intermediateBufferList);
-        if ( !checkResultC(result, "AudioUnitRender") ) {
+        if ( !checkResult(result, "AudioUnitRender") ) {
             break;
         }
         
@@ -348,7 +348,7 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
                                                               &frames, 
                                                               bufferList, 
                                                               NULL);
-            if ( !checkResultC(result, "AudioConverterConvertComplexBuffer") ) {
+            if ( !checkResult(result, "AudioConverterConvertComplexBuffer") ) {
                 break;
             }
         }

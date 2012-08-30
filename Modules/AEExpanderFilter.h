@@ -12,9 +12,10 @@
 #define AEExpanderFilterRatioGateMode 0
 
 typedef enum {
-    AEExpanderFilterPresetSmooth,
-    AEExpanderFilterPresetMedium,
-    AEExpanderFilterPresetPercussive
+    AEExpanderFilterPresetNone=-1,
+    AEExpanderFilterPresetSmooth=0,
+    AEExpanderFilterPresetMedium=1,
+    AEExpanderFilterPresetPercussive=2
 } AEExpanderFilterPreset;
 
 @interface AEExpanderFilter : NSObject <AEAudioFilter>
