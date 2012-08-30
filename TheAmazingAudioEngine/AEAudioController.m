@@ -171,6 +171,7 @@ typedef struct _message_t {
     void                            (^responseBlock)();
     void                           *userInfoByReference;
     int                             userInfoLength;
+    pthread_t                       sourceThread;
 } message_t;
 
 #pragma mark -
@@ -215,7 +216,7 @@ typedef struct _message_t {
     audio_level_monitor_t _inputLevelMonitorData;
 }
 
-- (void)pollForMainThreadMessages;
+- (void)pollForMessageResponses;
 static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS);
 
 - (void)initAudioSession;
@@ -1408,19 +1409,30 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
     }
 }
 
--(void)pollForMainThreadMessages {
-    NSAssert([NSThread isMainThread], @"Must be called on main thread");
+-(void)pollForMessageResponses {
+    pthread_t thread = pthread_self();
     while ( 1 ) {
-        int32_t availableBytes;
-        message_t *buffer = TPCircularBufferTail(&_mainThreadMessageBuffer, &availableBytes);
-        if ( !buffer ) break;
+        message_t *message = NULL;
+        @synchronized ( self ) {
+            int32_t availableBytes;
+            message_t *buffer = TPCircularBufferTail(&_mainThreadMessageBuffer, &availableBytes);
+            if ( !buffer ) break;
+            
+            if ( buffer->sourceThread && buffer->sourceThread != thread ) break;
+            
+            int messageLength = sizeof(message_t) + (buffer->userInfoLength && !buffer->userInfoByReference ? buffer->userInfoLength : 0);
+            message = malloc(messageLength);
+            memcpy(message, buffer, messageLength);
+            
+            TPCircularBufferConsume(&_mainThreadMessageBuffer, messageLength);
+            
+            _pendingResponses--;
+            
+            if ( _pollThread && _pendingResponses == 0 ) {
+                _pollThread.pollInterval = kIdleMessagingPollDuration;
+            }
+        }
         
-        int messageLength = sizeof(message_t) + (buffer->userInfoLength && !buffer->userInfoByReference ? buffer->userInfoLength : 0);
-        message_t *message = malloc(messageLength);
-        memcpy(message, buffer, messageLength);
-        
-        TPCircularBufferConsume(&_mainThreadMessageBuffer, messageLength);
-    
         if ( message->responseBlock ) {
             message->responseBlock(message->userInfoLength > 0
                                    ? (message->userInfoByReference ? message->userInfoByReference : message+1) 
@@ -1436,12 +1448,6 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
         }
         
         free(message);
-        
-        _pendingResponses--;
-        
-        if ( _pollThread && _pendingResponses == 0 ) {
-            _pollThread.pollInterval = kIdleMessagingPollDuration;
-        }
     }
 }
 
@@ -1449,53 +1455,56 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
                                         userInfoBytes:(void *)userInfo 
                                                length:(int)userInfoLength
                                         responseBlock:(void (^)(void *, int))responseBlock
-                                  userInfoByReference:(BOOL)userInfoByReference {
+                                  userInfoByReference:(BOOL)userInfoByReference
+                                         sourceThread:(pthread_t)sourceThread {
     
     if ( !userInfoByReference && userInfoLength > kMaxMessageDataSize ) {
         NSLog(@"Message data passed by value must be less than %d bytes (%d bytes provided)", kMaxMessageDataSize, userInfoLength);
         return;
     }
     
-    // Only perform on main thread
-    if ( ![NSThread isMainThread] ) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [self performAsynchronousMessageExchangeWithHandler:handler userInfoBytes:userInfo length:userInfoLength responseBlock:responseBlock userInfoByReference:userInfoByReference];
-        });
-        return;
-    }
-    
-    if ( responseBlock ) {
-        responseBlock = [responseBlock copy];
-        _pendingResponses++;
-        
-        if ( self.running && _pollThread.pollInterval == kIdleMessagingPollDuration ) {
-            // Perform more rapid active polling while we expect a response
-            _pollThread.pollInterval = _preferredBufferDuration;
+    @synchronized ( self ) {
+        if ( responseBlock ) {
+            responseBlock = [responseBlock copy];
+            _pendingResponses++;
+            
+            if ( self.running && _pollThread.pollInterval == kIdleMessagingPollDuration ) {
+                // Perform more rapid active polling while we expect a response
+                _pollThread.pollInterval = _preferredBufferDuration;
+            }
         }
-    }
-    
-    int32_t availableBytes;
-    message_t *message = TPCircularBufferHead(&_realtimeThreadMessageBuffer, &availableBytes);
-    assert(availableBytes >= sizeof(message_t) + (userInfoByReference ? 0 : userInfoLength));
-    
-    message->handler                = handler;
-    message->responseBlock          = responseBlock;
-    message->userInfoByReference    = userInfoByReference ? userInfo : NULL;
-    message->userInfoLength         = userInfoLength;
-    
-    if ( !userInfoByReference && userInfoLength > 0 ) {
-        memcpy((message+1), userInfo, userInfoLength);
-    }
-    
-    TPCircularBufferProduce(&_realtimeThreadMessageBuffer, sizeof(message_t) + (userInfoByReference ? 0 : userInfoLength));
-    
-    if ( !self.running ) {
-        processPendingMessagesOnRealtimeThread(self);
-        [self pollForMainThreadMessages];
+        
+        int32_t availableBytes;
+        message_t *message = TPCircularBufferHead(&_realtimeThreadMessageBuffer, &availableBytes);
+        assert(availableBytes >= sizeof(message_t) + (userInfoByReference ? 0 : userInfoLength));
+        
+        message->handler                = handler;
+        message->responseBlock          = responseBlock;
+        message->userInfoByReference    = userInfoByReference ? userInfo : NULL;
+        message->userInfoLength         = userInfoLength;
+        message->sourceThread           = sourceThread;
+        
+        if ( !userInfoByReference && userInfoLength > 0 ) {
+            memcpy((message+1), userInfo, userInfoLength);
+        }
+        
+        TPCircularBufferProduce(&_realtimeThreadMessageBuffer, sizeof(message_t) + (userInfoByReference ? 0 : userInfoLength));
+        
+        if ( !self.running ) {
+            if ( [NSThread isMainThread] ) {
+                processPendingMessagesOnRealtimeThread(self);
+                [self pollForMessageResponses];
+            } else {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    processPendingMessagesOnRealtimeThread(self);
+                    [self pollForMessageResponses];
+                });
+            }
+        }
     }
 }
 
-- (void)performAsynchronousMessageExchangeWithHandler:(AEAudioControllerMessageHandler)handler 
+- (void)performAsynchronousMessageExchangeWithHandler:(AEAudioControllerMessageHandler)handler
                                         userInfoBytes:(void *)userInfo 
                                                length:(int)userInfoLength
                                         responseBlock:(void (^)(void *, int))responseBlock {
@@ -1504,7 +1513,8 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
                                           userInfoBytes:userInfo 
                                                  length:userInfoLength 
                                           responseBlock:responseBlock
-                                    userInfoByReference:NO];
+                                    userInfoByReference:NO
+                                           sourceThread:NULL];
 }
 
 - (void)performSynchronousMessageExchangeWithHandler:(AEAudioControllerMessageHandler)handler 
@@ -1516,13 +1526,14 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
                                           userInfoBytes:userInfo 
                                                  length:userInfoLength 
                                           responseBlock:^(void * userInfo, int length){ finished = YES; }
-                                    userInfoByReference:YES];
+                                    userInfoByReference:YES
+                                           sourceThread:pthread_self()];
     
     // Wait for response
     uint64_t giveUpTime = mach_absolute_time() + (1.0 * __secondsToHostTicks);
     while ( !finished && mach_absolute_time() < giveUpTime ) {
         @autoreleasepool {
-            [self pollForMainThreadMessages];
+            [self pollForMessageResponses];
             if ( finished ) break;
             [NSThread sleepForTimeInterval:_preferredBufferDuration];
         }
@@ -1530,8 +1541,10 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
     
     if ( !finished ) {
         NSLog(@"TAAE: Timed out while performing message exchange");
-        processPendingMessagesOnRealtimeThread(self);
-        [self pollForMainThreadMessages];
+        @synchronized ( self ) {
+            processPendingMessagesOnRealtimeThread(self);
+            [self pollForMessageResponses];
+        }
     }
 }
 
@@ -3231,7 +3244,7 @@ static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferLi
     pthread_setname_np("com.theamazingaudioengine.AEAudioControllerMessagePollThread");
     while ( ![self isCancelled] ) {
         if ( AEAudioControllerHasPendingMainThreadMessages(_audioController) ) {
-            [_audioController performSelectorOnMainThread:@selector(pollForMainThreadMessages) withObject:nil waitUntilDone:YES];
+            [_audioController performSelectorOnMainThread:@selector(pollForMessageResponses) withObject:nil waitUntilDone:YES];
         }
         usleep(_pollInterval*1.0e6);
     }

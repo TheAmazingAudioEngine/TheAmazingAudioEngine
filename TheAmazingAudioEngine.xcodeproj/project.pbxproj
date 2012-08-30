@@ -35,25 +35,7 @@
 		4C215D131523A94200D36CAD /* AEAudioController.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CAD56801516281D003CE861 /* AEAudioController.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4C215D141523A94200D36CAD /* AEAudioFilePlayer.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CAD56A915163488003CE861 /* AEAudioFilePlayer.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4C215D151523A94200D36CAD /* AEUtilities.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C12CC98151D1EDA00562E2A /* AEUtilities.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		4C23242015AC5E2600038EC0 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C23241F15AC5E2600038EC0 /* UIKit.framework */; };
-		4C23242115AC5E2600038EC0 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C215CEE1523A7D500D36CAD /* Foundation.framework */; };
-		4C23242315AC5E2600038EC0 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C23242215AC5E2600038EC0 /* CoreGraphics.framework */; };
-		4C23243915AC5E5B00038EC0 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C23243415AC5E5B00038EC0 /* AppDelegate.m */; };
-		4C23243A15AC5E5B00038EC0 /* TPOscilloscopeLayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C23243615AC5E5B00038EC0 /* TPOscilloscopeLayer.m */; };
-		4C23243B15AC5E5B00038EC0 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C23243815AC5E5B00038EC0 /* ViewController.m */; };
-		4C23243F15AC5E6A00038EC0 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C23243C15AC5E6A00038EC0 /* main.m */; };
-		4C23244315AC5E7300038EC0 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 4C23244115AC5E7300038EC0 /* InfoPlist.strings */; };
-		4C23244B15AC5E8600038EC0 /* Icon-72.png in Resources */ = {isa = PBXBuildFile; fileRef = 4C23244515AC5E8600038EC0 /* Icon-72.png */; };
-		4C23244C15AC5E8600038EC0 /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 4C23244615AC5E8600038EC0 /* Icon.png */; };
-		4C23244D15AC5E8600038EC0 /* Icon@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 4C23244715AC5E8600038EC0 /* Icon@2x.png */; };
-		4C23244E15AC5E8600038EC0 /* Organ Run.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 4C23244815AC5E8600038EC0 /* Organ Run.m4a */; };
-		4C23244F15AC5E8600038EC0 /* Southern Rock Drums.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 4C23244915AC5E8600038EC0 /* Southern Rock Drums.m4a */; };
-		4C23245015AC5E8600038EC0 /* Southern Rock Organ.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 4C23244A15AC5E8600038EC0 /* Southern Rock Organ.m4a */; };
-		4C23245715AC5FDA00038EC0 /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C23245515AC5FDA00038EC0 /* Accelerate.framework */; };
-		4C23245815AC5FDA00038EC0 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C23245615AC5FDA00038EC0 /* AudioToolbox.framework */; };
-		4C23245A15AC5FE800038EC0 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C23245915AC5FE800038EC0 /* QuartzCore.framework */; };
 		4C23246315AC601D00038EC0 /* TPCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4CA689B61541F54200AF8DDD /* TPCircularBuffer.c */; };
-		4C23246415AC603100038EC0 /* libTheAmazingAudioEngineTrial.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C215CFD1523A83700D36CAD /* libTheAmazingAudioEngineTrial.a */; };
 		4C2886381556FC620074175A /* AEAudioController+Audiobus.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C2886361556FC620074175A /* AEAudioController+Audiobus.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4C2886391556FC620074175A /* AEAudioController+Audiobus.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C2886361556FC620074175A /* AEAudioController+Audiobus.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4C2886521557DB800074175A /* AEAudioController+Audiobus.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C2886511557DB800074175A /* AEAudioController+Audiobus.m */; };
@@ -72,34 +54,29 @@
 		4CA7EE84152456B200630345 /* AEUtilities.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C12CC98151D1EDA00562E2A /* AEUtilities.h */; settings = {ATTRIBUTES = (Public, ); }; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		4C25746C15EFFE6900D232E8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4C25746415EFFE6900D232E8 /* TheEngineSample.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 4C0C24851599FADD00D23E13;
+			remoteInfo = TheEngineSample;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		4C12CC98151D1EDA00562E2A /* AEUtilities.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEUtilities.h; sourceTree = "<group>"; };
 		4C12CC99151D1EDA00562E2A /* AEUtilities.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = AEUtilities.c; sourceTree = "<group>"; };
 		4C215CEC1523A7D500D36CAD /* libTheAmazingAudioEngine.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libTheAmazingAudioEngine.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C215CEE1523A7D500D36CAD /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		4C215CFD1523A83700D36CAD /* libTheAmazingAudioEngineTrial.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libTheAmazingAudioEngineTrial.a; sourceTree = BUILT_PRODUCTS_DIR; };
-		4C23241D15AC5E2600038EC0 /* TheEngineSample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TheEngineSample.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C23241F15AC5E2600038EC0 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		4C23242215AC5E2600038EC0 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
-		4C23243315AC5E5B00038EC0 /* AppDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AppDelegate.h; path = Distribution/TheEngineSample/TheEngineSample/AppDelegate.h; sourceTree = SOURCE_ROOT; };
-		4C23243415AC5E5B00038EC0 /* AppDelegate.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = AppDelegate.m; path = Distribution/TheEngineSample/TheEngineSample/AppDelegate.m; sourceTree = SOURCE_ROOT; };
-		4C23243515AC5E5B00038EC0 /* TPOscilloscopeLayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TPOscilloscopeLayer.h; path = Distribution/TheEngineSample/TheEngineSample/TPOscilloscopeLayer.h; sourceTree = SOURCE_ROOT; };
-		4C23243615AC5E5B00038EC0 /* TPOscilloscopeLayer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = TPOscilloscopeLayer.m; path = Distribution/TheEngineSample/TheEngineSample/TPOscilloscopeLayer.m; sourceTree = SOURCE_ROOT; };
-		4C23243715AC5E5B00038EC0 /* ViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ViewController.h; path = Distribution/TheEngineSample/TheEngineSample/ViewController.h; sourceTree = SOURCE_ROOT; };
-		4C23243815AC5E5B00038EC0 /* ViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = ViewController.m; path = Distribution/TheEngineSample/TheEngineSample/ViewController.m; sourceTree = SOURCE_ROOT; };
-		4C23243C15AC5E6A00038EC0 /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = main.m; path = Distribution/TheEngineSample/TheEngineSample/main.m; sourceTree = SOURCE_ROOT; };
-		4C23243D15AC5E6A00038EC0 /* TheEngineSample-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = "TheEngineSample-Info.plist"; path = "Distribution/TheEngineSample/TheEngineSample/TheEngineSample-Info.plist"; sourceTree = SOURCE_ROOT; };
-		4C23243E15AC5E6A00038EC0 /* TheEngineSample-Prefix.pch */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TheEngineSample-Prefix.pch"; path = "Distribution/TheEngineSample/TheEngineSample/TheEngineSample-Prefix.pch"; sourceTree = SOURCE_ROOT; };
-		4C23244215AC5E7300038EC0 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = Distribution/TheEngineSample/TheEngineSample/en.lproj/InfoPlist.strings; sourceTree = SOURCE_ROOT; };
-		4C23244515AC5E8600038EC0 /* Icon-72.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "Icon-72.png"; path = "Distribution/TheEngineSample/TheEngineSample/Resources/Icon-72.png"; sourceTree = SOURCE_ROOT; };
-		4C23244615AC5E8600038EC0 /* Icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon.png; path = Distribution/TheEngineSample/TheEngineSample/Resources/Icon.png; sourceTree = SOURCE_ROOT; };
-		4C23244715AC5E8600038EC0 /* Icon@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "Icon@2x.png"; path = "Distribution/TheEngineSample/TheEngineSample/Resources/Icon@2x.png"; sourceTree = SOURCE_ROOT; };
-		4C23244815AC5E8600038EC0 /* Organ Run.m4a */ = {isa = PBXFileReference; lastKnownFileType = file; name = "Organ Run.m4a"; path = "Distribution/TheEngineSample/TheEngineSample/Resources/Organ Run.m4a"; sourceTree = SOURCE_ROOT; };
-		4C23244915AC5E8600038EC0 /* Southern Rock Drums.m4a */ = {isa = PBXFileReference; lastKnownFileType = file; name = "Southern Rock Drums.m4a"; path = "Distribution/TheEngineSample/TheEngineSample/Resources/Southern Rock Drums.m4a"; sourceTree = SOURCE_ROOT; };
-		4C23244A15AC5E8600038EC0 /* Southern Rock Organ.m4a */ = {isa = PBXFileReference; lastKnownFileType = file; name = "Southern Rock Organ.m4a"; path = "Distribution/TheEngineSample/TheEngineSample/Resources/Southern Rock Organ.m4a"; sourceTree = SOURCE_ROOT; };
 		4C23245515AC5FDA00038EC0 /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
 		4C23245615AC5FDA00038EC0 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		4C23245915AC5FE800038EC0 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		4C25745E15EFFC4F00D232E8 /* Distribution */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Distribution; path = TheAmazingAudioEngine/Distribution; sourceTree = "<group>"; };
+		4C25746415EFFE6900D232E8 /* TheEngineSample.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = TheEngineSample.xcodeproj; sourceTree = "<group>"; };
 		4C2886361556FC620074175A /* AEAudioController+Audiobus.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "AEAudioController+Audiobus.h"; sourceTree = "<group>"; };
 		4C2886511557DB800074175A /* AEAudioController+Audiobus.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "AEAudioController+Audiobus.m"; sourceTree = "<group>"; };
 		4C2886541557DC230074175A /* AEAudioController+AudiobusStub.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "AEAudioController+AudiobusStub.h"; sourceTree = "<group>"; };
@@ -152,20 +129,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		4C23241A15AC5E2600038EC0 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				4C23245A15AC5FE800038EC0 /* QuartzCore.framework in Frameworks */,
-				4C23245715AC5FDA00038EC0 /* Accelerate.framework in Frameworks */,
-				4C23245815AC5FDA00038EC0 /* AudioToolbox.framework in Frameworks */,
-				4C23242015AC5E2600038EC0 /* UIKit.framework in Frameworks */,
-				4C23242115AC5E2600038EC0 /* Foundation.framework in Frameworks */,
-				4C23242315AC5E2600038EC0 /* CoreGraphics.framework in Frameworks */,
-				4C23246415AC603100038EC0 /* libTheAmazingAudioEngineTrial.a in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -182,35 +145,12 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		4C23242415AC5E2600038EC0 /* TheEngineSample */ = {
+		4C25746515EFFE6900D232E8 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				4C23243315AC5E5B00038EC0 /* AppDelegate.h */,
-				4C23243415AC5E5B00038EC0 /* AppDelegate.m */,
-				4C23243515AC5E5B00038EC0 /* TPOscilloscopeLayer.h */,
-				4C23243615AC5E5B00038EC0 /* TPOscilloscopeLayer.m */,
-				4C23243715AC5E5B00038EC0 /* ViewController.h */,
-				4C23243815AC5E5B00038EC0 /* ViewController.m */,
-				4C23244415AC5E7800038EC0 /* Supporting Files */,
+				4C25746D15EFFE6900D232E8 /* TheEngineSample.app */,
 			);
-			path = TheEngineSample;
-			sourceTree = "<group>";
-		};
-		4C23244415AC5E7800038EC0 /* Supporting Files */ = {
-			isa = PBXGroup;
-			children = (
-				4C23243C15AC5E6A00038EC0 /* main.m */,
-				4C23244115AC5E7300038EC0 /* InfoPlist.strings */,
-				4C23243D15AC5E6A00038EC0 /* TheEngineSample-Info.plist */,
-				4C23243E15AC5E6A00038EC0 /* TheEngineSample-Prefix.pch */,
-				4C23244515AC5E8600038EC0 /* Icon-72.png */,
-				4C23244615AC5E8600038EC0 /* Icon.png */,
-				4C23244715AC5E8600038EC0 /* Icon@2x.png */,
-				4C23244815AC5E8600038EC0 /* Organ Run.m4a */,
-				4C23244915AC5E8600038EC0 /* Southern Rock Drums.m4a */,
-				4C23244A15AC5E8600038EC0 /* Southern Rock Organ.m4a */,
-			);
-			name = "Supporting Files";
+			name = Products;
 			sourceTree = "<group>";
 		};
 		4C8A0F401540BBD700307CB6 /* Modules */ = {
@@ -249,9 +189,10 @@
 			children = (
 				4CE501911493F82600F23607 /* TheAmazingAudioEngine */,
 				4C8A0F401540BBD700307CB6 /* Modules */,
-				4C23242415AC5E2600038EC0 /* TheEngineSample */,
+				4C25745E15EFFC4F00D232E8 /* Distribution */,
 				4C215CED1523A7D500D36CAD /* Frameworks */,
 				4CE501901493F82600F23607 /* Products */,
+				4C25746415EFFE6900D232E8 /* TheEngineSample.xcodeproj */,
 			);
 			sourceTree = "<group>";
 		};
@@ -260,7 +201,6 @@
 			children = (
 				4C215CEC1523A7D500D36CAD /* libTheAmazingAudioEngine.a */,
 				4C215CFD1523A83700D36CAD /* libTheAmazingAudioEngineTrial.a */,
-				4C23241D15AC5E2600038EC0 /* TheEngineSample.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -357,6 +297,7 @@
 				4C215CFA1523A83700D36CAD /* Frameworks */,
 				4C215CFB1523A83700D36CAD /* Headers */,
 				4CA7EE931524681D00630345 /* ShellScript */,
+				4C25742C15EFA69500D232E8 /* ShellScript */,
 			);
 			buildRules = (
 			);
@@ -366,23 +307,6 @@
 			productName = TheAmazingAudioEngineTrial;
 			productReference = 4C215CFD1523A83700D36CAD /* libTheAmazingAudioEngineTrial.a */;
 			productType = "com.apple.product-type.library.static";
-		};
-		4C23241C15AC5E2600038EC0 /* TheEngineSample */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 4C23243015AC5E2600038EC0 /* Build configuration list for PBXNativeTarget "TheEngineSample" */;
-			buildPhases = (
-				4C23241915AC5E2600038EC0 /* Sources */,
-				4C23241A15AC5E2600038EC0 /* Frameworks */,
-				4C23241B15AC5E2600038EC0 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = TheEngineSample;
-			productName = TheEngineSample;
-			productReference = 4C23241D15AC5E2600038EC0 /* TheEngineSample.app */;
-			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
@@ -403,33 +327,44 @@
 			mainGroup = 4CE501811493F82600F23607;
 			productRefGroup = 4CE501901493F82600F23607 /* Products */;
 			projectDirPath = "";
+			projectReferences = (
+				{
+					ProductGroup = 4C25746515EFFE6900D232E8 /* Products */;
+					ProjectRef = 4C25746415EFFE6900D232E8 /* TheEngineSample.xcodeproj */;
+				},
+			);
 			projectRoot = "";
 			targets = (
 				4C215CEB1523A7D500D36CAD /* TheAmazingAudioEngine */,
 				4C215CFC1523A83700D36CAD /* TheAmazingAudioEngineTrial */,
-				4C23241C15AC5E2600038EC0 /* TheEngineSample */,
 			);
 		};
 /* End PBXProject section */
 
-/* Begin PBXResourcesBuildPhase section */
-		4C23241B15AC5E2600038EC0 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				4C23244315AC5E7300038EC0 /* InfoPlist.strings in Resources */,
-				4C23244B15AC5E8600038EC0 /* Icon-72.png in Resources */,
-				4C23244C15AC5E8600038EC0 /* Icon.png in Resources */,
-				4C23244D15AC5E8600038EC0 /* Icon@2x.png in Resources */,
-				4C23244E15AC5E8600038EC0 /* Organ Run.m4a in Resources */,
-				4C23244F15AC5E8600038EC0 /* Southern Rock Drums.m4a in Resources */,
-				4C23245015AC5E8600038EC0 /* Southern Rock Organ.m4a in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
+/* Begin PBXReferenceProxy section */
+		4C25746D15EFFE6900D232E8 /* TheEngineSample.app */ = {
+			isa = PBXReferenceProxy;
+			fileType = wrapper.application;
+			path = TheEngineSample.app;
+			remoteRef = 4C25746C15EFFE6900D232E8 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
 		};
-/* End PBXResourcesBuildPhase section */
+/* End PBXReferenceProxy section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		4C25742C15EFA69500D232E8 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "DISTRIBUTION_DIR=\"${BUILT_PRODUCTS_DIR}/Distribution\"\nDISTRIBUTION_SOURCE_DIR=\"${SRCROOT}/TheAmazingAudioEngine/Distribution\"\nMODULES_SOURCE_DIR=\"${SRCROOT}/Modules\"\nMODULES_TARGET_DIR=\"${DISTRIBUTION_DIR}/Modules\"\nSAMPLES_SOURCE_DIR=\"${SRCROOT}/TheEngineSample\"\nSAMPLES_PROJ_PATH=\"${SRCROOT}/TheEngineSample.xcodeproj\"\nSAMPLES_TARGET_DIR=\"${DISTRIBUTION_DIR}/TheEngineSample\"\n\nif [ -d \"${DISTRIBUTION_DIR}\" ]\nthen\necho rm -rf \"${DISTRIBUTION_DIR}\"\nfi\n\nmkdir -p \"${DISTRIBUTION_DIR}\"\n\ncp -r \"${DISTRIBUTION_SOURCE_DIR}/\"* \"${DISTRIBUTION_DIR}\"\ncp -r \"${BUILT_PRODUCTS_DIR}/${FULL_PRODUCT_NAME}\" \"${BUILT_PRODUCTS_DIR}/${PUBLIC_HEADERS_FOLDER_PATH}\" \"${DISTRIBUTION_DIR}\"\n\nmkdir -p \"${MODULES_TARGET_DIR}\"\ncp \"${MODULES_SOURCE_DIR}/\"*.h \"${MODULES_TARGET_DIR}\"\n          \nmkdir -p \"${SAMPLES_TARGET_DIR}\"\ncp -r \"${SAMPLES_SOURCE_DIR}\" \"${SAMPLES_TARGET_DIR}\"\ncp -r \"${SAMPLES_PROJ_PATH}\" \"${SAMPLES_TARGET_DIR}\"";
+		};
 		4CA7EE911524662000630345 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -496,29 +431,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		4C23241915AC5E2600038EC0 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				4C23243915AC5E5B00038EC0 /* AppDelegate.m in Sources */,
-				4C23243A15AC5E5B00038EC0 /* TPOscilloscopeLayer.m in Sources */,
-				4C23243B15AC5E5B00038EC0 /* ViewController.m in Sources */,
-				4C23243F15AC5E6A00038EC0 /* main.m in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
-
-/* Begin PBXVariantGroup section */
-		4C23244115AC5E7300038EC0 /* InfoPlist.strings */ = {
-			isa = PBXVariantGroup;
-			children = (
-				4C23244215AC5E7300038EC0 /* en */,
-			);
-			name = InfoPlist.strings;
-			sourceTree = "<group>";
-		};
-/* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
 		4C215CF71523A7D600D36CAD /* Debug */ = {
@@ -669,37 +582,6 @@
 			};
 			name = Release;
 		};
-		4C23243115AC5E2600038EC0 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
-				GCC_PRECOMPILE_PREFIX_HEADER = YES;
-				GCC_PREFIX_HEADER = "Distribution/TheEngineSample/TheEngineSample/TheEngineSample-Prefix.pch";
-				GCC_WARN_UNINITIALIZED_AUTOS = YES;
-				INFOPLIST_FILE = "Distribution/TheEngineSample/TheEngineSample/TheEngineSample-Info.plist";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				TARGETED_DEVICE_FAMILY = "1,2";
-				WRAPPER_EXTENSION = app;
-			};
-			name = Debug;
-		};
-		4C23243215AC5E2600038EC0 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
-				GCC_PRECOMPILE_PREFIX_HEADER = YES;
-				GCC_PREFIX_HEADER = "Distribution/TheEngineSample/TheEngineSample/TheEngineSample-Prefix.pch";
-				GCC_WARN_UNINITIALIZED_AUTOS = YES;
-				INFOPLIST_FILE = "Distribution/TheEngineSample/TheEngineSample/TheEngineSample-Info.plist";
-				OTHER_CFLAGS = "-DNS_BLOCK_ASSERTIONS=1";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				TARGETED_DEVICE_FAMILY = "1,2";
-				WRAPPER_EXTENSION = app;
-			};
-			name = Release;
-		};
 		4CE501981493F82600F23607 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -765,15 +647,6 @@
 			buildConfigurations = (
 				4C215D061523A83700D36CAD /* Debug */,
 				4C215D071523A83700D36CAD /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		4C23243015AC5E2600038EC0 /* Build configuration list for PBXNativeTarget "TheEngineSample" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				4C23243115AC5E2600038EC0 /* Debug */,
-				4C23243215AC5E2600038EC0 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

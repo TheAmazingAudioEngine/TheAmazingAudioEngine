@@ -936,8 +936,7 @@ typedef void (*AEAudioControllerMessageHandler)(AEAudioController *audioControll
  *      and optionally a pointer to data to be copied and passed to the handler, and the function will 
  *      be called on the realtime thread at the next polling interval.
  *
- *      This method will block on the main thread until the handler has been called, and a response
- *      received.
+ *      This method will block until the handler has been called, and a response received.
  *
  *      If all you need is a checkpoint to make sure the Core Audio thread is not mid-render, etc, then
  *      you may pass NULL for the handler.
