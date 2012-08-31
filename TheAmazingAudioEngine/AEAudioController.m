@@ -166,13 +166,15 @@ typedef struct {
 /*!
  * Message 
  */
-typedef struct _message_t {
-    AEAudioControllerMessageHandler handler;
+typedef struct {
+    void                            (^block)();
     void                            (^responseBlock)();
+    AEAudioControllerMainThreadMessageHandler handler;
     void                           *userInfoByReference;
     int                             userInfoLength;
     pthread_t                       sourceThread;
 } message_t;
+
 
 #pragma mark -
 
@@ -231,17 +233,15 @@ static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannelRef channel
 static OSStatus configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannelRef channel, AEChannelGroupRef parentGroup, int index, BOOL *updateRequired);
 static void configureChannelsInRangeForGroup(AEAudioController *THIS, NSRange range, AEChannelGroupRef group, BOOL *updateRequired);
 
-struct removeChannelsFromGroup_t { void **ptrs; void **userInfos; int count; AEChannelGroupRef group; };
-static void removeChannelsFromGroup(AEAudioController *THIS, void *userInfo, int userInfoLength);
+static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef group, void **ptrs, void **userInfos, int count);
 
 - (void)gatherChannelsFromGroup:(AEChannelGroupRef)group intoArray:(NSMutableArray*)array;
 - (AEChannelGroupRef)searchForGroupContainingChannelMatchingPtr:(void*)ptr userInfo:(void*)userInfo index:(int*)index;
 - (void)releaseResourcesForGroup:(AEChannelGroupRef)group;
 - (void)markGroupTorndown:(AEChannelGroupRef)group;
 
-struct callbackTableInfo_t { void *callback; void *userInfo; int flags; callback_table_t *table; BOOL found; };
-static void addCallbackToTable(AEAudioController *THIS, void *userInfo, int length);
-static void removeCallbackFromTable(AEAudioController *THIS, void *userInfo, int length);
+static void addCallbackToTable(AEAudioController *THIS, callback_table_t *table, void *callback, void *userInfo, int flags);
+static void removeCallbackFromTable(AEAudioController *THIS, callback_table_t *table, void *callback, void *userInfo, BOOL *found);
 - (NSArray *)associatedObjectsFromTable:(callback_table_t*)table matchingFlag:(uint8_t)flag;
 - (void)addCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannel:(id<AEAudioPlayable>)channelObj;
 - (void)addCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannelGroup:(AEChannelGroupRef)group;
@@ -952,19 +952,18 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     }
     
     // Remove the channels from the tables, on the core audio thread
-    void* ptrMatchArray[[channels count]];
-    void* userInfoMatchArray[[channels count]];
-    for ( int i=0; i<[channels count]; i++ ) {
+    int count = [channels count];
+    void** ptrMatchArray = malloc(count * sizeof(void*));
+    void** userInfoMatchArray = malloc(count * sizeof(void*));
+    for ( int i=0; i<count; i++ ) {
         ptrMatchArray[i] = ((id<AEAudioPlayable>)[channels objectAtIndex:i]).renderCallback;
         userInfoMatchArray[i] = [channels objectAtIndex:i];
     }
-    [self performSynchronousMessageExchangeWithHandler:removeChannelsFromGroup 
-                                         userInfoBytes:&(struct removeChannelsFromGroup_t){
-                                             .ptrs = ptrMatchArray,
-                                             .userInfos = userInfoMatchArray,
-                                             .count = [channels count],
-                                             .group = group } 
-                                                length:sizeof(struct removeChannelsFromGroup_t)];
+    [self performSynchronousMessageExchangeWithBlock:^{
+        removeChannelsFromGroup(self, group, ptrMatchArray, userInfoMatchArray, count);
+    }];
+    free(ptrMatchArray);
+    free(userInfoMatchArray);
     
     // Finally, stop observing and release channels
     for ( NSObject *channel in channels ) {
@@ -1001,15 +1000,9 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     if ( parentGroup ) {
         // Remove the group from the parent group's table, on the core audio thread
-        void* ptrMatchArray[1] = { group };
-        void* userInfoMatchArray[1] = { NULL };
-        [self performSynchronousMessageExchangeWithHandler:removeChannelsFromGroup 
-                                             userInfoBytes:&(struct removeChannelsFromGroup_t){
-                                                 .ptrs = ptrMatchArray,
-                                                 .userInfos = userInfoMatchArray,
-                                                 .count = 1,
-                                                 .group = parentGroup } 
-                                                    length:sizeof(struct removeChannelsFromGroup_t)];
+        [self performSynchronousMessageExchangeWithBlock:^{
+            removeChannelsFromGroup(self, parentGroup, (void*[1]){ group }, (void*[1]){ NULL }, 1);
+        }];
     }
     
     // Release channel resources
@@ -1155,13 +1148,10 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 
 - (void)addInputFilter:(id<AEAudioFilter>)filter {
     [filter retain];
-    [self performSynchronousMessageExchangeWithHandler:addCallbackToTable
-                                         userInfoBytes:&(struct callbackTableInfo_t){
-                                             .callback = filter.filterCallback,
-                                             .userInfo = filter,
-                                             .flags = kFilterFlag,
-                                             .table = &_inputCallbacks }
-                                                length:sizeof(struct callbackTableInfo_t)];
+    void *callback = filter.filterCallback;
+    [self performSynchronousMessageExchangeWithBlock:^{
+        addCallbackToTable(self, &_inputCallbacks, callback, filter, kFilterFlag);
+    }];
 }
 
 - (void)removeFilter:(id<AEAudioFilter>)filter {
@@ -1183,14 +1173,13 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 - (void)removeInputFilter:(id<AEAudioFilter>)filter {
-    struct callbackTableInfo_t arg = {
-        .callback = filter.filterCallback,
-        .userInfo = filter,
-        .table = &_inputCallbacks };
-    [self performSynchronousMessageExchangeWithHandler:removeCallbackFromTable
-                                         userInfoBytes:&arg
-                                                length:sizeof(struct callbackTableInfo_t)];
-    if ( arg.found ) {
+    void *callback = filter.filterCallback;
+    __block BOOL found = NO;
+    [self performSynchronousMessageExchangeWithBlock:^{
+        removeCallbackFromTable(self, &_inputCallbacks, callback, filter, &found);
+    }];
+    
+    if ( found ) {
         [filter release];
     }
 }
@@ -1299,24 +1288,20 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     [receiver retain];
     
-    [self performSynchronousMessageExchangeWithHandler:addCallbackToTable
-                                         userInfoBytes:&(struct callbackTableInfo_t){
-                                             .callback = receiver.receiverCallback,
-                                             .userInfo = receiver,
-                                             .flags = kReceiverFlag,
-                                             .table = &_inputCallbacks }
-                                                length:sizeof(struct callbackTableInfo_t)];
+    void *callback = receiver.receiverCallback;
+    [self performSynchronousMessageExchangeWithBlock:^{
+        addCallbackToTable(self, &_inputCallbacks, callback, receiver, kReceiverFlag);
+    }];
 }
 
 - (void)removeInputReceiver:(id<AEAudioReceiver>)receiver {
-    struct callbackTableInfo_t arg = {
-        .callback = receiver.receiverCallback,
-        .userInfo = receiver,
-        .table = &_inputCallbacks };
-    [self performSynchronousMessageExchangeWithHandler:removeCallbackFromTable
-                                         userInfoBytes:&arg
-                                                length:sizeof(struct callbackTableInfo_t)];
-    if ( arg.found ) {
+    void *callback = receiver.receiverCallback;
+    __block BOOL found = NO;
+    [self performSynchronousMessageExchangeWithBlock:^{
+        removeCallbackFromTable(self, &_inputCallbacks, callback, receiver, &found);
+    }];
+    
+    if ( found ) {
         [receiver release];
     }
 }
@@ -1334,24 +1319,21 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     }
     
     [receiver retain];
-
-    [self performSynchronousMessageExchangeWithHandler:addCallbackToTable
-                                         userInfoBytes:&(struct callbackTableInfo_t){
-                                             .callback = receiver.timingReceiverCallback,
-                                             .userInfo = receiver,
-                                             .table = &_timingCallbacks }
-                                                length:sizeof(struct callbackTableInfo_t)];
+    
+    void *callback = receiver.timingReceiverCallback;
+    [self performSynchronousMessageExchangeWithBlock:^{
+        addCallbackToTable(self, &_timingCallbacks, callback, receiver, 0);
+    }];
 }
 
 - (void)removeTimingReceiver:(id<AEAudioTimingReceiver>)receiver {
-    struct callbackTableInfo_t arg = {
-        .callback = receiver.timingReceiverCallback,
-        .userInfo = receiver,
-        .table = &_timingCallbacks };
-    [self performSynchronousMessageExchangeWithHandler:removeCallbackFromTable
-                                         userInfoBytes:&arg
-                                                length:sizeof(struct callbackTableInfo_t)];
-    if ( arg.found ) {
+    void *callback = receiver.timingReceiverCallback;
+    __block BOOL found = NO;
+    [self performSynchronousMessageExchangeWithBlock:^{
+        removeCallbackFromTable(self, &_timingCallbacks, callback, receiver, &found);
+    }];
+    
+    if ( found ) {
         [receiver release];
     }
 }
@@ -1364,48 +1346,37 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 
 static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
     // Only call this from the Core Audio thread, or the main thread if audio system is not yet running
-    
     int32_t availableBytes;
-    message_t *message = TPCircularBufferTail(&THIS->_realtimeThreadMessageBuffer, &availableBytes);
-    void *end = (char*)message + availableBytes;
+    message_t *messagePtr = TPCircularBufferTail(&THIS->_realtimeThreadMessageBuffer, &availableBytes);
+    void *end = (char*)messagePtr + availableBytes;
     
-    message_t messageBuffer;
-    uint8_t messageDataBuffer[kMaxMessageDataSize];
-    
-    while ( (void*)message < (void*)end ) {
-        memcpy(&messageBuffer, message, sizeof(messageBuffer));
+    message_t message;
+    while ( (void*)messagePtr < (void*)end ) {
+        memcpy(&message, messagePtr, sizeof(message));
+        TPCircularBufferConsume(&THIS->_realtimeThreadMessageBuffer, sizeof(message_t));
         
-        int dataLength = messageBuffer.userInfoLength && !messageBuffer.userInfoByReference ? messageBuffer.userInfoLength : 0;
-        
-        if ( dataLength > 0 ) {
-            memcpy(messageDataBuffer, message+1, messageBuffer.userInfoLength);
-        }
-        
-        TPCircularBufferConsume(&THIS->_realtimeThreadMessageBuffer, sizeof(message_t) + dataLength);
-        
-        if ( messageBuffer.handler ) {
-            messageBuffer.handler(THIS, 
-                                  messageBuffer.userInfoLength > 0
-                                    ? (messageBuffer.userInfoByReference ? messageBuffer.userInfoByReference : messageDataBuffer) 
-                                    : NULL, 
-                                  messageBuffer.userInfoLength);
-        }        
-
-        if ( messageBuffer.responseBlock ) {
-            int32_t space;
-            uint8_t *head = TPCircularBufferHead(&THIS->_mainThreadMessageBuffer, &space);
-            if ( space < sizeof(message_t) + dataLength ) {
-                printf("Insufficient buffer space when storing message reply\n");
-            } else {
-                memcpy(head, &messageBuffer, sizeof(message_t));
-                if ( dataLength > 0 ) {
-                    memcpy(head + sizeof(message_t), messageDataBuffer, dataLength);
-                }
-                TPCircularBufferProduce(&THIS->_mainThreadMessageBuffer, sizeof(message_t) + dataLength);
+        if ( message.block ) {
+#ifdef DEBUG
+            uint64_t start = mach_absolute_time();
+#endif
+            message.block();
+#ifdef DEBUG
+            uint64_t end = mach_absolute_time();
+            if ( (end-start)*__hostTicksToSeconds >= THIS->_preferredBufferDuration ) {
+                printf("Warning: Block perform on realtime thread took too long (%0.4lfs)", (end-start)*__hostTicksToSeconds);
             }
+#endif
+        }
+
+        if ( message.responseBlock ) {
+            int32_t availableBytes;
+            message_t *reply = TPCircularBufferHead(&THIS->_mainThreadMessageBuffer, &availableBytes);
+            assert(availableBytes >= sizeof(message_t));
+            memcpy(reply, &message, sizeof(message_t));
+            TPCircularBufferProduce(&THIS->_mainThreadMessageBuffer, sizeof(message_t));
         }
         
-        message = (message_t*)((char*)message + sizeof(message_t) + dataLength);
+        messagePtr++;
     }
 }
 
@@ -1434,10 +1405,7 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
         }
         
         if ( message->responseBlock ) {
-            message->responseBlock(message->userInfoLength > 0
-                                   ? (message->userInfoByReference ? message->userInfoByReference : message+1) 
-                                   : NULL, 
-                                   message->userInfoLength);
+            message->responseBlock();
             [message->responseBlock release];
         } else if ( message->handler ) {
             message->handler(self, 
@@ -1447,23 +1415,21 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
                              message->userInfoLength);
         }
         
+        if ( message->block ) {
+            [message->block release];
+        }
+        
         free(message);
     }
 }
 
-- (void)performAsynchronousMessageExchangeWithHandler:(AEAudioControllerMessageHandler)handler 
-                                        userInfoBytes:(void *)userInfo 
-                                               length:(int)userInfoLength
-                                        responseBlock:(void (^)(void *, int))responseBlock
-                                  userInfoByReference:(BOOL)userInfoByReference
-                                         sourceThread:(pthread_t)sourceThread {
-    
-    if ( !userInfoByReference && userInfoLength > kMaxMessageDataSize ) {
-        NSLog(@"Message data passed by value must be less than %d bytes (%d bytes provided)", kMaxMessageDataSize, userInfoLength);
-        return;
-    }
-    
+- (void)performAsynchronousMessageExchangeWithBlock:(void (^)())block
+                                      responseBlock:(void (^)())responseBlock
+                                       sourceThread:(pthread_t)sourceThread {
     @synchronized ( self ) {
+        if ( block ) {
+            block = [block copy];
+        }
         if ( responseBlock ) {
             responseBlock = [responseBlock copy];
             _pendingResponses++;
@@ -1476,19 +1442,13 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
         
         int32_t availableBytes;
         message_t *message = TPCircularBufferHead(&_realtimeThreadMessageBuffer, &availableBytes);
-        assert(availableBytes >= sizeof(message_t) + (userInfoByReference ? 0 : userInfoLength));
+        assert(availableBytes >= sizeof(message_t));
+        memset(message, 0, sizeof(message_t));
+        message->block         = block;
+        message->responseBlock = responseBlock;
+        message->sourceThread  = sourceThread;
         
-        message->handler                = handler;
-        message->responseBlock          = responseBlock;
-        message->userInfoByReference    = userInfoByReference ? userInfo : NULL;
-        message->userInfoLength         = userInfoLength;
-        message->sourceThread           = sourceThread;
-        
-        if ( !userInfoByReference && userInfoLength > 0 ) {
-            memcpy((message+1), userInfo, userInfoLength);
-        }
-        
-        TPCircularBufferProduce(&_realtimeThreadMessageBuffer, sizeof(message_t) + (userInfoByReference ? 0 : userInfoLength));
+        TPCircularBufferProduce(&_realtimeThreadMessageBuffer, sizeof(message_t));
         
         if ( !self.running ) {
             if ( [NSThread isMainThread] ) {
@@ -1504,30 +1464,15 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
     }
 }
 
-- (void)performAsynchronousMessageExchangeWithHandler:(AEAudioControllerMessageHandler)handler
-                                        userInfoBytes:(void *)userInfo 
-                                               length:(int)userInfoLength
-                                        responseBlock:(void (^)(void *, int))responseBlock {
-    
-    [self performAsynchronousMessageExchangeWithHandler:handler 
-                                          userInfoBytes:userInfo 
-                                                 length:userInfoLength 
-                                          responseBlock:responseBlock
-                                    userInfoByReference:NO
-                                           sourceThread:NULL];
+- (void)performAsynchronousMessageExchangeWithBlock:(void (^)())block responseBlock:(void (^)())responseBlock {
+    [self performAsynchronousMessageExchangeWithBlock:block responseBlock:responseBlock sourceThread:NULL];
 }
 
-- (void)performSynchronousMessageExchangeWithHandler:(AEAudioControllerMessageHandler)handler 
-                                       userInfoBytes:(void *)userInfo 
-                                              length:(int)userInfoLength {
+- (void)performSynchronousMessageExchangeWithBlock:(void (^)())block {
     __block BOOL finished = NO;
-    
-    [self performAsynchronousMessageExchangeWithHandler:handler 
-                                          userInfoBytes:userInfo 
-                                                 length:userInfoLength 
-                                          responseBlock:^(void * userInfo, int length){ finished = YES; }
-                                    userInfoByReference:YES
-                                           sourceThread:pthread_self()];
+    [self performAsynchronousMessageExchangeWithBlock:block
+                                        responseBlock:^{ finished = YES; }
+                                         sourceThread:pthread_self()];
     
     // Wait for response
     uint64_t giveUpTime = mach_absolute_time() + (1.0 * __secondsToHostTicks);
@@ -1549,17 +1494,15 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
 }
 
 void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController                 *THIS, 
-                                                          AEAudioControllerMessageHandler    handler, 
+                                                          AEAudioControllerMainThreadMessageHandler    handler, 
                                                           void                              *userInfo,
                                                           int                                userInfoLength) {
     
     int32_t availableBytes;
     message_t *message = TPCircularBufferHead(&THIS->_mainThreadMessageBuffer, &availableBytes);
     assert(availableBytes >= sizeof(message_t) + userInfoLength);
-    
+    memset(message, 0, sizeof(message_t));
     message->handler                = handler;
-    message->responseBlock          = NULL;
-    message->userInfoByReference    = NULL;
     message->userInfoLength         = userInfoLength;
     
     if ( userInfoLength > 0 ) {
@@ -1842,7 +1785,9 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     if ( channelElement->audiobusOutputPort ) [channelElement->audiobusOutputPort autorelease];
     
     if ( audiobusOutputPort == nil ) {
-        [self performSynchronousMessageExchangeWithHandler:removeAudiobusOutputPortFromChannelElement userInfoBytes:&channelElement length:sizeof(AEChannelRef)];
+        [self performSynchronousMessageExchangeWithBlock:^{
+            channelElement->audiobusOutputPort = nil;
+        }];
     } else {
         [audiobusOutputPort setClientFormat:channelElement->audioDescription];
         channelElement->audiobusOutputPort = [audiobusOutputPort retain];
@@ -2287,40 +2232,6 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     return NO;
 }
 
-struct updateInputDeviceStatusHandler_t { 
-    UInt32 numberOfInputChannels; 
-    BOOL inputAvailable; 
-    AudioStreamBasicDescription *audioDescription;
-    AudioBufferList *audioBufferList;
-    BOOL bufferIsAllocated;
-    AudioStreamBasicDescription *rawAudioDescription;
-    AudioConverterRef audioConverter;
-    AudioBufferList *scratchBuffer;
-};
-static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userInfo, int length) {
-    struct updateInputDeviceStatusHandler_t *arg = userInfo;
-    
-    if ( !THIS->_audiobusInputPort || !ABInputPortIsConnected(THIS->_audiobusInputPort) ) {
-        AudioStreamBasicDescription currentAudioDescription;
-        UInt32 size = sizeof(currentAudioDescription);
-        OSStatus result = AudioUnitGetProperty(THIS->_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &currentAudioDescription, &size);
-        checkResult(result, "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)");
-        
-        if ( memcmp(&currentAudioDescription, arg->rawAudioDescription, sizeof(AudioStreamBasicDescription)) != 0 ) {
-            result = AudioUnitSetProperty(THIS->_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, arg->rawAudioDescription, sizeof(AudioStreamBasicDescription));
-            checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
-        }
-    }
-    
-    THIS->_numberOfInputChannels    = arg->numberOfInputChannels;
-    THIS->_inputAudioDescription    = *arg->audioDescription;
-    THIS->_audioInputAvailable      = arg->inputAvailable;
-    THIS->_inputAudioBufferList     = arg->audioBufferList;
-    THIS->_inputAudioBufferListBuffersAreAllocated = arg->bufferIsAllocated;
-    THIS->_inputAudioConverter      = arg->audioConverter;
-    THIS->_inputAudioScratchBufferList = arg->scratchBuffer;
-}
-
 - (void)updateInputDeviceStatus {
     UInt32 inputAvailable=0;
     
@@ -2499,18 +2410,28 @@ static void updateInputDeviceStatusHandler(AEAudioController *THIS, void* userIn
     AudioConverterRef oldConverter      = _inputAudioConverter;
     AudioBufferList *oldScratchBuffer   = _inputAudioScratchBufferList;
     
-    // Set input stream format and update the properties
-    [self performSynchronousMessageExchangeWithHandler:updateInputDeviceStatusHandler
-                                         userInfoBytes:&(struct updateInputDeviceStatusHandler_t){
-                                             .numberOfInputChannels = numberOfInputChannels,
-                                             .inputAvailable = inputAvailable,
-                                             .audioDescription = &inputAudioDescription,
-                                             .audioBufferList = inputBufferList,
-                                             .bufferIsAllocated = bufferIsAllocated ,
-                                             .rawAudioDescription = &rawAudioDescription,
-                                             .audioConverter = converter,
-                                             .scratchBuffer = scratchBuffer }
-                                                length:sizeof(struct callbackTableInfo_t)];
+    // Set input stream format and update the properties, on the realtime thread
+    [self performSynchronousMessageExchangeWithBlock:^{
+        if ( !_audiobusInputPort || !ABInputPortIsConnected(_audiobusInputPort) ) {
+            AudioStreamBasicDescription currentAudioDescription;
+            UInt32 size = sizeof(currentAudioDescription);
+            OSStatus result = AudioUnitGetProperty(_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &currentAudioDescription, &size);
+            checkResult(result, "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)");
+            
+            if ( memcmp(&currentAudioDescription, &rawAudioDescription, sizeof(AudioStreamBasicDescription)) != 0 ) {
+                result = AudioUnitSetProperty(_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &rawAudioDescription, sizeof(AudioStreamBasicDescription));
+                checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
+            }
+        }
+        
+        _numberOfInputChannels    = numberOfInputChannels;
+        _inputAudioDescription    = inputAudioDescription;
+        _audioInputAvailable      = inputAvailable;
+        _inputAudioBufferList     = inputBufferList;
+        _inputAudioBufferListBuffersAreAllocated = bufferIsAllocated;
+        _inputAudioConverter      = converter;
+        _inputAudioScratchBufferList = scratchBuffer;
+    }];
     
     if ( oldInputBuffer && oldInputBuffer != inputBufferList ) {
         if ( existingBufferWasAllocated ) {
@@ -2807,44 +2728,43 @@ static void updateGraphDelayed(AEAudioController *THIS, void *userInfo, int leng
     }
 }
 
-static void removeChannelsFromGroup(AEAudioController *THIS, void *userInfo, int userInfoLength) {
-    struct removeChannelsFromGroup_t *args = userInfo;
+static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef group, void **ptrs, void **userInfos, int count) {
     
     // Set new bus count of group
-    UInt32 busCount = args->group->channelCount - args->count;
+    UInt32 busCount = group->channelCount - count;
     assert(busCount >= 0);
     
-    if ( !checkResult(AudioUnitSetProperty(args->group->mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &busCount, sizeof(busCount)),
+    if ( !checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &busCount, sizeof(busCount)),
                       "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) return;
     
     BOOL updateRequired = NO;
     
-    for ( int i=0; i < args->count; i++ ) {
+    for ( int i=0; i < count; i++ ) {
         
         // Find the channel in our fixed array
         int index = 0;
-        for ( index=0; index < args->group->channelCount; index++ ) {
-            if ( args->group->channels[index].ptr == args->ptrs[i] && args->group->channels[index].userInfo == args->userInfos[i] ) {
-                args->group->channelCount--;
+        for ( index=0; index < group->channelCount; index++ ) {
+            if ( group->channels[index].ptr == ptrs[i] && group->channels[index].userInfo == userInfos[i] ) {
+                group->channelCount--;
                 
                 // Shuffle the later elements backwards one space, disconnecting as we go
-                for ( int j=index; j<args->group->channelCount; j++ ) {
-                     int graphState = args->group->channels[j].graphState;
+                for ( int j=index; j<group->channelCount; j++ ) {
+                     int graphState = group->channels[j].graphState;
                      
                      if ( graphState & kGraphStateNodeConnected || graphState & kGraphStateRenderCallbackSet ) {
                          if ( j < busCount ) {
-                             checkResult(AUGraphDisconnectNodeInput(THIS->_audioGraph, args->group->mixerNode, j), "AUGraphDisconnectNodeInput");
+                             checkResult(AUGraphDisconnectNodeInput(THIS->_audioGraph, group->mixerNode, j), "AUGraphDisconnectNodeInput");
                              updateRequired = YES;
                          }
                          graphState &= ~(kGraphStateNodeConnected | kGraphStateRenderCallbackSet);
                      }
                      
-                     memcpy(&args->group->channels[j], &args->group->channels[j+1], sizeof(channel_t));
-                     args->group->channels[j].graphState = graphState;
+                     memcpy(&group->channels[j], &group->channels[j+1], sizeof(channel_t));
+                     group->channels[j].graphState = graphState;
                 }
                 
                 // Zero out the now-unused space
-                memset(&args->group->channels[args->group->channelCount], 0, sizeof(channel_t));
+                memset(&group->channels[group->channelCount], 0, sizeof(channel_t));
             }
         }
     }
@@ -2853,7 +2773,7 @@ static void removeChannelsFromGroup(AEAudioController *THIS, void *userInfo, int
         OSStatus result = AUGraphUpdate(THIS->_audioGraph, NULL);
         if ( result == kAUGraphErr_CannotDoInCurrentContext ) {
             // Complete the refresh on the main thread
-            AEAudioControllerSendAsynchronousMessageToMainThread(THIS, updateGroupDelayed, &args->group, sizeof(AEChannelGroupRef));
+            AEAudioControllerSendAsynchronousMessageToMainThread(THIS, updateGroupDelayed, &group, sizeof(AEChannelGroupRef));
             return;
         } else if ( result != kAUGraphErr_NodeNotFound ) {
             checkResult(result, "AUGraphUpdate");
@@ -2861,11 +2781,11 @@ static void removeChannelsFromGroup(AEAudioController *THIS, void *userInfo, int
     }
     
     updateRequired = NO;
-    configureChannelsInRangeForGroup(THIS, NSMakeRange(0, args->group->channelCount), args->group, &updateRequired);
+    configureChannelsInRangeForGroup(THIS, NSMakeRange(0, group->channelCount), group, &updateRequired);
     if ( updateRequired ) {
         OSStatus result = AUGraphUpdate(THIS->_audioGraph, NULL);
         if ( result == kAUGraphErr_CannotDoInCurrentContext ) {
-            AEAudioControllerSendAsynchronousMessageToMainThread(THIS, updateGraphDelayed, &args->group, sizeof(AEChannelGroupRef));
+            AEAudioControllerSendAsynchronousMessageToMainThread(THIS, updateGraphDelayed, &group, sizeof(AEChannelGroupRef));
         }
     }
 }
@@ -2977,38 +2897,33 @@ static void removeChannelsFromGroup(AEAudioController *THIS, void *userInfo, int
 
 #pragma mark - Callback management
 
-static void addCallbackToTable(AEAudioController *THIS, void *userInfo, int length) {
-    struct callbackTableInfo_t *arg = userInfo;
-    
-    callback_table_t* table = arg->table;
-    
-    table->callbacks[table->count].callback = arg->callback;
-    table->callbacks[table->count].userInfo = arg->userInfo;
-    table->callbacks[table->count].flags = arg->flags;
+static void addCallbackToTable(AEAudioController *THIS, callback_table_t *table, void *callback, void *userInfo, int flags) {
+    table->callbacks[table->count].callback = callback;
+    table->callbacks[table->count].userInfo = userInfo;
+    table->callbacks[table->count].flags = flags;
     table->count++;
 }
 
-void removeCallbackFromTable(AEAudioController *THIS, void *userInfo, int length) {
-    struct callbackTableInfo_t *arg = userInfo;
-    
-    callback_table_t* table = arg->table;
-    arg->found = NO;
+void removeCallbackFromTable(AEAudioController *THIS, callback_table_t *table, void *callback, void *userInfo, BOOL *found_p) {
+    BOOL found = NO;
     
     // Find the item in our fixed array
     int index = 0;
     for ( index=0; index<table->count; index++ ) {
-        if ( table->callbacks[index].callback == arg->callback && table->callbacks[index].userInfo == arg->userInfo ) {
-            arg->found = YES;
+        if ( table->callbacks[index].callback == callback && table->callbacks[index].userInfo == userInfo ) {
+            found = YES;
             break;
         }
     }
-    if ( arg->found ) {
+    if ( found ) {
         // Now shuffle the later elements backwards one space
         table->count--;
         for ( int i=index; i<table->count; i++ ) {
             table->callbacks[i] = table->callbacks[i+1];
         }
     }
+    
+    if ( found_p ) *found_p = found;
 }
 
 - (NSArray *)associatedObjectsFromTable:(callback_table_t*)table matchingFlag:(uint8_t)flag {
@@ -3030,23 +2945,15 @@ void removeCallbackFromTable(AEAudioController *THIS, void *userInfo, int length
     
     AEChannelRef channel = &parentGroup->channels[index];
     
-    [self performSynchronousMessageExchangeWithHandler:addCallbackToTable
-                                         userInfoBytes:&(struct callbackTableInfo_t){
-                                             .callback = callback,
-                                             .userInfo = userInfo,
-                                             .flags = flags,
-                                             .table = &channel->callbacks }
-                                                length:sizeof(struct callbackTableInfo_t)];
+    [self performSynchronousMessageExchangeWithBlock:^{
+        addCallbackToTable(self, &channel->callbacks, callback, userInfo, flags);
+    }];
 }
 
 - (void)addCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannelGroup:(AEChannelGroupRef)group {
-    [self performSynchronousMessageExchangeWithHandler:addCallbackToTable
-                                         userInfoBytes:&(struct callbackTableInfo_t){
-                                             .callback = callback,
-                                             .userInfo = userInfo,
-                                             .flags = flags,
-                                             .table = &group->channel->callbacks }
-                                                length:sizeof(struct callbackTableInfo_t)];
+    [self performSynchronousMessageExchangeWithBlock:^{
+        addCallbackToTable(self, &group->channel->callbacks, callback, userInfo, flags);
+    }];
 
     AEChannelGroupRef parentGroup = NULL;
     int index=0;
@@ -3069,26 +2976,21 @@ void removeCallbackFromTable(AEAudioController *THIS, void *userInfo, int length
     
     AEChannelRef channel = &parentGroup->channels[index];
     
-    struct callbackTableInfo_t arg = {
-        .callback = callback,
-        .userInfo = userInfo,
-        .table = &channel->callbacks };
-    [self performSynchronousMessageExchangeWithHandler:removeCallbackFromTable
-                                         userInfoBytes:&arg
-                                                length:sizeof(struct callbackTableInfo_t)];
-    return arg.found;
+    __block BOOL found = NO;
+    [self performSynchronousMessageExchangeWithBlock:^{
+        removeCallbackFromTable(self, &channel->callbacks, callback, userInfo, &found);
+    }];
+    
+    return found;
 }
 
 - (BOOL)removeCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(AEChannelGroupRef)group {
-    struct callbackTableInfo_t arg = {
-        .callback = callback,
-        .userInfo = userInfo,
-        .table = &group->channel->callbacks };
-    [self performSynchronousMessageExchangeWithHandler:removeCallbackFromTable
-                                         userInfoBytes:&arg
-                                                length:sizeof(struct callbackTableInfo_t)];
+    __block BOOL found = NO;
+    [self performSynchronousMessageExchangeWithBlock:^{
+        removeCallbackFromTable(self, &group->channel->callbacks, callback, userInfo, &found);
+    }];
     
-    if ( !arg.found ) return NO;
+    if ( !found ) return NO;
     
     AEChannelGroupRef parentGroup = NULL;
     int index=0;
@@ -3140,14 +3042,12 @@ void removeCallbackFromTable(AEAudioController *THIS, void *userInfo, int length
     for ( int i=0; i<channel->callbacks.count; i++ ) {
         if ( (channel->callbacks.callbacks[i].flags & kVariableSpeedFilterFlag ) ) {
             // Remove the old callback
-            struct callbackTableInfo_t arg = {
-                .callback = channel->callbacks.callbacks[i].callback,
-                .userInfo = channel->callbacks.callbacks[i].userInfo,
-                .table = &channel->callbacks };
-            [self performSynchronousMessageExchangeWithHandler:removeCallbackFromTable
-                                                 userInfoBytes:&arg
-                                                        length:sizeof(struct callbackTableInfo_t)];
-            if ( arg.found ) {
+            __block BOOL found = NO;
+            [self performSynchronousMessageExchangeWithBlock:^{
+                removeCallbackFromTable(self, &channel->callbacks, channel->callbacks.callbacks[i].callback, channel->callbacks.callbacks[i].userInfo, &found);
+            }];
+            
+            if ( found ) {
                 [(id)(long)channel->callbacks.callbacks[i].userInfo autorelease];
             }
         }
@@ -3155,14 +3055,10 @@ void removeCallbackFromTable(AEAudioController *THIS, void *userInfo, int length
     
     if ( filter ) {
         [filter retain];
-        [self performSynchronousMessageExchangeWithHandler:addCallbackToTable
-                                             userInfoBytes:&(struct callbackTableInfo_t){
-                                                 .callback = filter.filterCallback,
-                                                 .userInfo = filter,
-                                                 .flags = kVariableSpeedFilterFlag,
-                                                 .table = &channel->callbacks }
-                                                    length:sizeof(struct callbackTableInfo_t)];
-        
+        void *callback = filter.filterCallback;
+        [self performSynchronousMessageExchangeWithBlock:^{
+            addCallbackToTable(self, &channel->callbacks, callback, filter, kVariableSpeedFilterFlag);
+        }];
     }
 }
 

@@ -382,7 +382,7 @@ typedef struct _channel_group_t* AEChannelGroupRef;
  * @param userInfo          Pointer to your data
  * @param userInfoLength    Length of userInfo in bytes
  */
-typedef void (*AEAudioControllerMessageHandler)(AEAudioController *audioController, void *userInfo, int userInfoLength);
+typedef void (*AEAudioControllerMainThreadMessageHandler)(AEAudioController *audioController, void *userInfo, int userInfoLength);
 
 #pragma mark -
 
@@ -910,44 +910,43 @@ typedef void (*AEAudioControllerMessageHandler)(AEAudioController *audioControll
  * Send a message to the realtime thread asynchronously, optionally receiving a response via a block
  *
  *      This is a synchronization mechanism that allows you to schedule actions to be performed 
- *      on the realtime audio thread without any locking mechanism required.  Pass in a function pointer
- *      and optionally a pointer to data to be copied and passed to the handler, and the function will 
- *      be called on the realtime thread at the next polling interval.
+ *      on the realtime audio thread without any locking mechanism required.  Pass in a block, and
+ *      the block will be performed on the realtime thread at the next polling interval.
+ *
+ *      Important: Do not interact with any Objective-C objects inside your block, or hold locks, allocate
+ *      memory or interact with the BSD subsystem, as all of these may result in audio glitches due
+ *      to priority inversion.
  *
  *      If provided, the response block will be called on the main thread after the message has
- *      been sent, and will be passed the original userInfo data, which may be modified by the
- *      handler.
+ *      been sent. You may exchange information from the realtime thread to the main thread via a
+ *      shared data structure (such as a struct, allocated on the heap in advance).
  *
- * @param handler       A pointer to a function to call on the realtime thread
- * @param userInfo      Pointer to user info data to pass to handler - this will be copied
- * @param userInfoLength Length of userInfo in bytes
- * @param responseBlock A block to be performed on the main thread after the handler has been run.
+ * @param block         A block to be performed on the realtime thread.
+ * @param responseBlock A block to be performed on the main thread after the handler has been run, or nil.
  */
-- (void)performAsynchronousMessageExchangeWithHandler:(AEAudioControllerMessageHandler)handler 
-                                        userInfoBytes:(void*)userInfo 
-                                               length:(int)userInfoLength
-                                        responseBlock:(void (^)(void *userInfo, int userInfoLength))responseBlock;
+- (void)performAsynchronousMessageExchangeWithBlock:(void (^)())block
+                                      responseBlock:(void (^)())responseBlock;
 
 /*!
  * Send a message to the realtime thread synchronously
  *
  *      This is a synchronization mechanism that allows you to schedule actions to be performed 
- *      on the realtime audio thread without any locking mechanism required.  Pass in a function pointer
- *      and optionally a pointer to data to be copied and passed to the handler, and the function will 
- *      be called on the realtime thread at the next polling interval.
+ *      on the realtime audio thread without any locking mechanism required. Pass in a block, and
+ *      the block will be performed on the realtime thread at the next polling interval.
  *
- *      This method will block until the handler has been called, and a response received.
+ *      Important: Do not interact with any Objective-C objects inside your block, or hold locks, allocate
+ *      memory or interact with the BSD subsystem, as all of these may result in audio glitches due
+ *      to priority inversion.
+ *
+ *      This method will block the current thread until the block has been performed on the realtime thread.
+ *      You may pass information from the realtime thread to the calling thread via the use of __block variables.
  *
  *      If all you need is a checkpoint to make sure the Core Audio thread is not mid-render, etc, then
- *      you may pass NULL for the handler.
+ *      you may pass nil for the block.
  *
- * @param handler       A pointer to a function to call on the realtime thread
- * @param userInfo      Pointer to user info data to pass to handler - this will be passed by reference to the handler
- * @param userInfoLength Length of userInfo in bytes
+ * @param block         A block to be performed on the realtime thread.
  */
-- (void)performSynchronousMessageExchangeWithHandler:(AEAudioControllerMessageHandler)handler 
-                                       userInfoBytes:(void*)userInfo 
-                                              length:(int)userInfoLength;
+- (void)performSynchronousMessageExchangeWithBlock:(void (^)())block;
 
 /*!
  * Send a message to the main thread asynchronously
@@ -957,13 +956,13 @@ typedef void (*AEAudioControllerMessageHandler)(AEAudioController *audioControll
  *      optionally a pointer to data to be copied and passed to the handler, and the function will 
  *      be called on the realtime thread at the next polling interval.
  *
- * @param audioController The audio controller
- * @param handler       A pointer to a function to call on the main thread
- * @param userInfo      Pointer to user info data to pass to handler - this will be copied
- * @param userInfoLength Length of userInfo in bytes
+ * @param audioController The audio controller.
+ * @param handler         A pointer to a function to call on the main thread.
+ * @param userInfo        Pointer to user info data to pass to handler - this will be copied.
+ * @param userInfoLength  Length of userInfo in bytes.
  */
 void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController                 *audioController, 
-                                                          AEAudioControllerMessageHandler    handler, 
+                                                          AEAudioControllerMainThreadMessageHandler    handler, 
                                                           void                              *userInfo,
                                                           int                                userInfoLength);
 
