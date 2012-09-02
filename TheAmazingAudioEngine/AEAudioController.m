@@ -384,11 +384,11 @@ static void audioSessionPropertyListener(void *inClientData, AudioSessionPropert
             }
         }
         
-        if ( !updatedVP && (reason == kAudioSessionRouteChangeReason_NewDeviceAvailable || reason == kAudioSessionRouteChangeReason_OldDeviceUnavailable) ) {
+        if ( !updatedVP && (reason == kAudioSessionRouteChangeReason_NewDeviceAvailable || reason == kAudioSessionRouteChangeReason_OldDeviceUnavailable) && THIS->_inputEnabled ) {
             [THIS updateInputDeviceStatus];
         }
         
-    } else if ( inID == kAudioSessionProperty_AudioInputAvailable ) {
+    } else if ( inID == kAudioSessionProperty_AudioInputAvailable && THIS->_inputEnabled ) {
         [THIS updateInputDeviceStatus];
     }
 }
@@ -845,8 +845,10 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     _interrupted = NO;
     
-    // Determine if audio input is available, and the number of input channels available
-    [self updateInputDeviceStatus];
+    if ( _inputEnabled ) {
+        // Determine if audio input is available, and the number of input channels available
+        [self updateInputDeviceStatus];
+    }
     
     if ( !_pollThread ) {
         // Start messaging poll thread
@@ -1930,7 +1932,9 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
 }
 
 -(void)audiobusConnectionsChanged:(NSNotification*)notification {
-    [self updateInputDeviceStatus];
+    if ( _inputEnabled ) {
+        [self updateInputDeviceStatus];
+    }
     if ( !self.running ) {
         [self start];
     }
@@ -2059,7 +2063,9 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
 
     [self configureAudioUnit];
     
-    [self updateInputDeviceStatus];
+    if ( _inputEnabled ) {
+        [self updateInputDeviceStatus];
+    }
 
     if ( !_topGroup ) {
         // Allocate top-level group
@@ -2125,7 +2131,9 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
         return;
     }
 
-    [self updateInputDeviceStatus];
+    if ( _inputEnabled ) {
+        [self updateInputDeviceStatus];
+    }
     
     _topChannel.graphState &= ~(kGraphStateNodeConnected | kGraphStateRenderCallbackSet);
     BOOL unused;
@@ -2253,7 +2261,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     
     // Determine if audio input is available, and the number of input channels available
     AudioStreamBasicDescription rawAudioDescription = _audioDescription;
-    UInt32 numberOfInputChannels = 0;
+    UInt32 numberOfInputChannels = _audioDescription.mChannelsPerFrame;
     
     if ( _audiobusInputPort && ABInputPortIsConnected(_audiobusInputPort) ) {
         inputAvailable = YES;
@@ -2267,35 +2275,39 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
         size = sizeof(numberOfInputChannels);
         if ( inputAvailable ) {
             // Check channels on input
-            OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &numberOfInputChannels);
+            UInt32 channels;
+            OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &channels);
             if ( result == kAudioSessionIncompatibleCategory ) {
                 UInt32 originalAudioCategory;
                 UInt32 size = sizeof(originalAudioCategory);
                 AudioSessionGetProperty(kAudioSessionProperty_AudioCategory, &size, &originalAudioCategory);
                 
-                // Switch to play and record to get access to input info
-                self.audioSessionCategory = kAudioSessionCategory_PlayAndRecord;
-                
-                // Check channels on input
-                OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &numberOfInputChannels);
-                if ( !checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels)") ) {
-                    numberOfInputChannels = _audioDescription.mChannelsPerFrame;
+                if ( originalAudioCategory == kAudioSessionCategory_PlayAndRecord ) {
+                    NSLog(@"Unexpected audio system error while determining channel count");
+                } else {
+                    // Switch to play and record to get access to input info
+                    self.audioSessionCategory = kAudioSessionCategory_PlayAndRecord;
+                    
+                    // Check channels on input
+                    OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &channels);
+                    if ( checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels)") ) {
+                        numberOfInputChannels = channels;
+                    }
+                    
+                    // Switch back to other category
+                    self.audioSessionCategory = originalAudioCategory;
                 }
-                
-                // Switch back to other category
-                self.audioSessionCategory = originalAudioCategory;
-            } else if ( !checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels)") ) {
-                numberOfInputChannels = _audioDescription.mChannelsPerFrame;
+            } else if ( checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels)") ) {
+                numberOfInputChannels = channels;
             }
         }
     }
     
-    int channels = numberOfInputChannels == 0 ? _audioDescription.mChannelsPerFrame : numberOfInputChannels;
     if ( !(rawAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ) {
-        rawAudioDescription.mBytesPerFrame *= (float)channels / rawAudioDescription.mChannelsPerFrame;
-        rawAudioDescription.mBytesPerPacket *= (float)channels / rawAudioDescription.mChannelsPerFrame;
+        rawAudioDescription.mBytesPerFrame *= (float)numberOfInputChannels / rawAudioDescription.mChannelsPerFrame;
+        rawAudioDescription.mBytesPerPacket *= (float)numberOfInputChannels / rawAudioDescription.mChannelsPerFrame;
     }
-    rawAudioDescription.mChannelsPerFrame = channels;
+    rawAudioDescription.mChannelsPerFrame = numberOfInputChannels;
     
     AudioStreamBasicDescription inputAudioDescription = _inputMode == AEInputModeFixedAudioFormat ? _audioDescription : rawAudioDescription;
 
