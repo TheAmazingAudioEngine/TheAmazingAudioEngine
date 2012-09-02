@@ -46,18 +46,36 @@ static inline int min(int a, int b) { return a>b ? b : a; }
 
 static inline void AEAudioControllerError(OSStatus result, const char *operation, const char* file, int line) {
     int fourCC = CFSwapInt32HostToBig(result);
-    NSLog(@"%s:%d: %s result %d %08X %4.4s\n", file, line, operation, (int)result, (int)result, (char*)&fourCC); 
+    @autoreleasepool {
+        NSLog(@"%s:%d: %s result %d %08X %4.4s\n", file, line, operation, (int)result, (int)result, (char*)&fourCC);
+    }
 }
 
 #define checkResult(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/')+1,__LINE__))
 static inline BOOL _checkResult(OSStatus result, const char *operation, const char* file, int line) {
     if ( result != noErr ) {
+        static uint64_t lastMessage = 0;
+        static int messageCount=0;
+        uint64_t now = mach_absolute_time();
+        if ( (now-lastMessage)*__hostTicksToSeconds > 2 ) {
+            messageCount = 0;
+        }
+        lastMessage = now;
+        if ( ++messageCount >= 10 ) {
+            if ( messageCount == 10 ) {
+                @autoreleasepool {
+                    NSLog(@"Suppressing some messages");
+                }
+            }
+            if ( messageCount%500 != 0 ) {
+                return NO;
+            }
+        }
         AEAudioControllerError(result, operation, file, line);
         return NO;
     }
     return YES;
 }
-
 
 
 #pragma mark - Core types
@@ -1746,9 +1764,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
     [_audiobusInputPort release];
     _audiobusInputPort = audiobusInputPort;
 
-    if ( _audiobusInputPort ) {
-        [self updateInputDeviceStatus];
-    }
+    [self updateInputDeviceStatus];
 }
 
 -(void)setAudiobusOutputPort:(ABOutputPort *)audiobusOutputPort {
