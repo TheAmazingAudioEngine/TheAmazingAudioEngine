@@ -37,16 +37,13 @@
     player.url = url;
     
     AEAudioFileLoaderOperation *operation = [[AEAudioFileLoaderOperation alloc] initWithFileURL:url targetAudioDescription:player->_audioDescription];
-    NSOperationQueue *queue = [[NSOperationQueue alloc] init];
-    [queue addOperation:operation];
-    [queue waitUntilAllOperationsAreFinished];
+    [operation start];
     
     if ( operation.error ) {
         if ( error ) {
             *error = [[operation.error retain] autorelease];
         }
         [operation release];
-        [queue release];
         return nil;
     }
     
@@ -54,7 +51,6 @@
     player->_lengthInFrames = operation.lengthInFrames;
     
     [operation release];
-    [queue release];
     
     return player;
 }
