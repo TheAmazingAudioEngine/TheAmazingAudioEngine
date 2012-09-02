@@ -77,6 +77,18 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     return YES;
 }
 
+@interface NSError (AEAudioControllerAdditions)
++ (NSError*)audioControllerErrorWithMessage:(NSString*)message OSStatus:(OSStatus)status;
+@end
+@implementation NSError (AEAudioControllerAdditions)
++ (NSError*)audioControllerErrorWithMessage:(NSString*)message OSStatus:(OSStatus)status {
+    int fourCC = CFSwapInt32HostToBig(status);
+    return [NSError errorWithDomain:NSOSStatusErrorDomain
+                               code:status
+                           userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"%@ (error %d/%4.4s)", message, (int)status, (char*)&fourCC]
+                                                                forKey:NSLocalizedDescriptionKey]];
+}
+@end
 
 #pragma mark - Core types
 
@@ -239,7 +251,7 @@ typedef struct {
 - (void)pollForMessageResponses;
 static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS);
 
-- (void)initAudioSession;
+- (BOOL)initAudioSession;
 - (BOOL)setup;
 - (void)teardown;
 - (OSStatus)updateGraph;
@@ -274,6 +286,7 @@ static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp
 static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferList *buffer, UInt32 numberFrames, AudioStreamBasicDescription *audioDescription);
 
 @property (nonatomic, retain, readwrite) NSString *audioRoute;
+@property (nonatomic, retain) NSError *lastError;
 @property (nonatomic, retain) ABInputPort *audiobusInputPort;
 @property (nonatomic, retain) ABOutputPort *audiobusOutputPort;
 @end
@@ -313,7 +326,7 @@ static void interruptionListener(void *inClientData, UInt32 inInterruption) {
         }
         
         if ( THIS->_runningPriorToInterruption && ![THIS running] ) {
-            [THIS start];
+            [THIS start:NULL];
         }
         
         [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionEndedNotification object:THIS];
@@ -782,8 +795,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     [self initAudioSession];
     
     if ( ![self setup] ) {
-        [self release];
-        return nil;
+        _audioGraph = NULL;
     }
     
 #ifdef TRIAL
@@ -796,6 +808,8 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 - (void)dealloc {
+    self.lastError = nil;
+    
     if ( _pollThread ) {
         [_pollThread cancel];
         [_pollThread release];
@@ -837,10 +851,20 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     [super dealloc];
 }
 
-- (void)start {
+-(BOOL)start:(NSError **)error {
+    OSStatus status;
+    
     NSLog(@"TAAE: Starting Engine");
-    if ( !checkResult(AudioSessionSetActive(true), "AudioSessionSetActive") ) {
-        return;
+    
+    if ( !_audioGraph ) {
+        if ( error ) *error = _lastError;
+        self.lastError = nil;
+        return NO;
+    }
+    
+    if ( !checkResult(status=AudioSessionSetActive(true), "AudioSessionSetActive") ) {
+        if ( error ) *error = [NSError audioControllerErrorWithMessage:@"Couldn't activate audio session" OSStatus:status];
+        return NO;
     }
     
     _interrupted = NO;
@@ -860,10 +884,15 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     if ( !self.running ) {
         // Start things up
-        if ( checkResult(AUGraphStart(_audioGraph), "AUGraphStart") ) {
+        if ( checkResult(status=AUGraphStart(_audioGraph), "AUGraphStart") ) {
             _running = YES;
+        } else {
+            if ( error ) *error = [NSError audioControllerErrorWithMessage:@"Couldn't start audio engine" OSStatus:status];
+            return NO;
         }
     }
+    
+    return YES;
 }
 
 - (void)stop {
@@ -1922,7 +1951,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
         _interrupted = NO;
         
         if ( _runningPriorToInterruption && ![self running] ) {
-            [self start];
+            [self start:NULL];
         }
         
         [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionEndedNotification object:self];
@@ -1936,18 +1965,22 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
         [self updateInputDeviceStatus];
     }
     if ( !self.running ) {
-        [self start];
+        [self start:NULL];
     }
 }
 
 #pragma mark - Graph and audio session configuration
 
-- (void)initAudioSession {
+- (BOOL)initAudioSession {
     NSMutableString *extraInfo = [NSMutableString string];
     
     // Initialise the audio session
     OSStatus result = AudioSessionInitialize(NULL, NULL, interruptionListener, self);
-    if ( !checkResult(result, "AudioSessionInitialize") ) return;
+    if ( !checkResult(result, "AudioSessionInitialize") ) {
+        self.lastError = [NSError audioControllerErrorWithMessage:@"Couldn't initialize audio session" OSStatus:result];
+        _hasSystemError = YES;
+        return NO;
+    }
     
     // Register property listeners
     result = AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, self);
@@ -2031,6 +2064,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     CFRelease(route);
     
     NSLog(@"TAAE: Audio session initialized (%@)", extraInfo);
+    return YES;
 }
 
 - (BOOL)setup {
@@ -2095,7 +2129,11 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     
     // Initialize the graph
 	result = AUGraphInitialize(_audioGraph);
-    if ( !checkResult(result, "AUGraphInitialize") ) return NO;
+    if ( !checkResult(result, "AUGraphInitialize") ) {
+        self.lastError = [NSError audioControllerErrorWithMessage:@"Couldn't create audio graph" OSStatus:result];
+        _hasSystemError = YES;
+        return NO;
+    }
     
     NSLog(@"TAAE: Engine setup");
     
@@ -2914,7 +2952,7 @@ static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef g
         if ( [self setup] ) {
             NSLog(@"TAAE: Successfully recovered from system error");
             _hasSystemError = NO;
-            [self start];
+            [self start:NULL];
             return;
         }
     }

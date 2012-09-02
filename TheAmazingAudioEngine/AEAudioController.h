@@ -475,8 +475,11 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(AEAudioController *aud
 
 /*!
  * Start audio engine
+ *
+ * @param error On output, if not NULL, the error
+ * @return YES on success, NO on failure
  */
-- (void)start;
+- (BOOL)start:(NSError**)error;
 
 /*!
  * Stop audio engine
