@@ -417,13 +417,19 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
     *ioLengthInFrames = MIN(*ioLengthInFrames, sliceFrameCount);
     
     if ( sourceFrameCount > 0 ) {
+        int totalRequiredSkipFrames = 0;
         int skipFrames = 0;
 
-        if ( sourceTimestamp < sliceTimestamp - ((!source->synced ? 0.0001 : kResyncTimestampThreshold)*__secondsToHostTicks) ) {
+        if ( sourceTimestamp < sliceTimestamp - ((!source->synced ? 0.001 : kResyncTimestampThreshold)*__secondsToHostTicks) ) {
             // This source is behind. We'll skip some frames.
-            int totalRequiredSkipFrames = (sliceTimestamp - sourceTimestamp) * __hostTicksToSeconds * source->audioDescription.mSampleRate;
+            totalRequiredSkipFrames = (sliceTimestamp - sourceTimestamp) * __hostTicksToSeconds * source->audioDescription.mSampleRate;
             skipFrames = MIN(totalRequiredSkipFrames, MAX(0, (long long)sourceFrameCount - (long long)*ioLengthInFrames));
-            
+        } else {
+            source->synced = YES;
+            source->started = YES;
+        }
+        
+        if ( skipFrames > 0 ) {
             UInt32 microfadeFrames = 0;
             if ( source->synced ) {
 #ifdef DEBUG
@@ -670,6 +676,11 @@ UInt32 AEMixerBufferPeek(AEMixerBuffer *THIS, uint64_t *outNextTimestamp) {
     
     if ( !hasActiveSources ) {
         // No sources at the moment
+        if ( outNextTimestamp ) *outNextTimestamp = 0;
+        return 0;
+    }
+    
+    if ( latestStartTimestamp >= earliestEndTimestamp ) {
         if ( outNextTimestamp ) *outNextTimestamp = 0;
         return 0;
     }
