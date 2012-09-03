@@ -792,9 +792,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     TPCircularBufferInit(&_realtimeThreadMessageBuffer, kMessageBufferLength);
     TPCircularBufferInit(&_mainThreadMessageBuffer, kMessageBufferLength);
     
-    [self initAudioSession];
-    
-    if ( ![self setup] ) {
+    if ( ![self initAudioSession] || ![self setup] ) {
         _audioGraph = NULL;
     }
     
