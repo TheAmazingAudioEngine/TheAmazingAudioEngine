@@ -257,7 +257,7 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS);
 - (OSStatus)updateGraph;
 - (BOOL)mustUpdateVoiceProcessingSettings;
 - (void)replaceIONode;
-- (void)updateInputDeviceStatus;
+- (BOOL)updateInputDeviceStatus;
 
 static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannelRef channel, AEChannelGroupRef parentGroup, int index, BOOL *updateRequired);
 static OSStatus configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannelRef channel, AEChannelGroupRef parentGroup, int index, BOOL *updateRequired);
@@ -865,11 +865,17 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         return NO;
     }
     
+    BOOL hasError = NO;
+    
     _interrupted = NO;
     
     if ( _inputEnabled ) {
         // Determine if audio input is available, and the number of input channels available
-        [self updateInputDeviceStatus];
+        if ( ![self updateInputDeviceStatus] ) {
+            if ( error ) *error = self.lastError;
+            self.lastError = nil;
+            hasError = YES;
+        }
     }
     
     if ( !_pollThread ) {
@@ -890,7 +896,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         }
     }
     
-    return YES;
+    return !hasError;
 }
 
 - (void)stop {
@@ -2292,8 +2298,10 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     return NO;
 }
 
-- (void)updateInputDeviceStatus {
+- (BOOL)updateInputDeviceStatus {
     UInt32 inputAvailable=0;
+    
+    BOOL success = YES;
     
     // Determine if audio input is available, and the number of input channels available
     AudioStreamBasicDescription rawAudioDescription = _audioDescription;
@@ -2320,6 +2328,8 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
                 
                 if ( originalAudioCategory == kAudioSessionCategory_PlayAndRecord ) {
                     NSLog(@"Unexpected audio system error while determining channel count");
+                    if ( !_lastError ) self.lastError = [NSError audioControllerErrorWithMessage:@"Audio system error while determining input channel count" OSStatus:result];
+                    success = NO;
                 } else {
                     // Switch to play and record to get access to input info
                     self.audioSessionCategory = kAudioSessionCategory_PlayAndRecord;
@@ -2534,6 +2544,8 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
               useVoiceProcessing ? @", using voice processing" : @"",
               converter ? @", with converter" : @"");
     }
+    
+    return success;
 }
 
 static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannelRef channel, AEChannelGroupRef parentGroup, int index, BOOL *updateRequired) {
