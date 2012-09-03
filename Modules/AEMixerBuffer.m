@@ -39,6 +39,7 @@ typedef struct {
     float                                   volume;
     float                                   pan;
     BOOL                                    started;
+    AudioBufferList                        *skipFadeBuffer;
 } source_t;
 
 typedef void(*AEMixerBufferAction)(AEMixerBuffer *buffer, void *userInfo);
@@ -83,6 +84,7 @@ static const UInt32 kMaxMicrofadeDuration                   = 512;
 
 static inline source_t *sourceWithID(AEMixerBuffer *THIS, AEMixerBufferSource sourceID, int* index);
 static void prepareNewSource(AEMixerBuffer *THIS, AEMixerBufferSource sourceID);
+static void prepareSkipFadeBufferForSource(source_t* source);
 - (void)refreshMixingGraph;
 @end
 
@@ -143,6 +145,10 @@ static void prepareNewSource(AEMixerBuffer *THIS, AEMixerBufferSource sourceID);
             if ( !_table[i].renderCallback ) {
                 TPCircularBufferCleanup(&_table[i].buffer);
             }
+            for ( int j=0; j<_table[i].skipFadeBuffer->mNumberBuffers; j++ ) {
+                free(_table[i].skipFadeBuffer->mBuffers[j].mData);
+            }
+            free(_table[i].skipFadeBuffer);
         }
     }
     
@@ -195,6 +201,7 @@ void AEMixerBufferEnqueue(AEMixerBuffer *THIS, AEMixerBufferSource sourceID, Aud
         source->pan = 0.0;
         source->audioDescription = _clientFormat;
         source->lastAudioTimestamp = mach_absolute_time();
+        prepareSkipFadeBufferForSource(source);
         [self refreshMixingGraph];
     } else {
         TPCircularBufferCleanup(&source->buffer);
@@ -445,21 +452,30 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
     
             BOOL canMicrofade = bufferList && source->audioDescription.mBitsPerChannel == 16;
             
-            // Take the first of the frames we're going to skip
-            microfadeFrames = MIN(*ioLengthInFrames, kMaxMicrofadeDuration);
-            if ( source->renderCallback ) {
-                source->renderCallback(source->source, microfadeFrames, bufferList, source->callbackUserinfo);
+            if ( source->skipFadeBuffer->mBuffers[0].mDataByteSize > 0 ) {
+                // We have some frames in the skip buffer, ready to crossfade
+                microfadeFrames = microfadeFrames = MIN(*ioLengthInFrames, source->skipFadeBuffer->mBuffers[0].mDataByteSize / source->audioDescription.mBytesPerFrame);
             } else {
-                TPCircularBufferDequeueBufferListFrames(&source->buffer, &microfadeFrames, bufferList, NULL, &source->audioDescription);
+                // Take the first of the frames we're going to skip, given that there's not already some stored frames in the skip buffer
+                microfadeFrames = MIN(*ioLengthInFrames, kMaxMicrofadeDuration);
+                for ( int i=0; i<source->skipFadeBuffer->mNumberBuffers; i++ ) {
+                    source->skipFadeBuffer->mBuffers[i].mDataByteSize = source->audioDescription.mBytesPerFrame * microfadeFrames;
+                }
+                
+                if ( source->renderCallback ) {
+                    source->renderCallback(source->source, microfadeFrames, source->skipFadeBuffer, source->callbackUserinfo);
+                } else {
+                    TPCircularBufferDequeueBufferListFrames(&source->buffer, &microfadeFrames, source->skipFadeBuffer, NULL, &source->audioDescription);
+                }
             }
             
             if ( canMicrofade ) {
                 // Convert the audio to float
                 for ( int i=0; i<source->audioDescription.mChannelsPerFrame; i++ ) {
                     if ( source->audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ) {
-                        vDSP_vflt16(bufferList->mBuffers[i].mData, 1, THIS->_microfadeBuffer[i], 1, microfadeFrames);
+                        vDSP_vflt16(source->skipFadeBuffer->mBuffers[i].mData, 1, THIS->_microfadeBuffer[i], 1, microfadeFrames);
                     } else {
-                        vDSP_vflt16((SInt16*)bufferList->mBuffers[0].mData+i, source->audioDescription.mChannelsPerFrame, THIS->_microfadeBuffer[i], 1, microfadeFrames);
+                        vDSP_vflt16((SInt16*)source->skipFadeBuffer->mBuffers[0].mData+i, source->audioDescription.mChannelsPerFrame, THIS->_microfadeBuffer[i], 1, microfadeFrames);
                     }
                 }
                 
@@ -474,16 +490,15 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
             }
             
             // Throw away the rest
-            UInt32 discardFrames = MAX((int)skipFrames-(int)microfadeFrames, 0);
-            while ( discardFrames > 0 ) {
-                UInt32 frames = MIN(discardFrames, *ioLengthInFrames);
-                if ( source->renderCallback ) {
-                    source->renderCallback(source->source, microfadeFrames, bufferList, source->callbackUserinfo);
-                } else {
-                    TPCircularBufferDequeueBufferListFrames(&source->buffer, &microfadeFrames, bufferList, NULL, &source->audioDescription);
-                }
-                if ( frames == 0 ) break;
-                discardFrames -= frames;
+            UInt32 discardFrames = MAX((int)skipFrames-(int)(source->skipFadeBuffer->mBuffers[0].mDataByteSize > 0 ? 0 : microfadeFrames), 0);
+            if ( source->renderCallback ) {
+                source->renderCallback(source->source, discardFrames, NULL, source->callbackUserinfo);
+            } else {
+                TPCircularBufferDequeueBufferListFrames(&source->buffer, &discardFrames, NULL, NULL, &source->audioDescription);
+            }
+            
+            for ( int i=0; i<source->skipFadeBuffer->mNumberBuffers; i++ ) {
+                source->skipFadeBuffer->mBuffers[i].mDataByteSize = 0;
             }
             
             // Take the fresh audio
@@ -633,6 +648,8 @@ UInt32 AEMixerBufferPeek(AEMixerBuffer *THIS, uint64_t *outNextTimestamp) {
     uint64_t now = mach_absolute_time();
     uint64_t earliestEndTimestamp = UINT64_MAX;
     uint64_t latestStartTimestamp = 0;
+    source_t *earliestEndSource = NULL;
+    UInt32 earliestEndSourceFrameCount = 0;
     UInt32 minFrameCount = UINT32_MAX;
     BOOL hasActiveSources = NO;
     
@@ -660,17 +677,21 @@ UInt32 AEMixerBufferPeek(AEMixerBuffer *THIS, uint64_t *outNextTimestamp) {
                 // This source is empty
                 if ( outNextTimestamp ) *outNextTimestamp = 0;
                 return 0;
-            } else {
-                if ( frameCount < minFrameCount ) minFrameCount = frameCount;
-                source->lastAudioTimestamp = now;
             }
+            
+            if ( frameCount < minFrameCount ) minFrameCount = frameCount;
+            source->lastAudioTimestamp = now;
             
             hasActiveSources = YES;
             
             uint64_t endTimestamp = timestamp + (((double)frameCount / source->audioDescription.mSampleRate) * __secondsToHostTicks);
             
             if ( timestamp > latestStartTimestamp ) latestStartTimestamp = timestamp;
-            if ( endTimestamp < earliestEndTimestamp ) earliestEndTimestamp = endTimestamp;
+            if ( endTimestamp < earliestEndTimestamp ) {
+                earliestEndTimestamp = endTimestamp;
+                earliestEndSource = source;
+                earliestEndSourceFrameCount = frameCount;
+            }
         }
     }
     
@@ -680,9 +701,34 @@ UInt32 AEMixerBufferPeek(AEMixerBuffer *THIS, uint64_t *outNextTimestamp) {
         return 0;
     }
     
-    if ( latestStartTimestamp >= earliestEndTimestamp ) {
-        if ( outNextTimestamp ) *outNextTimestamp = 0;
-        return 0;
+    if ( earliestEndSource && latestStartTimestamp >= earliestEndTimestamp ) {
+        // One of the sources is behind - skip all frames of this source and re-evaluate
+        #ifdef DEBUG
+        printf("Mixer buffer skipping %ld frames of source %p\n", earliestEndSourceFrameCount, earliestEndSource);
+        #endif
+        
+        UInt32 skipFrames = earliestEndSourceFrameCount;
+        
+        if ( earliestEndSource->skipFadeBuffer->mBuffers[0].mDataByteSize == 0 ) {
+            // Take the first of the frames we're going to skip, to crossfade later
+            UInt32 microfadeFrames = MIN(earliestEndSourceFrameCount, kMaxMicrofadeDuration);
+            skipFrames -= microfadeFrames;
+            for ( int i=0; i<earliestEndSource->skipFadeBuffer->mNumberBuffers; i++ ) {
+                earliestEndSource->skipFadeBuffer->mBuffers[i].mDataByteSize = earliestEndSource->audioDescription.mBytesPerFrame * microfadeFrames;
+            }
+            if ( earliestEndSource->renderCallback ) {
+                earliestEndSource->renderCallback(earliestEndSource->source, microfadeFrames, earliestEndSource->skipFadeBuffer, earliestEndSource->callbackUserinfo);
+            } else {
+                TPCircularBufferDequeueBufferListFrames(&earliestEndSource->buffer, &microfadeFrames, earliestEndSource->skipFadeBuffer, NULL, &earliestEndSource->audioDescription);
+            }
+        }
+        
+        if ( earliestEndSource->renderCallback ) {
+            earliestEndSource->renderCallback(earliestEndSource->source, skipFrames, NULL, earliestEndSource->callbackUserinfo);
+        } else {
+            TPCircularBufferDequeueBufferListFrames(&earliestEndSource->buffer, &skipFrames, NULL, NULL, &earliestEndSource->audioDescription);
+        }
+        return AEMixerBufferPeek(THIS, outNextTimestamp);
     }
     
     UInt32 frameCount = round((earliestEndTimestamp - latestStartTimestamp) * __hostTicksToSeconds * THIS->_clientFormat.mSampleRate);
@@ -933,12 +979,23 @@ static void prepareNewSource(AEMixerBuffer *THIS, AEMixerBufferSource sourceID) 
     source->pan = 0.0;
     source->audioDescription = THIS->_clientFormat;
     source->lastAudioTimestamp = mach_absolute_time();
+    prepareSkipFadeBufferForSource(source);
     
     TPCircularBufferInit(&source->buffer, kSourceBufferLength);
     
     OSMemoryBarrier();
     source->source = sourceID;
     [THIS refreshMixingGraph];
+}
+
+static void prepareSkipFadeBufferForSource(source_t* source) {
+    source->skipFadeBuffer = malloc(sizeof(AudioBufferList)+((source->audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? source->audioDescription.mChannelsPerFrame-1 : 0)*sizeof(AudioBuffer)));
+    source->skipFadeBuffer->mNumberBuffers = source->audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? source->audioDescription.mChannelsPerFrame : 1;
+    for ( int i=0; i<source->skipFadeBuffer->mNumberBuffers; i++ ) {
+        source->skipFadeBuffer->mBuffers[i].mNumberChannels = source->audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? 1 : source->audioDescription.mChannelsPerFrame;
+        source->skipFadeBuffer->mBuffers[i].mData = malloc(source->audioDescription.mBytesPerFrame * kMaxMicrofadeDuration);
+        source->skipFadeBuffer->mBuffers[i].mDataByteSize = 0;
+    }
 }
 
 @end
