@@ -29,7 +29,7 @@
     
     // Create an instance of the audio controller, set it up and start it running
     self.audioController = [[[AEAudioController alloc] initWithAudioDescription:[AEAudioController interleaved16BitStereoAudioDescription] inputEnabled:YES] autorelease];
-    [_audioController start];
+    [_audioController start:NULL];
     
     // Create and display view controller
     self.viewController = [[[ViewController alloc] initWithAudioController:_audioController] autorelease];

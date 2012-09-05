@@ -433,6 +433,14 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(AEAudioController *aud
 + (AudioStreamBasicDescription)nonInterleaved16BitStereoAudioDescription;
 
 /*!
+ * Floating-point stereo audio description, non-interleaved
+ *
+ *      This is a floating-point PCM, stereo, non-interleaved format at 44.1kHz that can be used
+ *      with @link initWithAudioDescription: @endlink.
+ */
++ (AudioStreamBasicDescription)nonInterleavedFloatStereoAudioDescription;
+
+/*!
  * Determine whether voice processing is available on this device
  *
  *      Older devices are not able to perform voice processing - this determines

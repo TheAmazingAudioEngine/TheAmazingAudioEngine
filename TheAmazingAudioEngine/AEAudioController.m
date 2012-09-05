@@ -726,6 +726,20 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     return audioDescription;
 }
 
++ (AudioStreamBasicDescription)nonInterleavedFloatStereoAudioDescription {
+    AudioStreamBasicDescription audioDescription;
+    memset(&audioDescription, 0, sizeof(audioDescription));
+    audioDescription.mFormatID          = kAudioFormatLinearPCM;
+    audioDescription.mFormatFlags       = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved;
+    audioDescription.mChannelsPerFrame  = 2;
+    audioDescription.mBytesPerPacket    = sizeof(float);
+    audioDescription.mFramesPerPacket   = 1;
+    audioDescription.mBytesPerFrame     = sizeof(float);
+    audioDescription.mBitsPerChannel    = 8 * sizeof(float);
+    audioDescription.mSampleRate        = 44100.0;
+    return audioDescription;
+}
+
 + (AudioStreamBasicDescription)audioUnitCanonicalAudioDescription {
     AudioStreamBasicDescription audioDescription;
     memset(&audioDescription, 0, sizeof(audioDescription));
