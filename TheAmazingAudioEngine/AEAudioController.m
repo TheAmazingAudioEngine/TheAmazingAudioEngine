@@ -360,6 +360,8 @@ static void audioSessionPropertyListener(void *inClientData, AudioSessionPropert
         
         THIS.audioRoute = [NSString stringWithString:(NSString*)route];
         
+        NSLog(@"TAAE: Changed audio route to %@", THIS.audioRoute);
+        
         BOOL playingThroughSpeaker;
         if ( [(NSString*)route isEqualToString:@"ReceiverAndMicrophone"] ) {
             checkResult(AudioSessionRemovePropertyListenerWithUserData(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, THIS), "AudioSessionRemovePropertyListenerWithUserData");
@@ -1428,7 +1430,7 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
 #ifdef DEBUG
             uint64_t end = mach_absolute_time();
             if ( (end-start)*__hostTicksToSeconds >= THIS->_preferredBufferDuration ) {
-                printf("Warning: Block perform on realtime thread took too long (%0.4lfs)", (end-start)*__hostTicksToSeconds);
+                printf("Warning: Block perform on realtime thread took too long (%0.4lfs)\n", (end-start)*__hostTicksToSeconds);
             }
 #endif
         }
