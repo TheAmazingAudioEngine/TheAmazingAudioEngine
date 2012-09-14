@@ -17,6 +17,7 @@
 #import "AEAudioController+Audiobus.h"
 #import "AEAudioController+AudiobusStub.h"
 #import <mach/mach_time.h>
+#import <pthread.h>
 
 static double __hostTicksToSeconds = 0.0;
 static double __secondsToHostTicks = 0.0;
