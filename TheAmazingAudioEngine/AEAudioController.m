@@ -3255,7 +3255,8 @@ static void serveAudiobusInputQueue(AEAudioController *THIS) {
     AudioUnitRenderActionFlags flags = kAudiobusSourceFlag;
     while ( 1 ) {
         UInt32 frames = ABInputPortPeek(THIS->_audiobusInputPort, &timestamp.mHostTime);
-        if ( frames < ioBufferLength ) break;
+        if ( frames == 0 ) break;
+        
         frames = MIN(ioBufferLength, frames);
         timestamp.mSampleTime = __sampleTime;
         __sampleTime += frames;
