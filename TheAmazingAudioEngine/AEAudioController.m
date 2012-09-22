@@ -792,7 +792,6 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     _audioDescription = audioDescription;
     _inputAudioDescription = audioDescription;
     _inputEnabled = enableInput;
-    _enableBluetoothInput = YES;
     _voiceProcessingEnabled = useVoiceProcessing;
     _preferredBufferDuration = 0.005;
     _inputMode = AEInputModeFixedAudioFormat;
