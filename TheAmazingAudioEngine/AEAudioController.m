@@ -2350,38 +2350,27 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     } else {
         size = sizeof(numberOfInputChannels);
         if ( inputAvailable ) {
-            UInt32 originalAudioCategory;
-            UInt32 size = sizeof(originalAudioCategory);
-            AudioSessionGetProperty(kAudioSessionProperty_AudioCategory, &size, &originalAudioCategory);
-            
-            // Switch to requested audio category, if necessary
-            if ( originalAudioCategory != _audioSessionCategory ) {
-                self.audioSessionCategory = _audioSessionCategory;
-                originalAudioCategory = _audioSessionCategory;
-            }
-            
             // Check channels on input
             UInt32 channels;
             OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &channels);
             if ( result == kAudioSessionIncompatibleCategory ) {
-                if ( originalAudioCategory == kAudioSessionCategory_PlayAndRecord ) {
-                    NSLog(@"Unexpected audio system error while determining channel count");
-                    if ( !_lastError ) self.lastError = [NSError audioControllerErrorWithMessage:@"Audio system error while determining input channel count" OSStatus:result];
-                    success = NO;
-                } else {
-                    // Switch to play and record to get access to input info
-                    self.audioSessionCategory = kAudioSessionCategory_PlayAndRecord;
-                    
-                    // Check channels on input
-                    OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &channels);
-                    if ( checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels)") ) {
-                        numberOfInputChannels = channels;
-                    }
-                    
-                    // Switch back to other category
-                    self.audioSessionCategory = originalAudioCategory;
+                // Attempt to force category, and try again
+                UInt32 originalCategory = _audioSessionCategory;
+                self.audioSessionCategory = kAudioSessionCategory_PlayAndRecord;
+                result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &channels);
+                if ( checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels)") ) {
+                    numberOfInputChannels = channels;
                 }
-            } else if ( checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels)") ) {
+                if ( originalCategory != kAudioSessionCategory_PlayAndRecord ) {
+                    self.audioSessionCategory = originalCategory;
+                }
+            }
+
+            if ( !checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels)") ) {
+                NSLog(@"Unexpected audio system error while determining channel count");
+                if ( !_lastError ) self.lastError = [NSError audioControllerErrorWithMessage:@"Audio system error while determining input channel count" OSStatus:result];
+                success = NO;
+            } else {
                 numberOfInputChannels = channels;
             }
         }
