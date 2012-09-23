@@ -86,7 +86,7 @@ static void audioCallback(id                        receiver,
     AERecorder *THIS = receiver;
     if ( !THIS->_recording ) return;
     
-    AEMixerBufferEnqueue(THIS->_mixer, source, audio, frames, time->mHostTime);
+    AEMixerBufferEnqueue(THIS->_mixer, source, audio, frames, time);
     
     // Let the mixer buffer provide the audio buffer
     UInt32 bufferLength = kProcessChunkSize;
