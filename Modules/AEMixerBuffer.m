@@ -65,6 +65,7 @@ static const UInt32 kMaxMicrofadeDuration                   = 512;
     AudioStreamBasicDescription _clientFormat;
     AudioStreamBasicDescription _mixerOutputFormat;
     source_t                    _table[kMaxSources];
+    uint64_t                    _currentSliceSampleTime;
     AudioTimeStamp              _currentSliceTimestamp;
     UInt32                      _currentSliceFrameCount;
     AUGraph                     _graph;
@@ -323,16 +324,14 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
         
         // Perform render
         AudioUnitRenderActionFlags flags = 0;
-        if ( !THIS->_currentSliceTimestamp.mFlags & kAudioTimeStampSampleTimeValid ) {
-            THIS->_currentSliceTimestamp.mSampleTime = 0;
-            THIS->_currentSliceTimestamp.mFlags |= kAudioTimeStampSampleTimeValid;
-        }
+        THIS->_currentSliceTimestamp.mFlags |= kAudioTimeStampSampleTimeValid;
+        THIS->_currentSliceTimestamp.mSampleTime = THIS->_currentSliceSampleTime;
         OSStatus result = AudioUnitRender(THIS->_mixerUnit, &flags, &THIS->_currentSliceTimestamp, 0, frames, intermediateBufferList);
         if ( !checkResult(result, "AudioUnitRender") ) {
             break;
         }
         
-        THIS->_currentSliceTimestamp.mSampleTime += frames;
+        THIS->_currentSliceSampleTime += frames;
         THIS->_currentSliceTimestamp.mHostTime += ((double)frames/THIS->_clientFormat.mSampleRate) * __secondsToHostTicks;
         THIS->_currentSliceFrameCount -= frames;
         
