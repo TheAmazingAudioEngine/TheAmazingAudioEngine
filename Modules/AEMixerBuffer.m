@@ -65,7 +65,6 @@ static const UInt32 kMaxMicrofadeDuration                   = 512;
     AudioStreamBasicDescription _clientFormat;
     AudioStreamBasicDescription _mixerOutputFormat;
     source_t                    _table[kMaxSources];
-    uint64_t                    _currentSliceSampleTime;
     AudioTimeStamp              _currentSliceTimestamp;
     UInt32                      _currentSliceFrameCount;
     AUGraph                     _graph;
@@ -324,14 +323,16 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
         
         // Perform render
         AudioUnitRenderActionFlags flags = 0;
-        THIS->_currentSliceTimestamp.mFlags |= kAudioTimeStampSampleTimeValid;
-        THIS->_currentSliceTimestamp.mSampleTime = THIS->_currentSliceSampleTime;
+        if ( !THIS->_currentSliceTimestamp.mFlags & kAudioTimeStampSampleTimeValid ) {
+            THIS->_currentSliceTimestamp.mSampleTime = 0;
+            THIS->_currentSliceTimestamp.mFlags |= kAudioTimeStampSampleTimeValid;
+        }
         OSStatus result = AudioUnitRender(THIS->_mixerUnit, &flags, &THIS->_currentSliceTimestamp, 0, frames, intermediateBufferList);
         if ( !checkResult(result, "AudioUnitRender") ) {
             break;
         }
         
-        THIS->_currentSliceSampleTime += frames;
+        THIS->_currentSliceTimestamp.mSampleTime += frames;
         THIS->_currentSliceTimestamp.mHostTime += ((double)frames/THIS->_clientFormat.mSampleRate) * __secondsToHostTicks;
         THIS->_currentSliceFrameCount -= frames;
         
@@ -672,10 +673,10 @@ UInt32 AEMixerBufferPeek(AEMixerBuffer *THIS, AudioTimeStamp *outNextTimestamp) 
             source->lastAudioTimestamp = now;
             
             hasActiveSources = YES;
-            
+
             AudioTimeStamp endTimestamp = timestamp;
-            endTimestamp.mHostTime += (((double)frameCount / source->audioDescription.mSampleRate) * __secondsToHostTicks);
-            endTimestamp.mSampleTime += frameCount;
+            endTimestamp.mHostTime = frameCount == UINT32_MAX ? UINT64_MAX : (UInt64)(endTimestamp.mHostTime + (((double)frameCount / source->audioDescription.mSampleRate) * __secondsToHostTicks));
+            endTimestamp.mSampleTime = frameCount == UINT32_MAX ? UINT32_MAX : (endTimestamp.mSampleTime + frameCount);
             
             if ( timestamp.mHostTime > latestStartTimestamp.mHostTime ) latestStartTimestamp = timestamp;
             if ( endTimestamp.mHostTime < earliestEndTimestamp.mHostTime ) {
@@ -685,6 +686,8 @@ UInt32 AEMixerBufferPeek(AEMixerBuffer *THIS, AudioTimeStamp *outNextTimestamp) 
             }
         }
     }
+    
+    
     
     if ( !hasActiveSources ) {
         // No sources at the moment
