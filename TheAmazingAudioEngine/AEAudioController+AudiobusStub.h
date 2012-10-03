@@ -16,13 +16,13 @@ extern NSString * ABConnectionsChangedNotification;
 
 #define ABMetadataBlockList void*
 typedef NSUInteger ABInputPortAttributes;
-void ABInputPortReceive(ABInputPort *inputPort, ABPort *sourcePortOrNil, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, uint64_t *outTimestamp, ABMetadataBlockList *ioMetadataBlockList);
-UInt32 ABInputPortPeek(ABInputPort *inputPort, uint64_t *outNextTimestamp);
+void ABInputPortReceive(ABInputPort *inputPort, ABPort *sourcePortOrNil, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, AudioTimeStamp *outTimestamp, ABMetadataBlockList *ioMetadataBlockList);
+UInt32 ABInputPortPeek(ABInputPort *inputPort, AudioTimeStamp *outNextTimestamp);
 BOOL ABInputPortIsConnected(ABInputPort *inputPort);
-BOOL ABOutputPortSendAudio(ABOutputPort* outputPort, const AudioBufferList *audio, UInt32 lengthInFrames, UInt64 hostTime, ABMetadataBlockList *metadata);
+BOOL ABOutputPortSendAudio(ABOutputPort* outputPort, const AudioBufferList *audio, UInt32 lengthInFrames, const AudioTimeStamp *timestamp, ABMetadataBlockList *metadata);
 ABInputPortAttributes ABOutputPortGetConnectedPortAttributes(ABOutputPort *outputPort);
 NSTimeInterval ABOutputPortGetAverageLatency(ABOutputPort *outputPort);
-typedef void (^ABInputPortAudioInputBlock)(ABInputPort *inputPort, UInt32 lengthInFrames, uint64_t nextTimestamp, ABPort *sourcePortOrNil);
+typedef void (^ABInputPortAudioInputBlock)(ABInputPort *inputPort, UInt32 lengthInFrames, AudioTimeStamp nextTimestamp, ABPort *sourcePortOrNil);
 
 @interface NSObject ()
 - (AudioStreamBasicDescription)clientFormat;

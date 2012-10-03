@@ -490,7 +490,7 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
     
     if ( channel->audiobusOutputPort ) {
         // Send via Audiobus
-        ABOutputPortSendAudio(channel->audiobusOutputPort, audio, frames, arg->inTimeStamp.mHostTime, NULL);
+        ABOutputPortSendAudio(channel->audiobusOutputPort, audio, frames, &arg->inTimeStamp, NULL);
         if ( ABOutputPortGetConnectedPortAttributes(channel->audiobusOutputPort) & ABInputPortAttributePlaysLiveAudio ) {
             // Silence output after sending
             for ( int i=0; i<audio->mNumberBuffers; i++ ) memset(audio->mBuffers[i].mData, 0, audio->mBuffers[i].mDataByteSize);
@@ -3242,7 +3242,7 @@ static void serveAudiobusInputQueue(AEAudioController *THIS) {
     static Float64 __sampleTime = 0;
     AudioUnitRenderActionFlags flags = kAudiobusSourceFlag;
     while ( 1 ) {
-        UInt32 frames = ABInputPortPeek(THIS->_audiobusInputPort, &timestamp.mHostTime);
+        UInt32 frames = ABInputPortPeek(THIS->_audiobusInputPort, &timestamp);
         if ( frames == 0 ) break;
         
         frames = MIN(ioBufferLength, frames);
