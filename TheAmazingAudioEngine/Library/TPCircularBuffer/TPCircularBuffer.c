@@ -108,6 +108,8 @@ void TPCircularBufferCleanup(TPCircularBuffer *buffer) {
 }
 
 void TPCircularBufferClear(TPCircularBuffer *buffer) {
-    buffer->head = buffer->tail = 0;
-    buffer->fillCount = 0;
+    int32_t fillCount;
+    if ( TPCircularBufferTail(buffer, &fillCount) ) {
+        TPCircularBufferConsume(buffer, fillCount);
+    }
 }
