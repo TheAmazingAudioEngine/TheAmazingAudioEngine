@@ -9,11 +9,11 @@
 #import "AEAudioController+Audiobus.h"
 #import "AEAudioController+AudiobusStub.h"
 
-__attribute__((weak)) void ABInputPortReceive(ABInputPort *inputPort, ABPort *sourcePortOrNil, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, uint64_t *outTimestamp, ABMetadataBlockList *ioMetadataBlockList) {
+__attribute__((weak)) void ABInputPortReceive(ABInputPort *inputPort, ABPort *sourcePortOrNil, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, AudioTimeStamp *outTimestamp, ABMetadataBlockList *ioMetadataBlockList) {
     printf("ABInputPortReceive stub called\n");
 }
 
-__attribute__((weak)) UInt32 ABInputPortPeek(ABInputPort *inputPort, uint64_t *outNextTimestamp) {
+__attribute__((weak)) UInt32 ABInputPortPeek(ABInputPort *inputPort, AudioTimeStamp *outNextTimestamp) {
     printf("ABInputPortPeek stub called\n");
     return 0;
 }
@@ -23,7 +23,7 @@ __attribute__((weak)) BOOL ABInputPortIsConnected(ABInputPort *inputPort) {
     return NO;
 }
 
-__attribute__((weak)) BOOL ABOutputPortSendAudio(ABOutputPort* outputPort, const AudioBufferList *audio, UInt32 lengthInFrames, UInt64 hostTime, ABMetadataBlockList *metadata) {
+__attribute__((weak)) BOOL ABOutputPortSendAudio(ABOutputPort* outputPort, const AudioBufferList *audio, UInt32 lengthInFrames, const AudioTimeStamp *timestamp, ABMetadataBlockList *metadata) {
     printf("ABOutputPortSendAudio stub called\n");
     return NO;
 }
