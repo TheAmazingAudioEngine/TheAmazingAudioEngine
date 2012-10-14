@@ -7,59 +7,32 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		4C0C24BD159A135A00D23E13 /* AEMixerBuffer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C8A0F3E1540BBD300307CB6 /* AEMixerBuffer.m */; };
-		4C0C24BE159A135A00D23E13 /* AELimiter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA689B21541EF4A00AF8DDD /* AELimiter.m */; };
-		4C0C24BF159A135A00D23E13 /* AELimiterFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA689BD1542D4FE00AF8DDD /* AELimiterFilter.m */; };
-		4C0C24C0159A135A00D23E13 /* AEExpanderFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA689C415447E3100AF8DDD /* AEExpanderFilter.m */; };
-		4C0C24C1159A135A00D23E13 /* AEPlaythroughChannel.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA689C01542DC8C00AF8DDD /* AEPlaythroughChannel.m */; };
-		4C0C24C2159A135A00D23E13 /* AERecorder.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C38DC511545840E009F4454 /* AERecorder.m */; };
-		4C0C24C4159A139500D23E13 /* AEMixerBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C8A0F3D1540BBD300307CB6 /* AEMixerBuffer.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		4C0C24C5159A139500D23E13 /* AELimiter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CA689B11541EF4A00AF8DDD /* AELimiter.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		4C0C24C6159A139500D23E13 /* AELimiterFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CA689BC1542D4FE00AF8DDD /* AELimiterFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		4C0C24C7159A139500D23E13 /* AEExpanderFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CA689C315447E3100AF8DDD /* AEExpanderFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		4C0C24C8159A139500D23E13 /* AEPlaythroughChannel.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CA689BF1542DC8C00AF8DDD /* AEPlaythroughChannel.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		4C0C24C9159A139500D23E13 /* AERecorder.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C38DC501545840E009F4454 /* AERecorder.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		4C0C24D4159A291700D23E13 /* TPCircularBuffer+AudioBufferList.c in Sources */ = {isa = PBXBuildFile; fileRef = 4CA689B81541F54200AF8DDD /* TPCircularBuffer+AudioBufferList.c */; };
 		4C215CEF1523A7D500D36CAD /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C215CEE1523A7D500D36CAD /* Foundation.framework */; };
-		4C215CFE1523A83700D36CAD /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C215CEE1523A7D500D36CAD /* Foundation.framework */; };
 		4C215D081523A8E500D36CAD /* AEAudioController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CAD56811516281D003CE861 /* AEAudioController.m */; };
 		4C215D091523A8E500D36CAD /* AEAudioFilePlayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CAD56AA15163488003CE861 /* AEAudioFilePlayer.m */; };
 		4C215D0A1523A8E500D36CAD /* AEUtilities.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C12CC99151D1EDA00562E2A /* AEUtilities.c */; };
-		4C215D0D1523A8E600D36CAD /* AEAudioController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CAD56811516281D003CE861 /* AEAudioController.m */; };
-		4C215D0E1523A8E600D36CAD /* AEAudioFilePlayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CAD56AA15163488003CE861 /* AEAudioFilePlayer.m */; };
-		4C215D0F1523A8E600D36CAD /* AEUtilities.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C12CC99151D1EDA00562E2A /* AEUtilities.c */; };
-		4C215D101523A8E600D36CAD /* AETrialModeController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CAD56851516281D003CE861 /* AETrialModeController.m */; };
 		4C215D121523A94200D36CAD /* TheAmazingAudioEngine.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CAD569315162822003CE861 /* TheAmazingAudioEngine.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4C215D131523A94200D36CAD /* AEAudioController.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CAD56801516281D003CE861 /* AEAudioController.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4C215D141523A94200D36CAD /* AEAudioFilePlayer.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CAD56A915163488003CE861 /* AEAudioFilePlayer.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4C215D151523A94200D36CAD /* AEUtilities.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C12CC98151D1EDA00562E2A /* AEUtilities.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		4C23246315AC601D00038EC0 /* TPCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4CA689B61541F54200AF8DDD /* TPCircularBuffer.c */; };
 		4C25747415F0D8E100D232E8 /* TPCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C25747215F0D8E000D232E8 /* TPCircularBuffer.c */; };
-		4C25747515F0D8E100D232E8 /* TPCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C25747215F0D8E000D232E8 /* TPCircularBuffer.c */; };
 		4C25747615F0D8E100D232E8 /* TPCircularBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C25747315F0D8E100D232E8 /* TPCircularBuffer.h */; };
-		4C25747715F0D8E100D232E8 /* TPCircularBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C25747315F0D8E100D232E8 /* TPCircularBuffer.h */; };
 		4C2886381556FC620074175A /* AEAudioController+Audiobus.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C2886361556FC620074175A /* AEAudioController+Audiobus.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		4C2886391556FC620074175A /* AEAudioController+Audiobus.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C2886361556FC620074175A /* AEAudioController+Audiobus.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4C2886521557DB800074175A /* AEAudioController+Audiobus.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C2886511557DB800074175A /* AEAudioController+Audiobus.m */; };
-		4C2886531557DB800074175A /* AEAudioController+Audiobus.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C2886511557DB800074175A /* AEAudioController+Audiobus.m */; };
 		4C38DC5515458AB1009F4454 /* AEAudioFileWriter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C38DC5315458AB1009F4454 /* AEAudioFileWriter.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		4C38DC5615458AB1009F4454 /* AEAudioFileWriter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C38DC5315458AB1009F4454 /* AEAudioFileWriter.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4C38DC5715458AB1009F4454 /* AEAudioFileWriter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C38DC5415458AB1009F4454 /* AEAudioFileWriter.m */; };
-		4C38DC5815458AB1009F4454 /* AEAudioFileWriter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C38DC5415458AB1009F4454 /* AEAudioFileWriter.m */; };
 		4C49FE32153DC21A008725E0 /* AEAudioFileLoaderOperation.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C49FE30153DC21A008725E0 /* AEAudioFileLoaderOperation.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		4C49FE33153DC21A008725E0 /* AEAudioFileLoaderOperation.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C49FE30153DC21A008725E0 /* AEAudioFileLoaderOperation.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4C49FE34153DC21A008725E0 /* AEAudioFileLoaderOperation.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C49FE31153DC21A008725E0 /* AEAudioFileLoaderOperation.m */; };
-		4C49FE35153DC21A008725E0 /* AEAudioFileLoaderOperation.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C49FE31153DC21A008725E0 /* AEAudioFileLoaderOperation.m */; };
-		4CA7EE81152456B200630345 /* TheAmazingAudioEngine.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CAD569315162822003CE861 /* TheAmazingAudioEngine.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		4CA7EE82152456B200630345 /* AEAudioController.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CAD56801516281D003CE861 /* AEAudioController.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		4CA7EE83152456B200630345 /* AEAudioFilePlayer.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CAD56A915163488003CE861 /* AEAudioFilePlayer.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		4CA7EE84152456B200630345 /* AEUtilities.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C12CC98151D1EDA00562E2A /* AEUtilities.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4C698CFD162B02EF008B159D /* TPCircularBuffer+AudioBufferList.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C698CF9162B02EF008B159D /* TPCircularBuffer+AudioBufferList.c */; };
+		4C698CFE162B02EF008B159D /* TPCircularBuffer+AudioBufferList.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C698CFA162B02EF008B159D /* TPCircularBuffer+AudioBufferList.h */; };
+		4C698CFF162B02EF008B159D /* TPCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C698CFB162B02EF008B159D /* TPCircularBuffer.c */; };
+		4C698D00162B02EF008B159D /* TPCircularBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C698CFC162B02EF008B159D /* TPCircularBuffer.h */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		4C25746C15EFFE6900D232E8 /* PBXContainerItemProxy */ = {
+		4C698D09162B048E008B159D /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = 4C25746415EFFE6900D232E8 /* TheEngineSample.xcodeproj */;
+			containerPortal = 4C698D01162B048E008B159D /* TheEngineSample.xcodeproj */;
 			proxyType = 2;
 			remoteGlobalIDString = 4C0C24851599FADD00D23E13;
 			remoteInfo = TheEngineSample;
@@ -71,14 +44,12 @@
 		4C12CC99151D1EDA00562E2A /* AEUtilities.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = AEUtilities.c; sourceTree = "<group>"; };
 		4C215CEC1523A7D500D36CAD /* libTheAmazingAudioEngine.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libTheAmazingAudioEngine.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C215CEE1523A7D500D36CAD /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
-		4C215CFD1523A83700D36CAD /* libTheAmazingAudioEngineTrial.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libTheAmazingAudioEngineTrial.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C23241F15AC5E2600038EC0 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		4C23242215AC5E2600038EC0 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
 		4C23245515AC5FDA00038EC0 /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
 		4C23245615AC5FDA00038EC0 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		4C23245915AC5FE800038EC0 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
 		4C25745E15EFFC4F00D232E8 /* Distribution */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Distribution; path = TheAmazingAudioEngine/Distribution; sourceTree = "<group>"; };
-		4C25746415EFFE6900D232E8 /* TheEngineSample.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = TheEngineSample.xcodeproj; sourceTree = "<group>"; };
 		4C25747215F0D8E000D232E8 /* TPCircularBuffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = TPCircularBuffer.c; path = Library/TPCircularBuffer/TPCircularBuffer.c; sourceTree = "<group>"; };
 		4C25747315F0D8E100D232E8 /* TPCircularBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TPCircularBuffer.h; path = Library/TPCircularBuffer/TPCircularBuffer.h; sourceTree = "<group>"; };
 		4C2886361556FC620074175A /* AEAudioController+Audiobus.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "AEAudioController+Audiobus.h"; sourceTree = "<group>"; };
@@ -90,14 +61,16 @@
 		4C38DC5415458AB1009F4454 /* AEAudioFileWriter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEAudioFileWriter.m; sourceTree = "<group>"; };
 		4C49FE30153DC21A008725E0 /* AEAudioFileLoaderOperation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEAudioFileLoaderOperation.h; sourceTree = "<group>"; };
 		4C49FE31153DC21A008725E0 /* AEAudioFileLoaderOperation.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEAudioFileLoaderOperation.m; sourceTree = "<group>"; };
+		4C698CF8162B02EF008B159D /* README.markdown */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = README.markdown; sourceTree = "<group>"; };
+		4C698CF9162B02EF008B159D /* TPCircularBuffer+AudioBufferList.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "TPCircularBuffer+AudioBufferList.c"; sourceTree = "<group>"; };
+		4C698CFA162B02EF008B159D /* TPCircularBuffer+AudioBufferList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "TPCircularBuffer+AudioBufferList.h"; sourceTree = "<group>"; };
+		4C698CFB162B02EF008B159D /* TPCircularBuffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = TPCircularBuffer.c; sourceTree = "<group>"; };
+		4C698CFC162B02EF008B159D /* TPCircularBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TPCircularBuffer.h; sourceTree = "<group>"; };
+		4C698D01162B048E008B159D /* TheEngineSample.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = TheEngineSample.xcodeproj; path = Sample/TheEngineSample.xcodeproj; sourceTree = "<group>"; };
 		4C8A0F3D1540BBD300307CB6 /* AEMixerBuffer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AEMixerBuffer.h; path = Modules/AEMixerBuffer.h; sourceTree = "<group>"; };
 		4C8A0F3E1540BBD300307CB6 /* AEMixerBuffer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = AEMixerBuffer.m; path = Modules/AEMixerBuffer.m; sourceTree = "<group>"; };
 		4CA689B11541EF4A00AF8DDD /* AELimiter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AELimiter.h; path = Modules/AELimiter.h; sourceTree = "<group>"; };
 		4CA689B21541EF4A00AF8DDD /* AELimiter.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = AELimiter.m; path = Modules/AELimiter.m; sourceTree = "<group>"; };
-		4CA689B61541F54200AF8DDD /* TPCircularBuffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = TPCircularBuffer.c; path = Modules/TPCircularBuffer.c; sourceTree = "<group>"; };
-		4CA689B71541F54200AF8DDD /* TPCircularBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TPCircularBuffer.h; path = Modules/TPCircularBuffer.h; sourceTree = "<group>"; };
-		4CA689B81541F54200AF8DDD /* TPCircularBuffer+AudioBufferList.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = "TPCircularBuffer+AudioBufferList.c"; path = "Modules/TPCircularBuffer+AudioBufferList.c"; sourceTree = "<group>"; };
-		4CA689B91541F54200AF8DDD /* TPCircularBuffer+AudioBufferList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "TPCircularBuffer+AudioBufferList.h"; path = "Modules/TPCircularBuffer+AudioBufferList.h"; sourceTree = "<group>"; };
 		4CA689BC1542D4FE00AF8DDD /* AELimiterFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AELimiterFilter.h; path = Modules/AELimiterFilter.h; sourceTree = "<group>"; };
 		4CA689BD1542D4FE00AF8DDD /* AELimiterFilter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = AELimiterFilter.m; path = Modules/AELimiterFilter.m; sourceTree = "<group>"; };
 		4CA689BF1542DC8C00AF8DDD /* AEPlaythroughChannel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AEPlaythroughChannel.h; path = Modules/AEPlaythroughChannel.h; sourceTree = "<group>"; };
@@ -106,8 +79,6 @@
 		4CA689C415447E3100AF8DDD /* AEExpanderFilter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = AEExpanderFilter.m; path = Modules/AEExpanderFilter.m; sourceTree = "<group>"; };
 		4CAD56801516281D003CE861 /* AEAudioController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEAudioController.h; sourceTree = "<group>"; };
 		4CAD56811516281D003CE861 /* AEAudioController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEAudioController.m; sourceTree = "<group>"; };
-		4CAD56841516281D003CE861 /* AETrialModeController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AETrialModeController.h; sourceTree = "<group>"; };
-		4CAD56851516281D003CE861 /* AETrialModeController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AETrialModeController.m; sourceTree = "<group>"; };
 		4CAD569315162822003CE861 /* TheAmazingAudioEngine.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TheAmazingAudioEngine.h; sourceTree = "<group>"; };
 		4CAD56A915163488003CE861 /* AEAudioFilePlayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEAudioFilePlayer.h; sourceTree = "<group>"; };
 		4CAD56AA15163488003CE861 /* AEAudioFilePlayer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEAudioFilePlayer.m; sourceTree = "<group>"; };
@@ -120,14 +91,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				4C215CEF1523A7D500D36CAD /* Foundation.framework in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		4C215CFA1523A83700D36CAD /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				4C215CFE1523A83700D36CAD /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -147,10 +110,23 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		4C25746515EFFE6900D232E8 /* Products */ = {
+		4C698CF7162B02EF008B159D /* TPCircularBuffer */ = {
 			isa = PBXGroup;
 			children = (
-				4C25746D15EFFE6900D232E8 /* TheEngineSample.app */,
+				4C698CF8162B02EF008B159D /* README.markdown */,
+				4C698CF9162B02EF008B159D /* TPCircularBuffer+AudioBufferList.c */,
+				4C698CFA162B02EF008B159D /* TPCircularBuffer+AudioBufferList.h */,
+				4C698CFB162B02EF008B159D /* TPCircularBuffer.c */,
+				4C698CFC162B02EF008B159D /* TPCircularBuffer.h */,
+			);
+			name = TPCircularBuffer;
+			path = Modules/TPCircularBuffer;
+			sourceTree = "<group>";
+		};
+		4C698D02162B048E008B159D /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				4C698D0A162B048E008B159D /* TheEngineSample.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -158,7 +134,7 @@
 		4C8A0F401540BBD700307CB6 /* Modules */ = {
 			isa = PBXGroup;
 			children = (
-				4CA689C215446AAC00AF8DDD /* TPCircularBuffer */,
+				4C698CF7162B02EF008B159D /* TPCircularBuffer */,
 				4C8A0F3D1540BBD300307CB6 /* AEMixerBuffer.h */,
 				4C8A0F3E1540BBD300307CB6 /* AEMixerBuffer.m */,
 				4CA689B11541EF4A00AF8DDD /* AELimiter.h */,
@@ -175,17 +151,6 @@
 			name = Modules;
 			sourceTree = "<group>";
 		};
-		4CA689C215446AAC00AF8DDD /* TPCircularBuffer */ = {
-			isa = PBXGroup;
-			children = (
-				4CA689B61541F54200AF8DDD /* TPCircularBuffer.c */,
-				4CA689B71541F54200AF8DDD /* TPCircularBuffer.h */,
-				4CA689B81541F54200AF8DDD /* TPCircularBuffer+AudioBufferList.c */,
-				4CA689B91541F54200AF8DDD /* TPCircularBuffer+AudioBufferList.h */,
-			);
-			name = TPCircularBuffer;
-			sourceTree = "<group>";
-		};
 		4CE501811493F82600F23607 = {
 			isa = PBXGroup;
 			children = (
@@ -194,7 +159,7 @@
 				4C25745E15EFFC4F00D232E8 /* Distribution */,
 				4C215CED1523A7D500D36CAD /* Frameworks */,
 				4CE501901493F82600F23607 /* Products */,
-				4C25746415EFFE6900D232E8 /* TheEngineSample.xcodeproj */,
+				4C698D01162B048E008B159D /* TheEngineSample.xcodeproj */,
 			);
 			sourceTree = "<group>";
 		};
@@ -202,7 +167,6 @@
 			isa = PBXGroup;
 			children = (
 				4C215CEC1523A7D500D36CAD /* libTheAmazingAudioEngine.a */,
-				4C215CFD1523A83700D36CAD /* libTheAmazingAudioEngineTrial.a */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -222,8 +186,6 @@
 				4C38DC5415458AB1009F4454 /* AEAudioFileWriter.m */,
 				4C12CC98151D1EDA00562E2A /* AEUtilities.h */,
 				4C12CC99151D1EDA00562E2A /* AEUtilities.c */,
-				4CAD56841516281D003CE861 /* AETrialModeController.h */,
-				4CAD56851516281D003CE861 /* AETrialModeController.m */,
 				4C49FE30153DC21A008725E0 /* AEAudioFileLoaderOperation.h */,
 				4C49FE31153DC21A008725E0 /* AEAudioFileLoaderOperation.m */,
 				4C25747215F0D8E000D232E8 /* TPCircularBuffer.c */,
@@ -248,27 +210,8 @@
 				4C38DC5515458AB1009F4454 /* AEAudioFileWriter.h in Headers */,
 				4C215D151523A94200D36CAD /* AEUtilities.h in Headers */,
 				4C25747615F0D8E100D232E8 /* TPCircularBuffer.h in Headers */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		4C215CFB1523A83700D36CAD /* Headers */ = {
-			isa = PBXHeadersBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				4CA7EE81152456B200630345 /* TheAmazingAudioEngine.h in Headers */,
-				4CA7EE82152456B200630345 /* AEAudioController.h in Headers */,
-				4C2886391556FC620074175A /* AEAudioController+Audiobus.h in Headers */,
-				4C49FE33153DC21A008725E0 /* AEAudioFileLoaderOperation.h in Headers */,
-				4CA7EE83152456B200630345 /* AEAudioFilePlayer.h in Headers */,
-				4C38DC5615458AB1009F4454 /* AEAudioFileWriter.h in Headers */,
-				4CA7EE84152456B200630345 /* AEUtilities.h in Headers */,
-				4C0C24C4159A139500D23E13 /* AEMixerBuffer.h in Headers */,
-				4C0C24C5159A139500D23E13 /* AELimiter.h in Headers */,
-				4C0C24C6159A139500D23E13 /* AELimiterFilter.h in Headers */,
-				4C0C24C7159A139500D23E13 /* AEExpanderFilter.h in Headers */,
-				4C0C24C8159A139500D23E13 /* AEPlaythroughChannel.h in Headers */,
-				4C0C24C9159A139500D23E13 /* AERecorder.h in Headers */,
-				4C25747715F0D8E100D232E8 /* TPCircularBuffer.h in Headers */,
+				4C698CFE162B02EF008B159D /* TPCircularBuffer+AudioBufferList.h in Headers */,
+				4C698D00162B02EF008B159D /* TPCircularBuffer.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -282,7 +225,8 @@
 				4C215CE81523A7D500D36CAD /* Sources */,
 				4C215CE91523A7D500D36CAD /* Frameworks */,
 				4C215CEA1523A7D500D36CAD /* Headers */,
-				4CA7EE911524662000630345 /* ShellScript */,
+				4CA7EE911524662000630345 /* Build Universal Static Library */,
+				4C698CBC162B0018008B159D /* Build Static Library Distribution */,
 			);
 			buildRules = (
 			);
@@ -291,25 +235,6 @@
 			name = TheAmazingAudioEngine;
 			productName = TheAmazingAudioEngine;
 			productReference = 4C215CEC1523A7D500D36CAD /* libTheAmazingAudioEngine.a */;
-			productType = "com.apple.product-type.library.static";
-		};
-		4C215CFC1523A83700D36CAD /* TheAmazingAudioEngineTrial */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 4C215D051523A83700D36CAD /* Build configuration list for PBXNativeTarget "TheAmazingAudioEngineTrial" */;
-			buildPhases = (
-				4C215CF91523A83700D36CAD /* Sources */,
-				4C215CFA1523A83700D36CAD /* Frameworks */,
-				4C215CFB1523A83700D36CAD /* Headers */,
-				4CA7EE931524681D00630345 /* ShellScript */,
-				4C25742C15EFA69500D232E8 /* ShellScript */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = TheAmazingAudioEngineTrial;
-			productName = TheAmazingAudioEngineTrial;
-			productReference = 4C215CFD1523A83700D36CAD /* libTheAmazingAudioEngineTrial.a */;
 			productType = "com.apple.product-type.library.static";
 		};
 /* End PBXNativeTarget section */
@@ -333,62 +258,50 @@
 			projectDirPath = "";
 			projectReferences = (
 				{
-					ProductGroup = 4C25746515EFFE6900D232E8 /* Products */;
-					ProjectRef = 4C25746415EFFE6900D232E8 /* TheEngineSample.xcodeproj */;
+					ProductGroup = 4C698D02162B048E008B159D /* Products */;
+					ProjectRef = 4C698D01162B048E008B159D /* TheEngineSample.xcodeproj */;
 				},
 			);
 			projectRoot = "";
 			targets = (
 				4C215CEB1523A7D500D36CAD /* TheAmazingAudioEngine */,
-				4C215CFC1523A83700D36CAD /* TheAmazingAudioEngineTrial */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXReferenceProxy section */
-		4C25746D15EFFE6900D232E8 /* TheEngineSample.app */ = {
+		4C698D0A162B048E008B159D /* TheEngineSample.app */ = {
 			isa = PBXReferenceProxy;
 			fileType = wrapper.application;
 			path = TheEngineSample.app;
-			remoteRef = 4C25746C15EFFE6900D232E8 /* PBXContainerItemProxy */;
+			remoteRef = 4C698D09162B048E008B159D /* PBXContainerItemProxy */;
 			sourceTree = BUILT_PRODUCTS_DIR;
 		};
 /* End PBXReferenceProxy section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		4C25742C15EFA69500D232E8 /* ShellScript */ = {
+		4C698CBC162B0018008B159D /* Build Static Library Distribution */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			inputPaths = (
 			);
+			name = "Build Static Library Distribution";
 			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ \"true\" == ${ALREADYINVOKED:-false} ]\nthen\n# This is the other build, called from the original instance\nexit 0\nfi\n\nDISTRIBUTION_DIR=\"${BUILT_PRODUCTS_DIR}/Distribution\"\nDISTRIBUTION_SOURCE_DIR=\"${SRCROOT}/TheAmazingAudioEngine/Distribution\"\nMODULES_SOURCE_DIR=\"${SRCROOT}/Modules\"\nMODULES_TARGET_DIR=\"${DISTRIBUTION_DIR}/Modules\"\nSAMPLES_SOURCE_DIR=\"${SRCROOT}/TheEngineSample\"\nSAMPLES_PROJ_PATH=\"${SRCROOT}/TheEngineSample.xcodeproj\"\nSAMPLES_TARGET_DIR=\"${DISTRIBUTION_DIR}/TheEngineSample\"\n\nif [ -d \"${DISTRIBUTION_DIR}\" ]\nthen\necho rm -rf \"${DISTRIBUTION_DIR}\"\nfi\n\nmkdir -p \"${DISTRIBUTION_DIR}\"\n\ncp -r \"${DISTRIBUTION_SOURCE_DIR}/\"* \"${DISTRIBUTION_DIR}\"\ncp -r \"${BUILT_PRODUCTS_DIR}/${FULL_PRODUCT_NAME}\" \"${BUILT_PRODUCTS_DIR}/${PUBLIC_HEADERS_FOLDER_PATH}\" \"${DISTRIBUTION_DIR}\"\n\nmkdir -p \"${MODULES_TARGET_DIR}\"\ncp \"${MODULES_SOURCE_DIR}/\"*.h \"${MODULES_TARGET_DIR}\"\n          \nmkdir -p \"${SAMPLES_TARGET_DIR}\"\ncp -r \"${SAMPLES_SOURCE_DIR}\" \"${SAMPLES_TARGET_DIR}\"\ncp -r \"${SAMPLES_PROJ_PATH}\" \"${SAMPLES_TARGET_DIR}\"";
+			shellScript = "if [ \"true\" == ${ALREADYINVOKED:-false} ]\nthen\n# This is the other build, called from the original instance\nexit 0\nfi\n\nDISTRIBUTION_DIR=\"${BUILT_PRODUCTS_DIR}/Distribution\"\nDISTRIBUTION_SOURCE_DIR=\"${SRCROOT}/TheAmazingAudioEngine/Distribution\"\nMODULES_SOURCE_DIR=\"${SRCROOT}/Modules\"\nMODULES_TARGET_DIR=\"${DISTRIBUTION_DIR}/Modules\"\nSAMPLES_SOURCE_DIR=\"${SRCROOT}/Sample\"\nSAMPLES_TARGET_DIR=\"${DISTRIBUTION_DIR}/Sample\"\n\nif [ -d \"${DISTRIBUTION_DIR}\" ]\nthen\nrm -rf \"${DISTRIBUTION_DIR}\"\nfi\n\nmkdir -p \"${DISTRIBUTION_DIR}\"\n\ncp -r \"${DISTRIBUTION_SOURCE_DIR}/\"* \"${DISTRIBUTION_DIR}\"\ncp -r \"${BUILT_PRODUCTS_DIR}/${FULL_PRODUCT_NAME}\" \"${BUILT_PRODUCTS_DIR}/${PUBLIC_HEADERS_FOLDER_PATH}\" \"${DISTRIBUTION_DIR}\"\n\nmkdir -p \"${MODULES_TARGET_DIR}\"\ncp -r \"${MODULES_SOURCE_DIR}/\"* \"${MODULES_TARGET_DIR}\"\n\nmkdir -p \"${SAMPLES_TARGET_DIR}\"\ncp -r \"${SAMPLES_SOURCE_DIR}/\"* \"${SAMPLES_TARGET_DIR}\"\n\ncat \"${SRCROOT}/.gitignore\" | xargs -I\"[]\" find \"${DISTRIBUTION_DIR}\" -name \"[]\" | xargs rm -rf\n\n";
 		};
-		4CA7EE911524662000630345 /* ShellScript */ = {
+		4CA7EE911524662000630345 /* Build Universal Static Library */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			inputPaths = (
 			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "#\n# Universal static library script\n# http://github.com/michaeltyson/iOS-Universal-Library-Template\n#\n# Version 2.4\n# \n# Purpose:\n#   Create a static library for iPhone from within XCode\n#   Because Apple staff DELIBERATELY broke Xcode to make this impossible from the GUI (Xcode 3.2.3 specifically states this in the Release notes!)\n#   ...no, I don't understand why they did this!\n#\n# Author: Adam Martin - http://twitter.com/redglassesapps\n# Tweaked and made into an Xcode template by Michael Tyson - http://atastypixel.com/blog\n# Based on: original script from Eonil (main changes: Eonil's script WILL NOT WORK in Xcode GUI - it WILL CRASH YOUR COMPUTER)\n#\n# More info: see this Stack Overflow question: http://stackoverflow.com/questions/3520977/build-fat-static-library-device-simulator-using-xcode-and-sdk-4\n\n#################[ Tests: helps workaround any future bugs in Xcode ]########\n#\nDEBUG_THIS_SCRIPT=\"false\"\n\nif [ $DEBUG_THIS_SCRIPT = \"true\" ]\nthen\necho \"########### TESTS #############\"\necho \"Use the following variables when debugging this script; note that they may change on recursions\"\necho \"BUILD_DIR = $BUILD_DIR\"\necho \"BUILD_ROOT = $BUILD_ROOT\"\necho \"CONFIGURATION_BUILD_DIR = $CONFIGURATION_BUILD_DIR\"\necho \"BUILT_PRODUCTS_DIR = $BUILT_PRODUCTS_DIR\"\necho \"CONFIGURATION_TEMP_DIR = $CONFIGURATION_TEMP_DIR\"\necho \"TARGET_BUILD_DIR = $TARGET_BUILD_DIR\"\nfi\n\nif [ \"true\" == ${ALREADYINVOKED:-false} ]\nthen\n# This is the other build, called from the original instance\nexit 0\nfi\n\n\n# Find the BASESDK version number\nSDK_VERSION=$(echo ${SDK_NAME} | grep -o '.\\{3\\}$')\n\n# Next, work out if we're in SIM or DEVICE\nif [ ${PLATFORM_NAME} = \"iphonesimulator\" ]\nthen\nOTHER_SDK_TO_BUILD=iphoneos${SDK_VERSION}\nelse\nOTHER_SDK_TO_BUILD=iphonesimulator${SDK_VERSION}\nfi\n\necho \"XCode has selected SDK: ${PLATFORM_NAME} with version: ${SDK_VERSION} (although back-targetting: ${IPHONEOS_DEPLOYMENT_TARGET})\"\necho \"...therefore, OTHER_SDK_TO_BUILD = ${OTHER_SDK_TO_BUILD}\"\n\n# Build the other architecture\necho \"xcodebuild -configuration \\\"${CONFIGURATION}\\\" -target \\\"${TARGET_NAME}\\\" -sdk \\\"${OTHER_SDK_TO_BUILD}\\\" ${ACTION} RUN_CLANG_STATIC_ANALYZER=NO\"\nxcodebuild -project \"${PROJECT_FILE_PATH}\" -configuration \"${CONFIGURATION}\" -target \"${TARGET_NAME}\" -sdk \"${OTHER_SDK_TO_BUILD}\" ${ACTION} RUN_CLANG_STATIC_ANALYZER=NO BUILD_DIR=\"${BUILD_DIR}\" BUILD_ROOT=\"${BUILD_ROOT}\" ALREADYINVOKED=\"true\"\n\n# Merge built architectures\nCURRENTCONFIG_DEVICE_DIR=\"${SYMROOT}/${CONFIGURATION}-iphoneos\"\nCURRENTCONFIG_SIMULATOR_DIR=\"${SYMROOT}/${CONFIGURATION}-iphonesimulator\"\nCURRENTCONFIG_UNIVERSAL_DIR=\"${SYMROOT}/${CONFIGURATION}-universal\"\n\necho \"Taking device build from: ${CURRENTCONFIG_DEVICE_DIR}\"\necho \"Taking simulator build from: ${CURRENTCONFIG_SIMULATOR_DIR}\"\necho \"...I will output a universal build to: ${CURRENTCONFIG_UNIVERSAL_DIR}\"\n\nif [ ! -e \"${CURRENTCONFIG_UNIVERSAL_DIR}/${EXECUTABLE_NAME}\" -o \\\n\"${CURRENTCONFIG_DEVICE_DIR}/${EXECUTABLE_NAME}\" -nt \"${CURRENTCONFIG_UNIVERSAL_DIR}/${EXECUTABLE_NAME}\" -o \\\n\"${CURRENTCONFIG_SIMULATOR_DIR}/${EXECUTABLE_NAME}\" -nt \"${CURRENTCONFIG_UNIVERSAL_DIR}/${EXECUTABLE_NAME}\" ]\nthen\nmkdir -p \"${CURRENTCONFIG_UNIVERSAL_DIR}\"\nrm -f \"${CURRENTCONFIG_UNIVERSAL_DIR}/${EXECUTABLE_NAME}\"\n\necho \"lipo: for current configuration (${CONFIGURATION}) creating output file: ${CURRENTCONFIG_UNIVERSAL_DIR}/${EXECUTABLE_NAME}\"\nlipo -create -output \"${CURRENTCONFIG_UNIVERSAL_DIR}/${EXECUTABLE_NAME}\" \"${CURRENTCONFIG_DEVICE_DIR}/${EXECUTABLE_NAME}\" \"${CURRENTCONFIG_SIMULATOR_DIR}/${EXECUTABLE_NAME}\"\n\necho \"Copying universal build back over to ${CURRENTCONFIG_DEVICE_DIR} and ${CURRENTCONFIG_SIMULATOR_DIR}\"\ncp \"${CURRENTCONFIG_UNIVERSAL_DIR}/${EXECUTABLE_NAME}\" \"${CURRENTCONFIG_DEVICE_DIR}/${EXECUTABLE_NAME}\"\ncp \"${CURRENTCONFIG_UNIVERSAL_DIR}/${EXECUTABLE_NAME}\" \"${CURRENTCONFIG_SIMULATOR_DIR}/${EXECUTABLE_NAME}\"\ntouch \"${CURRENTCONFIG_UNIVERSAL_DIR}/${EXECUTABLE_NAME}\"\n\n# Also copy public headers\nif [ -d \"${CURRENTCONFIG_DEVICE_DIR}/${PUBLIC_HEADERS_FOLDER_PATH}\" ]\nthen\nmkdir -p \"${CURRENTCONFIG_UNIVERSAL_DIR}/${PUBLIC_HEADERS_FOLDER_PATH}\"\ncp \"${CURRENTCONFIG_DEVICE_DIR}/${PUBLIC_HEADERS_FOLDER_PATH}/\"* \"${CURRENTCONFIG_UNIVERSAL_DIR}/${PUBLIC_HEADERS_FOLDER_PATH}\"\nfi\nelse\necho \"Everything up to date.\"\nfi\n";
-		};
-		4CA7EE931524681D00630345 /* ShellScript */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-			);
+			name = "Build Universal Static Library";
 			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -409,29 +322,8 @@
 				4C38DC5715458AB1009F4454 /* AEAudioFileWriter.m in Sources */,
 				4C2886521557DB800074175A /* AEAudioController+Audiobus.m in Sources */,
 				4C25747415F0D8E100D232E8 /* TPCircularBuffer.c in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		4C215CF91523A83700D36CAD /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				4C215D0D1523A8E600D36CAD /* AEAudioController.m in Sources */,
-				4C215D0E1523A8E600D36CAD /* AEAudioFilePlayer.m in Sources */,
-				4C215D0F1523A8E600D36CAD /* AEUtilities.c in Sources */,
-				4C215D101523A8E600D36CAD /* AETrialModeController.m in Sources */,
-				4C49FE35153DC21A008725E0 /* AEAudioFileLoaderOperation.m in Sources */,
-				4C38DC5815458AB1009F4454 /* AEAudioFileWriter.m in Sources */,
-				4C2886531557DB800074175A /* AEAudioController+Audiobus.m in Sources */,
-				4C0C24BD159A135A00D23E13 /* AEMixerBuffer.m in Sources */,
-				4C0C24BE159A135A00D23E13 /* AELimiter.m in Sources */,
-				4C0C24BF159A135A00D23E13 /* AELimiterFilter.m in Sources */,
-				4C0C24C0159A135A00D23E13 /* AEExpanderFilter.m in Sources */,
-				4C0C24C1159A135A00D23E13 /* AEPlaythroughChannel.m in Sources */,
-				4C0C24C2159A135A00D23E13 /* AERecorder.m in Sources */,
-				4C0C24D4159A291700D23E13 /* TPCircularBuffer+AudioBufferList.c in Sources */,
-				4C23246315AC601D00038EC0 /* TPCircularBuffer.c in Sources */,
-				4C25747515F0D8E100D232E8 /* TPCircularBuffer.c in Sources */,
+				4C698CFD162B02EF008B159D /* TPCircularBuffer+AudioBufferList.c in Sources */,
+				4C698CFF162B02EF008B159D /* TPCircularBuffer.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -508,84 +400,6 @@
 			};
 			name = Release;
 		};
-		4C215D061523A83700D36CAD /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				DSTROOT = /tmp/TheAmazingAudioEngineTrial.dst;
-				GCC_PRECOMPILE_PREFIX_HEADER = YES;
-				GCC_PREFIX_HEADER = "TheAmazingAudioEngine/TheAmazingAudioEngine-Prefix.pch";
-				GCC_PREPROCESSOR_DEFINITIONS = (
-					"TRIAL=1",
-					"$(inherited)",
-				);
-				GCC_WARN_UNINITIALIZED_AUTOS = YES;
-				OTHER_CFLAGS = (
-					"-DTPCircularBuffer=AECB",
-					"-DTPCircularBufferInit=AECBInit",
-					"-DTPCircularBufferCleanup=AECBClean",
-					"-DTPCircularBufferClear=AECBClear",
-					"-DTPCircularBufferTail=AECBTail",
-					"-DTPCircularBufferConsume=AECBConsume",
-					"-DTPCircularBufferHead=AECBHead",
-					"-DTPCircularBufferProduce=AECBProduce",
-					"-DTPCircularBufferProduceBytes=AECBProduceBytes",
-					"-DTPCircularBufferPrepareEmptyAudioBufferList=AECBPrepareEmptyBL",
-					"-DTPCircularBufferProduceAudioBufferList=AECBProduceBL",
-					"-DTPCircularBufferCopyAudioBufferList=AECBCopyBL",
-					"-DTPCircularBufferNextBufferList=AECBNextBL",
-					"-DTPCircularBufferNextBufferListAfter=AECBNextBLAfter",
-					"-DTPCircularBufferConsumeNextBufferList=AECBConsumeBL",
-					"-DTPCircularBufferConsumeNextBufferListPartial=AECBConsumeBLPartial",
-					"-DTPCircularBufferConsumeBufferListFrames=AECBConsumeBLFrames",
-					"-DTPCircularBufferPeek=AECBPeek",
-					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
-				);
-				OTHER_LDFLAGS = "-ObjC";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				PUBLIC_HEADERS_FOLDER_PATH = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-			};
-			name = Debug;
-		};
-		4C215D071523A83700D36CAD /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				DSTROOT = /tmp/TheAmazingAudioEngineTrial.dst;
-				GCC_PRECOMPILE_PREFIX_HEADER = YES;
-				GCC_PREFIX_HEADER = "TheAmazingAudioEngine/TheAmazingAudioEngine-Prefix.pch";
-				GCC_PREPROCESSOR_DEFINITIONS = (
-					"TRIAL=1",
-					"$(inherited)",
-				);
-				GCC_WARN_UNINITIALIZED_AUTOS = YES;
-				OTHER_CFLAGS = (
-					"-DTPCircularBuffer=AECB",
-					"-DTPCircularBufferInit=AECBInit",
-					"-DTPCircularBufferCleanup=AECBClean",
-					"-DTPCircularBufferClear=AECBClear",
-					"-DTPCircularBufferTail=AECBTail",
-					"-DTPCircularBufferConsume=AECBConsume",
-					"-DTPCircularBufferHead=AECBHead",
-					"-DTPCircularBufferProduce=AECBProduce",
-					"-DTPCircularBufferProduceBytes=AECBProduceBytes",
-					"-DTPCircularBufferPrepareEmptyAudioBufferList=AECBPrepareEmptyBL",
-					"-DTPCircularBufferProduceAudioBufferList=AECBProduceBL",
-					"-DTPCircularBufferCopyAudioBufferList=AECBCopyBL",
-					"-DTPCircularBufferNextBufferList=AECBNextBL",
-					"-DTPCircularBufferNextBufferListAfter=AECBNextBLAfter",
-					"-DTPCircularBufferConsumeNextBufferList=AECBConsumeBL",
-					"-DTPCircularBufferConsumeNextBufferListPartial=AECBConsumeBLPartial",
-					"-DTPCircularBufferConsumeBufferListFrames=AECBConsumeBLFrames",
-					"-DTPCircularBufferPeek=AECBPeek",
-					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
-				);
-				OTHER_LDFLAGS = "-ObjC";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				PUBLIC_HEADERS_FOLDER_PATH = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-			};
-			name = Release;
-		};
 		4CE501981493F82600F23607 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -634,15 +448,6 @@
 			buildConfigurations = (
 				4C215CF71523A7D600D36CAD /* Debug */,
 				4C215CF81523A7D600D36CAD /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		4C215D051523A83700D36CAD /* Build configuration list for PBXNativeTarget "TheAmazingAudioEngineTrial" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				4C215D061523A83700D36CAD /* Debug */,
-				4C215D071523A83700D36CAD /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

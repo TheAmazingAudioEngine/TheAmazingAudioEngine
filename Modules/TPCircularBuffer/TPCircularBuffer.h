@@ -58,6 +58,9 @@ void  TPCircularBufferCleanup(TPCircularBuffer *buffer);
  * Clear buffer
  *
  *  Resets buffer to original, empty state.
+ *
+ *  This is safe for use by consumer while producer is accessing 
+ *  buffer.
  */
 void  TPCircularBufferClear(TPCircularBuffer *buffer);
 

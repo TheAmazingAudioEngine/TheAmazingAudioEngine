@@ -22,10 +22,6 @@
 static double __hostTicksToSeconds = 0.0;
 static double __secondsToHostTicks = 0.0;
 
-#ifdef TRIAL
-#import "AETrialModeController.h"
-#endif
-
 const int kMaximumChannelsPerGroup              = 100;
 const int kMaximumCallbacksPerSource            = 15;
 const int kMessageBufferLength                  = 8192;
@@ -809,12 +805,6 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     if ( ![self initAudioSession] || ![self setup] ) {
         _audioGraph = NULL;
     }
-    
-#ifdef TRIAL
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [[AETrialModeController alloc] init];
-    });
-#endif
     
     return self;
 }
