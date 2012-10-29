@@ -244,6 +244,7 @@ typedef struct {
     AudioConverterRef   _inputAudioConverter;
     AudioBufferList    *_inputAudioScratchBufferList;
     audio_level_monitor_t _inputLevelMonitorData;
+    BOOL                _usingAudiobusInput;
 }
 
 - (void)pollForMessageResponses;
@@ -537,7 +538,7 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
 static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
     AEAudioController *THIS = (AEAudioController *)inRefCon;
     
-    if ( THIS->_audiobusInputPort && !(*ioActionFlags & kAudiobusSourceFlag) && ABInputPortIsConnected(THIS->_audiobusInputPort) ) {
+    if ( THIS->_audiobusInputPort && !(*ioActionFlags & kAudiobusSourceFlag) && THIS->_usingAudiobusInput ) {
         // If Audiobus is connected, then serve Audiobus queue rather than serving system input queue
         serveAudiobusInputQueue(THIS);
         return noErr;
@@ -662,7 +663,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         
     if ( *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
         
-        if ( !THIS->_hardwareInputAvailable && THIS->_audiobusInputPort && !(*ioActionFlags & kAudiobusSourceFlag) && ABInputPortIsConnected(THIS->_audiobusInputPort) ) {
+        if ( !THIS->_hardwareInputAvailable && THIS->_audiobusInputPort && !(*ioActionFlags & kAudiobusSourceFlag) && THIS->_usingAudiobusInput ) {
             // If Audiobus is connected, then serve Audiobus queue (here, rather than the input queue as hardware is stopped)
             serveAudiobusInputQueue(THIS);
             return noErr;
@@ -2327,6 +2328,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     UInt32 inputAvailable        = 0;
     BOOL hardwareInputAvailable  = NO;
     UInt32 numberOfInputChannels = _audioDescription.mChannelsPerFrame;
+    BOOL usingAudiobus           = NO;
     
     UInt32 size = sizeof(inputAvailable);
     OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_AudioInputAvailable, &size, &inputAvailable);
@@ -2337,6 +2339,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     if ( _audiobusInputPort && ABInputPortIsConnected(_audiobusInputPort) ) {
         inputAvailable          = YES;
         numberOfInputChannels   = 2;
+        usingAudiobus           = YES;
     } else {
         size = sizeof(numberOfInputChannels);
         if ( inputAvailable ) {
@@ -2549,6 +2552,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
         _inputAudioBufferListBuffersAreAllocated = bufferIsAllocated;
         _inputAudioConverter      = converter;
         _inputAudioScratchBufferList = scratchBuffer;
+        _usingAudiobusInput       = usingAudiobus;
     }];
     
     if ( oldInputBuffer && oldInputBuffer != inputBufferList ) {
@@ -2576,8 +2580,9 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     
     if ( inputChannelsChanged || inputAvailableChanged || oldConverter != converter || (oldInputBuffer && oldInputBuffer != _inputAudioBufferList) || (oldScratchBuffer && oldScratchBuffer != scratchBuffer) ) {
         if ( inputAvailable ) {
-            NSLog(@"TAAE: Input status updated (%lu channel, %@%@%@)",
+            NSLog(@"TAAE: Input status updated (%lu channel, %@%@%@%@)",
                   numberOfInputChannels,
+                  usingAudiobus ? @"using Audiobus, " : @"",
                   inputAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? @"non-interleaved" : @"interleaved",
                   [self usingVPIO] ? @", using voice processing" : @"",
                   converter ? @", with converter" : @"");
