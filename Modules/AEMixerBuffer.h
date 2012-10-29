@@ -17,6 +17,11 @@
 typedef void* AEMixerBufferSource;
 
 /*!
+ * A frame count value indicating an inactive source
+ */
+#define AEMixerBufferSourceInactive (UINT32_MAX-1)
+
+/*!
  * Source render callback
  *
  *      This is called by AEMixerBuffer when audio for the source is required, if you have provided callbacks
@@ -42,7 +47,7 @@ typedef void (*AEMixerBufferSourceRenderCallback) (AEMixerBufferSource       sou
  * @param source            The source. This can be anything you like, as long as it is not NULL, and is unique to each source.
  * @param outTimestamp      On output, the timestamp of the next audio from the source.
  * @param userInfo          The opaque pointer passed to [AEMixerBufferSetSourceCallbacks](@ref AEMixerBuffer::AEMixerBufferSetSourceCallbacks).
- * @return The number of available frames
+ * @return The number of available frames. Return the special value AEMixerBufferSourceInactive to indicate an inactive source.
  */
 typedef UInt32 (*AEMixerBufferSourcePeekCallback) (AEMixerBufferSource  source,
                                                    AudioTimeStamp      *outTimestamp,
@@ -68,9 +73,9 @@ typedef UInt32 (*AEMixerBufferSourcePeekCallback) (AEMixerBufferSource  source,
 /*!
  * Initialiser
  *
- * @param audioDescription  The AudioStreamBasicDescription defining the audio format used
+ * @param clientFormat  The AudioStreamBasicDescription defining the audio format used
  */
-- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription;
+- (id)initWithClientFormat:(AudioStreamBasicDescription)clientFormat;
 
 /*!
  * Enqueue audio
@@ -201,5 +206,22 @@ UInt32 AEMixerBufferPeek(AEMixerBuffer *mixerBuffer, AudioTimeStamp *outNextTime
  *  Set to 0.0 to avoid waiting on idle sources.
  */
 @property (nonatomic, assign) NSTimeInterval sourceIdleThreshold;
+
+/*!
+ * Whether to assume sources have infinite capacity
+ *
+ *  Setting this to YES will make the mixer assume the frame count
+ *  for each source is infinite, and will render sources regardless
+ *  of the frame count returned by the peek callback.
+ *
+ *  Note that the results of AEMixerBufferPeek will still return a frame
+ *  count derived by the true frame count returned by the peek callback,
+ *  but calling AEMixerBufferRender will assume that the available
+ *  frame count across all sources is infinite.
+ *
+ *  This property is useful when using sources that generate audio
+ *  on demand.
+ */
+@property (nonatomic, assign) BOOL assumeInfiniteSources;
 
 @end
