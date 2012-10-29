@@ -70,7 +70,12 @@ bool TPCircularBufferCopyAudioBufferList(TPCircularBuffer *buffer, const AudioBu
 static __inline__ __attribute__((always_inline)) AudioBufferList *TPCircularBufferNextBufferList(TPCircularBuffer *buffer, AudioTimeStamp *outTimestamp) {
     int32_t dontcare; // Length of segment is contained within buffer list, so we can ignore this
     TPCircularBufferABLBlockHeader *block = TPCircularBufferTail(buffer, &dontcare);
-    if ( !block ) return NULL;
+    if ( !block ) {
+        if ( outTimestamp ) {
+            memset(outTimestamp, 0, sizeof(AudioTimeStamp));
+        }
+        return NULL;
+    }
     if ( outTimestamp ) {
         memcpy(outTimestamp, &block->timestamp, sizeof(AudioTimeStamp));
     }

@@ -176,7 +176,7 @@ void TPCircularBufferDequeueBufferListFrames(TPCircularBuffer *buffer, UInt32 *i
         
         if ( outputBufferList ) {
             for ( int i=0; i<outputBufferList->mNumberBuffers; i++ ) {
-                assert((char*)outputBufferList->mBuffers[i].mData + bytesCopied + bytesToCopy <= (char*)outputBufferList->mBuffers[i].mData + outputBufferList->mBuffers[i].mDataByteSize);
+                assert(bytesCopied + bytesToCopy <= outputBufferList->mBuffers[i].mDataByteSize);
                 assert((char*)bufferList->mBuffers[i].mData + bytesToCopy <= (char*)bufferList+(block?block->totalLength:0));
                 
                 memcpy((char*)outputBufferList->mBuffers[i].mData + bytesCopied, bufferList->mBuffers[i].mData, bytesToCopy);
@@ -190,6 +190,12 @@ void TPCircularBufferDequeueBufferListFrames(TPCircularBuffer *buffer, UInt32 *i
     }
     
     *ioLengthInFrames -= bytesToGo / audioFormat->mBytesPerFrame;
+    
+    if ( outputBufferList ) {
+        for ( int i=0; i<outputBufferList->mNumberBuffers; i++ ) {
+            outputBufferList->mBuffers[i].mDataByteSize = *ioLengthInFrames * audioFormat->mBytesPerFrame;
+        }
+    }
 }
 
 static UInt32 _TPCircularBufferPeek(TPCircularBuffer *buffer, AudioTimeStamp *outTimestamp, AudioStreamBasicDescription *audioFormat, UInt32 contiguousToleranceSampleTime) {
