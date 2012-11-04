@@ -1535,11 +1535,15 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
     // Wait for response
     uint64_t giveUpTime = mach_absolute_time() + (1.0 * __secondsToHostTicks);
     while ( !finished && mach_absolute_time() < giveUpTime ) {
-        @autoreleasepool {
+        if ( [NSThread isMainThread] ) {
             [self pollForMessageResponses];
-            if ( finished ) break;
-            [NSThread sleepForTimeInterval:_preferredBufferDuration];
+        } else {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self pollForMessageResponses];
+            });
         }
+        if ( finished ) break;
+        [NSThread sleepForTimeInterval:_preferredBufferDuration];
     }
     
     if ( !finished ) {
