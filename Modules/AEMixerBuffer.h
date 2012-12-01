@@ -158,6 +158,33 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *mixerBuffer, AEMixerBufferS
 UInt32 AEMixerBufferPeek(AEMixerBuffer *mixerBuffer, AudioTimeStamp *outNextTimestamp);
 
 /*!
+ * Mark end of time interval
+ *
+ *  When receiving each audio source separately via AEMixerBufferDequeueSingleSource (instead of mixed
+ *  with AEMixerBufferDequeue), you must call this function at the end of each time interval in order
+ *  to inform the mixer that you are finished with that audio segment. Any sources that have not
+ *  been dequeued will have their audio discarded in order to retain synchronization.
+ *
+ * @param mixerBuffer       The mixer buffer.
+ */
+void AEMixerBufferEndTimeInterval(AEMixerBuffer *mixerBuffer);
+
+/*!
+ * Mark the given source as idle
+ *
+ *  Normally, if the mixer buffer doesn't receive any audio for a given source within
+ *  the time interval given by the sourceIdleThreshold property, the buffer will wait,
+ *  allowing no frames to be dequeued until either further audio is received for the
+ *  source, or the sourceIdleThreshold limit is met.
+ *
+ *  To avoid this delay and immediately mark a given source as idle, use this function.
+ *
+ * @param mixerBuffer       The mixer buffer
+ * @param source            The source to mark as idle
+ */
+void AEMixerBufferMarkSourceIdle(AEMixerBuffer *mixerBuffer, AEMixerBufferSource source);
+
+/*!
  * Set a different AudioStreamBasicDescription for a source
  */
 - (void)setAudioDescription:(AudioStreamBasicDescription*)audioDescription forSource:(AEMixerBufferSource)source;
@@ -223,5 +250,10 @@ UInt32 AEMixerBufferPeek(AEMixerBuffer *mixerBuffer, AudioTimeStamp *outNextTime
  *  on demand.
  */
 @property (nonatomic, assign) BOOL assumeInfiniteSources;
+
+/*!
+ * Debug level
+ */
+@property (nonatomic, assign) int debugLevel;
 
 @end
