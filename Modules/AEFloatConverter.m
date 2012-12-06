@@ -45,7 +45,7 @@ static OSStatus complexInputDataProc(AudioConverterRef             inAudioConver
     AudioStreamBasicDescription floatAudioDescription;
     floatAudioDescription.mFormatID          = kAudioFormatLinearPCM;
     floatAudioDescription.mFormatFlags       = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved;
-    floatAudioDescription.mChannelsPerFrame  = 2;
+    floatAudioDescription.mChannelsPerFrame  = sourceFormat.mChannelsPerFrame;
     floatAudioDescription.mBytesPerPacket    = sizeof(float);
     floatAudioDescription.mFramesPerPacket   = 1;
     floatAudioDescription.mBytesPerFrame     = sizeof(float);
@@ -59,7 +59,9 @@ static OSStatus complexInputDataProc(AudioConverterRef             inAudioConver
         checkResult(AudioConverterNew(&floatAudioDescription, &sourceFormat, &_fromFloatConverter), "AudioConverterNew");
         _scratchBufferList = (AudioBufferList*)malloc(sizeof(AudioBufferList) + (floatAudioDescription.mChannelsPerFrame-1)*sizeof(AudioBuffer));
         _scratchBufferList->mNumberBuffers = floatAudioDescription.mChannelsPerFrame;
-        _scratchBufferList->mBuffers[0].mNumberChannels = _scratchBufferList->mBuffers[1].mNumberChannels = 1;
+        for ( int i=0; i<_scratchBufferList->mNumberBuffers; i++ ) {
+            _scratchBufferList->mBuffers[i].mNumberChannels = 1;
+        }
     }
     
     return self;
@@ -73,17 +75,17 @@ static OSStatus complexInputDataProc(AudioConverterRef             inAudioConver
 }
 
 
-BOOL AEFloatConverterToFloat(AEFloatConverter* THIS, AudioBufferList *sourceBuffer, float* targetBuffers[2], UInt32 frames) {
+BOOL AEFloatConverterToFloat(AEFloatConverter* THIS, AudioBufferList *sourceBuffer, float** targetBuffers, UInt32 frames) {
     if ( THIS->_toFloatConverter ) {
         UInt32 originalBufferSize = sourceBuffer->mBuffers[0].mDataByteSize;
         for ( int i=0; i<sourceBuffer->mNumberBuffers; i++ ) {
             sourceBuffer->mBuffers[i].mDataByteSize = frames * THIS->_sourceAudioDescription.mBytesPerFrame;
         }
         
-        THIS->_scratchBufferList->mBuffers[0].mData = targetBuffers[0];
-        THIS->_scratchBufferList->mBuffers[0].mDataByteSize = frames * sizeof(float);
-        THIS->_scratchBufferList->mBuffers[1].mData = targetBuffers[1];
-        THIS->_scratchBufferList->mBuffers[1].mDataByteSize = frames * sizeof(float);
+        for ( int i=0; i<THIS->_scratchBufferList->mNumberBuffers; i++ ) {
+            THIS->_scratchBufferList->mBuffers[i].mData = targetBuffers[i];
+            THIS->_scratchBufferList->mBuffers[i].mDataByteSize = frames * sizeof(float);
+        }
         
         OSStatus result = AudioConverterFillComplexBuffer(THIS->_toFloatConverter,
                                                           complexInputDataProc,
@@ -100,23 +102,24 @@ BOOL AEFloatConverterToFloat(AEFloatConverter* THIS, AudioBufferList *sourceBuff
             return NO;
         }
     } else {
-        memcpy(targetBuffers[0], sourceBuffer->mBuffers[0].mData, frames * sizeof(float));
-        memcpy(targetBuffers[1], sourceBuffer->mBuffers[1].mData, frames * sizeof(float));
+        for ( int i=0; i<THIS->_scratchBufferList->mNumberBuffers; i++ ) {
+            memcpy(targetBuffers[i], sourceBuffer->mBuffers[i].mData, frames * sizeof(float));
+        }
     }
     
     return YES;
 }
 
-BOOL AEFloatConverterFromFloat(AEFloatConverter* THIS, float* sourceBuffers[2], AudioBufferList *targetBuffer, UInt32 frames) {
+BOOL AEFloatConverterFromFloat(AEFloatConverter* THIS, float** sourceBuffers, AudioBufferList *targetBuffer, UInt32 frames) {
     for ( int i=0; i<targetBuffer->mNumberBuffers; i++ ) {
         targetBuffer->mBuffers[i].mDataByteSize = frames * THIS->_sourceAudioDescription.mBytesPerFrame;
     }
     
     if ( THIS->_fromFloatConverter ) {
-        THIS->_scratchBufferList->mBuffers[0].mData = sourceBuffers[0];
-        THIS->_scratchBufferList->mBuffers[0].mDataByteSize = frames * sizeof(float);
-        THIS->_scratchBufferList->mBuffers[1].mData = sourceBuffers[1];
-        THIS->_scratchBufferList->mBuffers[1].mDataByteSize = frames * sizeof(float);
+        for ( int i=0; i<THIS->_scratchBufferList->mNumberBuffers; i++ ) {
+            THIS->_scratchBufferList->mBuffers[i].mData = sourceBuffers[i];
+            THIS->_scratchBufferList->mBuffers[i].mDataByteSize = frames * sizeof(float);
+        }
         
         OSStatus result = AudioConverterFillComplexBuffer(THIS->_fromFloatConverter,
                                                           complexInputDataProc,
@@ -128,8 +131,9 @@ BOOL AEFloatConverterFromFloat(AEFloatConverter* THIS, float* sourceBuffers[2], 
             return NO;
         }
     } else {
-        memcpy(targetBuffer->mBuffers[0].mData, sourceBuffers[0], frames * sizeof(float));
-        memcpy(targetBuffer->mBuffers[1].mData, sourceBuffers[1], frames * sizeof(float));
+        for ( int i=0; i<THIS->_scratchBufferList->mNumberBuffers; i++ ) {
+            memcpy(targetBuffer->mBuffers[i].mData, sourceBuffers[i], frames * sizeof(float));
+        }
     }
     
     return YES;
