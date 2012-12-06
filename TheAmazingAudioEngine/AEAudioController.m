@@ -812,22 +812,22 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 
 - (void)dealloc {
     self.lastError = nil;
-    
-    if ( _pollThread ) {
-        [_pollThread cancel];
-        [_pollThread release];
-    }
-    
-    self.audiobusInputPort = nil;
-    self.audiobusOutputPort = nil;
-    
+
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [self stop];
     [self teardown];
     
+    OSStatus result = AudioSessionRemovePropertyListenerWithUserData(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, self);
+    checkResult(result, "AudioSessionRemovePropertyListenerWithUserData");
+    
+    result = AudioSessionRemovePropertyListenerWithUserData(kAudioSessionProperty_AudioInputAvailable, audioSessionPropertyListener, self);
+    checkResult(result, "AudioSessionRemovePropertyListenerWithUserData");
+    
     self.audioRoute = nil;
     
-    self.inputChannelSelection = nil;
+    if ( _audiobusInputPort ) [_audiobusInputPort release];
+    if ( _topChannel.audiobusOutputPort ) [_topChannel.audiobusOutputPort release];
+    if ( _inputChannelSelection ) [_inputChannelSelection release];
     
     NSArray *channels = [self channels];
     for ( NSObject *channel in channels ) {
@@ -921,6 +921,9 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     if ( _pollThread ) {
         [_pollThread cancel];
+        while ( [_pollThread isExecuting] ) {
+            [NSThread sleepForTimeInterval:0.01];
+        }
         [_pollThread release];
         _pollThread = nil;
     }
@@ -2006,7 +2009,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     
     // Initialise the audio session
     OSStatus result = AudioSessionInitialize(NULL, NULL, interruptionListener, self);
-    if ( !checkResult(result, "AudioSessionInitialize") ) {
+    if ( result != kAudioSessionAlreadyInitialized && !checkResult(result, "AudioSessionInitialize") ) {
         self.lastError = [NSError audioControllerErrorWithMessage:@"Couldn't initialize audio session" OSStatus:result];
         _hasSystemError = YES;
         return NO;
@@ -3285,7 +3288,7 @@ static void serveAudiobusInputQueue(AEAudioController *THIS) {
     pthread_setname_np("com.theamazingaudioengine.AEAudioControllerMessagePollThread");
     while ( ![self isCancelled] ) {
         if ( AEAudioControllerHasPendingMainThreadMessages(_audioController) ) {
-            [_audioController performSelectorOnMainThread:@selector(pollForMessageResponses) withObject:nil waitUntilDone:YES];
+            [_audioController performSelectorOnMainThread:@selector(pollForMessageResponses) withObject:nil waitUntilDone:NO];
         }
         usleep(_pollInterval*1.0e6);
     }
