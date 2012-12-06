@@ -20,15 +20,14 @@
  *  you the loaded audio in, optionally setting a completion block, and 
  *  adding the operation to an operation queue.
  *
- *  If you wish to load a file synchronously, then you can create an
- *  operation queue, then wait upon it, like so:
+ *  If you wish to load a file synchronously, then you can simply start
+ *  the operation yourself, like so:
  *
  *  @code
- *  AEAudioFileLoaderOperation *operation = [[AEAudioFileLoaderOperation alloc] initWithFileURL:url targetAudioDescription:audioDescription];
- *  NSOperationQueue *queue = [[NSOperationQueue alloc] init];
- *  [queue addOperation:operation];
- *  [queue waitUntilAllOperationsAreFinished];
- *  
+ *  AEAudioFileLoaderOperation *operation = [[AEAudioFileLoaderOperation alloc] initWithFileURL:url 
+ *                                                                       targetAudioDescription:audioDescription];
+ *  [operation start];
+ *
  *  if ( operation.error ) {
  *     // Load failed! Clean up, report error, etc.
  *  } else {
@@ -37,12 +36,11 @@
  *     _lengthInFrames = operation.lengthInFrames;
  *  }
  *  
- *  [operation release];
- *  [queue release];
+ *  [operation release]; // If not using ARC
  *  @endcode
  *
- *  Note that this is not suitable for large audio files, which should
- *  be loaded incrementally as playback occurs.
+ *  Note that this class is not suitable for use with large audio files, 
+ *  which should be loaded incrementally as playback occurs.
  */
 @interface AEAudioFileLoaderOperation : NSOperation
 

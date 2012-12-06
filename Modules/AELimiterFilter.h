@@ -9,6 +9,12 @@
 #import <Foundation/Foundation.h>
 #import "TheAmazingAudioEngine.h"
 
+/*!
+ * A wrapper around the @link AELimiter @endlink class that allows it
+ * to be used as an AEAudioFilter.
+ *
+ * See the AELimiter documentation for descriptions of the parameters.
+ */
 @interface AELimiterFilter : NSObject <AEAudioFilter>
 @property (nonatomic, assign) UInt32 hold;
 @property (nonatomic, assign) UInt32 attack;

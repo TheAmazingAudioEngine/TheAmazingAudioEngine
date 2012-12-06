@@ -2,6 +2,8 @@
 //  TPCircularBuffer+AudioBufferList.h
 //  Circular/Ring buffer implementation
 //
+//  https://github.com/michaeltyson/TPCircularBuffer
+//
 //  Created by Michael Tyson on 20/03/2012.
 //  Copyright 2012 A Tasty Pixel. All rights reserved.
 //
