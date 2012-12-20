@@ -22,6 +22,7 @@
 @property (nonatomic, retain) AEAudioController *audioController;
 @property (nonatomic, retain) AEAudioFilePlayer *loop1;
 @property (nonatomic, retain) AEAudioFilePlayer *loop2;
+@property (nonatomic, retain) AEBlockChannel *oscillator;
 @property (nonatomic, retain) AEAudioFilePlayer *oneshot;
 @property (nonatomic, retain) AEPlaythroughChannel *playthrough;
 @property (nonatomic, retain) AELimiterFilter *limiter;
@@ -43,6 +44,7 @@
 @synthesize audioController = _audioController;
 @synthesize loop1 = _loop1;
 @synthesize loop2 = _loop2;
+@synthesize oscillator = _oscillator;
 @synthesize oneshot = _oneshot;
 @synthesize playthrough = _playthrough;
 @synthesize limiter = _limiter;
@@ -76,8 +78,26 @@
     _loop2.volume = 1.0;
     _loop2.channelIsMuted = YES;
     _loop2.loop = YES;
+    
+    __block float oscillatorPosition = 0;
+    __block float oscillatorRate = 500.0/44100.0;
+    self.oscillator = [[[AEBlockChannel alloc] initWithBlock:^(const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
+        for ( int i=0; i<frames; i++ ) {
+            // Quick sin-esque oscillator
+            float x = oscillatorPosition;
+            x *= x; x -= 1.0; x *= x; // x now in the range 0...1
+            x *= INT16_MAX; // x now in range 0-INT16_MAX
+            x -= INT16_MAX / 2; // x now in range -INT16_MAX/2 - INT16_MAX/2
+            oscillatorPosition += oscillatorRate;
+            if ( oscillatorPosition > 1.0 ) oscillatorPosition -= 2.0;
+            
+            ((SInt16*)audio->mBuffers[0].mData)[i] = x;
+            ((SInt16*)audio->mBuffers[1].mData)[i] = x;
+        }
+    }] autorelease];
+    _oscillator.channelIsMuted = YES;
         
-    [_audioController addChannels:[NSArray arrayWithObjects:_loop1, _loop2, nil]];
+    [_audioController addChannels:[NSArray arrayWithObjects:_loop1, _loop2, _oscillator, nil]];
     
     return self;
 }
@@ -200,7 +220,7 @@
 -(NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     switch ( section ) {
         case 0:
-            return 2;
+            return 3;
             
         case 1:
             return 1;
@@ -252,6 +272,14 @@
                     slider.value = _loop2.volume;
                     [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(loop2SwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     [slider addTarget:self action:@selector(loop2VolumeChanged:) forControlEvents:UIControlEventValueChanged];
+                    break;
+                }
+                case 2: {
+                    cell.textLabel.text = @"Oscillator";
+                    ((UISwitch*)cell.accessoryView).on = !_oscillator.channelIsMuted;
+                    slider.value = _oscillator.volume;
+                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(oscillatorSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                    [slider addTarget:self action:@selector(oscillatorVolumeChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
                 }
             }
@@ -319,6 +347,14 @@
 
 - (void)loop2VolumeChanged:(UISlider*)sender {
     _loop2.volume = sender.value;
+}
+
+- (void)oscillatorSwitchChanged:(UISwitch*)sender {
+    _oscillator.channelIsMuted = !sender.isOn;
+}
+
+- (void)oscillatorVolumeChanged:(UISlider*)sender {
+    _oscillator.volume = sender.value;
 }
 
 - (void)oneshotPlayButtonPressed:(UIButton*)sender {

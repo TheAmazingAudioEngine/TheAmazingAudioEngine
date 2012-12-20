@@ -11,4 +11,5 @@
 #import "AEAudioFileLoaderOperation.h"
 #import "AEAudioFilePlayer.h"
 #import "AEAudioFileWriter.h"
+#import "AEBlockChannel.h"
 #import "AEUtilities.h"

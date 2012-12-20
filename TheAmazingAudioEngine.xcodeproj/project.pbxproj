@@ -25,6 +25,8 @@
 		4C38DC5715458AB1009F4454 /* AEAudioFileWriter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C38DC5415458AB1009F4454 /* AEAudioFileWriter.m */; };
 		4C49FE32153DC21A008725E0 /* AEAudioFileLoaderOperation.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C49FE30153DC21A008725E0 /* AEAudioFileLoaderOperation.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4C49FE34153DC21A008725E0 /* AEAudioFileLoaderOperation.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C49FE31153DC21A008725E0 /* AEAudioFileLoaderOperation.m */; };
+		4C4B11F416833FDD00A3BA2E /* AEBlockChannel.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C4B11F216833FDD00A3BA2E /* AEBlockChannel.h */; };
+		4C4B11F516833FDD00A3BA2E /* AEBlockChannel.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C4B11F316833FDD00A3BA2E /* AEBlockChannel.m */; };
 		4C698CFD162B02EF008B159D /* TPCircularBuffer+AudioBufferList.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C698CF9162B02EF008B159D /* TPCircularBuffer+AudioBufferList.c */; };
 		4C698CFE162B02EF008B159D /* TPCircularBuffer+AudioBufferList.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C698CFA162B02EF008B159D /* TPCircularBuffer+AudioBufferList.h */; };
 		4C698CFF162B02EF008B159D /* TPCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C698CFB162B02EF008B159D /* TPCircularBuffer.c */; };
@@ -65,6 +67,8 @@
 		4C38DC5415458AB1009F4454 /* AEAudioFileWriter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEAudioFileWriter.m; sourceTree = "<group>"; };
 		4C49FE30153DC21A008725E0 /* AEAudioFileLoaderOperation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEAudioFileLoaderOperation.h; sourceTree = "<group>"; };
 		4C49FE31153DC21A008725E0 /* AEAudioFileLoaderOperation.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEAudioFileLoaderOperation.m; sourceTree = "<group>"; };
+		4C4B11F216833FDD00A3BA2E /* AEBlockChannel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEBlockChannel.h; sourceTree = "<group>"; };
+		4C4B11F316833FDD00A3BA2E /* AEBlockChannel.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEBlockChannel.m; sourceTree = "<group>"; };
 		4C698CF8162B02EF008B159D /* README.markdown */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = README.markdown; sourceTree = "<group>"; };
 		4C698CF9162B02EF008B159D /* TPCircularBuffer+AudioBufferList.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "TPCircularBuffer+AudioBufferList.c"; sourceTree = "<group>"; };
 		4C698CFA162B02EF008B159D /* TPCircularBuffer+AudioBufferList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "TPCircularBuffer+AudioBufferList.h"; sourceTree = "<group>"; };
@@ -192,6 +196,8 @@
 				4C38DC5415458AB1009F4454 /* AEAudioFileWriter.m */,
 				4C12CC98151D1EDA00562E2A /* AEUtilities.h */,
 				4C12CC99151D1EDA00562E2A /* AEUtilities.c */,
+				4C4B11F216833FDD00A3BA2E /* AEBlockChannel.h */,
+				4C4B11F316833FDD00A3BA2E /* AEBlockChannel.m */,
 				4C49FE30153DC21A008725E0 /* AEAudioFileLoaderOperation.h */,
 				4C49FE31153DC21A008725E0 /* AEAudioFileLoaderOperation.m */,
 				4C25747215F0D8E000D232E8 /* TPCircularBuffer.c */,
@@ -219,6 +225,7 @@
 				4C698CFE162B02EF008B159D /* TPCircularBuffer+AudioBufferList.h in Headers */,
 				4C698D00162B02EF008B159D /* TPCircularBuffer.h in Headers */,
 				4C26433E16494EA2003F983D /* AEFloatConverter.h in Headers */,
+				4C4B11F416833FDD00A3BA2E /* AEBlockChannel.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -332,6 +339,7 @@
 				4C698CFD162B02EF008B159D /* TPCircularBuffer+AudioBufferList.c in Sources */,
 				4C698CFF162B02EF008B159D /* TPCircularBuffer.c in Sources */,
 				4C26433F16494EA2003F983D /* AEFloatConverter.m in Sources */,
+				4C4B11F516833FDD00A3BA2E /* AEBlockChannel.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
