@@ -9,7 +9,16 @@
 #import <Foundation/Foundation.h>
 #import "TheAmazingAudioEngine.h"
 
+/*!
+ * Playthrough channel, used for live monitoring of input
+ */
 @interface AEPlaythroughChannel : NSObject <AEAudioPlayable, AEAudioReceiver>
+
+/*!
+ * Initialise
+ *
+ * @param audioController The Audio Controller
+ */
 - (id)initWithAudioController:(AEAudioController*)audioController;
 
 @property (nonatomic, readonly) float volume;
