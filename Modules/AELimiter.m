@@ -54,7 +54,7 @@ static element_t findNextTriggerValueInRange(AELimiter *THIS, AudioBufferList *d
     self.hold = 22050;
     self.decay = 44100;
     self.attack = 2048;
-    _level = INT16_MAX;
+    _level = 0.2;
     _gain = 1.0;
     _framesSinceLastTrigger = kNoValue;
     _framesToNextTrigger = kNoValue;
@@ -74,7 +74,7 @@ static element_t findNextTriggerValueInRange(AELimiter *THIS, AudioBufferList *d
 BOOL AELimiterEnqueue(AELimiter *THIS, float** buffers, int numberOfBuffers, UInt32 length, const AudioTimeStamp *timestamp) {
     assert(numberOfBuffers <= 2);
     
-    char audioBufferListBytes[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
+    char audioBufferListBytes[sizeof(AudioBufferList)+(numberOfBuffers-1)*sizeof(AudioBuffer)];
     AudioBufferList *bufferList = (AudioBufferList*)audioBufferListBytes;
     bufferList->mNumberBuffers = numberOfBuffers;
     for ( int i=0; i<numberOfBuffers; i++ ) {
@@ -96,10 +96,8 @@ void AELimiterDrain(AELimiter *THIS, float** buffers, int numberOfBuffers, UInt3
 }
 
 static void _AELimiterDequeue(AELimiter *THIS, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
-    assert(numberOfBuffers <= 2);
-    
     // Dequeue the audio
-    char audioBufferListBytes[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
+    char audioBufferListBytes[sizeof(AudioBufferList)+(numberOfBuffers-1)*sizeof(AudioBuffer)];
     AudioBufferList *bufferList = (AudioBufferList*)audioBufferListBytes;
     bufferList->mNumberBuffers = numberOfBuffers;
     for ( int i=0; i<numberOfBuffers; i++ ) {

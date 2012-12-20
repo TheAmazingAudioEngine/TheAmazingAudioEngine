@@ -8,6 +8,7 @@
 
 #import "AEExpanderFilter.h"
 #import <Accelerate/Accelerate.h>
+#import "AEFloatConverter.h"
 #import <libkern/OSAtomic.h>
 #import <mach/mach_time.h>
 
@@ -26,18 +27,17 @@ static inline double ratio_from_db(float db) { return pow(10.0, db / 10.0); };
 static inline double db_from_ratio(float value) { return 10.0 * log10(value); };
 static inline double db_from_value(UInt16 value) { return db_from_ratio((double)value / INT16_MAX); };
 
-#define kScratchBufferSize 8192
+#define kScratchBufferLength 8192
 #define kCalibrationTime 2.0
 #define kCalibrationThresholdOffset 3.0 // dB
 #define kMaxAutoThreshold -5.0
-#define kMaxChannels 8
 
 typedef void (^AECalibrateCompletionBlock)(void);
 
 @interface AEExpanderFilter ()  {
+    AudioStreamBasicDescription _clientFormat;
     float        _maxValue;
-    float       *_scratchBuffer[kMaxChannels];
-    int          _configuredChannels;
+    float      **_scratchBuffer;
     UInt16       _threshold;
     UInt16       _offThreshold;
     double       _thresholdOffset;
@@ -50,10 +50,12 @@ typedef void (^AECalibrateCompletionBlock)(void);
 }
 
 @property (nonatomic, copy) AECalibrateCompletionBlock calibrateCompletionBlock;
+@property (nonatomic, retain) AEFloatConverter *floatConverter;
+@property (nonatomic, assign) AEAudioController *audioController;
 @end
 
 @implementation AEExpanderFilter
-@synthesize ratio = _ratio, attack = _attack, decay = _decay, calibrateCompletionBlock = _calibrateCompletionBlock;
+@synthesize ratio = _ratio, attack = _attack, decay = _decay, calibrateCompletionBlock = _calibrateCompletionBlock, floatConverter = _floatConverter, audioController = _audioController;
 @dynamic threshold, hysteresis;
 
 +(void)initialize {
@@ -63,12 +65,20 @@ typedef void (^AECalibrateCompletionBlock)(void);
     __secondsToHostTicks = 1.0 / __hostTicksToSeconds;
 }
 
-- (id)init {
+- (id)initWithAudioController:(AEAudioController *)audioController clientFormat:(AudioStreamBasicDescription)clientFormat {
     if ( !(self = [super init]) ) return nil;
     
-    _scratchBuffer[0] = (float*)malloc(sizeof(float) * kScratchBufferSize);
-    _scratchBuffer[1] = (float*)malloc(sizeof(float) * kScratchBufferSize);
-    _configuredChannels = 2;
+    self.audioController = audioController;
+    _clientFormat = clientFormat;
+    
+    self.floatConverter = [[[AEFloatConverter alloc] initWithSourceFormat:clientFormat] autorelease];
+    
+    _scratchBuffer = (float**)malloc(sizeof(float**) * clientFormat.mChannelsPerFrame);
+    assert(_scratchBuffer);
+    for ( int i=0; i<clientFormat.mChannelsPerFrame; i++ ) {
+        _scratchBuffer[i] = malloc(sizeof(float) * kScratchBufferLength);
+        assert(_scratchBuffer[i]);
+    }
     
     self.threshold = -13.0;
     
@@ -81,8 +91,40 @@ typedef void (^AECalibrateCompletionBlock)(void);
 }
 
 - (void)dealloc {
-    for ( int i=0; i<_configuredChannels; i++ ) free(_scratchBuffer[i]);
+    for ( int i=0; i<_clientFormat.mChannelsPerFrame; i++ ) {
+        free(_scratchBuffer[i]);
+    }
+    free(_scratchBuffer);
+    self.floatConverter = nil;
     [super dealloc];
+}
+
+-(void)setClientFormat:(AudioStreamBasicDescription)clientFormat {
+    
+    AEFloatConverter *floatConverter = [[[AEFloatConverter alloc] initWithSourceFormat:clientFormat] autorelease];
+    
+    float **scratchBuffer = (float**)malloc(sizeof(float**) * clientFormat.mChannelsPerFrame);
+    assert(scratchBuffer);
+    for ( int i=0; i<clientFormat.mChannelsPerFrame; i++ ) {
+        scratchBuffer[i] = malloc(sizeof(float) * kScratchBufferLength);
+        assert(scratchBuffer[i]);
+    }
+    
+    AEFloatConverter *oldFloatConverter = _floatConverter;
+    float** oldScratchBuffer = _scratchBuffer;
+    AudioStreamBasicDescription oldClientFormat = _clientFormat;
+    
+    [_audioController performSynchronousMessageExchangeWithBlock:^{
+        _floatConverter = floatConverter;
+        _scratchBuffer = scratchBuffer;
+        _clientFormat = clientFormat;
+    }];
+    
+    [oldFloatConverter release];
+    for ( int i=0; i<oldClientFormat.mChannelsPerFrame; i++ ) {
+        free(oldScratchBuffer[i]);
+    }
+    free(oldScratchBuffer);
 }
 
 - (void)assignPreset:(AEExpanderFilterPreset)preset {
@@ -165,22 +207,6 @@ typedef void (^AECalibrateCompletionBlock)(void);
     return _hysteresis_db;
 }
 
-struct reconfigureChannels_t { AEExpanderFilter *filter; int numberOfChannels; };
-static void reconfigureChannels(AEAudioController *audioController, void *userInfo, int len) {
-    struct reconfigureChannels_t *arg = userInfo;
-    AEExpanderFilter *THIS = arg->filter;
-    
-    if ( THIS->_configuredChannels >= arg->numberOfChannels ) return;
-    
-    for ( int i=THIS->_configuredChannels; i<arg->numberOfChannels; i++ ) {
-        THIS->_scratchBuffer[i] = (float*)malloc(sizeof(float) * kScratchBufferSize);
-    }
-    
-    OSMemoryBarrier();
-    
-    THIS->_configuredChannels = arg->numberOfChannels;
-}
-
 static void completeCalibration(AEAudioController *audioController, void *userInfo, int len) {
     AEExpanderFilter *THIS = *(AEExpanderFilter**)userInfo;
     THIS->_threshold = min((THIS->_calibrationMaxValue + kCalibrationThresholdOffset),
@@ -200,17 +226,6 @@ static void filterCallback(id                        receiver,
                            UInt32                    frames,
                            AudioBufferList          *audio) {
     AEExpanderFilter *THIS = (AEExpanderFilter*)receiver;
-    
-    AudioStreamBasicDescription *asbd = AEAudioControllerAudioDescription(audioController);
-    assert(asbd->mFormatFlags & kAudioFormatFlagIsNonInterleaved);
-    
-    if ( audio->mNumberBuffers > THIS->_configuredChannels ) {
-        AEAudioControllerSendAsynchronousMessageToMainThread(audioController, 
-                                                             reconfigureChannels, 
-                                                             &(struct reconfigureChannels_t){ .filter = THIS, .numberOfChannels = audio->mNumberBuffers}, 
-                                                             sizeof(struct reconfigureChannels_t));
-        return;
-    }
     
     // Convert audio to floats on scratch buffer for processing, and find maxima
     float max = 0;

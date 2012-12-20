@@ -40,6 +40,15 @@ typedef enum {
 @interface AEExpanderFilter : NSObject <AEAudioFilter>
 
 /*!
+ * Initialise
+ *
+ * @param audioController The Audio Controller
+ * @param clientFormat The audio format to use
+ */
+- (id)initWithAudioController:(AEAudioController*)audioController clientFormat:(AudioStreamBasicDescription)clientFormat;
+
+
+/*!
  * Apply a preset
  */
 - (void)assignPreset:(AEExpanderFilterPreset)preset;
@@ -56,6 +65,7 @@ typedef enum {
  */
 - (void)startCalibratingWithCompletionBlock:(void (^)(void))block;
 
+@property (nonatomic, assign) AudioStreamBasicDescription clientFormat;
 
 @property (nonatomic, assign) float ratio;
 @property (nonatomic, assign) double threshold;

@@ -354,8 +354,8 @@
 
 - (void)limiterSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
-        self.limiter = [[[AELimiterFilter alloc] init] autorelease];
-        _limiter.level = INT16_MAX * 0.1;
+        self.limiter = [[[AELimiterFilter alloc] initWithAudioController:_audioController clientFormat:_audioController.audioDescription] autorelease];
+        _limiter.level = 0.1;
         [_audioController addFilter:_limiter];
     } else {
         [_audioController removeFilter:_limiter];
@@ -365,7 +365,7 @@
 
 - (void)expanderSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
-        self.expander = [[[AEExpanderFilter alloc] init] autorelease];
+        self.expander = [[[AEExpanderFilter alloc] initWithAudioController:_audioController clientFormat:_audioController.audioDescription] autorelease];
         [_audioController addFilter:_expander];
     } else {
         [_audioController removeFilter:_expander];
