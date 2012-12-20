@@ -148,9 +148,9 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
         
     } else {
         
-        // Derive the output audio description from the client format, but with interleaved, big endian signed integers.
+        // Derive the output audio description from the client format, but with interleaved, big endian (if AIFF) signed integers.
         AudioStreamBasicDescription audioDescription = _audioDescription;
-        audioDescription.mFormatFlags = kLinearPCMFormatFlagIsBigEndian | kLinearPCMFormatFlagIsSignedInteger | kLinearPCMFormatFlagIsPacked;
+        audioDescription.mFormatFlags = (fileType == kAudioFileAIFFType ? kLinearPCMFormatFlagIsBigEndian : 0) | kLinearPCMFormatFlagIsSignedInteger | kLinearPCMFormatFlagIsPacked;
         audioDescription.mFormatID = kAudioFormatLinearPCM;
         audioDescription.mBytesPerPacket =
             audioDescription.mBytesPerFrame = audioDescription.mChannelsPerFrame * (audioDescription.mBitsPerChannel/8);
