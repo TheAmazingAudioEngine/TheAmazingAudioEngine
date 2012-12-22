@@ -2228,7 +2228,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
         AURenderCallbackStruct inRenderProc;
         inRenderProc.inputProc = &inputAvailableCallback;
         inRenderProc.inputProcRefCon = self;
-        result = AudioUnitSetProperty(_ioAudioUnit, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 1, &inRenderProc, sizeof(inRenderProc));
+        result = AudioUnitSetProperty(_ioAudioUnit, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 0, &inRenderProc, sizeof(inRenderProc));
         checkResult(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_SetInputCallback)");
     } else {
         // Disable input
@@ -2240,7 +2240,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     if ( [self usingVPIO] ) {
         // Set quality
         UInt32 quality = 127;
-        OSStatus result = AudioUnitSetProperty(_ioAudioUnit, kAUVoiceIOProperty_VoiceProcessingQuality, kAudioUnitScope_Global, 1, &quality, sizeof(quality));
+        OSStatus result = AudioUnitSetProperty(_ioAudioUnit, kAUVoiceIOProperty_VoiceProcessingQuality, kAudioUnitScope_Global, 0, &quality, sizeof(quality));
         checkResult(result, "AudioUnitSetProperty(kAUVoiceIOProperty_VoiceProcessingQuality)");
         
         // If we're using voice processing, clamp the buffer duration
