@@ -19,11 +19,11 @@ typedef void (^AEBlockChannelBlock)(const AudioTimeStamp     *time,
 @interface AEBlockChannel : NSObject <AEAudioPlayable>
 
 /*!
- * Initialize
+ * Create a new channel with a given block
  *
  * @param block Block to use for audio generation
  */
-- (id)initWithBlock:(AEBlockChannelBlock)block;
++ (AEBlockChannel*)channelWithBlock:(AEBlockChannelBlock)block;
 
 /*!
  * Track volume

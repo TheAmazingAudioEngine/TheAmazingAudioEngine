@@ -81,20 +81,25 @@
     
     __block float oscillatorPosition = 0;
     __block float oscillatorRate = 500.0/44100.0;
-    self.oscillator = [[[AEBlockChannel alloc] initWithBlock:^(const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
+    
+    self.oscillator = [AEBlockChannel channelWithBlock:^(const AudioTimeStamp  *time,
+                                                               UInt32           frames,
+                                                               AudioBufferList *audio) {
         for ( int i=0; i<frames; i++ ) {
             // Quick sin-esque oscillator
             float x = oscillatorPosition;
-            x *= x; x -= 1.0; x *= x; // x now in the range 0...1
-            x *= INT16_MAX; // x now in range 0-INT16_MAX
-            x -= INT16_MAX / 2; // x now in range -INT16_MAX/2 - INT16_MAX/2
+            x *= x; x -= 1.0; x *= x;       // x now in the range 0...1
+            x *= INT16_MAX;
+            x -= INT16_MAX / 2;
             oscillatorPosition += oscillatorRate;
             if ( oscillatorPosition > 1.0 ) oscillatorPosition -= 2.0;
             
             ((SInt16*)audio->mBuffers[0].mData)[i] = x;
             ((SInt16*)audio->mBuffers[1].mData)[i] = x;
         }
-    }] autorelease];
+    }];
+    
+    
     _oscillator.channelIsMuted = YES;
         
     [_audioController addChannels:[NSArray arrayWithObjects:_loop1, _loop2, _oscillator, nil]];

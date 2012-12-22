@@ -25,6 +25,10 @@
     return self;
 }
 
++ (AEBlockChannel*)channelWithBlock:(AEBlockChannelBlock)block {
+    return [[[AEBlockChannel alloc] initWithBlock:block] autorelease];
+}
+
 -(void)dealloc {
     self.block = nil;
     [super dealloc];
