@@ -792,7 +792,6 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     _inputAudioDescription = audioDescription;
     _inputEnabled = enableInput;
     _voiceProcessingEnabled = useVoiceProcessing;
-    _preferredBufferDuration = 0.005;
     _inputMode = AEInputModeFixedAudioFormat;
     _voiceProcessingOnlyForSpeakerAndMicrophone = YES;
     
@@ -1425,7 +1424,7 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
             message.block();
 #ifdef DEBUG
             uint64_t end = mach_absolute_time();
-            if ( (end-start)*__hostTicksToSeconds >= THIS->_preferredBufferDuration ) {
+            if ( (end-start)*__hostTicksToSeconds >= (THIS->_preferredBufferDuration ? THIS->_preferredBufferDuration : 0.01) ) {
                 printf("Warning: Block perform on realtime thread took too long (%0.4lfs)\n", (end-start)*__hostTicksToSeconds);
             }
 #endif
@@ -1499,7 +1498,7 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
             
             if ( self.running && _pollThread.pollInterval == kIdleMessagingPollDuration ) {
                 // Perform more rapid active polling while we expect a response
-                _pollThread.pollInterval = _preferredBufferDuration;
+                _pollThread.pollInterval = _preferredBufferDuration ? _preferredBufferDuration : 0.01;
             }
         }
         
@@ -1548,7 +1547,7 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
             });
         }
         if ( finished ) break;
-        [NSThread sleepForTimeInterval:_preferredBufferDuration];
+        [NSThread sleepForTimeInterval:_preferredBufferDuration ? _preferredBufferDuration : 0.01];
     }
     
     if ( !finished ) {
@@ -1796,11 +1795,22 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 }
 
 -(void)setPreferredBufferDuration:(float)preferredBufferDuration {
+    if ( _preferredBufferDuration == preferredBufferDuration ) return;
+    
     _preferredBufferDuration = preferredBufferDuration;
 
     Float32 preferredBufferSize = [self usingVPIO] ? MAX(kMaxBufferDurationWithVPIO, _preferredBufferDuration) : _preferredBufferDuration;
     OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
     checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
+    
+    Float32 grantedBufferSize;
+    UInt32 grantedBufferSizeSize = sizeof(grantedBufferSize);
+    result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration, &grantedBufferSizeSize, &grantedBufferSize);
+    checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration)");
+    
+    NSLog(@"Buffer duration %0.2g, %d frames (requested %0.2gs, %d frames)",
+          grantedBufferSize, (int)round(grantedBufferSize*_audioDescription.mSampleRate),
+          preferredBufferSize, (int)round(preferredBufferSize*_audioDescription.mSampleRate));
 }
 
 -(void)setVoiceProcessingEnabled:(BOOL)voiceProcessingEnabled {
@@ -2024,19 +2034,6 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     result = AudioSessionAddPropertyListener(kAudioSessionProperty_AudioInputAvailable, audioSessionPropertyListener, self);
     checkResult(result, "AudioSessionAddPropertyListener");
     
-    // Set preferred buffer size
-    Float32 preferredBufferSize = [self usingVPIO] ? MAX(kMaxBufferDurationWithVPIO, _preferredBufferDuration) : _preferredBufferDuration;
-    result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
-    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
-    Float32 grantedBufferSize;
-    UInt32 grantedBufferSizeSize = sizeof(grantedBufferSize);
-    result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration, &grantedBufferSizeSize, &grantedBufferSize);
-    checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration)");
-    [extraInfo appendFormat:@"Buffer duration %0.2g, %d frames", grantedBufferSize, (int)round(grantedBufferSize*_audioDescription.mSampleRate)];
-    if ( grantedBufferSize != preferredBufferSize ) {
-        [extraInfo appendFormat:@" (requested %0.2gs, %d frames)", preferredBufferSize, (int)round(preferredBufferSize*_audioDescription.mSampleRate)];
-    }
-    
     // Set sample rate
     Float64 sampleRate = _audioDescription.mSampleRate;
     result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareSampleRate, sizeof(sampleRate), &sampleRate);
@@ -2252,15 +2249,19 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
         OSStatus result = AudioUnitSetProperty(_ioAudioUnit, kAUVoiceIOProperty_VoiceProcessingQuality, kAudioUnitScope_Global, 0, &quality, sizeof(quality));
         checkResult(result, "AudioUnitSetProperty(kAUVoiceIOProperty_VoiceProcessingQuality)");
         
-        // If we're using voice processing, clamp the buffer duration
-        Float32 preferredBufferSize = MAX(kMaxBufferDurationWithVPIO, _preferredBufferDuration);
-        result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
-        checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
+        if ( _preferredBufferDuration ) {
+            // If we're using voice processing, clamp the buffer duration
+            Float32 preferredBufferSize = MAX(kMaxBufferDurationWithVPIO, _preferredBufferDuration);
+            result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
+            checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
+        }
     } else {
-        // Set the buffer duration
-        Float32 preferredBufferSize = _preferredBufferDuration;
-        OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
-        checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
+        if ( _preferredBufferDuration ) {
+            // Set the buffer duration
+            Float32 preferredBufferSize = _preferredBufferDuration;
+            OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
+            checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
+        }
     }
 }
 
@@ -3248,7 +3249,7 @@ static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferLi
 }
 
 static void serveAudiobusInputQueue(AEAudioController *THIS) {
-    UInt32 ioBufferLength = AEConvertSecondsToFrames(THIS, THIS->_preferredBufferDuration);
+    UInt32 ioBufferLength = AEConvertSecondsToFrames(THIS, THIS->_preferredBufferDuration ? THIS->_preferredBufferDuration : 0.005);
     AudioTimeStamp timestamp;
     static Float64 __sampleTime = 0;
     AudioUnitRenderActionFlags flags = kAudiobusSourceFlag;
