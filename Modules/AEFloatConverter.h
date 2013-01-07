@@ -38,7 +38,7 @@
  * @param frames            The number of frames to convert.
  * @return YES on success; NO on failure
  */
-BOOL AEFloatConverterToFloat(AEFloatConverter* converter, AudioBufferList *sourceBuffer, float** targetBuffers, UInt32 frames);
+BOOL AEFloatConverterToFloat(AEFloatConverter* converter, AudioBufferList *sourceBuffer, float * const * targetBuffers, UInt32 frames);
 
 /*!
  * Convert audio from floating-point
@@ -54,6 +54,6 @@ BOOL AEFloatConverterToFloat(AEFloatConverter* converter, AudioBufferList *sourc
  * @param frames            The number of frames to convert.
  * @return YES on success; NO on failure
  */
-BOOL AEFloatConverterFromFloat(AEFloatConverter* converter, float** sourceBuffers, AudioBufferList *targetBuffer, UInt32 frames);
+BOOL AEFloatConverterFromFloat(AEFloatConverter* converter, float * const * sourceBuffers, AudioBufferList *targetBuffer, UInt32 frames);
 
 @end

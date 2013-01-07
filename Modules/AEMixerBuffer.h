@@ -89,6 +89,10 @@ typedef UInt32 (*AEMixerBufferSourcePeekCallback) (AEMixerBufferSource  source,
  *  may be lost. If this is a problem, then call this function first on the main thread, for each source,
  *  with a NULL audio buffer, and a lengthInFrames value of 0.
  *
+ *  This function can safely be used in a different thread from the dequeue function. It can also be used
+ *  in a different thread from other calls to enqueue, given two conditions: No two threads enqueue the 
+ *  same source, and no two threads call enqueue for a new source simultaneously.
+ *
  * @param mixerBuffer    The mixer buffer.
  * @param source         The audio source. This can be anything you like, as long as it is not NULL, and is unique to each source.
  * @param audio          The audio buffer list.
@@ -115,6 +119,8 @@ void AEMixerBufferEnqueue(AEMixerBuffer *mixerBuffer, AEMixerBufferSource source
  * Dequeue audio
  *
  *  Call this function to receive synchronised and mixed audio.
+ *
+ *  This can safely be used in a different thread from the enqueue function.
  *
  * @param mixerBuffer       The mixer buffer.
  * @param bufferList        The buffer list to write audio to. The mData pointers 
@@ -186,8 +192,11 @@ void AEMixerBufferMarkSourceIdle(AEMixerBuffer *mixerBuffer, AEMixerBufferSource
 
 /*!
  * Set a different AudioStreamBasicDescription for a source
+ *
+ *  Important: Do not change this property while using enqueue/dequeue.
+ *  You must stop enqueuing or dequeuing audio first.
  */
-- (void)setAudioDescription:(AudioStreamBasicDescription*)audioDescription forSource:(AEMixerBufferSource)source;
+- (void)setAudioDescription:(AudioStreamBasicDescription)audioDescription forSource:(AEMixerBufferSource)source;
 
 /*!
  * Set volume for source
@@ -223,6 +232,14 @@ void AEMixerBufferMarkSourceIdle(AEMixerBuffer *mixerBuffer, AEMixerBufferSource
  * @param source            The audio source.
  */
 - (void)unregisterSource:(AEMixerBufferSource)source;
+
+/*!
+ * Client audio format
+ *
+ *  Important: Do not change this property while using enqueue/dequeue.
+ *  You must stop enqueuing or dequeuing audio first.
+ */
+@property (nonatomic, assign) AudioStreamBasicDescription clientFormat;
 
 /*!
  * How long to wait for empty sources before assuming they are idle

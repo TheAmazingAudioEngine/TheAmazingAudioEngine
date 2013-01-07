@@ -28,7 +28,7 @@ const int kMessageBufferLength                  = 8192;
 const int kMaxMessageDataSize                   = 2048;
 const NSTimeInterval kIdleMessagingPollDuration = 0.1;
 const int kRenderConversionScratchBufferSize    = 16384;
-const int kInputAudioBufferBytes                = 8192;
+const int kInputAudioBufferFrames               = 4096;
 const int kLevelMonitorScratchBufferSize        = 8192;
 const int kAudiobusSourceFlag                   = 1<<12;
 const NSTimeInterval kMaxBufferDurationWithVPIO = 0.01;
@@ -452,12 +452,13 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
         
         AudioBufferList *bufferList = audio;
         
-        char audioBufferListSpace[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
+        int bufferCount = (group->audioConverterSourceFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? group->audioConverterSourceFormat.mChannelsPerFrame : 1;
+        char audioBufferListSpace[sizeof(AudioBufferList)+(bufferCount-1)*sizeof(AudioBuffer)];
 
         if ( group->converterRequired ) {
             // Initialise output buffer
             bufferList = (AudioBufferList*)audioBufferListSpace;
-            bufferList->mNumberBuffers = (group->audioConverterSourceFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? group->audioConverterSourceFormat.mChannelsPerFrame : 1;
+            bufferList->mNumberBuffers = bufferCount;
             for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
                 bufferList->mBuffers[i].mNumberChannels = (group->audioConverterSourceFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? 1 : group->audioConverterSourceFormat.mChannelsPerFrame;
                 bufferList->mBuffers[i].mData           = group->audioConverterScratchBuffer + (i * kRenderConversionScratchBufferSize/bufferList->mNumberBuffers);
@@ -558,7 +559,7 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
     
     if ( THIS->_inputAudioBufferListBuffersAreAllocated ) {
         for ( int i=0; i<THIS->_inputAudioBufferList->mNumberBuffers; i++ ) {
-            THIS->_inputAudioBufferList->mBuffers[i].mDataByteSize = kInputAudioBufferBytes;
+            THIS->_inputAudioBufferList->mBuffers[i].mDataByteSize = kInputAudioBufferFrames * THIS->_inputAudioDescription.mBytesPerFrame;
         }
     } else {
         if ( !THIS->_inputAudioBufferList ) return noErr;
@@ -622,9 +623,10 @@ static OSStatus groupRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionF
         
         if ( group->converterRequired ) {
             // Initialise output buffer
-            char audioBufferListSpace[sizeof(AudioBufferList)+sizeof(AudioBuffer)];
+            int bufferCount = (group->audioConverterTargetFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? group->audioConverterTargetFormat.mChannelsPerFrame : 1;
+            char audioBufferListSpace[sizeof(AudioBufferList)+(bufferCount-1)*sizeof(AudioBuffer)];
             bufferList = (AudioBufferList*)audioBufferListSpace;
-            bufferList->mNumberBuffers = (group->audioConverterTargetFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? group->audioConverterTargetFormat.mChannelsPerFrame : 1;
+            bufferList->mNumberBuffers = bufferCount;
             for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
                 bufferList->mBuffers[i].mNumberChannels = (group->audioConverterTargetFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? 1 : group->audioConverterTargetFormat.mChannelsPerFrame;
                 bufferList->mBuffers[i].mData           = group->audioConverterScratchBuffer + (i * kRenderConversionScratchBufferSize/bufferList->mNumberBuffers);
@@ -2026,7 +2028,14 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     Float32 preferredBufferSize = [self usingVPIO] ? MAX(kMaxBufferDurationWithVPIO, _preferredBufferDuration) : _preferredBufferDuration;
     result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
     checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
-    [extraInfo appendFormat:@"Buffer duration %g", preferredBufferSize];
+    Float32 grantedBufferSize;
+    UInt32 grantedBufferSizeSize = sizeof(grantedBufferSize);
+    result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration, &grantedBufferSizeSize, &grantedBufferSize);
+    checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration)");
+    [extraInfo appendFormat:@"Buffer duration %0.2g, %d frames", grantedBufferSize, (int)round(grantedBufferSize*_audioDescription.mSampleRate)];
+    if ( grantedBufferSize != preferredBufferSize ) {
+        [extraInfo appendFormat:@" (requested %0.2gs, %d frames)", preferredBufferSize, (int)round(preferredBufferSize*_audioDescription.mSampleRate)];
+    }
     
     // Set sample rate
     Float64 sampleRate = _audioDescription.mSampleRate;
@@ -2478,7 +2487,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
                     || (mappingSize != targetMappingSize || memcmp(mapping, targetMapping, targetMappingSize)) ) {
                 checkResult(AudioConverterNew(&rawAudioDescription, &inputAudioDescription, &converter), "AudioConverterNew");
                 scratchBuffer = AEAllocateAndInitAudioBufferList(rawAudioDescription, 0);
-                inputBufferList = AEAllocateAndInitAudioBufferList(inputAudioDescription, kInputAudioBufferBytes / inputAudioDescription.mBytesPerFrame);
+                inputBufferList = AEAllocateAndInitAudioBufferList(inputAudioDescription, kInputAudioBufferFrames);
                 bufferIsAllocated = YES;
                 
                 checkResult(AudioConverterSetProperty(converter, kAudioConverterChannelMap, targetMappingSize, targetMapping), "AudioConverterSetProperty(kAudioConverterChannelMap");
