@@ -286,7 +286,9 @@ static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferLi
 static void serveAudiobusInputQueue(AEAudioController *THIS);
 
 @property (nonatomic, retain, readwrite) NSString *audioRoute;
+@property (nonatomic, assign, readwrite) float currentBufferDuration;
 @property (nonatomic, retain) NSError *lastError;
+@property (nonatomic, assign) NSTimer *housekeepingTimer;
 @property (nonatomic, retain) ABInputPort *audiobusInputPort;
 @property (nonatomic, retain) ABOutputPort *audiobusOutputPort;
 @end
@@ -808,10 +810,15 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         _audioGraph = NULL;
     }
     
+    self.housekeepingTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(housekeeping) userInfo:nil repeats:YES];
+    
     return self;
 }
 
 - (void)dealloc {
+    [_housekeepingTimer invalidate];
+    self.housekeepingTimer = nil;
+    
     self.lastError = nil;
 
     [[NSNotificationCenter defaultCenter] removeObserver:self];
@@ -870,6 +877,12 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         if ( error ) *error = [NSError audioControllerErrorWithMessage:@"Couldn't activate audio session" OSStatus:status];
         return NO;
     }
+    
+    Float32 bufferDuration;
+    UInt32 bufferDurationSize = sizeof(bufferDuration);
+    OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration, &bufferDurationSize, &bufferDuration);
+    checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration)");
+    if ( _currentBufferDuration != bufferDuration ) self.currentBufferDuration = bufferDuration;
     
     BOOL hasError = NO;
     
@@ -1807,6 +1820,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
     UInt32 grantedBufferSizeSize = sizeof(grantedBufferSize);
     result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration, &grantedBufferSizeSize, &grantedBufferSize);
     checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration)");
+    if ( _currentBufferDuration != grantedBufferSize ) self.currentBufferDuration = grantedBufferSize;
     
     NSLog(@"Buffer duration %0.2g, %d frames (requested %0.2gs, %d frames)",
           grantedBufferSize, (int)round(grantedBufferSize*_audioDescription.mSampleRate),
@@ -2101,6 +2115,13 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     }
     
     CFRelease(route);
+    
+    // Determine IO buffer duration
+    Float32 bufferDuration;
+    UInt32 bufferDurationSize = sizeof(bufferDuration);
+    result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration, &bufferDurationSize, &bufferDuration);
+    checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration)");
+    if ( _currentBufferDuration != bufferDuration ) self.currentBufferDuration = bufferDuration;
     
     NSLog(@"TAAE: Audio session initialized (%@)", extraInfo);
     return YES;
@@ -3263,6 +3284,13 @@ static void serveAudiobusInputQueue(AEAudioController *THIS) {
         
         inputAvailableCallback(THIS, &flags, &timestamp, 0, frames, NULL);
     }
+}
+
+- (void)housekeeping {
+    Float32 bufferDuration;
+    UInt32 bufferDurationSize = sizeof(bufferDuration);
+    OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration, &bufferDurationSize, &bufferDuration);
+    if ( result == noErr && _currentBufferDuration != bufferDuration ) self.currentBufferDuration = bufferDuration;
 }
 
 @end

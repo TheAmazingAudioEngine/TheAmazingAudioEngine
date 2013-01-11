@@ -1122,6 +1122,17 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
 @property (nonatomic, assign) float preferredBufferDuration;
 
 /*!
+ * Current buffer duration (in seconds)
+ *
+ *      This is the current hardware buffer duration, which may or may not be the same as
+ *      the @link preferredBufferDuration @endlink property, depending on the set of active
+ *      apps on the device and the order in which they were launched.
+ *
+ *      Observable.
+ */
+@property (nonatomic, readonly) float currentBufferDuration;
+
+/*!
  * Determine whether the audio engine is running
  *
  *      This is affected by calling start and stop on the audio controller.
