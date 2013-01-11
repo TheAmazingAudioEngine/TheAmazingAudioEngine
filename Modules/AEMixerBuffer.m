@@ -62,8 +62,8 @@ static const int kMaxSources                                = 10;
 static const NSTimeInterval kResyncTimestampThreshold       = 0.001;
 static const NSTimeInterval kSourceTimestampIdleThreshold   = 1.0;
 static const UInt32 kConversionBufferLength                 = 16384;
-static const UInt32 kScratchBufferLengthPerChannel          = 4096;
-static const UInt32 kSourceBufferLength                     = 65536;
+static const UInt32 kScratchBufferBytesPerChannel           = 16384;
+static const UInt32 kSourceBufferFrames                     = 8192;
 static const int kActionBufferSize                          = 2048;
 static const NSTimeInterval kActionMainThreadPollDuration   = 0.2;
 static const int kMinimumFrameCount                         = 64;
@@ -317,10 +317,10 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
     
     // If buffer list is provided with NULL mData pointers, use our own scratch buffer
     if ( bufferList && !bufferList->mBuffers[0].mData ) {
-        *ioLengthInFrames = MIN(*ioLengthInFrames, kScratchBufferLengthPerChannel / THIS->_clientFormat.mBytesPerFrame);
+        *ioLengthInFrames = MIN(*ioLengthInFrames, kScratchBufferBytesPerChannel / (THIS->_clientFormat.mBitsPerChannel/8));
         for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
-            bufferList->mBuffers[i].mData = THIS->_scratchBuffer + i*kScratchBufferLengthPerChannel;
-            bufferList->mBuffers[i].mDataByteSize = kScratchBufferLengthPerChannel;
+            bufferList->mBuffers[i].mDataByteSize = kScratchBufferBytesPerChannel * bufferList->mBuffers[i].mNumberChannels;
+            bufferList->mBuffers[i].mData = THIS->_scratchBuffer + i * bufferList->mBuffers[i].mDataByteSize;
         }
     }
     
@@ -515,10 +515,10 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
 
     // If buffer list is provided with NULL mData pointers, use our own scratch buffer
     if ( bufferList && !bufferList->mBuffers[0].mData ) {
-        *ioLengthInFrames = MIN(*ioLengthInFrames, kScratchBufferLengthPerChannel / audioDescription.mBytesPerFrame);
+        *ioLengthInFrames = MIN(*ioLengthInFrames, kScratchBufferBytesPerChannel / (audioDescription.mBitsPerChannel/8));
         for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
-            bufferList->mBuffers[i].mData = THIS->_scratchBuffer + i*kScratchBufferLengthPerChannel;
-            bufferList->mBuffers[i].mDataByteSize = kScratchBufferLengthPerChannel;
+            bufferList->mBuffers[i].mDataByteSize = kScratchBufferBytesPerChannel * bufferList->mBuffers[i].mNumberChannels;
+            bufferList->mBuffers[i].mData = THIS->_scratchBuffer + i*bufferList->mBuffers[i].mDataByteSize;
         }
     }
     
@@ -998,7 +998,7 @@ void AEMixerBufferMarkSourceIdle(AEMixerBuffer *THIS, AEMixerBufferSource source
         free(source->skipFadeBuffer);
     }
     
-    if ( memcmp(&source->audioDescription, &self->_clientFormat, sizeof(AudioStreamBasicDescription)) != 0 ) {
+    if ( source->audioDescription.mSampleRate && memcmp(&source->audioDescription, &self->_clientFormat, sizeof(AudioStreamBasicDescription)) != 0 ) {
         source->floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:source->audioDescription];
     }
     
@@ -1006,6 +1006,11 @@ void AEMixerBufferMarkSourceIdle(AEMixerBuffer *THIS, AEMixerBufferSource source
     
     if ( !source->renderCallback ) {
         TPCircularBufferClear(&source->buffer);
+        int bufferSize = kSourceBufferFrames * (source->audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? source->audioDescription.mBytesPerFrame * source->audioDescription.mChannelsPerFrame : source->audioDescription.mBytesPerFrame);
+        if ( source->buffer.length != bufferSize ) {
+            TPCircularBufferCleanup(&source->buffer);
+            TPCircularBufferInit(&source->buffer, bufferSize);
+        }
     }
     
     // Set input stream format
@@ -1246,7 +1251,7 @@ static OSStatus sourceInputCallback(void *inRefCon, AudioUnitRenderActionFlags *
             free(_scratchBuffer);
         }
         
-        _scratchBuffer = (uint8_t*)malloc(kScratchBufferLengthPerChannel * maxChannelCount);
+        _scratchBuffer = (uint8_t*)malloc(kScratchBufferBytesPerChannel * maxChannelCount);
         assert(_scratchBuffer);
         
         if ( _microfadeBuffer ) {
@@ -1260,6 +1265,18 @@ static OSStatus sourceInputCallback(void *inRefCon, AudioUnitRenderActionFlags *
         for ( int i=0; i<maxChannelCount * 2; i++ ) {
             _microfadeBuffer[i] = (float*)malloc(sizeof(float) * kMaxMicrofadeDuration);
             assert(_microfadeBuffer[i]);
+        }
+        
+        for ( int i=0; i<kMaxSources; i++ ) {
+            if ( _table[i].source && !_table[i].renderCallback && !_table[i].audioDescription.mSampleRate ) {
+                int bufferSize = kSourceBufferFrames * (_clientFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? _clientFormat.mBytesPerFrame * _clientFormat.mChannelsPerFrame : _clientFormat.mBytesPerFrame);
+                if ( _table[i].buffer.length != bufferSize ) {
+                    TPCircularBufferCleanup(&_table[i].buffer);
+                    TPCircularBufferInit(&_table[i].buffer, bufferSize);
+                } else {
+                    TPCircularBufferClear(&_table[i].buffer);
+                }
+            }
         }
         
         _configuredChannels = maxChannelCount;
@@ -1296,7 +1313,8 @@ static void prepareNewSource(AEMixerBuffer *THIS, AEMixerBufferSource sourceID) 
     source->lastAudioTimestamp = mach_absolute_time();
     prepareSkipFadeBufferForSource(THIS, source);
     
-    TPCircularBufferInit(&source->buffer, kSourceBufferLength);
+    int bufferSize = kSourceBufferFrames * (THIS->_clientFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? THIS->_clientFormat.mBytesPerFrame * THIS->_clientFormat.mChannelsPerFrame : THIS->_clientFormat.mBytesPerFrame);
+    TPCircularBufferInit(&source->buffer, bufferSize);
     
     OSMemoryBarrier();
     source->source = sourceID;
