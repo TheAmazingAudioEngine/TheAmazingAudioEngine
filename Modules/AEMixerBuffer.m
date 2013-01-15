@@ -767,6 +767,7 @@ static UInt32 _AEMixerBufferPeek(AEMixerBuffer *THIS, AudioTimeStamp *outNextTim
     }
     
     if ( !hasSources ) {
+        dprintf(THIS, 3, "No sources");
         if ( outNextTimestamp ) memset(outNextTimestamp, 0, sizeof(AudioTimeStamp));
         return 0;
     }

@@ -454,7 +454,7 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
         
         AudioBufferList *bufferList = audio;
         
-        int bufferCount = (group->audioConverterSourceFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? group->audioConverterSourceFormat.mChannelsPerFrame : 1;
+        int bufferCount = group->converterRequired ? ((group->audioConverterSourceFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? group->audioConverterSourceFormat.mChannelsPerFrame : 1) : 1;
         char audioBufferListSpace[sizeof(AudioBufferList)+(bufferCount-1)*sizeof(AudioBuffer)];
 
         if ( group->converterRequired ) {
@@ -623,10 +623,11 @@ static OSStatus groupRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionF
         // After render
         AudioBufferList *bufferList;
         
+        int bufferCount = group->converterRequired ? ((group->audioConverterTargetFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? group->audioConverterTargetFormat.mChannelsPerFrame : 1) : 1;
+        char audioBufferListSpace[sizeof(AudioBufferList)+(bufferCount-1)*sizeof(AudioBuffer)];
+        
         if ( group->converterRequired ) {
             // Initialise output buffer
-            int bufferCount = (group->audioConverterTargetFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? group->audioConverterTargetFormat.mChannelsPerFrame : 1;
-            char audioBufferListSpace[sizeof(AudioBufferList)+(bufferCount-1)*sizeof(AudioBuffer)];
             bufferList = (AudioBufferList*)audioBufferListSpace;
             bufferList->mNumberBuffers = bufferCount;
             for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
