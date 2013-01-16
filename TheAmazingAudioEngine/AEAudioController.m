@@ -363,23 +363,7 @@ static void audioSessionPropertyListener(void *inClientData, AudioSessionPropert
         NSLog(@"TAAE: Changed audio route to %@", THIS.audioRoute);
         
         BOOL playingThroughSpeaker;
-        if ( [(NSString*)route isEqualToString:@"ReceiverAndMicrophone"] ) {
-            checkResult(AudioSessionRemovePropertyListenerWithUserData(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, THIS), "AudioSessionRemovePropertyListenerWithUserData");
-            
-            // Re-route audio to the speaker (not the receiver)
-            UInt32 newRoute = kAudioSessionOverrideAudioRoute_Speaker;
-            checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute,  sizeof(route), &newRoute), "AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute)");
-            
-            if ( THIS.audioSessionCategory == kAudioSessionCategory_MediaPlayback || THIS.audioSessionCategory == kAudioSessionCategory_PlayAndRecord ) {
-                UInt32 allowMixing = YES;
-                checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing),
-                            "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
-            }
-            
-            checkResult(AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, THIS), "AudioSessionAddPropertyListener");
-            
-            playingThroughSpeaker = YES;
-        } else if ( [(NSString*)route isEqualToString:@"SpeakerAndMicrophone"] || [(NSString*)route isEqualToString:@"Speaker"] ) {
+        if ( [(NSString*)route isEqualToString:@"SpeakerAndMicrophone"] || [(NSString*)route isEqualToString:@"Speaker"] ) {
             playingThroughSpeaker = YES;
         } else {
             playingThroughSpeaker = NO;
@@ -2089,26 +2073,8 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
         
         self.audioRoute = [[(NSString*)route copy] autorelease];
         [extraInfo appendFormat:@", audio route '%@'", _audioRoute];
-        if ( [(NSString*)route isEqualToString:@"ReceiverAndMicrophone"] ) {
-            checkResult(AudioSessionRemovePropertyListenerWithUserData(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, self), 
-                        "AudioSessionRemovePropertyListenerWithUserData");
-            
-            // Re-route audio to the speaker (not the receiver)
-            UInt32 newRoute = kAudioSessionOverrideAudioRoute_Speaker;
-            checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute,  sizeof(route), &newRoute), 
-                        "AudioSessionSetProperty(kAudioSessionProperty_OverrideAudioRoute)");
-            
-            if ( self.audioSessionCategory == kAudioSessionCategory_MediaPlayback || self.audioSessionCategory == kAudioSessionCategory_PlayAndRecord ) {
-                UInt32 allowMixing = YES;
-                checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing),
-                            "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
-            }
-            
-            checkResult(AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, self),
-                        "AudioSessionAddPropertyListener");
-            
-            _playingThroughDeviceSpeaker = YES;
-        } else if ( [(NSString*)route isEqualToString:@"SpeakerAndMicrophone"] || [(NSString*)route isEqualToString:@"Speaker"] ) {
+        
+        if ( [(NSString*)route isEqualToString:@"SpeakerAndMicrophone"] || [(NSString*)route isEqualToString:@"Speaker"] ) {
             _playingThroughDeviceSpeaker = YES;
         } else {
             _playingThroughDeviceSpeaker = NO;
