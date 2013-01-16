@@ -2041,8 +2041,8 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     // Fetch sample rate, in case we didn't get quite what we requested
     Float64 achievedSampleRate;
     UInt32 size = sizeof(achievedSampleRate);
-    result = AudioSessionGetProperty(kAudioSessionProperty_PreferredHardwareSampleRate, &size, &achievedSampleRate);
-    checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_PreferredHardwareSampleRate)");
+    result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareSampleRate, &size, &achievedSampleRate);
+    checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareSampleRate)");
     if ( achievedSampleRate != sampleRate ) {
         NSLog(@"Warning: Delivered sample rate is %f", achievedSampleRate);
         _audioDescription.mSampleRate = achievedSampleRate;
@@ -2090,7 +2090,7 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
     checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration)");
     if ( _currentBufferDuration != bufferDuration ) self.currentBufferDuration = bufferDuration;
     
-    NSLog(@"TAAE: Audio session initialized (%@)", extraInfo);
+    NSLog(@"TAAE: Audio session initialized (%@)", [extraInfo stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@", "]]);
     return YES;
 }
 
