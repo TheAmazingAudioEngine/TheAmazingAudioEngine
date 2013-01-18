@@ -2275,8 +2275,10 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
         }
         _inputAudioBufferList = NULL;
     }
-    
-    [self markGroupTorndown:_topGroup];
+ 
+    if ( _topGroup ) {
+        [self markGroupTorndown:_topGroup];
+    }
 }
 
 - (OSStatus)updateGraph {
@@ -2356,20 +2358,24 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
                 UInt32 originalCategory = _audioSessionCategory;
                 self.audioSessionCategory = kAudioSessionCategory_PlayAndRecord;
                 result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &channels);
-                if ( checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels)") ) {
+                if ( result == noErr ) {
                     numberOfInputChannels = channels;
+                } else {
+                    NSLog(@"TAAE: Audio session error (rdar://13022588). Power-cycling audio session.");
+                    AudioSessionSetActive(false);
+                    AudioSessionSetActive(true);
+                    result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &channels);
+                    if ( result == noErr ) {
+                        numberOfInputChannels = channels;
+                    } else {
+                        if ( !_lastError ) self.lastError = [NSError audioControllerErrorWithMessage:@"Audio system error while determining input channel count" OSStatus:result];
+                        success = NO;
+                    }
                 }
+                
                 if ( originalCategory != kAudioSessionCategory_PlayAndRecord ) {
                     self.audioSessionCategory = originalCategory;
                 }
-            }
-
-            if ( !checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels)") ) {
-                NSLog(@"Unexpected audio system error while determining channel count");
-                if ( !_lastError ) self.lastError = [NSError audioControllerErrorWithMessage:@"Audio system error while determining input channel count" OSStatus:result];
-                success = NO;
-            } else {
-                numberOfInputChannels = channels;
             }
         }
     }
