@@ -2365,17 +2365,18 @@ static void removeAudiobusOutputPortFromChannelElement(AEAudioController *THIS, 
                     AudioSessionSetActive(false);
                     AudioSessionSetActive(true);
                     result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &channels);
-                    if ( result == noErr ) {
-                        numberOfInputChannels = channels;
-                    } else {
-                        if ( !_lastError ) self.lastError = [NSError audioControllerErrorWithMessage:@"Audio system error while determining input channel count" OSStatus:result];
-                        success = NO;
-                    }
                 }
                 
                 if ( originalCategory != kAudioSessionCategory_PlayAndRecord ) {
                     self.audioSessionCategory = originalCategory;
                 }
+            }
+            
+            if ( result == noErr ) {
+                numberOfInputChannels = channels;
+            } else {
+                if ( !_lastError ) self.lastError = [NSError audioControllerErrorWithMessage:@"Audio system error while determining input channel count" OSStatus:result];
+                success = NO;
             }
         }
     }
