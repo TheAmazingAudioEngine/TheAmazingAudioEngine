@@ -27,7 +27,7 @@ const int kMaximumCallbacksPerSource            = 15;
 const int kMessageBufferLength                  = 8192;
 const int kMaxMessageDataSize                   = 2048;
 const NSTimeInterval kIdleMessagingPollDuration = 0.1;
-const int kRenderConversionScratchBufferSize    = 16384;
+const int kRenderConversionScratchBufferSize    = 4096;
 const int kInputAudioBufferFrames               = 4096;
 const int kLevelMonitorScratchBufferSize        = 8192;
 const int kAudiobusSourceFlag                   = 1<<12;
@@ -173,7 +173,7 @@ typedef struct _channel_group_t {
     int                 channelCount;
     AudioConverterRef   audioConverter;
     BOOL                converterRequired;
-    char               *audioConverterScratchBuffer;
+    AudioBufferList    *audioConverterScratchBuffer;
     AudioStreamBasicDescription audioConverterTargetFormat;
     AudioStreamBasicDescription audioConverterSourceFormat;
     audio_level_monitor_t level_monitor_data;
@@ -238,7 +238,6 @@ typedef struct {
     AEAudioControllerMessagePollThread *_pollThread;
     int                 _pendingResponses;
     
-    char               *_renderConversionScratchBuffer;
     AudioBufferList    *_inputAudioBufferList;
     BOOL                _inputAudioBufferListBuffersAreAllocated;
     AudioConverterRef   _inputAudioConverter;
@@ -438,18 +437,11 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
         
         AudioBufferList *bufferList = audio;
         
-        int bufferCount = group->converterRequired ? ((group->audioConverterSourceFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? group->audioConverterSourceFormat.mChannelsPerFrame : 1) : 1;
-        char audioBufferListSpace[sizeof(AudioBufferList)+(bufferCount-1)*sizeof(AudioBuffer)];
-
+        char bufferListSpace[sizeof(AudioBufferList)+(group->audioConverterScratchBuffer ? group->audioConverterScratchBuffer->mNumberBuffers-1 : 0)*sizeof(AudioBuffer)];
         if ( group->converterRequired ) {
             // Initialise output buffer
-            bufferList = (AudioBufferList*)audioBufferListSpace;
-            bufferList->mNumberBuffers = bufferCount;
-            for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
-                bufferList->mBuffers[i].mNumberChannels = (group->audioConverterSourceFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? 1 : group->audioConverterSourceFormat.mChannelsPerFrame;
-                bufferList->mBuffers[i].mData           = group->audioConverterScratchBuffer + (i * kRenderConversionScratchBufferSize/bufferList->mNumberBuffers);
-                bufferList->mBuffers[i].mDataByteSize   = group->audioConverterSourceFormat.mBytesPerFrame * frames;
-            }
+            bufferList = (AudioBufferList*)bufferListSpace;
+            memcpy(bufferList, group->audioConverterScratchBuffer, sizeof(bufferListSpace));
         }
         
         // Tell mixer to render into bufferList
@@ -607,18 +599,11 @@ static OSStatus groupRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionF
         // After render
         AudioBufferList *bufferList;
         
-        int bufferCount = group->converterRequired ? ((group->audioConverterTargetFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? group->audioConverterTargetFormat.mChannelsPerFrame : 1) : 1;
-        char audioBufferListSpace[sizeof(AudioBufferList)+(bufferCount-1)*sizeof(AudioBuffer)];
-        
+        char bufferListSpace[sizeof(AudioBufferList)+(group->audioConverterScratchBuffer ? group->audioConverterScratchBuffer->mNumberBuffers-1 : 0)*sizeof(AudioBuffer)];
         if ( group->converterRequired ) {
             // Initialise output buffer
-            bufferList = (AudioBufferList*)audioBufferListSpace;
-            bufferList->mNumberBuffers = bufferCount;
-            for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
-                bufferList->mBuffers[i].mNumberChannels = (group->audioConverterTargetFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? 1 : group->audioConverterTargetFormat.mChannelsPerFrame;
-                bufferList->mBuffers[i].mData           = group->audioConverterScratchBuffer + (i * kRenderConversionScratchBufferSize/bufferList->mNumberBuffers);
-                bufferList->mBuffers[i].mDataByteSize   = group->audioConverterTargetFormat.mBytesPerFrame * inNumberFrames;
-            }
+            bufferList = (AudioBufferList*)bufferListSpace;
+            memcpy(bufferList, group->audioConverterScratchBuffer, sizeof(bufferListSpace));
             
             // Perform conversion
             OSStatus result = AudioConverterFillComplexBuffer(group->audioConverter, 
@@ -829,11 +814,6 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         }
     }
     [channels makeObjectsPerformSelector:@selector(release)];
-    
-    if ( _renderConversionScratchBuffer ) {
-        free(_renderConversionScratchBuffer);
-        _renderConversionScratchBuffer = NULL;
-    }
     
     [self removeChannelGroup:_topGroup];
     
@@ -2708,11 +2688,7 @@ static OSStatus configureGraphStateOfGroupChannel(AEAudioController *THIS, AECha
         result = AudioConverterNew(&group->audioConverterSourceFormat, &group->audioConverterTargetFormat, &group->audioConverter);
         if ( !checkResult(result, "AudioConverterNew") ) return result;
         
-        if ( !THIS->_renderConversionScratchBuffer ) {
-            // Allocate temporary conversion buffer
-            THIS->_renderConversionScratchBuffer = (char*)malloc(kRenderConversionScratchBufferSize);
-        }
-        group->audioConverterScratchBuffer = THIS->_renderConversionScratchBuffer;
+        group->audioConverterScratchBuffer = AEAllocateAndInitAudioBufferList(group->audioConverterSourceFormat, kRenderConversionScratchBufferSize);
     }
     
     if ( filters || channel->audiobusOutputPort ) {
@@ -2990,6 +2966,9 @@ static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef g
     if ( group->level_monitor_data.scratchBuffer ) {
         free(group->level_monitor_data.scratchBuffer);
         memset(&group->level_monitor_data, 0, sizeof(audio_level_monitor_t));
+    }
+    if ( group->audioConverterScratchBuffer ) {
+        AEFreeAudioBufferList(group->audioConverterScratchBuffer);
     }
     for ( int i=0; i<group->channelCount; i++ ) {
         AEChannelRef channel = &group->channels[i];
