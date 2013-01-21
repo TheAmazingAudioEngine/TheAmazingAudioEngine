@@ -246,41 +246,13 @@ typedef struct {
     BOOL                _usingAudiobusInput;
 }
 
-- (void)pollForMessageResponses;
-static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS);
-
-- (BOOL)initAudioSession;
-- (BOOL)setup;
-- (void)teardown;
-- (OSStatus)updateGraph;
 - (BOOL)mustUpdateVoiceProcessingSettings;
 - (void)replaceIONode;
 - (BOOL)updateInputDeviceStatus;
-
-static BOOL initialiseGroupChannel(AEAudioController *THIS, AEChannelRef channel, AEChannelGroupRef parentGroup, int index, BOOL *updateRequired);
+static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS);
 static OSStatus configureGraphStateOfGroupChannel(AEAudioController *THIS, AEChannelRef channel, AEChannelGroupRef parentGroup, int index, BOOL *updateRequired);
 static void configureChannelsInRangeForGroup(AEAudioController *THIS, NSRange range, AEChannelGroupRef group, BOOL *updateRequired);
-
-static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef group, void **ptrs, void **userInfos, int count);
-
-- (void)gatherChannelsFromGroup:(AEChannelGroupRef)group intoArray:(NSMutableArray*)array;
-- (AEChannelGroupRef)searchForGroupContainingChannelMatchingPtr:(void*)ptr userInfo:(void*)userInfo index:(int*)index;
-- (void)releaseResourcesForGroup:(AEChannelGroupRef)group;
-- (void)markGroupTorndown:(AEChannelGroupRef)group;
-
-static void addCallbackToTable(AEAudioController *THIS, callback_table_t *table, void *callback, void *userInfo, int flags);
-static void removeCallbackFromTable(AEAudioController *THIS, callback_table_t *table, void *callback, void *userInfo, BOOL *found);
-- (NSArray *)associatedObjectsFromTable:(callback_table_t*)table matchingFlag:(uint8_t)flag;
-- (void)addCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannel:(id<AEAudioPlayable>)channelObj;
-- (void)addCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannelGroup:(AEChannelGroupRef)group;
-- (BOOL)removeCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<AEAudioPlayable>)channelObj;
-- (BOOL)removeCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(AEChannelGroupRef)group;
-- (NSArray*)associatedObjectsWithFlags:(uint8_t)flags;
-- (NSArray*)associatedObjectsWithFlags:(uint8_t)flags forChannel:(id<AEAudioPlayable>)channelObj;
-- (NSArray*)associatedObjectsWithFlags:(uint8_t)flags forChannelGroup:(AEChannelGroupRef)group;
-- (void)setVariableSpeedFilter:(id<AEAudioVariableSpeedFilter>)filter forChannelStruct:(AEChannelRef)channel;
 static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp *inTimeStamp, UInt32 inNumberFrames, AudioBufferList *ioData);
-
 static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferList *buffer, UInt32 numberFrames, AudioStreamBasicDescription *audioDescription);
 static void serveAudiobusInputQueue(AEAudioController *THIS);
 
