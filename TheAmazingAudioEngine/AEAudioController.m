@@ -1035,9 +1035,6 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         [channelObjects addObjectsFromArray:objects];
     }
     
-    // Get a list of associated objects for this group
-    NSArray *groupObjects = [self associatedObjectsWithFlags:0 forChannelGroup:group];
-    
     if ( parentGroup ) {
         // Remove the group from the parent group's table, on the core audio thread
         [self performSynchronousMessageExchangeWithBlock:^{
@@ -1050,18 +1047,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     [channelObjects makeObjectsPerformSelector:@selector(release)];
     
     // Release group resources
-    [groupObjects makeObjectsPerformSelector:@selector(release)];
-    
-    // Release subgroup resources
-    for ( int i=0; i<group->channelCount; i++ ) {
-        AEChannelRef channel = &group->channels[i];
-        if ( channel->type == kChannelTypeGroup ) {
-            [self releaseResourcesForGroup:(AEChannelGroupRef)channel->ptr];
-            channel->ptr = NULL;
-        }
-    }
-    
-    free(group);
+    [self releaseResourcesForGroup:group];
 }
 
 -(NSArray *)channels {
@@ -2938,6 +2924,11 @@ static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef g
         group->audioConverter = NULL;
     }
     
+    if ( group->audioConverterScratchBuffer ) {
+        AEFreeAudioBufferList(group->audioConverterScratchBuffer);
+        group->audioConverterScratchBuffer = NULL;
+    }
+    
     if ( group->mixerNode ) {
         checkResult(AUGraphRemoveNode(_audioGraph, group->mixerNode), "AUGraphRemoveNode");
         group->mixerNode = 0;
@@ -2966,9 +2957,6 @@ static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef g
     if ( group->level_monitor_data.scratchBuffer ) {
         free(group->level_monitor_data.scratchBuffer);
         memset(&group->level_monitor_data, 0, sizeof(audio_level_monitor_t));
-    }
-    if ( group->audioConverterScratchBuffer ) {
-        AEFreeAudioBufferList(group->audioConverterScratchBuffer);
     }
     for ( int i=0; i<group->channelCount; i++ ) {
         AEChannelRef channel = &group->channels[i];
