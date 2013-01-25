@@ -86,7 +86,8 @@ void TPCircularBufferProduceAudioBufferList(TPCircularBuffer *buffer, const Audi
 }
 
 bool TPCircularBufferCopyAudioBufferList(TPCircularBuffer *buffer, const AudioBufferList *inBufferList, const AudioTimeStamp *inTimestamp, UInt32 frames, AudioStreamBasicDescription *audioDescription) {
-
+    if ( frames == 0 ) return true;
+    
     int byteCount = inBufferList->mBuffers[0].mDataByteSize;
     if ( frames != kTPCircularBufferCopyAll ) {
         byteCount = frames * audioDescription->mBytesPerFrame;
@@ -134,7 +135,7 @@ void TPCircularBufferConsumeNextBufferListPartial(TPCircularBuffer *buffer, int 
     if ( !block ) return;
     assert(!((unsigned long)block & 0xF)); // Beware unaligned accesses
     
-    int bytesToConsume = framesToConsume * audioFormat->mBytesPerFrame;
+    int bytesToConsume = min(framesToConsume * audioFormat->mBytesPerFrame, block->bufferList.mBuffers[0].mDataByteSize);
     
     if ( bytesToConsume == block->bufferList.mBuffers[0].mDataByteSize ) {
         TPCircularBufferConsumeNextBufferList(buffer);
