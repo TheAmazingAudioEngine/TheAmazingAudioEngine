@@ -41,6 +41,21 @@
 BOOL AEFloatConverterToFloat(AEFloatConverter* converter, AudioBufferList *sourceBuffer, float * const * targetBuffers, UInt32 frames);
 
 /*!
+ * Convert audio to floating-point, in a buffer list
+ *
+ *  This C function, safe to use in a Core Audio realtime thread context, will take
+ *  an audio buffer list of audio in the format you provided at initialisation, and
+ *  convert it into a noninterleaved float format.
+ *
+ * @param converter         Pointer to the converter object.
+ * @param sourceBuffer      An audio buffer list containing the source audio.
+ * @param targetBuffer      An audio buffer list to store the converted floating-point audio.
+ * @param frames            The number of frames to convert.
+ * @return YES on success; NO on failure
+ */
+BOOL AEFloatConverterToFloatBufferList(AEFloatConverter* converter, AudioBufferList *sourceBuffer,  AudioBufferList *targetBuffer, UInt32 frames);
+
+/*!
  * Convert audio from floating-point
  *
  *  This C function, safe to use in a Core Audio realtime thread context, will take
@@ -55,5 +70,25 @@ BOOL AEFloatConverterToFloat(AEFloatConverter* converter, AudioBufferList *sourc
  * @return YES on success; NO on failure
  */
 BOOL AEFloatConverterFromFloat(AEFloatConverter* converter, float * const * sourceBuffers, AudioBufferList *targetBuffer, UInt32 frames);
+
+/*!
+ * Convert audio from floating-point, in a buffer list
+ *
+ *  This C function, safe to use in a Core Audio realtime thread context, will take
+ *  an audio buffer list of audio in the format you provided at initialisation, and
+ *  convert it into a float array.
+ *
+ * @param converter         Pointer to the converter object.
+ * @param sourceBuffers     An audio buffer list containing the source audio.
+ * @param targetBuffer      An audio buffer list to store the converted audio into.
+ * @param frames            The number of frames to convert.
+ * @return YES on success; NO on failure
+ */
+BOOL AEFloatConverterFromFloatBufferList(AEFloatConverter* converter, AudioBufferList *sourceBuffer, AudioBufferList *targetBuffer, UInt32 frames);
+
+/*!
+ * The AudioStreamBasicDescription representing the converted floating-point format
+ */
+@property (nonatomic, readonly) AudioStreamBasicDescription floatingPointAudioDescription;
 
 @end

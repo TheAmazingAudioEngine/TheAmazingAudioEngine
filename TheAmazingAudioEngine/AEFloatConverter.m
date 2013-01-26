@@ -25,6 +25,7 @@ struct complexInputDataProc_t {
 
 @interface AEFloatConverter () {
     AudioStreamBasicDescription _sourceAudioDescription;
+    AudioStreamBasicDescription _floatAudioDescription;
     AudioConverterRef           _toFloatConverter;
     AudioConverterRef           _fromFloatConverter;
     AudioBufferList            *_scratchBufferList;
@@ -42,23 +43,22 @@ static OSStatus complexInputDataProc(AudioConverterRef             inAudioConver
 -(id)initWithSourceFormat:(AudioStreamBasicDescription)sourceFormat {
     if ( !(self = [super init]) ) return nil;
 
-    AudioStreamBasicDescription floatAudioDescription;
-    floatAudioDescription.mFormatID          = kAudioFormatLinearPCM;
-    floatAudioDescription.mFormatFlags       = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved;
-    floatAudioDescription.mChannelsPerFrame  = sourceFormat.mChannelsPerFrame;
-    floatAudioDescription.mBytesPerPacket    = sizeof(float);
-    floatAudioDescription.mFramesPerPacket   = 1;
-    floatAudioDescription.mBytesPerFrame     = sizeof(float);
-    floatAudioDescription.mBitsPerChannel    = 8 * sizeof(float);
-    floatAudioDescription.mSampleRate        = sourceFormat.mSampleRate;
+    _floatAudioDescription.mFormatID          = kAudioFormatLinearPCM;
+    _floatAudioDescription.mFormatFlags       = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved;
+    _floatAudioDescription.mChannelsPerFrame  = sourceFormat.mChannelsPerFrame;
+    _floatAudioDescription.mBytesPerPacket    = sizeof(float);
+    _floatAudioDescription.mFramesPerPacket   = 1;
+    _floatAudioDescription.mBytesPerFrame     = sizeof(float);
+    _floatAudioDescription.mBitsPerChannel    = 8 * sizeof(float);
+    _floatAudioDescription.mSampleRate        = sourceFormat.mSampleRate;
     
     memcpy(&_sourceAudioDescription, &sourceFormat, sizeof(AudioStreamBasicDescription));
     
-    if ( memcmp(&sourceFormat, &floatAudioDescription, sizeof(AudioStreamBasicDescription)) != 0 ) {
-        checkResult(AudioConverterNew(&sourceFormat, &floatAudioDescription, &_toFloatConverter), "AudioConverterNew");
-        checkResult(AudioConverterNew(&floatAudioDescription, &sourceFormat, &_fromFloatConverter), "AudioConverterNew");
-        _scratchBufferList = (AudioBufferList*)malloc(sizeof(AudioBufferList) + (floatAudioDescription.mChannelsPerFrame-1)*sizeof(AudioBuffer));
-        _scratchBufferList->mNumberBuffers = floatAudioDescription.mChannelsPerFrame;
+    if ( memcmp(&sourceFormat, &_floatAudioDescription, sizeof(AudioStreamBasicDescription)) != 0 ) {
+        checkResult(AudioConverterNew(&sourceFormat, &_floatAudioDescription, &_toFloatConverter), "AudioConverterNew");
+        checkResult(AudioConverterNew(&_floatAudioDescription, &sourceFormat, &_fromFloatConverter), "AudioConverterNew");
+        _scratchBufferList = (AudioBufferList*)malloc(sizeof(AudioBufferList) + (_floatAudioDescription.mChannelsPerFrame-1)*sizeof(AudioBuffer));
+        _scratchBufferList->mNumberBuffers = _floatAudioDescription.mChannelsPerFrame;
         for ( int i=0; i<_scratchBufferList->mNumberBuffers; i++ ) {
             _scratchBufferList->mBuffers[i].mNumberChannels = 1;
         }
@@ -110,6 +110,14 @@ BOOL AEFloatConverterToFloat(AEFloatConverter* THIS, AudioBufferList *sourceBuff
     return YES;
 }
 
+BOOL AEFloatConverterToFloatBufferList(AEFloatConverter* converter, AudioBufferList *sourceBuffer,  AudioBufferList *targetBuffer, UInt32 frames) {
+    float *targetBuffers[targetBuffer->mNumberBuffers];
+    for ( int i=0; i<targetBuffer->mNumberBuffers; i++ ) {
+        targetBuffers[i] = (float*)targetBuffer->mBuffers[i].mData;
+    }
+    return AEFloatConverterToFloat(converter, sourceBuffer, targetBuffers, frames);
+}
+
 BOOL AEFloatConverterFromFloat(AEFloatConverter* THIS, float * const * sourceBuffers, AudioBufferList *targetBuffer, UInt32 frames) {
     for ( int i=0; i<targetBuffer->mNumberBuffers; i++ ) {
         targetBuffer->mBuffers[i].mDataByteSize = frames * THIS->_sourceAudioDescription.mBytesPerFrame;
@@ -139,6 +147,14 @@ BOOL AEFloatConverterFromFloat(AEFloatConverter* THIS, float * const * sourceBuf
     return YES;
 }
 
+BOOL AEFloatConverterFromFloatBufferList(AEFloatConverter* converter, AudioBufferList *sourceBuffer, AudioBufferList *targetBuffer, UInt32 frames) {
+    float *sourceBuffers[sourceBuffer->mNumberBuffers];
+    for ( int i=0; i<sourceBuffer->mNumberBuffers; i++ ) {
+        sourceBuffers[i] = (float*)sourceBuffer->mBuffers[i].mData;
+    }
+    return AEFloatConverterFromFloat(converter, sourceBuffers, targetBuffer, frames);
+}
+
 static OSStatus complexInputDataProc(AudioConverterRef             inAudioConverter,
                                      UInt32                        *ioNumberDataPackets,
                                      AudioBufferList               *ioData,
@@ -153,6 +169,10 @@ static OSStatus complexInputDataProc(AudioConverterRef             inAudioConver
     arg->sourceBuffer = NULL;
     
     return noErr;
+}
+
+-(AudioStreamBasicDescription)floatingPointAudioDescription {
+    return _floatAudioDescription;
 }
 
 @end
