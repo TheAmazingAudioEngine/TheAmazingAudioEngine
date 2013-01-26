@@ -20,6 +20,7 @@ void ABInputPortReceive(ABInputPort *inputPort, ABPort *sourcePortOrNil, AudioBu
 UInt32 ABInputPortPeek(ABInputPort *inputPort, AudioTimeStamp *outNextTimestamp);
 BOOL ABInputPortIsConnected(ABInputPort *inputPort);
 BOOL ABOutputPortSendAudio(ABOutputPort* outputPort, const AudioBufferList *audio, UInt32 lengthInFrames, const AudioTimeStamp *timestamp, ABMetadataBlockList *metadata);
+BOOL ABOutputPortIsConnected(ABOutputPort *outputPort);
 ABInputPortAttributes ABOutputPortGetConnectedPortAttributes(ABOutputPort *outputPort);
 NSTimeInterval ABOutputPortGetAverageLatency(ABOutputPort *outputPort);
 typedef void (^ABInputPortAudioInputBlock)(ABInputPort *inputPort, UInt32 lengthInFrames, AudioTimeStamp nextTimestamp, ABPort *sourcePortOrNil);

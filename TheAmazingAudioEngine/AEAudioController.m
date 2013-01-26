@@ -16,6 +16,7 @@
 #import <Accelerate/Accelerate.h>
 #import "AEAudioController+Audiobus.h"
 #import "AEAudioController+AudiobusStub.h"
+#import "AEFloatConverter.h"
 #import <mach/mach_time.h>
 #import <pthread.h>
 
@@ -160,6 +161,7 @@ typedef struct __channel_t {
     int              graphState;
     AEAudioController *audioController;
     ABOutputPort    *audiobusOutputPort;
+    AEFloatConverter *audiobusFloatConverter;
     AudioBufferList *audiobusScratchBuffer;
 } channel_t, *AEChannelRef;
 
@@ -435,9 +437,23 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
         }
     }
     
-    if ( channel->audiobusOutputPort ) {
+    if ( channel->audiobusOutputPort && ABOutputPortIsConnected(channel->audiobusOutputPort) && channel->audiobusFloatConverter ) {
+        // Convert the audio to float, and apply volume/pan if necessary
+        if ( AEFloatConverterToFloatBufferList(channel->audiobusFloatConverter, audio, channel->audiobusScratchBuffer, frames) ) {
+            if ( fabs(1.0 - channel->volume) > 0.01 || fabs(0.0 - channel->pan) > 0.01 ) {
+                float volume = channel->volume;
+                for ( int i=0; i<channel->audiobusScratchBuffer->mNumberBuffers; i++ ) {
+                    float gain = (channel->audiobusScratchBuffer->mNumberBuffers == 2 ?
+                                  i == 0 ? (channel->pan <= 0.0 ? 1.0 : (1.0-((channel->pan/2)+0.5))*2.0) :
+                                  i == 1 ? (channel->pan >= 0.0 ? 1.0 : ((channel->pan/2)+0.5)*2.0) :
+                                  1 : 1) * volume;
+                    vDSP_vsmul(channel->audiobusScratchBuffer->mBuffers[i].mData, 1, &gain, channel->audiobusScratchBuffer->mBuffers[i].mData, 1, frames);
+                }
+            }
+        }
+        
         // Send via Audiobus
-        ABOutputPortSendAudio(channel->audiobusOutputPort, audio, frames, &arg->inTimeStamp, NULL);
+        ABOutputPortSendAudio(channel->audiobusOutputPort, channel->audiobusScratchBuffer, frames, &arg->inTimeStamp, NULL);
         if ( ABOutputPortGetConnectedPortAttributes(channel->audiobusOutputPort) & ABInputPortAttributePlaysLiveAudio ) {
             // Silence output after sending
             for ( int i=0; i<audio->mNumberBuffers; i++ ) memset(audio->mBuffers[i].mData, 0, audio->mBuffers[i].mDataByteSize);
@@ -1777,12 +1793,17 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
         }];
         AEFreeAudioBufferList(channelElement->audiobusScratchBuffer);
         channelElement->audiobusScratchBuffer = NULL;
+        [channelElement->audiobusFloatConverter release];
+        channelElement->audiobusFloatConverter = nil;
     } else {
-        [audiobusOutputPort setClientFormat:channelElement->audioDescription];
         channelElement->audiobusOutputPort = [audiobusOutputPort retain];
-        if ( !channelElement->audiobusScratchBuffer ) {
-            channelElement->audiobusScratchBuffer = AEAllocateAndInitAudioBufferList(channelElement->audioDescription, kScratchBufferFrames);
+        if ( !channelElement->audiobusFloatConverter ) {
+            channelElement->audiobusFloatConverter = [[AEFloatConverter alloc] initWithSourceFormat:channelElement->audioDescription];
         }
+        if ( !channelElement->audiobusScratchBuffer ) {
+            channelElement->audiobusScratchBuffer = AEAllocateAndInitAudioBufferList(channelElement->audiobusFloatConverter.floatingPointAudioDescription, kScratchBufferFrames);
+        }
+        [audiobusOutputPort setClientFormat:channelElement->audiobusFloatConverter.floatingPointAudioDescription];
         if ( channelElement->type == kChannelTypeGroup ) {
             AEChannelGroupRef parentGroup = NULL;
             int index=0;
@@ -1878,8 +1899,11 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
             checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
         }
         
-        if ( channelElement->audiobusOutputPort ) {
-            [channelElement->audiobusOutputPort setClientFormat:channel.audioDescription];
+        if ( channelElement->audiobusFloatConverter ) {
+            AEFloatConverter *newFloatConverter = [[AEFloatConverter alloc] initWithSourceFormat:channel.audioDescription];
+            AEFloatConverter *oldFloatConverter = channelElement->audiobusFloatConverter;
+            [self performSynchronousMessageExchangeWithBlock:^{ channelElement->audiobusFloatConverter = newFloatConverter; }];
+            [oldFloatConverter release];
         }
     }
 }
@@ -2847,6 +2871,8 @@ static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef g
         channel->audiobusOutputPort = NULL;
         AEFreeAudioBufferList(channel->audiobusScratchBuffer);
         channel->audiobusScratchBuffer = NULL;
+        [channel->audiobusFloatConverter release];
+        channel->audiobusFloatConverter = nil;
     }
     
     if ( channel->type == kChannelTypeGroup ) {

@@ -28,6 +28,11 @@ __attribute__((weak)) BOOL ABOutputPortSendAudio(ABOutputPort* outputPort, const
     return NO;
 }
 
+__attribute__((weak)) BOOL ABOutputPortIsConnected(ABOutputPort *outputPort) {
+    printf("ABOutputPortIsConnected stub called\n");
+    return NO;
+}
+
 __attribute__((weak)) ABInputPortAttributes ABOutputPortGetConnectedPortAttributes(ABOutputPort *outputPort) {
     printf("ABOutputPortGetConnectedPortAttributes stub called\n");
     return 0;
