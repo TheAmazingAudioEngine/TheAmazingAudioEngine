@@ -41,25 +41,6 @@
 
 @implementation ViewController
 
-@synthesize audioController = _audioController;
-@synthesize loop1 = _loop1;
-@synthesize loop2 = _loop2;
-@synthesize oscillator = _oscillator;
-@synthesize oneshot = _oneshot;
-@synthesize playthrough = _playthrough;
-@synthesize limiter = _limiter;
-@synthesize expander = _expander;
-@synthesize outputOscilloscope = _outputOscilloscope;
-@synthesize inputOscilloscope = _inputOscilloscope;
-@synthesize inputLevelLayer = _inputLevelLayer;
-@synthesize outputLevelLayer = _outputLevelLayer;
-@synthesize levelsTimer = _levelsTimer;
-@synthesize recorder = _recorder;
-@synthesize player = _player;
-@synthesize recordButton = _recordButton;
-@synthesize playButton = _playButton;
-@synthesize oneshotButton = _oneshotButton;
-
 - (id)initWithAudioController:(AEAudioController*)audioController {
     if ( !(self = [super initWithStyle:UITableViewStyleGrouped]) ) return nil;
     
@@ -192,12 +173,14 @@
     [_recordButton setTitle:@"Record" forState:UIControlStateNormal];
     [_recordButton setTitle:@"Stop" forState:UIControlStateSelected];
     [_recordButton addTarget:self action:@selector(record:) forControlEvents:UIControlEventTouchUpInside];
-    _recordButton.frame = CGRectMake(10, 10, ((footerView.bounds.size.width-30) / 2), footerView.bounds.size.height - 20);
+    _recordButton.frame = CGRectMake(20, 10, ((footerView.bounds.size.width-50) / 2), footerView.bounds.size.height - 20);
+    _recordButton.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleRightMargin;
     self.playButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
     [_playButton setTitle:@"Play" forState:UIControlStateNormal];
     [_playButton setTitle:@"Stop" forState:UIControlStateSelected];
     [_playButton addTarget:self action:@selector(play:) forControlEvents:UIControlEventTouchUpInside];
-    _playButton.frame = CGRectMake(_recordButton.frame.origin.x+_recordButton.frame.size.width+10, 10, ((footerView.bounds.size.width-30) / 2), footerView.bounds.size.height - 20);
+    _playButton.frame = CGRectMake(CGRectGetMaxX(_recordButton.frame)+10, 10, ((footerView.bounds.size.width-50) / 2), footerView.bounds.size.height - 20);
+    _playButton.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleLeftMargin;
     [footerView addSubview:_recordButton];
     [footerView addSubview:_playButton];
     self.tableView.tableFooterView = footerView;
@@ -212,6 +195,11 @@
     [super viewWillDisappear:animated];
     [_levelsTimer invalidate];
     self.levelsTimer = nil;
+}
+
+-(void)viewDidLayoutSubviews {
+    _outputOscilloscope.frame = CGRectMake(0, 0, self.tableView.tableHeaderView.bounds.size.width, 80);
+    _inputOscilloscope.frame = CGRectMake(0, 0, self.tableView.tableHeaderView.bounds.size.width, 80);
 }
 
 -(BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation {
@@ -256,7 +244,8 @@
     switch ( indexPath.section ) {
         case 0: {
             cell.accessoryView = [[[UISwitch alloc] initWithFrame:CGRectZero] autorelease];
-            UISlider *slider = [[[UISlider alloc] initWithFrame:CGRectMake(cell.bounds.size.width - cell.accessoryView.frame.size.width - 20 - 100, 0, 100, cell.bounds.size.height)] autorelease];
+            UISlider *slider = [[[UISlider alloc] initWithFrame:CGRectMake(cell.bounds.size.width - 100, 0, 100, cell.bounds.size.height)] autorelease];
+            slider.autoresizingMask = UIViewAutoresizingFlexibleRightMargin;
             slider.tag = kAuxiliaryViewTag;
             slider.maximumValue = 1.0;
             slider.minimumValue = 0.0;
