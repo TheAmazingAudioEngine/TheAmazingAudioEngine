@@ -25,7 +25,6 @@
 		4C0C24BC159A00D500D23E13 /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C0C24BB159A00D500D23E13 /* Accelerate.framework */; };
 		4C0C24CC159A246500D23E13 /* TPOscilloscopeLayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C0C24CB159A246500D23E13 /* TPOscilloscopeLayer.m */; };
 		4C0C24D6159A2B1500D23E13 /* libTheAmazingAudioEngine.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C0C24D5159A2B1500D23E13 /* libTheAmazingAudioEngine.a */; };
-		4C26434116494EAF003F983D /* AEFloatConverter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C26434016494EAF003F983D /* AEFloatConverter.m */; };
 		4C698CE2162B014B008B159D /* AEExpanderFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C698CD5162B014B008B159D /* AEExpanderFilter.m */; };
 		4C698CE3162B014B008B159D /* AELimiter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C698CD7162B014B008B159D /* AELimiter.m */; };
 		4C698CE4162B014B008B159D /* AELimiterFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C698CD9162B014B008B159D /* AELimiterFilter.m */; };
@@ -62,8 +61,6 @@
 		4C0C24CA159A246500D23E13 /* TPOscilloscopeLayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TPOscilloscopeLayer.h; sourceTree = "<group>"; };
 		4C0C24CB159A246500D23E13 /* TPOscilloscopeLayer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TPOscilloscopeLayer.m; sourceTree = "<group>"; };
 		4C0C24D5159A2B1500D23E13 /* libTheAmazingAudioEngine.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libTheAmazingAudioEngine.a; path = ../../libTheAmazingAudioEngine.a; sourceTree = "<group>"; };
-		4C26434016494EAF003F983D /* AEFloatConverter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = AEFloatConverter.m; path = ../../Modules/AEFloatConverter.m; sourceTree = "<group>"; };
-		4C26434316494EC5003F983D /* AEFloatConverter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AEFloatConverter.h; path = ../../Modules/AEFloatConverter.h; sourceTree = "<group>"; };
 		4C698CD4162B014B008B159D /* AEExpanderFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AEExpanderFilter.h; path = ../../Modules/AEExpanderFilter.h; sourceTree = "<group>"; };
 		4C698CD5162B014B008B159D /* AEExpanderFilter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = AEExpanderFilter.m; path = ../../Modules/AEExpanderFilter.m; sourceTree = "<group>"; };
 		4C698CD6162B014B008B159D /* AELimiter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AELimiter.h; path = ../../Modules/AELimiter.h; sourceTree = "<group>"; };
@@ -187,8 +184,6 @@
 		4C698CF1162B0212008B159D /* Modules */ = {
 			isa = PBXGroup;
 			children = (
-				4C26434316494EC5003F983D /* AEFloatConverter.h */,
-				4C26434016494EAF003F983D /* AEFloatConverter.m */,
 				4C698CD4162B014B008B159D /* AEExpanderFilter.h */,
 				4C698CD5162B014B008B159D /* AEExpanderFilter.m */,
 				4C698CD6162B014B008B159D /* AELimiter.h */,
@@ -292,7 +287,6 @@
 				4C698CE3162B014B008B159D /* AELimiter.m in Sources */,
 				4C698CE4162B014B008B159D /* AELimiterFilter.m in Sources */,
 				4C698CE5162B014B008B159D /* AEMixerBuffer.m in Sources */,
-				4C26434116494EAF003F983D /* AEFloatConverter.m in Sources */,
 				4C698CE6162B014B008B159D /* AEPlaythroughChannel.m in Sources */,
 				4C698CE7162B014B008B159D /* AERecorder.m in Sources */,
 				4C698CEF162B020A008B159D /* TPCircularBuffer+AudioBufferList.c in Sources */,

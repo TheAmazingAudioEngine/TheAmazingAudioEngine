@@ -12,4 +12,6 @@
 #import "AEAudioFilePlayer.h"
 #import "AEAudioFileWriter.h"
 #import "AEBlockChannel.h"
+#import "AEBlockFilter.h"
+#import "AEFloatConverter.h"
 #import "AEUtilities.h"
