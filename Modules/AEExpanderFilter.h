@@ -21,7 +21,7 @@
  *      A smooth-sounding preset with a gentle ratio
  * @var AEExpanderFilterPresetMedium
  *      A medium-level preset with 1/8 ratio and 5ms attack
- * @var AEExpanderFilterPercussive
+ * @var AEExpanderFilterPresetPercussive
  *      A gate-mode preset with 1ms attack, good for persussive audio
  */
 typedef enum {

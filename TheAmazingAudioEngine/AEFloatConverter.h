@@ -79,7 +79,7 @@ BOOL AEFloatConverterFromFloat(AEFloatConverter* converter, float * const * sour
  *  convert it into a float array.
  *
  * @param converter         Pointer to the converter object.
- * @param sourceBuffers     An audio buffer list containing the source audio.
+ * @param sourceBuffer      An audio buffer list containing the source audio.
  * @param targetBuffer      An audio buffer list to store the converted audio into.
  * @param frames            The number of frames to convert.
  * @return YES on success; NO on failure

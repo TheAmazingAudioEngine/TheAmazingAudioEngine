@@ -80,7 +80,7 @@ OSStatus AEAudioFileWriterAddAudio(AEAudioFileWriter* writer, AudioBufferList *b
  * @param lengthInFrames The length of the audio in the buffer list, in frames
  * @return A status code; noErr on success
  */
-OSStatus AEAudioFileWriterAddAudioSynchronously(AEAudioFileWriter* THIS, AudioBufferList *bufferList, UInt32 lengthInFrames);
+OSStatus AEAudioFileWriterAddAudioSynchronously(AEAudioFileWriter* writer, AudioBufferList *bufferList, UInt32 lengthInFrames);
 
 /*!
  * The path to the file being written

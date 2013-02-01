@@ -25,12 +25,12 @@ typedef void* AEMixerBufferSource;
  * Source render callback
  *
  *      This is called by AEMixerBuffer when audio for the source is required, if you have provided callbacks
- *      for the source via [AEMixerBufferSetSourceCallbacks](@ref AEMixerBuffer::AEMixerBufferSetSourceCallbacks).
+ *      for the source via [setRenderCallback:peekCallback:userInfo:forSource:](@ref setRenderCallback:peekCallback:userInfo:forSource:).
  *
  * @param source            The source. This can be anything you like, as long as it is not NULL, and is unique to each source.
  * @param frames            The number of frames required.
  * @param audio             The audio buffer list - audio should be copied into the provided buffers. May be NULL, in which case your render callback should simply discard the requested audio.
- * @param userInfo          The opaque pointer passed to [AEMixerBufferSetSourceCallbacks](@ref AEMixerBuffer::AEMixerBufferSetSourceCallbacks).
+ * @param userInfo          The opaque pointer passed to @link AEMixerBuffer::setRenderCallback:peekCallback:userInfo:forSource: setRenderCallback:peekCallback:userInfo:forSource: @endlink.
  */
 typedef void (*AEMixerBufferSourceRenderCallback) (AEMixerBufferSource       source,
                                                    UInt32                    frames,
@@ -42,11 +42,11 @@ typedef void (*AEMixerBufferSourceRenderCallback) (AEMixerBufferSource       sou
  *
  *      This is called by AEMixerBuffer when it needs to know the status of the source, if you have
  *      provided callbacks for the source via
- *      [AEMixerBufferSetSourceCallbacks](@ref AEMixerBuffer::AEMixerBufferSetSourceCallbacks).
+ *      @link AEMixerBuffer::setRenderCallback:peekCallback:userInfo:forSource: setRenderCallback:peekCallback:userInfo:forSource: @endlink.
  *
  * @param source            The source. This can be anything you like, as long as it is not NULL, and is unique to each source.
  * @param outTimestamp      On output, the timestamp of the next audio from the source.
- * @param userInfo          The opaque pointer passed to [AEMixerBufferSetSourceCallbacks](@ref AEMixerBuffer::AEMixerBufferSetSourceCallbacks).
+ * @param userInfo          The opaque pointer passed to @link AEMixerBuffer::setRenderCallback:peekCallback:userInfo:forSource: setRenderCallback:peekCallback:userInfo:forSource: @endlink.
  * @return The number of available frames. Return the special value AEMixerBufferSourceInactive to indicate an inactive source.
  */
 typedef UInt32 (*AEMixerBufferSourcePeekCallback) (AEMixerBufferSource  source,
@@ -62,7 +62,8 @@ typedef UInt32 (*AEMixerBufferSourcePeekCallback) (AEMixerBufferSource  source,
  *
  *  To use it, create an instance, passing in the AudioStreamBasicDescription of your audio,
  *  then provide data for each source by calling @link AEMixerBufferEnqueue @endlink. Or,
- *  provide callbacks for one or more sources with @link AEMixerBufferSetSourceCallbacks @endlink,
+ *  provide callbacks for one or more sources with 
+ *  [setRenderCallback:peekCallback:userInfo:forSource:](@ref setRenderCallback:peekCallback:userInfo:forSource:),
  *  which will cause this class to call your callbacks when data is needed.
  *
  *  Then, call @link AEMixerBufferDequeue @endlink to consume mixed and synchronised audio
