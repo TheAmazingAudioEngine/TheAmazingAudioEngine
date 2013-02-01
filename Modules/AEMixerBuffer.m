@@ -733,7 +733,7 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
             }
         }
         
-        if ( minConsumedFrameCount == THIS->_currentSliceFrameCount ) {
+        if ( minConsumedFrameCount > 0 ) {
             dprintf(THIS, 3, "Increasing timeline by %lu frames", minConsumedFrameCount);
             
             // Increment sample time
