@@ -16,13 +16,13 @@
  *  Presets to use with the expander filter
  *
  * @var AEExpanderFilterPresetNone 
- *      No preset
+ * No preset
  * @var AEExpanderFilterPresetSmooth
- *      A smooth-sounding preset with a gentle ratio
+ * A smooth-sounding preset with a gentle ratio
  * @var AEExpanderFilterPresetMedium
- *      A medium-level preset with 1/8 ratio and 5ms attack
+ * A medium-level preset with 1/8 ratio and 5ms attack
  * @var AEExpanderFilterPresetPercussive
- *      A gate-mode preset with 1ms attack, good for persussive audio
+ * A gate-mode preset with 1ms attack, good for persussive audio
  */
 typedef enum {
     AEExpanderFilterPresetNone=-1,

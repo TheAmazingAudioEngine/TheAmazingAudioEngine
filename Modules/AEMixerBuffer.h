@@ -24,8 +24,8 @@ typedef void* AEMixerBufferSource;
 /*!
  * Source render callback
  *
- *      This is called by AEMixerBuffer when audio for the source is required, if you have provided callbacks
- *      for the source via [setRenderCallback:peekCallback:userInfo:forSource:](@ref setRenderCallback:peekCallback:userInfo:forSource:).
+ * This is called by AEMixerBuffer when audio for the source is required, if you have provided callbacks
+ * for the source via @link AEMixerBuffer::setRenderCallback:peekCallback:userInfo:forSource: setRenderCallback:peekCallback:userInfo:forSource: @endlink.
  *
  * @param source            The source. This can be anything you like, as long as it is not NULL, and is unique to each source.
  * @param frames            The number of frames required.
@@ -40,9 +40,9 @@ typedef void (*AEMixerBufferSourceRenderCallback) (AEMixerBufferSource       sou
 /*!
  * Source peek callback
  *
- *      This is called by AEMixerBuffer when it needs to know the status of the source, if you have
- *      provided callbacks for the source via
- *      @link AEMixerBuffer::setRenderCallback:peekCallback:userInfo:forSource: setRenderCallback:peekCallback:userInfo:forSource: @endlink.
+ * This is called by AEMixerBuffer when it needs to know the status of the source, if you have
+ * provided callbacks for the source via
+ * @link AEMixerBuffer::setRenderCallback:peekCallback:userInfo:forSource: setRenderCallback:peekCallback:userInfo:forSource: @endlink.
  *
  * @param source            The source. This can be anything you like, as long as it is not NULL, and is unique to each source.
  * @param outTimestamp      On output, the timestamp of the next audio from the source.

@@ -15,15 +15,15 @@
 /*!
  * Begin rendering
  *
- *      Registers with the audio controller to start receiving
- *      outgoing audio samples, and begins rendering.
+ * Registers with the audio controller to start receiving
+ * outgoing audio samples, and begins rendering.
  */
 - (void)start;
 
 /*!
  * Stop rendering
  *
- *      Stops rendering, and unregisters from the audio controller.
+ * Stops rendering, and unregisters from the audio controller.
  */
 - (void)stop;
 
