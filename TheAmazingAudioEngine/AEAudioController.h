@@ -1189,5 +1189,10 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  */
 @property (nonatomic, readonly) AudioUnit audioUnit;
 
+/*!
+ * The audio graph handle
+ */
+@property (nonatomic, readonly) AUGraph audioGraph;
+
 @end
 

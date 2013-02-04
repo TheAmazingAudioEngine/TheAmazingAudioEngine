@@ -278,6 +278,7 @@ static void serveAudiobusInputQueue(AEAudioController *THIS);
             inputMode                   = _inputMode, 
             inputChannelSelection       = _inputChannelSelection,
             audioUnit                   = _ioAudioUnit,
+            audioGraph                  = _audioGraph,
             audioDescription            = _audioDescription,
             audioRoute                  = _audioRoute,
             inputAudioDescription       = _inputAudioDescription,

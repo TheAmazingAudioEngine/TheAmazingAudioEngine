@@ -31,6 +31,8 @@
 		4C698D00162B02EF008B159D /* TPCircularBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C698CFC162B02EF008B159D /* TPCircularBuffer.h */; };
 		4C8AED0416B3644500958034 /* AEFloatConverter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C8AED0216B3644500958034 /* AEFloatConverter.h */; };
 		4C8AED0516B3644500958034 /* AEFloatConverter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C8AED0316B3644500958034 /* AEFloatConverter.m */; };
+		4C99588516BB74720011FB01 /* AEAudioUnitChannel.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C99588316BB74720011FB01 /* AEAudioUnitChannel.h */; };
+		4C99588616BB74720011FB01 /* AEAudioUnitChannel.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C99588416BB74720011FB01 /* AEAudioUnitChannel.m */; };
 		4CEC0EB916B5294300D11ED9 /* AEBlockFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CEC0EB716B5294200D11ED9 /* AEBlockFilter.h */; };
 		4CEC0EBA16B5294300D11ED9 /* AEBlockFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CEC0EB816B5294300D11ED9 /* AEBlockFilter.m */; };
 /* End PBXBuildFile section */
@@ -79,6 +81,8 @@
 		4C8A0F3E1540BBD300307CB6 /* AEMixerBuffer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = AEMixerBuffer.m; path = Modules/AEMixerBuffer.m; sourceTree = "<group>"; };
 		4C8AED0216B3644500958034 /* AEFloatConverter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEFloatConverter.h; sourceTree = "<group>"; };
 		4C8AED0316B3644500958034 /* AEFloatConverter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEFloatConverter.m; sourceTree = "<group>"; };
+		4C99588316BB74720011FB01 /* AEAudioUnitChannel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEAudioUnitChannel.h; sourceTree = "<group>"; };
+		4C99588416BB74720011FB01 /* AEAudioUnitChannel.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEAudioUnitChannel.m; sourceTree = "<group>"; };
 		4CA689B11541EF4A00AF8DDD /* AELimiter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AELimiter.h; path = Modules/AELimiter.h; sourceTree = "<group>"; };
 		4CA689B21541EF4A00AF8DDD /* AELimiter.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = AELimiter.m; path = Modules/AELimiter.m; sourceTree = "<group>"; };
 		4CA689BC1542D4FE00AF8DDD /* AELimiterFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AELimiterFilter.h; path = Modules/AELimiterFilter.h; sourceTree = "<group>"; };
@@ -200,6 +204,8 @@
 				4C12CC99151D1EDA00562E2A /* AEUtilities.c */,
 				4C4B11F216833FDD00A3BA2E /* AEBlockChannel.h */,
 				4C4B11F316833FDD00A3BA2E /* AEBlockChannel.m */,
+				4C99588316BB74720011FB01 /* AEAudioUnitChannel.h */,
+				4C99588416BB74720011FB01 /* AEAudioUnitChannel.m */,
 				4CEC0EB716B5294200D11ED9 /* AEBlockFilter.h */,
 				4CEC0EB816B5294300D11ED9 /* AEBlockFilter.m */,
 				4C8AED0216B3644500958034 /* AEFloatConverter.h */,
@@ -233,6 +239,7 @@
 				4C4B11F416833FDD00A3BA2E /* AEBlockChannel.h in Headers */,
 				4C8AED0416B3644500958034 /* AEFloatConverter.h in Headers */,
 				4CEC0EB916B5294300D11ED9 /* AEBlockFilter.h in Headers */,
+				4C99588516BB74720011FB01 /* AEAudioUnitChannel.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -348,6 +355,7 @@
 				4C4B11F516833FDD00A3BA2E /* AEBlockChannel.m in Sources */,
 				4C8AED0516B3644500958034 /* AEFloatConverter.m in Sources */,
 				4CEC0EBA16B5294300D11ED9 /* AEBlockFilter.m in Sources */,
+				4C99588616BB74720011FB01 /* AEAudioUnitChannel.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

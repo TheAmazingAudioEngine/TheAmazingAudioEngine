@@ -15,14 +15,28 @@
 #import "AERecorder.h"
 #import <QuartzCore/QuartzCore.h>
 
+#define checkResult(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/')+1,__LINE__))
+static inline BOOL _checkResult(OSStatus result, const char *operation, const char* file, int line) {
+    if ( result != noErr ) {
+        int fourCC = CFSwapInt32HostToBig(result);
+        NSLog(@"%s:%d: %s result %d %08X %4.4s\n", file, line, operation, (int)result, (int)result, (char*)&fourCC);
+        return NO;
+    }
+    return YES;
+}
+
+
 #define kAuxiliaryViewTag 251
 
 
-@interface ViewController ()
+@interface ViewController () {
+    AudioFileID _audioUnitFile;
+}
 @property (nonatomic, retain) AEAudioController *audioController;
 @property (nonatomic, retain) AEAudioFilePlayer *loop1;
 @property (nonatomic, retain) AEAudioFilePlayer *loop2;
 @property (nonatomic, retain) AEBlockChannel *oscillator;
+@property (nonatomic, retain) AEAudioUnitChannel *audioUnitPlayer;
 @property (nonatomic, retain) AEAudioFilePlayer *oneshot;
 @property (nonatomic, retain) AEPlaythroughChannel *playthrough;
 @property (nonatomic, retain) AELimiterFilter *limiter;
@@ -37,6 +51,7 @@
 @property (nonatomic, retain) UIButton *recordButton;
 @property (nonatomic, retain) UIButton *playButton;
 @property (nonatomic, retain) UIButton *oneshotButton;
+@property (nonatomic, retain) UIButton *oneshotAudioUnitButton;
 @end
 
 @implementation ViewController
@@ -46,6 +61,7 @@
     
     self.audioController = audioController;
     
+    // Create the first loop player
     self.loop1 = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Drums" withExtension:@"m4a"]
                                            audioController:_audioController
                                                      error:NULL];
@@ -53,6 +69,7 @@
     _loop1.channelIsMuted = YES;
     _loop1.loop = YES;
     
+    // Create the second loop player
     self.loop2 = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Organ" withExtension:@"m4a"]
                                            audioController:_audioController
                                                      error:NULL];
@@ -60,9 +77,9 @@
     _loop2.channelIsMuted = YES;
     _loop2.loop = YES;
     
+    // Create a block-based channel, with an implementation of an oscillator
     __block float oscillatorPosition = 0;
-    __block float oscillatorRate = 500.0/44100.0;
-    
+    __block float oscillatorRate = 622.0/44100.0;
     self.oscillator = [AEBlockChannel channelWithBlock:^(const AudioTimeStamp  *time,
                                                                UInt32           frames,
                                                                AudioBufferList *audio) {
@@ -80,15 +97,28 @@
         }
     }];
     
-    
     _oscillator.channelIsMuted = YES;
-        
-    [_audioController addChannels:[NSArray arrayWithObjects:_loop1, _loop2, _oscillator, nil]];
+    
+    // Create an audio unit channel (a file player)
+    AudioComponentDescription audioUnitDescription;
+    audioUnitDescription.componentType = kAudioUnitType_Generator ;
+    audioUnitDescription.componentSubType = kAudioUnitSubType_AudioFilePlayer;
+    audioUnitDescription.componentManufacturer = kAudioUnitManufacturer_Apple;
+    self.audioUnitPlayer = [AEAudioUnitChannel audioUnitChannelWithComponentDescription:audioUnitDescription
+                                                                        audioController:_audioController
+                                                                                  error:NULL];
+    
+    // Add these four channels
+    [_audioController addChannels:[NSArray arrayWithObjects:_loop1, _loop2, _oscillator, _audioUnitPlayer, nil]];
     
     return self;
 }
 
 -(void)dealloc {
+    if ( _audioUnitFile ) {
+        AudioFileClose(_audioUnitFile);
+    }
+    
     if ( _levelsTimer ) [_levelsTimer invalidate];
 
     NSMutableArray *channelsToRemove = [NSMutableArray arrayWithObjects:_loop1, _loop2, nil];
@@ -128,6 +158,7 @@
     self.recordButton = nil;
     self.playButton = nil;
     self.oneshotButton = nil;
+    self.oneshotAudioUnitButton = nil;
     self.outputOscilloscope = nil;
     self.inputOscilloscope = nil;
     self.inputLevelLayer = nil;
@@ -216,7 +247,7 @@
             return 3;
             
         case 1:
-            return 1;
+            return 2;
             
         case 2:
             return 2;
@@ -280,13 +311,26 @@
             break;
         } 
         case 1: {
-            cell.accessoryView = self.oneshotButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
-            [_oneshotButton setTitle:@"Play" forState:UIControlStateNormal];
-            [_oneshotButton setTitle:@"Stop" forState:UIControlStateSelected];
-            [_oneshotButton sizeToFit];
-            [_oneshotButton setSelected:_oneshot != nil];
-            [_oneshotButton addTarget:self action:@selector(oneshotPlayButtonPressed:) forControlEvents:UIControlEventTouchUpInside];
-            cell.textLabel.text = @"One Shot";
+            switch ( indexPath.row ) {
+                case 0: {
+                    cell.accessoryView = self.oneshotButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+                    [_oneshotButton setTitle:@"Play" forState:UIControlStateNormal];
+                    [_oneshotButton setTitle:@"Stop" forState:UIControlStateSelected];
+                    [_oneshotButton sizeToFit];
+                    [_oneshotButton setSelected:_oneshot != nil];
+                    [_oneshotButton addTarget:self action:@selector(oneshotPlayButtonPressed:) forControlEvents:UIControlEventTouchUpInside];
+                    cell.textLabel.text = @"One Shot";
+                }
+                case 1: {
+                    cell.accessoryView = self.oneshotAudioUnitButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+                    [_oneshotAudioUnitButton setTitle:@"Play" forState:UIControlStateNormal];
+                    [_oneshotAudioUnitButton setTitle:@"Stop" forState:UIControlStateSelected];
+                    [_oneshotAudioUnitButton sizeToFit];
+                    [_oneshotAudioUnitButton setSelected:_oneshot != nil];
+                    [_oneshotAudioUnitButton addTarget:self action:@selector(oneshotAudioUnitPlayButtonPressed:) forControlEvents:UIControlEventTouchUpInside];
+                    cell.textLabel.text = @"One Shot (Audio Unit)";
+                }
+            }
             break;
         }
         case 2: {
@@ -368,6 +412,56 @@
         [_audioController addChannels:[NSArray arrayWithObject:_oneshot]];
         _oneshotButton.selected = YES;
     }
+}
+
+- (void)oneshotAudioUnitPlayButtonPressed:(UIButton*)sender {
+    if ( !_audioUnitFile ) {
+        NSURL *playerFile = [[NSBundle mainBundle] URLForResource:@"Organ Run" withExtension:@"m4a"];
+        checkResult(AudioFileOpenURL((CFURLRef)playerFile, kAudioFileReadPermission, 0, &_audioUnitFile), "AudioFileOpenURL");
+    }
+    
+    // Set the file to play
+    checkResult(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFileIDs, kAudioUnitScope_Global, 0, &_audioUnitFile, sizeof(_audioUnitFile)),
+                "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileIDs)");
+
+    // Determine file properties
+    UInt64 packetCount;
+	UInt32 size = sizeof(packetCount);
+	checkResult(AudioFileGetProperty(_audioUnitFile, kAudioFilePropertyAudioDataPacketCount, &size, &packetCount),
+                "AudioFileGetProperty(kAudioFilePropertyAudioDataPacketCount)");
+	
+	AudioStreamBasicDescription dataFormat;
+	size = sizeof(dataFormat);
+	checkResult(AudioFileGetProperty(_audioUnitFile, kAudioFilePropertyDataFormat, &size, &dataFormat),
+                "AudioFileGetProperty(kAudioFilePropertyDataFormat)");
+    
+	// Assign the region to play
+	ScheduledAudioFileRegion region;
+	memset (&region.mTimeStamp, 0, sizeof(region.mTimeStamp));
+	region.mTimeStamp.mFlags = kAudioTimeStampSampleTimeValid;
+	region.mTimeStamp.mSampleTime = 0;
+	region.mCompletionProc = NULL;
+	region.mCompletionProcUserData = NULL;
+	region.mAudioFile = _audioUnitFile;
+	region.mLoopCount = 0;
+	region.mStartFrame = 0;
+	region.mFramesToPlay = packetCount * dataFormat.mFramesPerPacket;
+	checkResult(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFileRegion, kAudioUnitScope_Global, 0, &region, sizeof(region)),
+                "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileRegion)");
+	
+	// Prime the player by reading some frames from disk
+	UInt32 defaultNumberOfFrames = 0;
+	checkResult(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFilePrime, kAudioUnitScope_Global, 0, &defaultNumberOfFrames, sizeof(defaultNumberOfFrames)),
+                "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFilePrime)");
+    
+    // Set the start time (now = -1)
+    AudioTimeStamp startTime;
+	memset (&startTime, 0, sizeof(startTime));
+	startTime.mFlags = kAudioTimeStampSampleTimeValid;
+	startTime.mSampleTime = -1;
+	checkResult(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduleStartTimeStamp, kAudioUnitScope_Global, 0, &startTime, sizeof(startTime)),
+			   "AudioUnitSetProperty(kAudioUnitProperty_ScheduleStartTimeStamp)");
+
 }
 
 - (void)playthroughSwitchChanged:(UISwitch*)sender {
