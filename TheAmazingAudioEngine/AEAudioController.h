@@ -215,6 +215,9 @@ typedef void (*AEAudioControllerAudioCallback) (id                        receiv
  *  audio is to be filtered.  The callback will be passed a reference to this object, so you should
  *  implement it from within the \@implementation block to gain access to your
  *  instance variables.
+ *
+ *  Note that it is your responsibility to make sure you are using the correct
+ *  AudioStreamBasicDescription for the source you are filtering.
  */
 @protocol AEAudioFilter <NSObject>
 
