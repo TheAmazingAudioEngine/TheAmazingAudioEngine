@@ -437,30 +437,7 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
             performLevelMonitoring(&group->level_monitor_data, audio, frames, &channel->audioDescription);
         }
     }
-    
-    if ( channel->audiobusOutputPort && ABOutputPortIsConnected(channel->audiobusOutputPort) && channel->audiobusFloatConverter ) {
-        // Convert the audio to float, and apply volume/pan if necessary
-        if ( AEFloatConverterToFloatBufferList(channel->audiobusFloatConverter, audio, channel->audiobusScratchBuffer, frames) ) {
-            if ( fabs(1.0 - channel->volume) > 0.01 || fabs(0.0 - channel->pan) > 0.01 ) {
-                float volume = channel->volume;
-                for ( int i=0; i<channel->audiobusScratchBuffer->mNumberBuffers; i++ ) {
-                    float gain = (channel->audiobusScratchBuffer->mNumberBuffers == 2 ?
-                                  i == 0 ? (channel->pan <= 0.0 ? 1.0 : (1.0-((channel->pan/2)+0.5))*2.0) :
-                                  i == 1 ? (channel->pan >= 0.0 ? 1.0 : ((channel->pan/2)+0.5)*2.0) :
-                                  1 : 1) * volume;
-                    vDSP_vsmul(channel->audiobusScratchBuffer->mBuffers[i].mData, 1, &gain, channel->audiobusScratchBuffer->mBuffers[i].mData, 1, frames);
-                }
-            }
-        }
         
-        // Send via Audiobus
-        ABOutputPortSendAudio(channel->audiobusOutputPort, channel->audiobusScratchBuffer, frames, &arg->inTimeStamp, NULL);
-        if ( ABOutputPortGetConnectedPortAttributes(channel->audiobusOutputPort) & ABInputPortAttributePlaysLiveAudio ) {
-            // Silence output after sending
-            for ( int i=0; i<audio->mNumberBuffers; i++ ) memset(audio->mBuffers[i].mData, 0, audio->mBuffers[i].mDataByteSize);
-        }
-    }
-    
     // Advance the sample time, to make sure we continue to render if we're called again with the same arguments
     arg->inTimeStamp.mSampleTime += frames;
     
@@ -498,6 +475,29 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     }
     
     handleCallbacksForChannel(channel, inTimeStamp, inNumberFrames, ioData);
+    
+    if ( channel->audiobusOutputPort && ABOutputPortIsConnected(channel->audiobusOutputPort) && channel->audiobusFloatConverter ) {
+        // Convert the audio to float, and apply volume/pan if necessary
+        if ( AEFloatConverterToFloatBufferList(channel->audiobusFloatConverter, ioData, channel->audiobusScratchBuffer, inNumberFrames) ) {
+            if ( fabs(1.0 - channel->volume) > 0.01 || fabs(0.0 - channel->pan) > 0.01 ) {
+                float volume = channel->volume;
+                for ( int i=0; i<channel->audiobusScratchBuffer->mNumberBuffers; i++ ) {
+                    float gain = (channel->audiobusScratchBuffer->mNumberBuffers == 2 ?
+                                  i == 0 ? (channel->pan <= 0.0 ? 1.0 : (1.0-((channel->pan/2)+0.5))*2.0) :
+                                  i == 1 ? (channel->pan >= 0.0 ? 1.0 : ((channel->pan/2)+0.5)*2.0) :
+                                  1 : 1) * volume;
+                    vDSP_vsmul(channel->audiobusScratchBuffer->mBuffers[i].mData, 1, &gain, channel->audiobusScratchBuffer->mBuffers[i].mData, 1, inNumberFrames);
+                }
+            }
+        }
+        
+        // Send via Audiobus
+        ABOutputPortSendAudio(channel->audiobusOutputPort, channel->audiobusScratchBuffer, inNumberFrames, inTimeStamp, NULL);
+        if ( ABOutputPortGetConnectedPortAttributes(channel->audiobusOutputPort) & ABInputPortAttributePlaysLiveAudio ) {
+            // Silence output after sending
+            for ( int i=0; i<ioData->mNumberBuffers; i++ ) memset(ioData->mBuffers[i].mData, 0, ioData->mBuffers[i].mDataByteSize);
+        }
+    }
     
     return result;
 }
