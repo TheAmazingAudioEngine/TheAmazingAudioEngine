@@ -19,6 +19,8 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 
 #define                        kNoMoreDataErr                            -2222
 
+static const UInt32 kMinimumAllowedConversionBlockSize = 64;
+
 struct complexInputDataProc_t {
     AudioBufferList *sourceBuffer;
 };
@@ -28,7 +30,9 @@ struct complexInputDataProc_t {
     AudioStreamBasicDescription _floatAudioDescription;
     AudioConverterRef           _toFloatConverter;
     AudioConverterRef           _fromFloatConverter;
-    AudioBufferList            *_scratchBufferList;
+    AudioBufferList            *_scratchFloatBufferList;
+    AudioBufferList            *_undersizeWorkaroundBuffer;
+    AudioBufferList            *_undersizeWorkaroundFloatBuffer;
 }
 
 static OSStatus complexInputDataProc(AudioConverterRef             inAudioConverter,
@@ -57,10 +61,26 @@ static OSStatus complexInputDataProc(AudioConverterRef             inAudioConver
     if ( memcmp(&sourceFormat, &_floatAudioDescription, sizeof(AudioStreamBasicDescription)) != 0 ) {
         checkResult(AudioConverterNew(&sourceFormat, &_floatAudioDescription, &_toFloatConverter), "AudioConverterNew");
         checkResult(AudioConverterNew(&_floatAudioDescription, &sourceFormat, &_fromFloatConverter), "AudioConverterNew");
-        _scratchBufferList = (AudioBufferList*)malloc(sizeof(AudioBufferList) + (_floatAudioDescription.mChannelsPerFrame-1)*sizeof(AudioBuffer));
-        _scratchBufferList->mNumberBuffers = _floatAudioDescription.mChannelsPerFrame;
-        for ( int i=0; i<_scratchBufferList->mNumberBuffers; i++ ) {
-            _scratchBufferList->mBuffers[i].mNumberChannels = 1;
+        _scratchFloatBufferList = (AudioBufferList*)malloc(sizeof(AudioBufferList) + (_floatAudioDescription.mChannelsPerFrame-1)*sizeof(AudioBuffer));
+        _scratchFloatBufferList->mNumberBuffers = _floatAudioDescription.mChannelsPerFrame;
+        for ( int i=0; i<_scratchFloatBufferList->mNumberBuffers; i++ ) {
+            _scratchFloatBufferList->mBuffers[i].mNumberChannels = 1;
+        }
+        
+        int numberOfSourceBuffers = sourceFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? sourceFormat.mChannelsPerFrame : 1;
+        int channelsPerSourceBuffer = sourceFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? 1 : sourceFormat.mChannelsPerFrame;
+        _undersizeWorkaroundBuffer = (AudioBufferList*)malloc(sizeof(AudioBufferList) + (numberOfSourceBuffers-1)*sizeof(AudioBuffer));
+        _undersizeWorkaroundBuffer->mNumberBuffers = numberOfSourceBuffers;
+        for ( int i=0; i<_undersizeWorkaroundBuffer->mNumberBuffers; i++ ) {
+            _undersizeWorkaroundBuffer->mBuffers[i].mData = malloc(sourceFormat.mBytesPerFrame * kMinimumAllowedConversionBlockSize);
+            _undersizeWorkaroundBuffer->mBuffers[i].mNumberChannels = channelsPerSourceBuffer;
+        }
+        
+        _undersizeWorkaroundFloatBuffer = (AudioBufferList*)malloc(sizeof(AudioBufferList) + (_floatAudioDescription.mChannelsPerFrame-1)*sizeof(AudioBuffer));
+        _undersizeWorkaroundFloatBuffer->mNumberBuffers = _floatAudioDescription.mChannelsPerFrame;
+        for ( int i=0; i<_undersizeWorkaroundFloatBuffer->mNumberBuffers; i++ ) {
+            _undersizeWorkaroundFloatBuffer->mBuffers[i].mData = malloc(_floatAudioDescription.mBytesPerFrame * kMinimumAllowedConversionBlockSize);
+            _undersizeWorkaroundFloatBuffer->mBuffers[i].mNumberChannels = 1;
         }
     }
     
@@ -70,37 +90,73 @@ static OSStatus complexInputDataProc(AudioConverterRef             inAudioConver
 -(void)dealloc {
     if ( _toFloatConverter ) AudioConverterDispose(_toFloatConverter);
     if ( _fromFloatConverter ) AudioConverterDispose(_fromFloatConverter);
-    if ( _scratchBufferList ) free(_scratchBufferList);
+    if ( _scratchFloatBufferList ) free(_scratchFloatBufferList);
+    if ( _undersizeWorkaroundBuffer ) {
+        for ( int i=0; i<_undersizeWorkaroundBuffer->mNumberBuffers; i++ ) {
+            free(_undersizeWorkaroundBuffer->mBuffers[i].mData);
+        }
+        free(_undersizeWorkaroundBuffer);
+    }
+    if ( _undersizeWorkaroundFloatBuffer ) {
+        for ( int i=0; i<_undersizeWorkaroundFloatBuffer->mNumberBuffers; i++ ) {
+            free(_undersizeWorkaroundFloatBuffer->mBuffers[i].mData);
+        }
+        free(_undersizeWorkaroundFloatBuffer);
+    }
     [super dealloc];
 }
 
 
 BOOL AEFloatConverterToFloat(AEFloatConverter* THIS, AudioBufferList *sourceBuffer, float * const * targetBuffers, UInt32 frames) {
+    if ( frames == 0 ) return YES;
+    
     if ( THIS->_toFloatConverter ) {
-        UInt32 originalBufferSize = sourceBuffer->mBuffers[0].mDataByteSize;
         for ( int i=0; i<sourceBuffer->mNumberBuffers; i++ ) {
             sourceBuffer->mBuffers[i].mDataByteSize = frames * THIS->_sourceAudioDescription.mBytesPerFrame;
         }
         
-        for ( int i=0; i<THIS->_scratchBufferList->mNumberBuffers; i++ ) {
-            THIS->_scratchBufferList->mBuffers[i].mData = targetBuffers[i];
-            THIS->_scratchBufferList->mBuffers[i].mDataByteSize = frames * sizeof(float);
+        for ( int i=0; i<THIS->_scratchFloatBufferList->mNumberBuffers; i++ ) {
+            THIS->_scratchFloatBufferList->mBuffers[i].mData = targetBuffers[i];
+            THIS->_scratchFloatBufferList->mBuffers[i].mDataByteSize = frames * sizeof(float);
+        }
+        
+        UInt32 originalFrameCount = frames;
+        
+        if ( frames < kMinimumAllowedConversionBlockSize ) {
+            // Workaround for limitation in audio converter that seems to disallow block sizes < 64 frames
+            // Provide our own buffers, of 64 frames
+            for ( int i=0; i<THIS->_undersizeWorkaroundBuffer->mNumberBuffers; i++ ) {
+                THIS->_undersizeWorkaroundBuffer->mBuffers[i].mDataByteSize = kMinimumAllowedConversionBlockSize * THIS->_sourceAudioDescription.mBytesPerFrame;
+                memset(THIS->_undersizeWorkaroundBuffer->mBuffers[i].mData, 0, THIS->_undersizeWorkaroundBuffer->mBuffers[i].mDataByteSize);
+                memcpy(THIS->_undersizeWorkaroundBuffer->mBuffers[i].mData, sourceBuffer->mBuffers[i].mData, frames * THIS->_sourceAudioDescription.mBytesPerFrame);
+            }
+            
+            for ( int i=0; i<THIS->_scratchFloatBufferList->mNumberBuffers; i++ ) {
+                THIS->_scratchFloatBufferList->mBuffers[i].mDataByteSize = kMinimumAllowedConversionBlockSize * THIS->_floatAudioDescription.mBytesPerFrame;
+                THIS->_scratchFloatBufferList->mBuffers[i].mData = THIS->_undersizeWorkaroundFloatBuffer->mBuffers[i].mData;
+            }
+            
+            sourceBuffer = THIS->_undersizeWorkaroundBuffer;
+            frames = kMinimumAllowedConversionBlockSize;
         }
         
         OSStatus result = AudioConverterFillComplexBuffer(THIS->_toFloatConverter,
                                                           complexInputDataProc,
                                                           &(struct complexInputDataProc_t) { .sourceBuffer = sourceBuffer },
                                                           &frames,
-                                                          THIS->_scratchBufferList,
+                                                          THIS->_scratchFloatBufferList,
                                                           NULL);
-        
-        for ( int i=0; i<sourceBuffer->mNumberBuffers; i++ ) {
-            sourceBuffer->mBuffers[i].mDataByteSize = originalBufferSize;
-        }
         
         if ( !checkResult(result, "AudioConverterConvertComplexBuffer") ) {
             return NO;
         }
+        
+        if ( originalFrameCount < kMinimumAllowedConversionBlockSize ) {
+            for ( int i=0; i<THIS->_scratchFloatBufferList->mNumberBuffers; i++ ) {
+                memcpy(targetBuffers[i], THIS->_scratchFloatBufferList->mBuffers[i].mData, originalFrameCount * THIS->_sourceAudioDescription.mBytesPerFrame);
+            }
+        }
+        
     } else {
         for ( int i=0; i<sourceBuffer->mNumberBuffers; i++ ) {
             memcpy(targetBuffers[i], sourceBuffer->mBuffers[i].mData, frames * sizeof(float));
@@ -119,24 +175,53 @@ BOOL AEFloatConverterToFloatBufferList(AEFloatConverter* converter, AudioBufferL
 }
 
 BOOL AEFloatConverterFromFloat(AEFloatConverter* THIS, float * const * sourceBuffers, AudioBufferList *targetBuffer, UInt32 frames) {
+    if ( frames == 0 ) return YES;
+    
     for ( int i=0; i<targetBuffer->mNumberBuffers; i++ ) {
         targetBuffer->mBuffers[i].mDataByteSize = frames * THIS->_sourceAudioDescription.mBytesPerFrame;
     }
     
     if ( THIS->_fromFloatConverter ) {
-        for ( int i=0; i<THIS->_scratchBufferList->mNumberBuffers; i++ ) {
-            THIS->_scratchBufferList->mBuffers[i].mData = sourceBuffers[i];
-            THIS->_scratchBufferList->mBuffers[i].mDataByteSize = frames * sizeof(float);
+        for ( int i=0; i<THIS->_scratchFloatBufferList->mNumberBuffers; i++ ) {
+            THIS->_scratchFloatBufferList->mBuffers[i].mData = sourceBuffers[i];
+            THIS->_scratchFloatBufferList->mBuffers[i].mDataByteSize = frames * sizeof(float);
+        }
+        
+        UInt32 originalFrameCount = frames;
+        AudioBufferList *originalTargetBuffer = targetBuffer;
+        
+        if ( frames < kMinimumAllowedConversionBlockSize ) {
+            // Workaround for limitation in audio converter that seems to disallow block sizes < 64 frames
+            // Provide our own buffers, of 64 frames
+            for ( int i=0; i<THIS->_scratchFloatBufferList->mNumberBuffers; i++ ) {
+                THIS->_scratchFloatBufferList->mBuffers[i].mDataByteSize = kMinimumAllowedConversionBlockSize * THIS->_floatAudioDescription.mBytesPerFrame;
+                THIS->_scratchFloatBufferList->mBuffers[i].mData = THIS->_undersizeWorkaroundFloatBuffer->mBuffers[i].mData;
+                memset(THIS->_scratchFloatBufferList->mBuffers[i].mData, 0, THIS->_scratchFloatBufferList->mBuffers[i].mDataByteSize);
+                memcpy(THIS->_scratchFloatBufferList->mBuffers[i].mData, sourceBuffers[i], frames * THIS->_floatAudioDescription.mBytesPerFrame);
+            }
+            
+            for ( int i=0; i<THIS->_undersizeWorkaroundBuffer->mNumberBuffers; i++ ) {
+                THIS->_undersizeWorkaroundBuffer->mBuffers[i].mDataByteSize = kMinimumAllowedConversionBlockSize * THIS->_sourceAudioDescription.mBytesPerFrame;
+            }
+            
+            targetBuffer = THIS->_undersizeWorkaroundBuffer;
+            frames = kMinimumAllowedConversionBlockSize;
         }
         
         OSStatus result = AudioConverterFillComplexBuffer(THIS->_fromFloatConverter,
                                                           complexInputDataProc,
-                                                          &(struct complexInputDataProc_t) { .sourceBuffer = THIS->_scratchBufferList },
+                                                          &(struct complexInputDataProc_t) { .sourceBuffer = THIS->_scratchFloatBufferList },
                                                           &frames,
                                                           targetBuffer,
                                                           NULL);
         if ( !checkResult(result, "AudioConverterConvertComplexBuffer") ) {
             return NO;
+        }
+        
+        if ( originalFrameCount < kMinimumAllowedConversionBlockSize ) {
+            for ( int i=0; i<THIS->_undersizeWorkaroundBuffer->mNumberBuffers; i++ ) {
+                memcpy(originalTargetBuffer->mBuffers[i].mData, THIS->_undersizeWorkaroundBuffer->mBuffers[i].mData, originalFrameCount * THIS->_sourceAudioDescription.mBytesPerFrame);
+            }
         }
     } else {
         for ( int i=0; i<targetBuffer->mNumberBuffers; i++ ) {
