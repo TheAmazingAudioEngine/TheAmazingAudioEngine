@@ -13,6 +13,7 @@
 #import "AEAudioFileWriter.h"
 #import "AEBlockChannel.h"
 #import "AEBlockFilter.h"
+#import "AEBlockAudioReceiver.h"
 #import "AEAudioUnitChannel.h"
 #import "AEFloatConverter.h"
 #import "AEUtilities.h"
