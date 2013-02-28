@@ -1726,6 +1726,32 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
           preferredBufferSize, (int)round(preferredBufferSize*_audioDescription.mSampleRate));
 }
 
+-(NSTimeInterval)inputLatency {
+    return AEAudioControllerInputLatency(self);
+}
+
+NSTimeInterval AEAudioControllerInputLatency(AEAudioController *controller) {
+    static Float32 value = 0;
+    if ( !value ) {
+        UInt32 size = sizeof(value);
+        AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputLatency, &size, &value);
+    }
+    return value;
+}
+
+-(NSTimeInterval)outputLatency {
+    return AEAudioControllerOutputLatency(self);
+}
+
+NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
+    static Float32 value = 0;
+    if ( !value ) {
+        UInt32 size = sizeof(value);
+        AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareOutputLatency, &size, &value);
+    }
+    return value;
+}
+
 -(void)setVoiceProcessingEnabled:(BOOL)voiceProcessingEnabled {
     if ( _voiceProcessingEnabled == voiceProcessingEnabled ) return;
     

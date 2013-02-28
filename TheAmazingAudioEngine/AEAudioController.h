@@ -1134,6 +1134,20 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
 @property (nonatomic, readonly) float currentBufferDuration;
 
 /*!
+ * Input latency (in seconds)
+ *
+ *  The currently-reported hardware input latency
+ */
+@property (nonatomic, readonly) NSTimeInterval inputLatency;
+
+/*!
+ * Output latency (in seconds)
+ *
+ *  The currently-reported hardware output latency
+ */
+@property (nonatomic, readonly) NSTimeInterval outputLatency;
+
+/*!
  * Determine whether the audio engine is running
  *
  *  This is affected by calling start and stop on the audio controller.
@@ -1196,6 +1210,24 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  * The audio graph handle
  */
 @property (nonatomic, readonly) AUGraph audioGraph;
+
+#pragma mark - C access to properties
+
+/*!
+ * Input latency (in seconds)
+ *
+ * @param controller The audio controller
+ * @returns The currently-reported hardware input latency
+ */
+NSTimeInterval AEAudioControllerInputLatency(AEAudioController *controller);
+
+/*!
+ * Output latency (in seconds)
+ *
+ * @param controller The audio controller
+ * @returns The currently-reported hardware output latency
+ */
+NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller);
 
 @end
 
