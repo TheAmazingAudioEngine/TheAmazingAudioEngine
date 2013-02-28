@@ -504,7 +504,7 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
 
 static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
     AEAudioController *THIS = (AEAudioController *)inRefCon;
-    
+
     if ( THIS->_audiobusInputPort && !(*ioActionFlags & kAudiobusSourceFlag) && THIS->_usingAudiobusInput ) {
         // If Audiobus is connected, then serve Audiobus queue rather than serving system input queue
         serveAudiobusInputQueue(THIS);
