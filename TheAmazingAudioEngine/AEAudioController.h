@@ -984,8 +984,29 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController     
 /** @name Metering */
 ///@{
 
+/*!
+ * Get output power level information since this method was last called
+ *
+ * @param averagePower If not NULL, on output will be set to the average power level of the most recent output audio, in decibels
+ * @param peakLevel If not NULL, on output will be set to the peak level of the most recent output audio, in decibels
+ */
 - (void)outputAveragePowerLevel:(Float32*)averagePower peakHoldLevel:(Float32*)peakLevel;
+
+/*!
+ * Get output power level information for a particular group, since this method was last called
+ *
+ * @param averagePower If not NULL, on output will be set to the average power level of the most recent audio, in decibels
+ * @param peakLevel If not NULL, on output will be set to the peak level of the most recent audio, in decibels
+ * @param group The channel group
+ */
 - (void)averagePowerLevel:(Float32*)averagePower peakHoldLevel:(Float32*)peakLevel forGroup:(AEChannelGroupRef)group;
+
+/*!
+ * Get input power level information since this method was last called
+ *
+ * @param averagePower If not NULL, on output will be set to the average power level of the most recent input audio, in decibels
+ * @param peakLevel If not NULL, on output will be set to the peak level of the most recent input audio, in decibels
+ */
 - (void)inputAveragePowerLevel:(Float32*)averagePower peakHoldLevel:(Float32*)peakLevel;
 
 ///@}
