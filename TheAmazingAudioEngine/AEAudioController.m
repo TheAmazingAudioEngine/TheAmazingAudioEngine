@@ -23,6 +23,10 @@
 static double __hostTicksToSeconds = 0.0;
 static double __secondsToHostTicks = 0.0;
 
+static Float32 __cachedInputLatency = 0;
+static Float32 __cachedOutputLatency = 0;
+
+
 const int kMaximumChannelsPerGroup              = 100;
 const int kMaximumCallbacksPerSource            = 15;
 const int kMessageBufferLength                  = 8192;
@@ -324,6 +328,9 @@ static void interruptionListener(void *inClientData, UInt32 inInterruption) {
 static void audioSessionPropertyListener(void *inClientData, AudioSessionPropertyID inID, UInt32 inDataSize, const void *inData) {
     AEAudioController *THIS = (AEAudioController *)inClientData;
     
+    __cachedInputLatency = 0;
+    __cachedOutputLatency = 0;
+    
     if (inID == kAudioSessionProperty_AudioRouteChange) {
         int reason = [[(NSDictionary*)inData objectForKey:[NSString stringWithCString:kAudioSession_AudioRouteChangeKey_Reason encoding:NSUTF8StringEncoding]] intValue];
         
@@ -452,7 +459,11 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
         return noErr;
     }
     
-    channel_producer_arg_t arg = { .channel = channel, .inTimeStamp = *inTimeStamp, .ioActionFlags = ioActionFlags };
+    AudioTimeStamp timestamp = *inTimeStamp;
+    // Adjust timestamp to factor in hardware output latency
+    timestamp.mHostTime += AEAudioControllerOutputLatency(channel->audioController)*__secondsToHostTicks;
+    
+    channel_producer_arg_t arg = { .channel = channel, .inTimeStamp = timestamp, .ioActionFlags = ioActionFlags };
     
     // Use variable speed filter, if there is one
     AEAudioControllerVariableSpeedFilterCallback varispeedFilter = NULL;
@@ -468,13 +479,13 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     OSStatus result = noErr;
     if ( varispeedFilter ) {
         // Run variable speed filter
-        varispeedFilter(varispeedFilterUserinfo, channel->audioController, &channelAudioProducer, (void*)&arg, inTimeStamp, inNumberFrames, ioData);
+        varispeedFilter(varispeedFilterUserinfo, channel->audioController, &channelAudioProducer, (void*)&arg, &timestamp, inNumberFrames, ioData);
     } else {
         // Take audio directly from channel
         result = channelAudioProducer((void*)&arg, ioData, inNumberFrames);
     }
     
-    handleCallbacksForChannel(channel, inTimeStamp, inNumberFrames, ioData);
+    handleCallbacksForChannel(channel, &timestamp, inNumberFrames, ioData);
     
     if ( channel->audiobusOutputPort && ABOutputPortIsConnected(channel->audiobusOutputPort) && channel->audiobusFloatConverter ) {
         // Convert the audio to float, and apply volume/pan if necessary
@@ -492,7 +503,7 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
         }
         
         // Send via Audiobus
-        ABOutputPortSendAudio(channel->audiobusOutputPort, channel->audiobusScratchBuffer, inNumberFrames, inTimeStamp, NULL);
+        ABOutputPortSendAudio(channel->audiobusOutputPort, channel->audiobusScratchBuffer, inNumberFrames, &timestamp, NULL);
         if ( ABOutputPortGetConnectedPortAttributes(channel->audiobusOutputPort) & ABInputPortAttributePlaysLiveAudio ) {
             // Silence output after sending
             for ( int i=0; i<ioData->mNumberBuffers; i++ ) memset(ioData->mBuffers[i].mData, 0, ioData->mBuffers[i].mDataByteSize);
@@ -505,6 +516,12 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
 static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
     AEAudioController *THIS = (AEAudioController *)inRefCon;
 
+    AudioTimeStamp timestamp = *inTimeStamp;
+    if ( !(*ioActionFlags & kAudiobusSourceFlag) ) {
+        // Adjust timestamp to factor in hardware input latency
+        timestamp.mHostTime += AEAudioControllerInputLatency(THIS)*__secondsToHostTicks;
+    }
+    
     if ( THIS->_audiobusInputPort && !(*ioActionFlags & kAudiobusSourceFlag) && THIS->_usingAudiobusInput ) {
         // If Audiobus is connected, then serve Audiobus queue rather than serving system input queue
         serveAudiobusInputQueue(THIS);
@@ -513,7 +530,7 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
 
     for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
         callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
-        ((AEAudioControllerTimingCallback)callback->callback)(callback->userInfo, THIS, inTimeStamp, AEAudioTimingContextInput);
+        ((AEAudioControllerTimingCallback)callback->callback)(callback->userInfo, THIS, &timestamp, AEAudioTimingContextInput);
     }
     
     if ( THIS->_inputAudioConverter ) {
@@ -540,7 +557,7 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
     if ( *ioActionFlags & kAudiobusSourceFlag && ABInputPortReceive != NULL ) {
         ABInputPortReceive(THIS->_audiobusInputPort, nil, THIS->_inputAudioBufferList, &inNumberFrames, NULL, NULL);
     } else {
-        OSStatus err = AudioUnitRender(THIS->_ioAudioUnit, ioActionFlags, inTimeStamp, 1, inNumberFrames, THIS->_inputAudioConverter ? THIS->_inputAudioScratchBufferList : THIS->_inputAudioBufferList);
+        OSStatus err = AudioUnitRender(THIS->_ioAudioUnit, ioActionFlags, &timestamp, 1, inNumberFrames, THIS->_inputAudioConverter ? THIS->_inputAudioScratchBufferList : THIS->_inputAudioBufferList);
         if ( !checkResult(err, "AudioUnitRender") ) { 
             return err; 
         }
@@ -566,7 +583,7 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
             callback_t *callback = &THIS->_inputCallbacks.callbacks[i];
             if ( !(callback->flags & type) ) continue;
             
-            ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, THIS, AEAudioSourceInput, inTimeStamp, inNumberFrames, THIS->_inputAudioBufferList);
+            ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, THIS, AEAudioSourceInput, &timestamp, inNumberFrames, THIS->_inputAudioBufferList);
         }
         if ( type == kReceiverFlag ) break;
     }
@@ -1731,12 +1748,11 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 }
 
 NSTimeInterval AEAudioControllerInputLatency(AEAudioController *controller) {
-    static Float32 value = 0;
-    if ( !value ) {
-        UInt32 size = sizeof(value);
-        AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputLatency, &size, &value);
+    if ( !__cachedInputLatency ) {
+        UInt32 size = sizeof(__cachedInputLatency);
+        AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputLatency, &size, &__cachedInputLatency);
     }
-    return value;
+    return __cachedInputLatency;
 }
 
 -(NSTimeInterval)outputLatency {
@@ -1744,12 +1760,11 @@ NSTimeInterval AEAudioControllerInputLatency(AEAudioController *controller) {
 }
 
 NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
-    static Float32 value = 0;
-    if ( !value ) {
-        UInt32 size = sizeof(value);
-        AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareOutputLatency, &size, &value);
+    if ( !__cachedOutputLatency ) {
+        UInt32 size = sizeof(__cachedOutputLatency);
+        AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareOutputLatency, &size, &__cachedOutputLatency);
     }
-    return value;
+    return __cachedOutputLatency;
 }
 
 -(void)setVoiceProcessingEnabled:(BOOL)voiceProcessingEnabled {

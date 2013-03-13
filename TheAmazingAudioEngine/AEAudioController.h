@@ -66,7 +66,7 @@ typedef enum {
  *
  * @param channel           The channel object
  * @param audioController   The Audio Controller
- * @param time              The time the buffer will be played
+ * @param time              The time the buffer will be played, automatically compensated for hardware latency.
  * @param frames            The number of frames required
  * @param audio             The audio buffer list - audio should be copied into the provided buffers
  */
@@ -173,7 +173,7 @@ typedef OSStatus (*AEAudioControllerRenderCallback) (id                        c
  * @param receiver   The receiver object
  * @param audioController The Audio Controller
  * @param source     The source of the audio: @link AEAudioSourceInput @endlink, @link AEAudioSourceMainOutput @endlink, an AEChannelGroupRef or an id<AEAudioPlayable>.
- * @param time       The time the audio was received (for input), or the time it will be played (for output)
+ * @param time       The time the audio was received (for input), or the time it will be played (for output), automatically compensated for hardware latency.
  * @param frames     The length of the audio, in frames
  * @param audio      The audio buffer list
  */
@@ -267,7 +267,7 @@ typedef OSStatus (*AEAudioControllerVariableSpeedFilterProducer)(void           
  * @param audioController The Audio Controller
  * @param producer  A function pointer to be used to produce input audio
  * @param producerToken An opaque pointer to be passed to the producer as the first argument
- * @param time      The time the output audio will be played
+ * @param time      The time the output audio will be played, automatically compensated for hardware latency.
  * @param frames    The length of the required audio, in frames
  * @param audio     The audio buffer list to write output audio to
  */
@@ -338,7 +338,7 @@ typedef enum {
  *
  * @param receiver  The receiver object
  * @param audioController The Audio Controller
- * @param time      The time the audio was received (for input), or the time it will be played (for output)
+ * @param time      The time the audio was received (for input), or the time it will be played (for output), automatically compensated for hardware latency.
  * @param context   The timing context - either input, or output
  */
 typedef void (*AEAudioControllerTimingCallback) (id                        receiver,
