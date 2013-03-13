@@ -320,6 +320,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
                     [_oneshotButton setSelected:_oneshot != nil];
                     [_oneshotButton addTarget:self action:@selector(oneshotPlayButtonPressed:) forControlEvents:UIControlEventTouchUpInside];
                     cell.textLabel.text = @"One Shot";
+                    break;
                 }
                 case 1: {
                     cell.accessoryView = self.oneshotAudioUnitButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
@@ -329,6 +330,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
                     [_oneshotAudioUnitButton setSelected:_oneshot != nil];
                     [_oneshotAudioUnitButton addTarget:self action:@selector(oneshotAudioUnitPlayButtonPressed:) forControlEvents:UIControlEventTouchUpInside];
                     cell.textLabel.text = @"One Shot (Audio Unit)";
+                    break;
                 }
             }
             break;
