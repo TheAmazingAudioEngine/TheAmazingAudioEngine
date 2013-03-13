@@ -22,5 +22,5 @@
 - (id)initWithAudioController:(AEAudioController*)audioController;
 
 @property (nonatomic, readonly) float volume;
-@property (nonatomic, readonly) AudioStreamBasicDescription clientFormat;
+@property (nonatomic, readonly) AudioStreamBasicDescription audioDescription;
 @end

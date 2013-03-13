@@ -21,7 +21,6 @@ static const int kAudioBufferLength = 16384;
 
 @implementation AEPlaythroughChannel
 @synthesize audioController=_audioController, volume = _volume;
-@dynamic clientFormat;
 
 +(NSSet *)keyPathsForValuesAffectingAudioDescription {
     return [NSSet setWithObject:@"audioController.inputAudioDescription"];
@@ -78,7 +77,7 @@ static OSStatus renderCallback(id                        channel,
     return renderCallback;
 }
 
--(AudioStreamBasicDescription)clientFormat {
+-(AudioStreamBasicDescription)audioDescription {
     return _audioController.inputAudioDescription;
 }
 
