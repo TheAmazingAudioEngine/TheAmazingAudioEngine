@@ -177,11 +177,8 @@ typedef struct _channel_group_t {
     AudioUnit           mixerAudioUnit;
     AEChannelRef        channels[kMaximumChannelsPerGroup];
     int                 channelCount;
-    AudioConverterRef   audioConverter;
-    BOOL                converterRequired;
-    AudioBufferList    *audioConverterScratchBuffer;
-    AudioStreamBasicDescription audioConverterTargetFormat;
-    AudioStreamBasicDescription audioConverterSourceFormat;
+    AUNode              converterNode;
+    AudioUnit           converterUnit;
     audio_level_monitor_t level_monitor_data;
 } channel_group_t;
 
@@ -422,29 +419,9 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
     } else if ( channel->type == kChannelTypeGroup ) {
         AEChannelGroupRef group = (AEChannelGroupRef)channel->ptr;
         
-        AudioBufferList *bufferList = audio;
-        
-        char bufferListSpace[sizeof(AudioBufferList)+(group->audioConverterScratchBuffer ? group->audioConverterScratchBuffer->mNumberBuffers-1 : 0)*sizeof(AudioBuffer)];
-        if ( group->converterRequired ) {
-            // Initialise output buffer
-            bufferList = (AudioBufferList*)bufferListSpace;
-            memcpy(bufferList, group->audioConverterScratchBuffer, sizeof(bufferListSpace));
-        }
-        
-        // Tell mixer to render into bufferList
-        OSStatus status = AudioUnitRender(group->mixerAudioUnit, arg->ioActionFlags, &arg->inTimeStamp, 0, *frames, bufferList);
+        // Tell mixer/mixer's converter unit to render into audio
+        OSStatus status = AudioUnitRender(group->converterUnit ? group->converterUnit : group->mixerAudioUnit, arg->ioActionFlags, &arg->inTimeStamp, 0, *frames, audio);
         if ( !checkResult(status, "AudioUnitRender") ) return status;
-        
-        if ( group->converterRequired ) {
-            // Perform conversion
-            status = AudioConverterFillComplexBuffer(group->audioConverter, 
-                                                     fillComplexBufferInputProc, 
-                                                     &(struct fillComplexBufferInputProc_t) { .bufferList = bufferList, .frames = *frames },
-                                                     frames, 
-                                                     audio, 
-                                                     NULL);
-            checkResult(status, "AudioConverterFillComplexBuffer");
-        }
         
         if ( group->level_monitor_data.monitoringEnabled ) {
             performLevelMonitoring(&group->level_monitor_data, audio, *frames, &channel->audioDescription);
@@ -635,34 +612,10 @@ static OSStatus groupRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionF
     
     if ( !(*ioActionFlags & kAudioUnitRenderAction_PreRender) ) {
         // After render
-        AudioBufferList *bufferList;
-        
-        char bufferListSpace[sizeof(AudioBufferList)+(group->audioConverterScratchBuffer ? group->audioConverterScratchBuffer->mNumberBuffers-1 : 0)*sizeof(AudioBuffer)];
-        if ( group->converterRequired ) {
-            // Initialise output buffer
-            bufferList = (AudioBufferList*)bufferListSpace;
-            memcpy(bufferList, group->audioConverterScratchBuffer, sizeof(bufferListSpace));
-            
-            // Perform conversion
-            OSStatus result = AudioConverterFillComplexBuffer(group->audioConverter, 
-                                                              fillComplexBufferInputProc, 
-                                                              &(struct fillComplexBufferInputProc_t) { .bufferList = ioData, .frames = inNumberFrames }, 
-                                                              &inNumberFrames, 
-                                                              bufferList, 
-                                                              NULL);
-            if ( !checkResult(result, "AudioConverterConvertComplexBuffer") ) {
-                return noErr;
-            }
-            
-        } else {
-            // We can pull audio out directly, as it's in the right format
-            bufferList = ioData;
-        }
-        
-        handleCallbacksForChannel(channel, inTimeStamp, inNumberFrames, bufferList);
+        handleCallbacksForChannel(channel, inTimeStamp, inNumberFrames, ioData);
         
         if ( group->level_monitor_data.monitoringEnabled ) {
-            performLevelMonitoring(&group->level_monitor_data, bufferList, inNumberFrames, &channel->audioDescription);
+            performLevelMonitoring(&group->level_monitor_data, ioData, inNumberFrames, &channel->audioDescription);
         }
     }
     
@@ -794,7 +747,6 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 - (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing {
     if ( !(self = [super init]) ) return nil;
     
-    NSAssert(audioDescription.mChannelsPerFrame <= 2, @"Only mono or stereo audio supported");
     NSAssert(audioDescription.mFormatID == kAudioFormatLinearPCM, @"Only linear PCM supported");
 
     _audioSessionCategory = enableInput ? kAudioSessionCategory_PlayAndRecord : kAudioSessionCategory_MediaPlayback;
@@ -2362,23 +2314,14 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     BOOL inputAvailableChanged = NO;
     
     if ( inputAvailable ) {
-        if ( !(rawAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ) {
-            rawAudioDescription.mBytesPerFrame *= (float)numberOfInputChannels / rawAudioDescription.mChannelsPerFrame;
-            rawAudioDescription.mBytesPerPacket *= (float)numberOfInputChannels / rawAudioDescription.mChannelsPerFrame;
-        }
-        rawAudioDescription.mChannelsPerFrame = numberOfInputChannels;
+        AEAudioStreamBasicDescriptionSetChannelsPerFrame(&rawAudioDescription, numberOfInputChannels);
         
         if ( _inputMode == AEInputModeVariableAudioFormat ) {
             inputAudioDescription = rawAudioDescription;
         
             if ( [_inputChannelSelection count] > 0 ) {
                 // Set the target input audio description channels to the number of selected channels
-                int channels = MIN(2, [_inputChannelSelection count]);
-                if ( !(inputAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ) {
-                    inputAudioDescription.mBytesPerFrame *= (float)channels / inputAudioDescription.mChannelsPerFrame;
-                    inputAudioDescription.mBytesPerPacket *= (float)channels / inputAudioDescription.mChannelsPerFrame;
-                }
-                inputAudioDescription.mChannelsPerFrame = channels;
+                AEAudioStreamBasicDescriptionSetChannelsPerFrame(&inputAudioDescription, [_inputChannelSelection count]);
             }
         }
         
@@ -2602,26 +2545,35 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
         if ( !checkResult(result, "AUGraphNodeInfo") ) return NO;
         
         // Try to set mixer's output stream format
-        group->converterRequired = NO;
         channel->audioDescription = _audioDescription;
         result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &_audioDescription, sizeof(_audioDescription));
         
         if ( result == kAudioUnitErr_FormatNotSupported ) {
-            // The mixer only supports a subset of formats. If it doesn't support this one, then we'll convert manually
+            // The mixer only supports a subset of formats. If it doesn't support this one, then we'll add an audio converter
+            AudioStreamBasicDescription defaultAudioDescription;
+            UInt32 size = sizeof(defaultAudioDescription);
+            result = AudioUnitGetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &defaultAudioDescription, &size);
+            defaultAudioDescription.mSampleRate = _audioDescription.mSampleRate;
+            AEAudioStreamBasicDescriptionSetChannelsPerFrame(&defaultAudioDescription, _audioDescription.mChannelsPerFrame);
             
-            // Indicate that an audio converter will be required
-            group->converterRequired = YES;
+            if ( !checkResult(result=AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &defaultAudioDescription, size), "AudioUnitSetProperty") ) {
+                AUGraphRemoveNode(_audioGraph, group->mixerNode);
+                group->mixerNode = 0;
+                return NO;
+            }
             
-            // Get the existing format, and apply just the sample rate
-            AudioStreamBasicDescription mixerFormat;
-            UInt32 size = sizeof(mixerFormat);
-            checkResult(AudioUnitGetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &mixerFormat, &size),
-                        "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)");
-            mixerFormat.mSampleRate = _audioDescription.mSampleRate;
+            AudioComponentDescription audioConverterDescription = AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_FormatConverter, kAudioUnitSubType_AUConverter);
             
-            checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &mixerFormat, sizeof(mixerFormat)), 
-                        "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat");            
-            
+            if ( !checkResult(result=AUGraphAddNode(_audioGraph, &audioConverterDescription, &group->converterNode), "AUGraphAddNode") ||
+                !checkResult(result=AUGraphNodeInfo(_audioGraph, group->converterNode, NULL, &group->converterUnit), "AUGraphNodeInfo") ||
+                !checkResult(result=AUGraphConnectNodeInput(_audioGraph, group->mixerNode, 0, group->converterNode, 0), "AUGraphConnectNodeInput") ||
+                !checkResult(result=AudioUnitSetProperty(group->converterUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &defaultAudioDescription, sizeof(AudioStreamBasicDescription)), "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)") ||
+                !checkResult(result=AudioUnitSetProperty(group->converterUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &_audioDescription, sizeof(AudioStreamBasicDescription)), "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)") ) {
+                
+                AUGraphRemoveNode(_audioGraph, group->mixerNode);
+                group->mixerNode = 0;
+                return NO;
+            }
         } else {
             checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
         }
@@ -2670,25 +2622,6 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
         }
     }
     
-    if ( (outputCallbacks || filters || group->level_monitor_data.monitoringEnabled || channel->audiobusOutputPort) && group->converterRequired && !group->audioConverter ) {
-        // Initialise audio converter if necessary
-        
-        // Get mixer's output stream format
-        AudioStreamBasicDescription mixerFormat;
-        UInt32 size = sizeof(mixerFormat);
-        result = AudioUnitGetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &mixerFormat, &size);
-        if ( !checkResult(result, "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)") ) return NO;
-        
-        group->audioConverterTargetFormat = channel->audioDescription;
-        group->audioConverterSourceFormat = mixerFormat;
-        
-        // Create audio converter
-        result = AudioConverterNew(&group->audioConverterSourceFormat, &group->audioConverterTargetFormat, &group->audioConverter);
-        if ( !checkResult(result, "AudioConverterNew") ) return NO;
-        
-        group->audioConverterScratchBuffer = AEAllocateAndInitAudioBufferList(group->audioConverterSourceFormat, kScratchBufferFrames);
-    }
-    
     if ( filters || channel->audiobusOutputPort ) {
         // We need to use our own render callback, because we're either filtering, or sending via Audiobus (and we may need to adjust timestamp)
         if ( channel->graphState & kGraphStateNodeConnected ) {
@@ -2702,7 +2635,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
         
         if ( channel->graphState & kGraphStateRenderNotificationSet ) {
             // Remove render notification callback
-            result = AudioUnitRemoveRenderNotify(group->mixerAudioUnit, &groupRenderNotifyCallback, channel);
+            result = AudioUnitRemoveRenderNotify(group->converterUnit ? group->converterUnit : group->mixerAudioUnit, &groupRenderNotifyCallback, channel);
             if ( !checkResult(result, "AudioUnitRemoveRenderNotify") ) return NO;
             channel->graphState &= ~kGraphStateRenderNotificationSet;
         }
@@ -2733,7 +2666,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
         
         if ( !(channel->graphState & kGraphStateNodeConnected) ) {
             // Connect output of mixer directly to the parent mixer
-            result = AUGraphConnectNodeInput(_audioGraph, group->mixerNode, 0, parentGroup ? parentGroup->mixerNode : _ioNode, parentGroup ? index : 0);
+            result = AUGraphConnectNodeInput(_audioGraph, group->converterNode ? group->converterNode : group->mixerNode, 0, parentGroup ? parentGroup->mixerNode : _ioNode, parentGroup ? index : 0);
             if ( !checkResult(result, "AUGraphConnectNodeInput") ) return NO;
             channel->graphState |= kGraphStateNodeConnected;
             updateRequired = YES;
@@ -2744,24 +2677,18 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
             // We need to register a callback to be notified when the mixer renders, to pass on the audio
             if ( !(channel->graphState & kGraphStateRenderNotificationSet) ) {
                 // Add render notification callback
-                result = AudioUnitAddRenderNotify(group->mixerAudioUnit, &groupRenderNotifyCallback, channel);
+                result = AudioUnitAddRenderNotify(group->converterUnit ? group->converterUnit : group->mixerAudioUnit, &groupRenderNotifyCallback, channel);
                 if ( !checkResult(result, "AudioUnitRemoveRenderNotify") ) return NO;
                 channel->graphState |= kGraphStateRenderNotificationSet;
             }
         } else {
             if ( channel->graphState & kGraphStateRenderNotificationSet ) {
                 // Remove render notification callback
-                result = AudioUnitRemoveRenderNotify(group->mixerAudioUnit, &groupRenderNotifyCallback, channel);
+                result = AudioUnitRemoveRenderNotify(group->converterUnit ? group->converterUnit : group->mixerAudioUnit, &groupRenderNotifyCallback, channel);
                 if ( !checkResult(result, "AudioUnitRemoveRenderNotify") ) return NO;
                 channel->graphState &= ~kGraphStateRenderNotificationSet;
             }
         }
-    }
-    
-    if ( !outputCallbacks && !filters && !group->level_monitor_data.monitoringEnabled && group->audioConverter && !(channel->graphState & kGraphStateRenderCallbackSet) ) {
-        // Cleanup audio converter
-        AudioConverterDispose(group->audioConverter);
-        group->audioConverter = NULL;
     }
     
     if ( updateRequired ) {
@@ -2825,10 +2752,6 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     if ( updateRequired ) {
         checkResult([self updateGraph], "Update graph");
     }
-}
-
-static void updateGraphDelayed(AEAudioController *THIS, void *userInfo, int length) {
-    checkResult([THIS updateGraph], "AUGraphUpdate");
 }
 
 static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef group, void **ptrs, void **objects, AEChannelRef *outChannelReferences, int count) {
@@ -2938,14 +2861,10 @@ static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef g
 }
 
 - (void)releaseResourcesForGroup:(AEChannelGroupRef)group {
-    if ( group->audioConverter ) {
-        checkResult(AudioConverterDispose(group->audioConverter), "AudioConverterDispose");
-        group->audioConverter = NULL;
-    }
-    
-    if ( group->audioConverterScratchBuffer ) {
-        AEFreeAudioBufferList(group->audioConverterScratchBuffer);
-        group->audioConverterScratchBuffer = NULL;
+    if ( group->converterNode ) {
+        checkResult(AUGraphRemoveNode(_audioGraph, group->converterNode), "AUGraphRemoveNode");
+        group->converterNode = 0;
+        group->converterUnit = NULL;
     }
     
     if ( group->mixerNode ) {
@@ -2968,6 +2887,8 @@ static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef g
     group->channel->graphState = kGraphStateUninitialized;
     group->mixerNode = 0;
     group->mixerAudioUnit = NULL;
+    group->converterNode = 0;
+    group->converterUnit = NULL;
     if ( group->level_monitor_data.scratchBuffer ) {
         free(group->level_monitor_data.scratchBuffer);
         memset(&group->level_monitor_data, 0, sizeof(audio_level_monitor_t));
