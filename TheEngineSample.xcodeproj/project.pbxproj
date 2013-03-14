@@ -44,7 +44,7 @@
 			remoteGlobalIDString = 4C215CEC1523A7D500D36CAD;
 			remoteInfo = TheAmazingAudioEngine;
 		};
-		4C7C67F216F1605F00721E60 /* PBXContainerItemProxy */ = {
+		4C7C681216F1619D00721E60 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 4C7C67EC16F1605A00721E60 /* TheAmazingAudioEngine.xcodeproj */;
 			proxyType = 1;
@@ -240,7 +240,7 @@
 			buildRules = (
 			);
 			dependencies = (
-				4C7C67F316F1605F00721E60 /* PBXTargetDependency */,
+				4C7C681316F1619D00721E60 /* PBXTargetDependency */,
 			);
 			name = TheEngineSample;
 			productName = TheEngineSample;
@@ -330,10 +330,10 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		4C7C67F316F1605F00721E60 /* PBXTargetDependency */ = {
+		4C7C681316F1619D00721E60 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = TheAmazingAudioEngine;
-			targetProxy = 4C7C67F216F1605F00721E60 /* PBXContainerItemProxy */;
+			targetProxy = 4C7C681216F1619D00721E60 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 

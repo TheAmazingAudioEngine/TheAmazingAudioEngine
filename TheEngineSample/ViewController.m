@@ -488,7 +488,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 
 - (void)limiterSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
-        self.limiter = [[[AELimiterFilter alloc] initWithAudioController:_audioController clientFormat:_audioController.audioDescription] autorelease];
+        self.limiter = [[[AELimiterFilter alloc] initWithAudioController:_audioController] autorelease];
         _limiter.level = 0.1;
         [_audioController addFilter:_limiter];
     } else {
@@ -499,7 +499,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 
 - (void)expanderSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
-        self.expander = [[[AEExpanderFilter alloc] initWithAudioController:_audioController clientFormat:_audioController.audioDescription] autorelease];
+        self.expander = [[[AEExpanderFilter alloc] initWithAudioController:_audioController] autorelease];
         [_audioController addFilter:_expander];
     } else {
         [_audioController removeFilter:_expander];

@@ -1062,14 +1062,13 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  * Input channel selection
  *
  *  When there are more than one input channel, you may specify which of the
- *  available channels are actually used as input. This is an array of NSIntegers,
+ *  available channels are actually used as input. This is an array of NSNumbers,
  *  each referring to a channel (starting with the number 0 for the first channel).
  *  
  *  Specified input channels will be mapped to output chanels in the order they appear
  *  in this array, so the first channel specified will be mapped to the first output
  *  channel (the only output channel, if output is mono, or the left channel for stereo
- *  output), the second input to the second output (the right channel). Only the first
- *  two channels will ever be used.
+ *  output), the second input to the second output (the right channel).
  *
  *  By default, the first two inputs will be used, for devices with more than 1 input
  *  channel.
