@@ -219,13 +219,18 @@ static void completeCalibration(AEAudioController *audioController, void *userIn
     THIS->_calibrateCompletionBlock = nil;
 }
 
-static void filterCallback(id                        receiver,
-                           AEAudioController        *audioController,
-                           void                     *source,
-                           const AudioTimeStamp     *time,
-                           UInt32                    frames,
-                           AudioBufferList          *audio) {
-    AEExpanderFilter *THIS = (AEExpanderFilter*)receiver;
+static OSStatus filterCallback(id                        filter,
+                               AEAudioController        *audioController,
+                               AEAudioControllerFilterProducer producer,
+                               void                     *producerToken,
+                               const AudioTimeStamp     *time,
+                               UInt32                    frames,
+                               AudioBufferList          *audio) {
+    
+    AEExpanderFilter *THIS = (AEExpanderFilter*)filter;
+    
+    OSStatus status = producer(producerToken, audio, &frames);
+    if ( status != noErr ) return status;
     
     // Convert audio to floats on scratch buffer for processing, and find maxima
     float max = 0;
@@ -244,7 +249,7 @@ static void filterCallback(id                        receiver,
         if ( mach_absolute_time()-THIS->_calibrationStartTime >= kCalibrationTime*__secondsToHostTicks ) {
             THIS->_calibrationStartTime = 0;
             AEAudioControllerSendAsynchronousMessageToMainThread(audioController, completeCalibration, &THIS, sizeof(AEExpanderFilter*));
-            return;
+            return noErr;
         }
     }
     
@@ -268,7 +273,7 @@ static void filterCallback(id                        receiver,
     // Apply to audio
     switch ( THIS->_state ) {
         case kStateOpen:
-            return;
+            return noErr;
             break;
         case kStateClosed:
             for ( int i=0; i<audio->mNumberBuffers; i++ ) {
@@ -335,9 +340,11 @@ static void filterCallback(id                        receiver,
     for ( int i=0; i<audio->mNumberBuffers; i++ ) {
         vDSP_vfix16(THIS->_scratchBuffer[i], 1, (SInt16*)audio->mBuffers[i].mData, 1, frames);
     }
+    
+    return noErr;
 }
 
-- (AEAudioControllerAudioCallback)filterCallback {
+-(AEAudioControllerFilterCallback)filterCallback {
     return filterCallback;
 }
 

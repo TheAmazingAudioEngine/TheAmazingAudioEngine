@@ -97,7 +97,6 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 enum {
     kFilterFlag               = 1<<0,
     kReceiverFlag             = 1<<1,
-    kVariableSpeedFilterFlag  = 1<<2,
     kAudiobusOutputPortFlag   = 1<<3
 };
 
@@ -185,15 +184,6 @@ typedef struct _channel_group_t {
     AudioStreamBasicDescription audioConverterSourceFormat;
     audio_level_monitor_t level_monitor_data;
 } channel_group_t;
-
-/*!
- * Channel producer argument
- */
-typedef struct __channel_producer_arg_t {
-    AEChannelRef channel;
-    AudioTimeStamp inTimeStamp;
-    AudioUnitRenderActionFlags *ioActionFlags;
-} channel_producer_arg_t;
 
 #pragma mark Messaging
 
@@ -392,15 +382,31 @@ static OSStatus fillComplexBufferInputProc(AudioConverterRef             inAudio
     return noErr;
 }
 
-static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UInt32 frames) {
+typedef struct __channel_producer_arg_t {
+    AEChannelRef channel;
+    AudioTimeStamp inTimeStamp;
+    AudioUnitRenderActionFlags *ioActionFlags;
+    int nextFilterIndex;
+} channel_producer_arg_t;
+
+static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UInt32 *frames) {
     channel_producer_arg_t *arg = (channel_producer_arg_t*)userInfo;
     AEChannelRef channel = arg->channel;
     
     OSStatus status = noErr;
     
-    if ( channel->audiobusOutputPort && ABOutputPortGetConnectedPortAttributes(channel->audiobusOutputPort) & ABInputPortAttributePlaysLiveAudio ) {
-        // We're sending via the output port, and the receiver plays live - offset the timestamp by the reported latency
-        arg->inTimeStamp.mHostTime += ABOutputPortGetAverageLatency(channel->audiobusOutputPort)*__secondsToHostTicks;
+    // See if there's another filter
+    for ( int i=0, filterIndex=0; i<channel->callbacks.count; i++ ) {
+        callback_t *callback = &channel->callbacks.callbacks[i];
+        if ( callback->flags & kFilterFlag ) {
+            if ( filterIndex == arg->nextFilterIndex ) {
+                // Run this filter
+                channel_producer_arg_t filterArg = *arg;
+                filterArg.nextFilterIndex = filterIndex+1;
+                return ((AEAudioControllerFilterCallback)callback->callback)(callback->userInfo, channel->audioController, &channelAudioProducer, (void*)&filterArg, &arg->inTimeStamp, *frames, audio);
+            }
+            filterIndex++;
+        }
     }
     
     if ( channel->type == kChannelTypeChannel ) {
@@ -411,7 +417,7 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
             memset(audio->mBuffers[i].mData, 0, audio->mBuffers[i].mDataByteSize);
         }
         
-        status = callback(channelObj, channel->audioController, &arg->inTimeStamp, frames, audio);
+        status = callback(channelObj, channel->audioController, &arg->inTimeStamp, *frames, audio);
         
     } else if ( channel->type == kChannelTypeGroup ) {
         AEChannelGroupRef group = (AEChannelGroupRef)channel->ptr;
@@ -426,27 +432,27 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
         }
         
         // Tell mixer to render into bufferList
-        OSStatus status = AudioUnitRender(group->mixerAudioUnit, arg->ioActionFlags, &arg->inTimeStamp, 0, frames, bufferList);
+        OSStatus status = AudioUnitRender(group->mixerAudioUnit, arg->ioActionFlags, &arg->inTimeStamp, 0, *frames, bufferList);
         if ( !checkResult(status, "AudioUnitRender") ) return status;
         
         if ( group->converterRequired ) {
             // Perform conversion
             status = AudioConverterFillComplexBuffer(group->audioConverter, 
                                                      fillComplexBufferInputProc, 
-                                                     &(struct fillComplexBufferInputProc_t) { .bufferList = bufferList, .frames = frames }, 
-                                                     &frames, 
+                                                     &(struct fillComplexBufferInputProc_t) { .bufferList = bufferList, .frames = *frames },
+                                                     frames, 
                                                      audio, 
                                                      NULL);
             checkResult(status, "AudioConverterFillComplexBuffer");
         }
         
         if ( group->level_monitor_data.monitoringEnabled ) {
-            performLevelMonitoring(&group->level_monitor_data, audio, frames, &channel->audioDescription);
+            performLevelMonitoring(&group->level_monitor_data, audio, *frames, &channel->audioDescription);
         }
     }
         
     // Advance the sample time, to make sure we continue to render if we're called again with the same arguments
-    arg->inTimeStamp.mSampleTime += frames;
+    arg->inTimeStamp.mSampleTime += *frames;
     
     return status;
 }
@@ -460,30 +466,23 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     }
     
     AudioTimeStamp timestamp = *inTimeStamp;
-    // Adjust timestamp to factor in hardware output latency
-    timestamp.mHostTime += AEAudioControllerOutputLatency(channel->audioController)*__secondsToHostTicks;
     
-    channel_producer_arg_t arg = { .channel = channel, .inTimeStamp = timestamp, .ioActionFlags = ioActionFlags };
-    
-    // Use variable speed filter, if there is one
-    AEAudioControllerVariableSpeedFilterCallback varispeedFilter = NULL;
-    void * varispeedFilterUserinfo = NULL;
-    for ( int i=0; i<channel->callbacks.count; i++ ) {
-        callback_t *callback = &channel->callbacks.callbacks[i];
-        if ( callback->flags & kVariableSpeedFilterFlag ) {
-            varispeedFilter = callback->callback;
-            varispeedFilterUserinfo = callback->userInfo;
-        }
-    }
-    
-    OSStatus result = noErr;
-    if ( varispeedFilter ) {
-        // Run variable speed filter
-        varispeedFilter(varispeedFilterUserinfo, channel->audioController, &channelAudioProducer, (void*)&arg, &timestamp, inNumberFrames, ioData);
+    if ( channel->audiobusOutputPort && ABOutputPortGetConnectedPortAttributes(channel->audiobusOutputPort) & ABInputPortAttributePlaysLiveAudio ) {
+        // We're sending via the output port, and the receiver plays live - offset the timestamp by the reported latency
+        timestamp.mHostTime += ABOutputPortGetAverageLatency(channel->audiobusOutputPort)*__secondsToHostTicks;
     } else {
-        // Take audio directly from channel
-        result = channelAudioProducer((void*)&arg, ioData, inNumberFrames);
+        // Adjust timestamp to factor in hardware output latency
+        timestamp.mHostTime += AEAudioControllerOutputLatency(channel->audioController)*__secondsToHostTicks;
     }
+    
+    channel_producer_arg_t arg = {
+        .channel = channel,
+        .inTimeStamp = timestamp,
+        .ioActionFlags = ioActionFlags,
+        .nextFilterIndex = 0
+    };
+    
+    OSStatus result = channelAudioProducer((void*)&arg, ioData, &inNumberFrames);
     
     handleCallbacksForChannel(channel, &timestamp, inNumberFrames, ioData);
     
@@ -511,6 +510,58 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     }
     
     return result;
+}
+
+typedef struct __input_producer_arg_t {
+    AEAudioController *THIS;
+    AudioTimeStamp inTimeStamp;
+    AudioUnitRenderActionFlags *ioActionFlags;
+    int nextFilterIndex;
+} input_producer_arg_t;
+
+static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt32 *frames) {
+    input_producer_arg_t *arg = (input_producer_arg_t*)userInfo;
+    AEAudioController *THIS = arg->THIS;
+    
+    // See if there's another filter
+    for ( int i=0, filterIndex=0; i<THIS->_inputCallbacks.count; i++ ) {
+        callback_t *callback = &THIS->_inputCallbacks.callbacks[i];
+        if ( callback->flags & kFilterFlag ) {
+            if ( filterIndex == arg->nextFilterIndex ) {
+                // Run this filter
+                input_producer_arg_t filterArg = *arg;
+                filterArg.nextFilterIndex = filterIndex+1;
+                return ((AEAudioControllerFilterCallback)callback->callback)(callback->userInfo, THIS, &inputAudioProducer, (void*)&filterArg, &arg->inTimeStamp, *frames, audio);
+            }
+            filterIndex++;
+        }
+    }
+    
+    // Render audio into buffer
+    if ( *arg->ioActionFlags & kAudiobusSourceFlag && ABInputPortReceive != NULL ) {
+        ABInputPortReceive(THIS->_audiobusInputPort, nil, audio, frames, NULL, NULL);
+    } else {
+        OSStatus err = AudioUnitRender(THIS->_ioAudioUnit, arg->ioActionFlags, &arg->inTimeStamp, 1, *frames, THIS->_inputAudioConverter ? THIS->_inputAudioScratchBufferList : audio);
+        if ( !checkResult(err, "AudioUnitRender") ) {
+            *frames = 0;
+            return err;
+        }
+        
+        if ( THIS->_inputAudioConverter ) {
+            // Perform conversion
+            assert(THIS->_inputAudioScratchBufferList->mBuffers[0].mData && THIS->_inputAudioScratchBufferList->mBuffers[0].mDataByteSize > 0);
+            assert(audio->mBuffers[0].mData && audio->mBuffers[0].mDataByteSize > 0);
+            
+            OSStatus result = AudioConverterFillComplexBuffer(THIS->_inputAudioConverter,
+                                                              fillComplexBufferInputProc,
+                                                              &(struct fillComplexBufferInputProc_t) { .bufferList = THIS->_inputAudioScratchBufferList, .frames = *frames },
+                                                              frames,
+                                                              audio,
+                                                              NULL);
+            checkResult(result, "AudioConverterConvertComplexBuffer");
+        }
+    }
+    return noErr;
 }
 
 static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
@@ -553,39 +604,21 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
         }
     }
     
-    // Render audio into buffer
-    if ( *ioActionFlags & kAudiobusSourceFlag && ABInputPortReceive != NULL ) {
-        ABInputPortReceive(THIS->_audiobusInputPort, nil, THIS->_inputAudioBufferList, &inNumberFrames, NULL, NULL);
-    } else {
-        OSStatus err = AudioUnitRender(THIS->_ioAudioUnit, ioActionFlags, &timestamp, 1, inNumberFrames, THIS->_inputAudioConverter ? THIS->_inputAudioScratchBufferList : THIS->_inputAudioBufferList);
-        if ( !checkResult(err, "AudioUnitRender") ) { 
-            return err; 
-        }
-        
-        if ( THIS->_inputAudioConverter ) {
-            // Perform conversion
-            assert(THIS->_inputAudioScratchBufferList->mBuffers[0].mData && THIS->_inputAudioScratchBufferList->mBuffers[0].mDataByteSize > 0);
-            assert(THIS->_inputAudioBufferList->mBuffers[0].mData && THIS->_inputAudioBufferList->mBuffers[0].mDataByteSize > 0);
-            
-            OSStatus result = AudioConverterFillComplexBuffer(THIS->_inputAudioConverter, 
-                                                              fillComplexBufferInputProc, 
-                                                              &(struct fillComplexBufferInputProc_t) { .bufferList = THIS->_inputAudioScratchBufferList, .frames = inNumberFrames }, 
-                                                              &inNumberFrames, 
-                                                              THIS->_inputAudioBufferList, 
-                                                              NULL);
-            checkResult(result, "AudioConverterConvertComplexBuffer");
-        }
-    }
+    input_producer_arg_t arg = {
+        .THIS = THIS,
+        .inTimeStamp = timestamp,
+        .ioActionFlags = ioActionFlags,
+        .nextFilterIndex = 0
+    };
     
-    // Pass audio to input filters, then callbacks
-    for ( int type=kFilterFlag; ; type = kReceiverFlag ) {
-        for ( int i=0; i<THIS->_inputCallbacks.count; i++ ) {
-            callback_t *callback = &THIS->_inputCallbacks.callbacks[i];
-            if ( !(callback->flags & type) ) continue;
-            
-            ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, THIS, AEAudioSourceInput, &timestamp, inNumberFrames, THIS->_inputAudioBufferList);
-        }
-        if ( type == kReceiverFlag ) break;
+    OSStatus result = inputAudioProducer((void*)&arg, THIS->_inputAudioBufferList, &inNumberFrames);
+    
+    // Pass audio to callbacks
+    for ( int i=0; i<THIS->_inputCallbacks.count; i++ ) {
+        callback_t *callback = &THIS->_inputCallbacks.callbacks[i];
+        if ( !(callback->flags & kReceiverFlag) ) continue;
+        
+        ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, THIS, AEAudioSourceInput, &timestamp, inNumberFrames, THIS->_inputAudioBufferList);
     }
     
     // Perform input metering
@@ -593,7 +626,7 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
         performLevelMonitoring(&THIS->_inputLevelMonitorData, THIS->_inputAudioBufferList, inNumberFrames, &THIS->_inputAudioDescription);
     }
     
-    return noErr;
+    return result;
 }
 
 static OSStatus groupRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
@@ -1199,31 +1232,6 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 
 -(NSArray *)inputFilters {
     return [self associatedObjectsFromTable:&_inputCallbacks matchingFlag:kFilterFlag];
-}
-
-- (void)setVariableSpeedFilter:(id<AEAudioVariableSpeedFilter>)filter {
-    [self setVariableSpeedFilter:filter forChannelGroup:_topGroup];
-}
-
-- (void)setVariableSpeedFilter:(id<AEAudioVariableSpeedFilter>)filter forChannel:(id<AEAudioPlayable>)channelObj {
-    int index=0;
-    AEChannelGroupRef parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:channelObj index:&index];
-    NSAssert(parentGroup != NULL, @"Channel not found");
-    
-    [self setVariableSpeedFilter:filter forChannelStruct:parentGroup->channels[index]];
-}
-
-- (void)setVariableSpeedFilter:(id<AEAudioVariableSpeedFilter>)filter forChannelGroup:(AEChannelGroupRef)group {
-    [self setVariableSpeedFilter:filter forChannelStruct:group->channel];
-    
-    AEChannelGroupRef parentGroup = NULL;
-    int index=0;
-    if ( group != _topGroup ) {
-        parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
-        NSAssert(parentGroup != NULL, @"Channel group not found");
-    }
-    
-    [self configureGraphStateOfGroupChannel:group->channel parentGroup:parentGroup index:index];
 }
 
 #pragma mark - Output receivers
@@ -2655,7 +2663,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     
     BOOL outputCallbacks=NO, filters=NO;
     for ( int i=0; i<channel->callbacks.count && (!outputCallbacks || !filters); i++ ) {
-        if ( channel->callbacks.callbacks[i].flags & (kFilterFlag | kVariableSpeedFilterFlag) ) {
+        if ( channel->callbacks.callbacks[i].flags & kFilterFlag ) {
             filters = YES;
         } else if ( channel->callbacks.callbacks[i].flags & kReceiverFlag ) {
             outputCallbacks = YES;
@@ -3046,7 +3054,7 @@ static void removeCallbackFromTable(AEAudioController *THIS, callback_table_t *t
     return result;
 }
 
-- (void)addCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannel:(id<AEAudioPlayable>)channelObj {
+- (void)addCallback:(void*)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannel:(id<AEAudioPlayable>)channelObj {
     int index=0;
     AEChannelGroupRef parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:channelObj index:&index];
     NSAssert(parentGroup != NULL, @"Channel not found");
@@ -3058,7 +3066,7 @@ static void removeCallbackFromTable(AEAudioController *THIS, callback_table_t *t
     }];
 }
 
-- (void)addCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannelGroup:(AEChannelGroupRef)group {
+- (void)addCallback:(void*)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannelGroup:(AEChannelGroupRef)group {
     [self performSynchronousMessageExchangeWithBlock:^{
         addCallbackToTable(self, &group->channel->callbacks, callback, userInfo, flags);
     }];
@@ -3073,7 +3081,7 @@ static void removeCallbackFromTable(AEAudioController *THIS, callback_table_t *t
     [self configureGraphStateOfGroupChannel:group->channel parentGroup:parentGroup index:index];
 }
 
-- (BOOL)removeCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannel:(id<AEAudioPlayable>)channelObj {
+- (BOOL)removeCallback:(void*)callback userInfo:(void*)userInfo fromChannel:(id<AEAudioPlayable>)channelObj {
     int index=0;
     AEChannelGroupRef parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:channelObj index:&index];
     NSAssert(parentGroup != NULL, @"Channel not found");
@@ -3088,7 +3096,7 @@ static void removeCallbackFromTable(AEAudioController *THIS, callback_table_t *t
     return found;
 }
 
-- (BOOL)removeCallback:(AEAudioControllerAudioCallback)callback userInfo:(void*)userInfo fromChannelGroup:(AEChannelGroupRef)group {
+- (BOOL)removeCallback:(void*)callback userInfo:(void*)userInfo fromChannelGroup:(AEChannelGroupRef)group {
     __block BOOL found = NO;
     [self performSynchronousMessageExchangeWithBlock:^{
         removeCallbackFromTable(self, &group->channel->callbacks, callback, userInfo, &found);
@@ -3127,40 +3135,8 @@ static void removeCallbackFromTable(AEAudioController *THIS, callback_table_t *t
     return [self associatedObjectsFromTable:&group->channel->callbacks matchingFlag:flags];
 }
 
-- (void)setVariableSpeedFilter:(id<AEAudioVariableSpeedFilter>)filter forChannelStruct:(AEChannelRef)channel {
-    for ( int i=0; i<channel->callbacks.count; i++ ) {
-        if ( (channel->callbacks.callbacks[i].flags & kVariableSpeedFilterFlag ) ) {
-            // Remove the old callback
-            __block BOOL found = NO;
-            [self performSynchronousMessageExchangeWithBlock:^{
-                removeCallbackFromTable(self, &channel->callbacks, channel->callbacks.callbacks[i].callback, channel->callbacks.callbacks[i].userInfo, &found);
-            }];
-            
-            if ( found ) {
-                [(id)(long)channel->callbacks.callbacks[i].userInfo autorelease];
-            }
-        }
-    }
-    
-    if ( filter ) {
-        [filter retain];
-        void *callback = filter.filterCallback;
-        [self performSynchronousMessageExchangeWithBlock:^{
-            addCallbackToTable(self, &channel->callbacks, callback, filter, kVariableSpeedFilterFlag);
-        }];
-    }
-}
-
 static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp *inTimeStamp, UInt32 inNumberFrames, AudioBufferList *ioData) {
-    // Pass audio to filters
-    for ( int i=0; i<channel->callbacks.count; i++ ) {
-        callback_t *callback = &channel->callbacks.callbacks[i];
-        if ( callback->flags & kFilterFlag ) {
-            ((AEAudioControllerAudioCallback)callback->callback)(callback->userInfo, channel->audioController, channel->ptr, inTimeStamp, inNumberFrames, ioData);
-        }
-    }
-    
-    // And finally pass to output callbacks
+    // Pass audio to output callbacks
     for ( int i=0; i<channel->callbacks.count; i++ ) {
         callback_t *callback = &channel->callbacks.callbacks[i];
         if ( callback->flags & kReceiverFlag ) {

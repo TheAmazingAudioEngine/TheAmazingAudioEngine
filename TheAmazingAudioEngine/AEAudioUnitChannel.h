@@ -27,19 +27,9 @@
  * @param error On output, if not NULL, will point to an error if a problem occurred
  * @return The initialised channel
  */
-+ (AEAudioUnitChannel*)audioUnitChannelWithComponentDescription:(AudioComponentDescription)audioComponentDescription
-                                                audioController:(AEAudioController*)audioController
-                                                          error:(NSError**)error;
-
-/*!
- * Attempt to set the audio description
- *
- *  Note that not all audio descriptions are supported by audio units.
- *
- * @param audioDescription The new audio description to use
- * @return YES if the new audio description was accepted; NO otherwise.
- */
-- (BOOL)changeAudioDescription:(AudioStreamBasicDescription)audioDescription;
+- (id)initWithComponentDescription:(AudioComponentDescription)audioComponentDescription
+                   audioController:(AEAudioController*)audioController
+                             error:(NSError**)error;
 
 /*!
  * Track volume
@@ -69,11 +59,6 @@
  * If YES, track will be silenced, but render callbacks will continue to be performed.
  */
 @property (nonatomic, assign) BOOL channelIsMuted;
-
-/*
- * The audio format for this channel
- */
-@property (nonatomic, readonly) AudioStreamBasicDescription audioDescription;
 
 /*!
  * The audio unit

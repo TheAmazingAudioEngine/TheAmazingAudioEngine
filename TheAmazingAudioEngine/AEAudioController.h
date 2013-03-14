@@ -69,6 +69,7 @@ typedef enum {
  * @param time              The time the buffer will be played, automatically compensated for hardware latency.
  * @param frames            The number of frames required
  * @param audio             The audio buffer list - audio should be copied into the provided buffers
+ * @return A status code
  */
 typedef OSStatus (*AEAudioControllerRenderCallback) (id                        channel,
                                                      AEAudioController        *audioController,
@@ -162,7 +163,7 @@ typedef OSStatus (*AEAudioControllerRenderCallback) (id                        c
  *
  *  This callback is used for notifying you of incoming audio (either from 
  *  the built-in microphone, or another input device), and outgoing audio that
- *  is about to be played by the system.  It's also used for audio filtering.
+ *  is about to be played by the system.
  *
  *  The receiver object is passed through as a parameter.  You should not send it Objective-C
  *  messages, but if you implement the callback within your receiver's \@implementation block, you 
@@ -208,10 +209,63 @@ typedef void (*AEAudioControllerAudioCallback) (id                        receiv
 @end
 
 /*!
+ * Filter audio producer
+ *
+ *  This defines the function passed to a AEAudioControllerFilterCallback,
+ *  which is used to produce input audio to be processed by the filter.
+ *
+ * @param producerToken    An opaque pointer to be passed to the function
+ * @param audio            Audio buffer list to be written to
+ * @param frames           Number of frames to produce on input, number of frames produced on output
+ * @return A status code
+ */
+typedef OSStatus (*AEAudioControllerFilterProducer)(void            *producerToken, 
+                                                    AudioBufferList *audio, 
+                                                    UInt32          *frames);
+
+
+/*!
+ * Filter callback
+ *
+ *  This callback is used for audio filters.
+ *
+ *  A filter implementation must call the function pointed to by the *producer* argument,
+ *  passing *producerToken*, *audio*, and *frames* as arguments, in order to produce as much
+ *  audio is required to produce *frames* frames of output audio:
+ *
+ *          OSStatus status = producer(producerToken, audio, &frames);
+ *          if ( status != noErr ) return status;
+ *
+ *  Then the audio can be processed as desired.
+ *
+ *  The filter object is passed through as a parameter.  You should not send it Objective-C
+ *  messages, but if you implement the callback within your filter's \@implementation block, you 
+ *  can gain direct access to the instance variables of the filter ("((MyFilter*)filter)->myInstanceVariable").
+ *
+ *  Do not wait on locks, allocate memory, or call any Objective-C or BSD code.
+ *
+ * @param filter    The filter object
+ * @param audioController The Audio Controller
+ * @param producer  A function pointer to be used to produce input audio
+ * @param producerToken An opaque pointer to be passed to the producer as the first argument
+ * @param time      The time the output audio will be played or the time input audio was received, automatically compensated for hardware latency.
+ * @param frames    The length of the required audio, in frames
+ * @param audio     The audio buffer list to write output audio to
+ * @return A status code
+ */
+typedef OSStatus (*AEAudioControllerFilterCallback)(id                        filter,
+                                                    AEAudioController        *audioController,
+                                                    AEAudioControllerFilterProducer producer,
+                                                    void                     *producerToken,
+                                                    const AudioTimeStamp     *time,
+                                                    UInt32                    frames,
+                                                    AudioBufferList          *audio);
+
+/*!
  * AEAudioFilter protocol
  *
- *  The interface that a filter object must implement - this includes 'filterCallback',
- *  which is a @link AEAudioControllerAudioCallback C callback @endlink to be called when 
+ *  The interface that a filter must implement - this includes 'filterCallback', which is a 
+ *  @link AEAudioControllerFilterCallback C callback @endlink to be called when
  *  audio is to be filtered.  The callback will be passed a reference to this object, so you should
  *  implement it from within the \@implementation block to gain access to your
  *  instance variables.
@@ -227,78 +281,9 @@ typedef void (*AEAudioControllerAudioCallback) (id                        receiv
  *  This method must return a pointer to the filter callback function that performs
  *  audio manipulation.  Always return the same pointer - this must not change over time.
  *
- * @return Pointer to an audio callback
- */
-@property (nonatomic, readonly) AEAudioControllerAudioCallback filterCallback;
-
-@end
-
-
-/*!
- * Variable speed filter producer
- *
- *  This defines the function passed to a AEAudioControllerVariableSpeedFilterCallback,
- *  which is used to produce input audio to be processed by the filter.
- *
- * @param producerToken    An opaque pointer to be passed to the function
- * @param audio            Audio buffer list to be written to
- * @param frames           Number of frames to produce
- * @return A status code
- */
-typedef OSStatus (*AEAudioControllerVariableSpeedFilterProducer)(void            *producerToken, 
-                                                                 AudioBufferList *audio, 
-                                                                 UInt32           frames);
-
-
-/*!
- * Variable speed filter callback
- *
- *  This callback is used for variable speed audio filters - that is, filters that
- *  have a playback rate that is not 1:1.  The system provides as an argument
- *  a function pointer that is used to produce input audio.
- *
- *  The filter object is passed through as a parameter.  You should not send it Objective-C
- *  messages, but if you implement the callback within your filter's \@implementation block, you 
- *  can gain direct access to the instance variables of the filter ("((MyFilter*)filter)->myInstanceVariable").
- *
- *  Do not wait on locks, allocate memory, or call any Objective-C or BSD code.
- *
- * @param filter    The filter object
- * @param audioController The Audio Controller
- * @param producer  A function pointer to be used to produce input audio
- * @param producerToken An opaque pointer to be passed to the producer as the first argument
- * @param time      The time the output audio will be played, automatically compensated for hardware latency.
- * @param frames    The length of the required audio, in frames
- * @param audio     The audio buffer list to write output audio to
- */
-typedef void (*AEAudioControllerVariableSpeedFilterCallback) (id                        filter,
-                                                              AEAudioController        *audioController,
-                                                              AEAudioControllerVariableSpeedFilterProducer producer,
-                                                              void                     *producerToken,
-                                                              const AudioTimeStamp     *time,
-                                                              UInt32                    frames,
-                                                              AudioBufferList          *audio);
-
-/*!
- * AEAudioVariableSpeedFilter protocol
- *
- *  The interface that a variable speed filter object must implement - this includes 'filterCallback',
- *  which is a @link AEAudioControllerVariableSpeedFilterCallback C callback @endlink to be called when 
- *  audio is to be filtered.  The callback will be passed a reference to this object, so you should
- *  implement it from within the \@implementation block to gain access to your
- *  instance variables.
- */
-@protocol AEAudioVariableSpeedFilter <NSObject>
-
-/*!
- * Reference to the filter callback
- *
- *  This method must return a pointer to the filter callback function that performs
- *  audio manipulation.  Always return the same pointer - this must not change over time.
- *
  * @return Pointer to a variable speed filter callback
  */
-@property (nonatomic, readonly) AEAudioControllerVariableSpeedFilterCallback filterCallback;
+@property (nonatomic, readonly) AEAudioControllerFilterCallback filterCallback;
 
 @end
 
@@ -726,47 +711,6 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(AEAudioController *aud
  * Get a list of all input filters
  */
 - (NSArray*)inputFilters;
-
-/*!
- * Set variable speed audio filter for the system output
- *
- *  Variable audio filters are used to process live audio before playback, at a
- *  playback rate other than 1:1. You can provide one variable audio filter per
- *  node (channel, group, the root system node).
- *
- *  See @link AEAudioControllerVariableSpeedFilterCallback @endlink for more info.
- *
- * @param filter An object that implements the AEAudioVariableSpeedFilter protocol, or nil
- */
-- (void)setVariableSpeedFilter:(id<AEAudioVariableSpeedFilter>)filter;
-
-/*!
- * Set variable speed audio filter for the system output
- *
- *  Variable audio filters are used to process live audio before playback, at a
- *  playback rate other than 1:1. You can provide one variable audio filter per
- *  node (channel, group, the root system node).
- *
- *  See @link AEAudioControllerVariableSpeedFilterCallback @endlink for more info.
- *
- * @param filter An object that implements the AEAudioVariableSpeedFilter protocol, or nil
- * @param channel Channel to assign filter to
- */
-- (void)setVariableSpeedFilter:(id<AEAudioVariableSpeedFilter>)filter forChannel:(id<AEAudioPlayable>)channel;
-
-/*!
- * Set variable speed audio filter for the system output
- *
- *  Variable audio filters are used to process live audio before playback, at a
- *  playback rate other than 1:1. You can provide one variable audio filter per
- *  node (channel, group, the root system node).
- *
- *  See @link AEAudioControllerVariableSpeedFilterCallback @endlink for more info.
- *
- * @param filter An object that implements the AEAudioVariableSpeedFilter protocol, or nil
- * @param group Group to assign filter to
- */
-- (void)setVariableSpeedFilter:(id<AEAudioVariableSpeedFilter>)filter forChannelGroup:(AEChannelGroupRef)group;
 
 ///@}
 #pragma mark - Output receivers

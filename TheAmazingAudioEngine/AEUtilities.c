@@ -80,3 +80,20 @@ int AEGetNumberOfFramesInAudioBufferList(AudioBufferList *list, AudioStreamBasic
     }
     return list->mBuffers[0].mDataByteSize / ((audioFormat.mBitsPerChannel/8) * channelCount);
 }
+
+AudioComponentDescription AEAudioComponentDescriptionMake(OSType manufacturer, OSType type, OSType subtype) {
+    AudioComponentDescription description;
+    memset(&description, 0, sizeof(description));
+    description.componentManufacturer = manufacturer;
+    description.componentType = type;
+    description.componentSubType = subtype;
+    return description;
+}
+
+void AEAudioStreamBasicDescriptionSetChannelsPerFrame(AudioStreamBasicDescription *audioDescription, int numberOfChannels) {
+    if ( !(audioDescription->mFormatFlags & kAudioFormatFlagIsNonInterleaved) ) {
+        audioDescription->mBytesPerFrame *= (float)numberOfChannels / (float)audioDescription->mChannelsPerFrame;
+        audioDescription->mBytesPerPacket *= (float)numberOfChannels / (float)audioDescription->mChannelsPerFrame;
+    }
+    audioDescription->mChannelsPerFrame = numberOfChannels;
+}

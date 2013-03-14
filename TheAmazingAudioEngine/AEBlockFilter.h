@@ -9,7 +9,26 @@
 #import <Foundation/Foundation.h>
 #import "TheAmazingAudioEngine.h"
 
-typedef void (^AEBlockFilterBlock)(void                     *source,
+/*!
+ * Filter processing block
+ *
+ *  A filter implementation must call the function pointed to by the *producer* argument,
+ *  passing *producerToken*, *audio*, and *frames* as arguments, in order to produce as much
+ *  audio is required to produce *frames* frames of output audio:
+ *
+ *          OSStatus status = producer(producerToken, audio, &frames);
+ *          if ( status != noErr ) return status;
+ *
+ *  Then the audio can be processed as desired.
+ *
+ * @param producer A function to be called to produce audio for filtering
+ * @param producerToken An opaque pointer to be passed to *producer* when producing audio
+ * @param time      The time the output audio will be played or the time input audio was received, automatically compensated for hardware latency.
+ * @param frames    The length of the required audio, in frames
+ * @param audio     The audio buffer list to write output audio to
+ */
+typedef void (^AEBlockFilterBlock)(AEAudioControllerFilterProducer producer,
+                                   void                     *producerToken,
                                    const AudioTimeStamp     *time,
                                    UInt32                    frames,
                                    AudioBufferList          *audio);

@@ -102,15 +102,19 @@ const int kScratchBufferLength = 8192;
     _limiter.level = level;
 }
 
-static void filterCallback(id                        receiver,
-                           AEAudioController        *audioController,
-                           void                     *source,
-                           const AudioTimeStamp     *time,
-                           UInt32                    frames,
-                           AudioBufferList          *audio) {
+static OSStatus filterCallback(id                        filter,
+                               AEAudioController        *audioController,
+                               AEAudioControllerFilterProducer producer,
+                               void                     *producerToken,
+                               const AudioTimeStamp     *time,
+                               UInt32                    frames,
+                               AudioBufferList          *audio) {
     
     assert(frames < kScratchBufferLength);
-    AELimiterFilter *THIS = receiver;
+    AELimiterFilter *THIS = filter;
+    
+    OSStatus status = producer(producerToken, audio, &frames);
+    if ( status != noErr ) return status;
     
     // Copy buffer into floating point scratch buffer
     AEFloatConverterToFloat(THIS->_floatConverter, audio, THIS->_scratchBuffer, frames);
@@ -122,9 +126,11 @@ static void filterCallback(id                        receiver,
         // Convert back to buffer
         AEFloatConverterFromFloat(THIS->_floatConverter, THIS->_scratchBuffer, audio, frames);
     }
+    
+    return noErr;
 }
 
--(AEAudioControllerAudioCallback)filterCallback {
+-(AEAudioControllerFilterCallback)filterCallback {
     return filterCallback;
 }
 

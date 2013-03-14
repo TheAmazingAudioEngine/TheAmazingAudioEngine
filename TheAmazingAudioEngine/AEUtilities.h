@@ -81,6 +81,25 @@ void AEInitAudioBufferList(AudioBufferList *list, int listSize, AudioStreamBasic
  */
 int AEGetNumberOfFramesInAudioBufferList(AudioBufferList *list, AudioStreamBasicDescription audioFormat, int *oNumberOfChannels);
 
+
+/*!
+ * Create an AudioComponentDescription structure
+ *
+ * @param manufacturer  The audio component manufacturer (e.g. kAudioUnitManufacturer_Apple)
+ * @param type          The type (e.g. kAudioUnitType_Generator)
+ * @param subtype       The subtype (e.g. kAudioUnitSubType_AudioFilePlayer)
+ * @returns An AudioComponentDescription structure with the given attributes
+ */
+AudioComponentDescription AEAudioComponentDescriptionMake(OSType manufacturer, OSType type, OSType subtype);
+    
+/*!
+ * Assign a channel count to an AudioStreamBasicDescription
+ *
+ *  This method ensures that the mBytesPerFrame/mBytesPerPacket value is updated
+ *  correctly for interleaved audio.
+ */
+void AEAudioStreamBasicDescriptionSetChannelsPerFrame(AudioStreamBasicDescription *audioDescription, int numberOfChannels);
+
 #ifdef __cplusplus
 }
 #endif

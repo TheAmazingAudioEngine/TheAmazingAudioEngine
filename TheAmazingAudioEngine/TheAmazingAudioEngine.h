@@ -15,5 +15,14 @@
 #import "AEBlockFilter.h"
 #import "AEBlockAudioReceiver.h"
 #import "AEAudioUnitChannel.h"
+#import "AEAudioUnitFilter.h"
 #import "AEFloatConverter.h"
 #import "AEUtilities.h"
+
+/*!
+ @mainpage
+ 
+ @section Introduction
+ 
+ The Amazing Audio Engine...
+ */

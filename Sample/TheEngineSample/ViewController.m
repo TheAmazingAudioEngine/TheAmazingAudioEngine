@@ -41,6 +41,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 @property (nonatomic, retain) AEPlaythroughChannel *playthrough;
 @property (nonatomic, retain) AELimiterFilter *limiter;
 @property (nonatomic, retain) AEExpanderFilter *expander;
+@property (nonatomic, retain) AEAudioUnitFilter *reverb;
 @property (nonatomic, retain) TPOscilloscopeLayer *outputOscilloscope;
 @property (nonatomic, retain) TPOscilloscopeLayer *inputOscilloscope;
 @property (nonatomic, retain) CALayer *inputLevelLayer;
@@ -100,13 +101,9 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     _oscillator.channelIsMuted = YES;
     
     // Create an audio unit channel (a file player)
-    AudioComponentDescription audioUnitDescription;
-    audioUnitDescription.componentType = kAudioUnitType_Generator ;
-    audioUnitDescription.componentSubType = kAudioUnitSubType_AudioFilePlayer;
-    audioUnitDescription.componentManufacturer = kAudioUnitManufacturer_Apple;
-    self.audioUnitPlayer = [AEAudioUnitChannel audioUnitChannelWithComponentDescription:audioUnitDescription
-                                                                        audioController:_audioController
-                                                                                  error:NULL];
+    self.audioUnitPlayer = [[[AEAudioUnitChannel alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Generator, kAudioUnitSubType_AudioFilePlayer)
+                                                                     audioController:_audioController
+                                                                               error:NULL] autorelease];
     
     // Add these four channels
     [_audioController addChannels:[NSArray arrayWithObjects:_loop1, _loop2, _oscillator, _audioUnitPlayer, nil]];
@@ -152,6 +149,11 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     if ( _expander ) {
         [_audioController removeFilter:_expander];
         self.expander = nil;
+    }
+    
+    if ( _reverb ) {
+        [_audioController removeFilter:_reverb];
+        self.reverb = nil;
     }
     
     self.recorder = nil;
@@ -250,7 +252,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
             return 2;
             
         case 2:
-            return 2;
+            return 3;
             
         case 3:
             return 1;
@@ -349,6 +351,12 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
                     cell.textLabel.text = @"Expander";
                     ((UISwitch*)cell.accessoryView).on = _expander != nil;
                     [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(expanderSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                    break;
+                }
+                case 2: {
+                    cell.textLabel.text = @"Reverb";
+                    ((UISwitch*)cell.accessoryView).on = _expander != nil;
+                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(reverbSwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
                 }
             }
@@ -496,6 +504,19 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     } else {
         [_audioController removeFilter:_expander];
         self.expander = nil;
+    }
+}
+
+- (void)reverbSwitchChanged:(UISwitch*)sender {
+    if ( sender.isOn ) {
+        self.reverb = [[[AEAudioUnitFilter alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Effect, kAudioUnitSubType_Reverb2) audioController:_audioController error:NULL] autorelease];
+        
+        AudioUnitSetParameter(_reverb.audioUnit, kAudioUnitScope_Global, 0, kReverb2Param_DryWetMix, 100.f, 0);
+        
+        [_audioController addFilter:_reverb];
+    } else {
+        [_audioController removeFilter:_reverb];
+        self.reverb = nil;
     }
 }
 

@@ -30,17 +30,19 @@
     [super dealloc];
 }
 
-static void filterCallback(id                        filter,
-                           AEAudioController        *audioController,
-                           void                     *source,
-                           const AudioTimeStamp     *time,
-                           UInt32                    frames,
-                           AudioBufferList          *audio) {
+static OSStatus filterCallback(id                        filter,
+                               AEAudioController        *audioController,
+                               AEAudioControllerFilterProducer producer,
+                               void                     *producerToken,
+                               const AudioTimeStamp     *time,
+                               UInt32                    frames,
+                               AudioBufferList          *audio) {
     AEBlockFilter *THIS = (AEBlockFilter*)filter;
-    THIS->_block(source, time, frames, audio);
+    THIS->_block(producer, producerToken, time, frames, audio);
+    return noErr;
 }
 
--(AEAudioControllerAudioCallback)filterCallback {
+-(AEAudioControllerFilterCallback)filterCallback {
     return filterCallback;
 }
 
