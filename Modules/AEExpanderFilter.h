@@ -43,9 +43,8 @@ typedef enum {
  * Initialise
  *
  * @param audioController The Audio Controller
- * @param clientFormat The audio format to use
  */
-- (id)initWithAudioController:(AEAudioController*)audioController clientFormat:(AudioStreamBasicDescription)clientFormat;
+- (id)initWithAudioController:(AEAudioController*)audioController;
 
 
 /*!

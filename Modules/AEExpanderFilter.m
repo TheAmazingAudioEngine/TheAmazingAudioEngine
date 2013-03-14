@@ -65,17 +65,17 @@ typedef void (^AECalibrateCompletionBlock)(void);
     __secondsToHostTicks = 1.0 / __hostTicksToSeconds;
 }
 
-- (id)initWithAudioController:(AEAudioController *)audioController clientFormat:(AudioStreamBasicDescription)clientFormat {
+- (id)initWithAudioController:(AEAudioController *)audioController {
     if ( !(self = [super init]) ) return nil;
     
     self.audioController = audioController;
-    _clientFormat = clientFormat;
+    _clientFormat = audioController.audioDescription;
     
-    self.floatConverter = [[[AEFloatConverter alloc] initWithSourceFormat:clientFormat] autorelease];
+    self.floatConverter = [[[AEFloatConverter alloc] initWithSourceFormat:_clientFormat] autorelease];
     
-    _scratchBuffer = (float**)malloc(sizeof(float**) * clientFormat.mChannelsPerFrame);
+    _scratchBuffer = (float**)malloc(sizeof(float**) * _clientFormat.mChannelsPerFrame);
     assert(_scratchBuffer);
-    for ( int i=0; i<clientFormat.mChannelsPerFrame; i++ ) {
+    for ( int i=0; i<_clientFormat.mChannelsPerFrame; i++ ) {
         _scratchBuffer[i] = malloc(sizeof(float) * kScratchBufferLength);
         assert(_scratchBuffer[i]);
     }

@@ -21,9 +21,8 @@
  * Initialise
  *
  * @param audioController The Audio Controller
- * @param clientFormat The audio format to use
  */
-- (id)initWithAudioController:(AEAudioController*)audioController clientFormat:(AudioStreamBasicDescription)clientFormat;
+- (id)initWithAudioController:(AEAudioController*)audioController;
 
 @property (nonatomic, assign) UInt32 hold;
 @property (nonatomic, assign) UInt32 attack;
@@ -31,5 +30,4 @@
 @property (nonatomic, assign) float level;
 
 @property (nonatomic, assign) AudioStreamBasicDescription clientFormat;
-
 @end

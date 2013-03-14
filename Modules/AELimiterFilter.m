@@ -24,21 +24,21 @@ const int kScratchBufferLength = 8192;
 @implementation AELimiterFilter
 @synthesize floatConverter = _floatConverter, hold = _hold, attack = _attack, decay = _decay, level = _level, limiter = _limiter, clientFormat = _clientFormat, audioController = _audioController;
 
-- (id)initWithAudioController:(AEAudioController *)audioController clientFormat:(AudioStreamBasicDescription)clientFormat {
+- (id)initWithAudioController:(AEAudioController *)audioController {
     if ( !(self = [super init]) ) return nil;
-
+    
     self.audioController = audioController;
-    _clientFormat = clientFormat;
-    self.floatConverter = [[[AEFloatConverter alloc] initWithSourceFormat:clientFormat] autorelease];
-    self.limiter = [[[AELimiter alloc] init] autorelease];
+    _clientFormat = audioController.audioDescription;
+    self.floatConverter = [[[AEFloatConverter alloc] initWithSourceFormat:_clientFormat] autorelease];
+    self.limiter = [[[AELimiter alloc] initWithNumberOfChannels:_clientFormat.mChannelsPerFrame] autorelease];
     _hold = _limiter.hold;
     _attack = _limiter.attack;
     _decay = _limiter.decay;
     _level = _limiter.level;
     
-    _scratchBuffer = (float**)malloc(sizeof(float**) * clientFormat.mChannelsPerFrame);
+    _scratchBuffer = (float**)malloc(sizeof(float**) * _clientFormat.mChannelsPerFrame);
     assert(_scratchBuffer);
-    for ( int i=0; i<clientFormat.mChannelsPerFrame; i++ ) {
+    for ( int i=0; i<_clientFormat.mChannelsPerFrame; i++ ) {
         _scratchBuffer[i] = malloc(sizeof(float) * kScratchBufferLength);
         assert(_scratchBuffer[i]);
     }
@@ -68,16 +68,21 @@ const int kScratchBufferLength = 8192;
         assert(scratchBuffer[i]);
     }
     
+    AELimiter *limiter = [[AELimiter alloc] initWithNumberOfChannels:clientFormat.mChannelsPerFrame];
+    
+    AELimiter *oldLimiter = _limiter;
     AEFloatConverter *oldFloatConverter = _floatConverter;
     float** oldScratchBuffer = _scratchBuffer;
     AudioStreamBasicDescription oldClientFormat = _clientFormat;
     
     [_audioController performSynchronousMessageExchangeWithBlock:^{
+        _limiter = limiter;
         _floatConverter = floatConverter;
         _scratchBuffer = scratchBuffer;
         _clientFormat = clientFormat;
     }];
     
+    [oldLimiter release];
     [oldFloatConverter release];
     for ( int i=0; i<oldClientFormat.mChannelsPerFrame; i++ ) {
         free(oldScratchBuffer[i]);
@@ -119,8 +124,8 @@ static OSStatus filterCallback(id                        filter,
     // Copy buffer into floating point scratch buffer
     AEFloatConverterToFloat(THIS->_floatConverter, audio, THIS->_scratchBuffer, frames);
     
-    AELimiterEnqueue(THIS->_limiter, THIS->_scratchBuffer, THIS->_clientFormat.mChannelsPerFrame, frames, NULL);
-    AELimiterDequeue(THIS->_limiter, THIS->_scratchBuffer, THIS->_clientFormat.mChannelsPerFrame, &frames, NULL);
+    AELimiterEnqueue(THIS->_limiter, THIS->_scratchBuffer, frames, NULL);
+    AELimiterDequeue(THIS->_limiter, THIS->_scratchBuffer, &frames, NULL);
     
     if ( frames > 0 ) {
         // Convert back to buffer

@@ -29,6 +29,13 @@
 @interface AELimiter : NSObject
 
 /*!
+ * Init
+ * 
+ * @param numberOfChannels Number of channels to use
+ */
+- (id)initWithNumberOfChannels:(NSInteger)numberOfChannels;
+
+/*!
  * Enqueue audio
  *
  *  Add audio to be processed.
@@ -37,12 +44,11 @@
  *
  * @param limiter           A pointer to the limiter object.
  * @param buffers           An array of floating-point arrays containing noninterleaved audio to enqueue.
- * @param numberOfBuffers   The number of arrays indicated by the buffers parameter (the number of audio channels).
  * @param length            The length of the audio, in frames
  * @param timestamp         The timestamp of the audio, or NULL
  * @return YES on success, NO on failure.
  */
-BOOL AELimiterEnqueue(AELimiter *limiter, float** buffers, int numberOfBuffers, UInt32 length, const AudioTimeStamp *timestamp);
+BOOL AELimiterEnqueue(AELimiter *limiter, float** buffers, UInt32 length, const AudioTimeStamp *timestamp);
 
 /*!
  * Dequeue audio
@@ -58,11 +64,10 @@ BOOL AELimiterEnqueue(AELimiter *limiter, float** buffers, int numberOfBuffers, 
  *
  * @param limiter           A pointer to the limiter object.
  * @param buffers           An array of floating-point arrays to store the dequeued noninterleaved audio.
- * @param numberOfBuffers   The number of arrays indicated by the buffers parameter (the number of audio channels).
  * @param ioLength          On input, the length of the audio to dequeue, in frames; on output, the amount of audio dequeued.
  * @param timestamp         On output, the timestamp of the next audio, if not NULL.
  */
-void AELimiterDequeue(AELimiter *limiter, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp);
+void AELimiterDequeue(AELimiter *limiter, float** buffers, UInt32 *ioLength, AudioTimeStamp *timestamp);
 
 /*!
  * Query the fill count of the limiter
@@ -86,11 +91,10 @@ UInt32 AELimiterFillCount(AELimiter *limiter, AudioTimeStamp *timestamp, UInt32 
  *
  * @param limiter           A pointer to the limiter object.
  * @param buffers           An array of floating-point arrays to store the dequeued noninterleaved audio.
- * @param numberOfBuffers   The number of arrays indicated by the buffers parameter (the number of audio channels).
  * @param ioLength          On input, the length of the audio to dequeue, in frames; on output, the amount of audio dequeued.
  * @param timestamp         On output, the timestamp of the next audio, if not NULL.
  */
-void AELimiterDrain(AELimiter *limiter, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp);
+void AELimiterDrain(AELimiter *limiter, float** buffers, UInt32 *ioLength, AudioTimeStamp *timestamp);
 
 /*!
  * Reset the buffer, clearing all enqueued audio

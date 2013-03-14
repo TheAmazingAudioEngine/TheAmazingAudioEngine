@@ -12,7 +12,7 @@
 #import "TPCircularBuffer+AudioBufferList.h"
 #import <Accelerate/Accelerate.h>
 
-const int kBufferSize = 176400;
+const int kBufferSize = 88200; /* Bytes per channel */
 const UInt32 kNoValue = INT_MAX;
 
 typedef enum {
@@ -38,7 +38,7 @@ static inline int min(int a, int b) { return a>b ? b : a; }
     float            _triggerValue;
     AudioStreamBasicDescription _audioDescription;
 }
-static void _AELimiterDequeue(AELimiter *THIS, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp);
+static void _AELimiterDequeue(AELimiter *THIS, float** buffers, UInt32 *ioLength, AudioTimeStamp *timestamp);
 static inline void advanceTime(AELimiter *THIS, UInt32 frames);
 static element_t findMaxValueInRange(AELimiter *THIS, AudioBufferList *dequeuedBufferList, int dequeuedBufferListOffset, NSRange range);
 static element_t findNextTriggerValueInRange(AELimiter *THIS, AudioBufferList *dequeuedBufferList, int dequeuedBufferListOffset, NSRange range);
@@ -47,10 +47,10 @@ static element_t findNextTriggerValueInRange(AELimiter *THIS, AudioBufferList *d
 @implementation AELimiter
 @synthesize hold = _hold, attack = _attack, decay = _decay, level = _level;
 
-- (id)init {
+- (id)initWithNumberOfChannels:(NSInteger)numberOfChannels {
     if ( !(self = [super init]) ) return nil;
     
-    TPCircularBufferInit(&_buffer, kBufferSize);
+    TPCircularBufferInit(&_buffer, kBufferSize*numberOfChannels);
     self.hold = 22050;
     self.decay = 44100;
     self.attack = 2048;
@@ -61,7 +61,7 @@ static element_t findNextTriggerValueInRange(AELimiter *THIS, AudioBufferList *d
     
     _audioDescription.mFormatID          = kAudioFormatLinearPCM;
     _audioDescription.mFormatFlags       = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved;
-    _audioDescription.mChannelsPerFrame  = 2;
+    _audioDescription.mChannelsPerFrame  = numberOfChannels;
     _audioDescription.mBytesPerPacket    = sizeof(float);
     _audioDescription.mFramesPerPacket   = 1;
     _audioDescription.mBytesPerFrame     = sizeof(float);
@@ -71,8 +71,8 @@ static element_t findNextTriggerValueInRange(AELimiter *THIS, AudioBufferList *d
     return self;
 }
 
-BOOL AELimiterEnqueue(AELimiter *THIS, float** buffers, int numberOfBuffers, UInt32 length, const AudioTimeStamp *timestamp) {
-    assert(numberOfBuffers <= 2);
+BOOL AELimiterEnqueue(AELimiter *THIS, float** buffers, UInt32 length, const AudioTimeStamp *timestamp) {
+    int numberOfBuffers = THIS->_audioDescription.mChannelsPerFrame;
     
     char audioBufferListBytes[sizeof(AudioBufferList)+(numberOfBuffers-1)*sizeof(AudioBuffer)];
     AudioBufferList *bufferList = (AudioBufferList*)audioBufferListBytes;
@@ -86,17 +86,18 @@ BOOL AELimiterEnqueue(AELimiter *THIS, float** buffers, int numberOfBuffers, UIn
     return TPCircularBufferCopyAudioBufferList(&THIS->_buffer, bufferList, timestamp, kTPCircularBufferCopyAll, NULL);
 }
 
-void AELimiterDequeue(AELimiter *THIS, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
+void AELimiterDequeue(AELimiter *THIS, float** buffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
     *ioLength = min(*ioLength, AELimiterFillCount(THIS, NULL, NULL));
-    _AELimiterDequeue(THIS, buffers, numberOfBuffers, ioLength, timestamp);
+    _AELimiterDequeue(THIS, buffers, ioLength, timestamp);
 }
 
-void AELimiterDrain(AELimiter *THIS, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
-    _AELimiterDequeue(THIS, buffers, numberOfBuffers, ioLength, timestamp);
+void AELimiterDrain(AELimiter *THIS, float** buffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
+    _AELimiterDequeue(THIS, buffers, ioLength, timestamp);
 }
 
-static void _AELimiterDequeue(AELimiter *THIS, float** buffers, int numberOfBuffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
+static void _AELimiterDequeue(AELimiter *THIS, float** buffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
     // Dequeue the audio
+    int numberOfBuffers = THIS->_audioDescription.mChannelsPerFrame;
     char audioBufferListBytes[sizeof(AudioBufferList)+(numberOfBuffers-1)*sizeof(AudioBuffer)];
     AudioBufferList *bufferList = (AudioBufferList*)audioBufferListBytes;
     bufferList->mNumberBuffers = numberOfBuffers;
@@ -158,7 +159,12 @@ static void _AELimiterDequeue(AELimiter *THIS, float** buffers, int numberOfBuff
                     if ( numberOfBuffers == 2 ) {
                         vDSP_vrampmul2(buffers[0]+frameNumber, buffers[1]+frameNumber, 1, &THIS->_gain, &step, buffers[0]+frameNumber, buffers[1]+frameNumber, 1, stateDuration);
                     } else {
-                        vDSP_vrampmul(buffers[0]+frameNumber, 1, &THIS->_gain, &step, buffers[0]+frameNumber, 1, stateDuration);
+                        float gain = THIS->_gain;
+                        for ( int channel=0; channel<numberOfBuffers; channel++ ) {
+                            gain = THIS->_gain;
+                            vDSP_vrampmul(buffers[channel]+frameNumber, 1, &gain, &step, buffers[channel]+frameNumber, 1, stateDuration);
+                        }
+                        THIS->_gain = gain;
                     }
                 } else {
                     THIS->_gain = THIS->_level / THIS->_triggerValue;
@@ -234,7 +240,12 @@ static void _AELimiterDequeue(AELimiter *THIS, float** buffers, int numberOfBuff
                     if ( numberOfBuffers == 2 ) {
                         vDSP_vrampmul2(buffers[0] + frameNumber, buffers[1] + frameNumber, 1, &THIS->_gain, &step, buffers[0] + frameNumber, buffers[1] + frameNumber, 1, stateDuration);
                     } else {
-                        vDSP_vrampmul(buffers[0] + frameNumber, 1, &THIS->_gain, &step, buffers[0] + frameNumber, 1, stateDuration);
+                        float gain = THIS->_gain;
+                        for ( int channel=0; channel<numberOfBuffers; channel++ ) {
+                            gain = THIS->_gain;
+                            vDSP_vrampmul(buffers[channel] + frameNumber, 1, &THIS->_gain, &step, buffers[channel] + frameNumber, 1, stateDuration);
+                        }
+                        THIS->_gain = gain;
                     }
                 } else {
                     THIS->_gain = 1;
