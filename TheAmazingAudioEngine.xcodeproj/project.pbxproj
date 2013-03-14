@@ -38,16 +38,6 @@
 		4CEC0EBA16B5294300D11ED9 /* AEBlockFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CEC0EB816B5294300D11ED9 /* AEBlockFilter.m */; };
 /* End PBXBuildFile section */
 
-/* Begin PBXContainerItemProxy section */
-		4C698D09162B048E008B159D /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 4C698D01162B048E008B159D /* TheEngineSample.xcodeproj */;
-			proxyType = 2;
-			remoteGlobalIDString = 4C0C24851599FADD00D23E13;
-			remoteInfo = TheEngineSample;
-		};
-/* End PBXContainerItemProxy section */
-
 /* Begin PBXFileReference section */
 		4C12CC98151D1EDA00562E2A /* AEUtilities.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEUtilities.h; sourceTree = "<group>"; };
 		4C12CC99151D1EDA00562E2A /* AEUtilities.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = AEUtilities.c; sourceTree = "<group>"; };
@@ -79,7 +69,6 @@
 		4C698CFA162B02EF008B159D /* TPCircularBuffer+AudioBufferList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "TPCircularBuffer+AudioBufferList.h"; sourceTree = "<group>"; };
 		4C698CFB162B02EF008B159D /* TPCircularBuffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = TPCircularBuffer.c; sourceTree = "<group>"; };
 		4C698CFC162B02EF008B159D /* TPCircularBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TPCircularBuffer.h; sourceTree = "<group>"; };
-		4C698D01162B048E008B159D /* TheEngineSample.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = TheEngineSample.xcodeproj; path = Sample/TheEngineSample.xcodeproj; sourceTree = "<group>"; };
 		4C8A0F3D1540BBD300307CB6 /* AEMixerBuffer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AEMixerBuffer.h; path = Modules/AEMixerBuffer.h; sourceTree = "<group>"; };
 		4C8A0F3E1540BBD300307CB6 /* AEMixerBuffer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = AEMixerBuffer.m; path = Modules/AEMixerBuffer.m; sourceTree = "<group>"; };
 		4C8AED0216B3644500958034 /* AEFloatConverter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEFloatConverter.h; sourceTree = "<group>"; };
@@ -144,14 +133,6 @@
 			path = Modules/TPCircularBuffer;
 			sourceTree = "<group>";
 		};
-		4C698D02162B048E008B159D /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				4C698D0A162B048E008B159D /* TheEngineSample.app */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
 		4C8A0F401540BBD700307CB6 /* Modules */ = {
 			isa = PBXGroup;
 			children = (
@@ -180,7 +161,6 @@
 				4C25745E15EFFC4F00D232E8 /* Distribution */,
 				4C215CED1523A7D500D36CAD /* Frameworks */,
 				4CE501901493F82600F23607 /* Products */,
-				4C698D01162B048E008B159D /* TheEngineSample.xcodeproj */,
 			);
 			sourceTree = "<group>";
 		};
@@ -262,7 +242,6 @@
 				4C215CE91523A7D500D36CAD /* Frameworks */,
 				4C215CEA1523A7D500D36CAD /* Headers */,
 				4CA7EE911524662000630345 /* Build Universal Static Library */,
-				4C698CBC162B0018008B159D /* Build Static Library Distribution */,
 			);
 			buildRules = (
 			);
@@ -292,12 +271,6 @@
 			mainGroup = 4CE501811493F82600F23607;
 			productRefGroup = 4CE501901493F82600F23607 /* Products */;
 			projectDirPath = "";
-			projectReferences = (
-				{
-					ProductGroup = 4C698D02162B048E008B159D /* Products */;
-					ProjectRef = 4C698D01162B048E008B159D /* TheEngineSample.xcodeproj */;
-				},
-			);
 			projectRoot = "";
 			targets = (
 				4C215CEB1523A7D500D36CAD /* TheAmazingAudioEngine */,
@@ -305,31 +278,7 @@
 		};
 /* End PBXProject section */
 
-/* Begin PBXReferenceProxy section */
-		4C698D0A162B048E008B159D /* TheEngineSample.app */ = {
-			isa = PBXReferenceProxy;
-			fileType = wrapper.application;
-			path = TheEngineSample.app;
-			remoteRef = 4C698D09162B048E008B159D /* PBXContainerItemProxy */;
-			sourceTree = BUILT_PRODUCTS_DIR;
-		};
-/* End PBXReferenceProxy section */
-
 /* Begin PBXShellScriptBuildPhase section */
-		4C698CBC162B0018008B159D /* Build Static Library Distribution */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-			);
-			name = "Build Static Library Distribution";
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "if [ \"true\" == ${ALREADYINVOKED:-false} ]\nthen\n# This is the other build, called from the original instance\nexit 0\nfi\n\nDISTRIBUTION_DIR=\"${BUILT_PRODUCTS_DIR}/Distribution\"\nDISTRIBUTION_SOURCE_DIR=\"${SRCROOT}/TheAmazingAudioEngine/Distribution\"\nMODULES_SOURCE_DIR=\"${SRCROOT}/Modules\"\nMODULES_TARGET_DIR=\"${DISTRIBUTION_DIR}/Modules\"\nSAMPLES_SOURCE_DIR=\"${SRCROOT}/Sample\"\nSAMPLES_TARGET_DIR=\"${DISTRIBUTION_DIR}/Sample\"\n\nif [ -d \"${DISTRIBUTION_DIR}\" ]\nthen\nrm -rf \"${DISTRIBUTION_DIR}\"\nfi\n\nmkdir -p \"${DISTRIBUTION_DIR}\"\n\ncp -r \"${DISTRIBUTION_SOURCE_DIR}/\"* \"${DISTRIBUTION_DIR}\"\ncp -r \"${BUILT_PRODUCTS_DIR}/${FULL_PRODUCT_NAME}\" \"${BUILT_PRODUCTS_DIR}/${PUBLIC_HEADERS_FOLDER_PATH}\" \"${DISTRIBUTION_DIR}\"\n\nmkdir -p \"${MODULES_TARGET_DIR}\"\ncp -r \"${MODULES_SOURCE_DIR}/\"* \"${MODULES_TARGET_DIR}\"\n\nmkdir -p \"${SAMPLES_TARGET_DIR}\"\ncp -r \"${SAMPLES_SOURCE_DIR}/\"* \"${SAMPLES_TARGET_DIR}\"\n\ncat \"${SRCROOT}/.gitignore\" | xargs -I\"[]\" find \"${DISTRIBUTION_DIR}\" -name \"[]\" | xargs rm -rf\n\nif [ \"${CONFIGURATION}\" = \"Release\" -a \"${FULL_PRODUCT_NAME}\" = \"libTheAmazingAudioEngine.a\" ]\nthen\nopen -a \"Finder\" \"${DISTRIBUTION_DIR}\"\nfi\n";
-		};
 		4CA7EE911524662000630345 /* Build Universal Static Library */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
