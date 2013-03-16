@@ -48,7 +48,6 @@
 		4C23245515AC5FDA00038EC0 /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
 		4C23245615AC5FDA00038EC0 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		4C23245915AC5FE800038EC0 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
-		4C25745E15EFFC4F00D232E8 /* Distribution */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Distribution; path = TheAmazingAudioEngine/Distribution; sourceTree = "<group>"; };
 		4C25747215F0D8E000D232E8 /* TPCircularBuffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = TPCircularBuffer.c; path = Library/TPCircularBuffer/TPCircularBuffer.c; sourceTree = "<group>"; };
 		4C25747315F0D8E100D232E8 /* TPCircularBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TPCircularBuffer.h; path = Library/TPCircularBuffer/TPCircularBuffer.h; sourceTree = "<group>"; };
 		4C2886361556FC620074175A /* AEAudioController+Audiobus.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "AEAudioController+Audiobus.h"; sourceTree = "<group>"; };
@@ -158,7 +157,6 @@
 			children = (
 				4CE501911493F82600F23607 /* TheAmazingAudioEngine */,
 				4C8A0F401540BBD700307CB6 /* Modules */,
-				4C25745E15EFFC4F00D232E8 /* Distribution */,
 				4C215CED1523A7D500D36CAD /* Frameworks */,
 				4CE501901493F82600F23607 /* Products */,
 			);

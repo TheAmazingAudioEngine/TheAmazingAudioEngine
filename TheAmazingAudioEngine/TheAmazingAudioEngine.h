@@ -3,7 +3,26 @@
 //  The Amazing Audio Engine
 //
 //  Created by Michael Tyson on 18/03/2012.
-//  Copyright (c) 2012 A Tasty Pixel. All rights reserved.
+//
+//  Copyright (C) 2012-2013 A Tasty Pixel
+//
+//  This software is provided 'as-is', without any express or implied
+//  warranty.  In no event will the authors be held liable for any damages
+//  arising from the use of this software.
+//
+//  Permission is granted to anyone to use this software for any purpose,
+//  including commercial applications, and to alter it and redistribute it
+//  freely, subject to the following restrictions:
+//
+//  1. The origin of this software must not be misrepresented; you must not
+//     claim that you wrote the original software. If you use this software
+//     in a product, an acknowledgment in the product documentation would be
+//     appreciated but is not required.
+//
+//  2. Altered source versions must be plainly marked as such, and must not be
+//     misrepresented as being the original software.
+//
+//  3. This notice may not be removed or altered from any source distribution.
 //
 
 #import "AEAudioController.h"
@@ -38,13 +57,13 @@
  
  In addition to these basic components, The Amazing Audio Engine includes a number of other features and utilities:
  
+  - Deep integration of [Audiobus](@ref Audiobus), the inter-app audio system for iOS.
   - A channel class for [playing and looping audio files](@ref Audio-Files).
   - An NSOperation class for [loading audio files into memory](@ref Reading-Audio).
   - A class for [writing audio to an audio file](@ref Writing-Audio).
   - [Multi-channel input](@ref Multichannel-Input) hardware support.
   - Utilities for [managing AudioBufferLists](@ref Audio-Buffers), the basic unit of audio.
   - [Timing Receivers](@ref Timing-Receivers), which are used for sequencing and synchronization.
-  - Deep integration of [Audiobus](http://audiob.us), the inter-app audio system for iOS.
   - A class for managing easy conversion to and from [floating-point format](@ref Vector-Processing) for use with the Accelerate vector processing framework.
   - A [lock-free synchronization](@ref Synchronization) system that lets you send messages between your app's main thread, and the
     Core Audio thread, without having to worry about managing access to shared variables in a way that doesn't
@@ -561,16 +580,58 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  
  ----------
  
+ Next, read on to find out how to interact with other audio apps, sending, receiving or filtering audio
+ with [Audiobus](@ref Audiobus).
+ 
+@page Audiobus Audiobus
+ 
+ [Audiobus](http://audiob.us) is an exciting new technology that lets users combine iOS apps into an integrated,
+ modular virtual studio - a bit like virtual audio cables.
+ 
+ Compatible apps build in support for the Audiobus SDK, which allows them to create 'ports' which can either send,
+ receive or process audio.
+ 
+ The Amazing Audio Engine, developed by Michael Tyson, the same developer who created Audiobus, contains a
+ @link AEAudioController(AudiobusAdditions) deep integration @endlink of Audiobus, with support for:
+ 
+ - Receiving Audiobus audio that seamlessly replaces microphone/device audio input.
+ - Sending Audiobus audio from any point in your app: The primary app output, or any channel or channel group.
+ 
+ The Audiobus SDK is not yet publicly available - register to be notified when it is at
+ http://audiob.us/#developers
+ 
+ <!--
+ To integrate Audiobus into your The Amazing Audio Engine-based app, you need to register an account with 
+ the [Audiobus Developer Center](http://developer.audiob.us), download the latest Audiobus SDK and
+ follow the instructions in the [Audiobus Documentation](http://developer.audiob.us/doc)'s
+ [integration guide](http://developer.audiob.us/doc/_integration-_guide.html) to set up
+ your project with the Audiobus SDK.
+
+ Then you can:
+ 
+ - Receive Audiobus audio by creating an Audiobus Input Port and passing it to The Amazing Audio Engine
+   via AEAudioController's [audiobusInputPort](@ref AEAudioController::audiobusInputPort).
+ - Send your app's audio output via Audiobus by creating an Output Port and assigning it to 
+   audiobusOutputPort](@ref AEAudioController::audiobusOutputPort).
+ - Send one individual channel via Audiobus by assigning a new Output Port via
+   @link AEAudioController::setAudiobusOutputPort:forChannel: setAudiobusOutputPort:forChannel: @endlink
+ - Send a channel group via Audiobus by assigning a new Output Port via
+   @link AEAudioController::setAudiobusOutputPort:forChannelGroup: setAudiobusOutputPort:forChannelGroup: @endlink
+ -->
+
+ 
+ -------------
+ 
  We've now covered the basic building blocks of apps using The Amazing Audio Engine, but there's plenty more to know.
  
- Read on to find out about:
+ [Read on](@ref Other-Facilities) to find out about:
  
-  - Reading from audio files.
-  - Writing to audio files.
-  - Managing audio buffers.
-  - Making your app dramatically more efficient by using vector processing operations.
-  - Efficient, safe and simple inter-thread synchronization using The Amazing Audio Engine's messaging system.
-  - How to schedule events with absolute accuracy.
+  - [Reading](@ref Reading-Audio) from audio files.
+  - [Writing](@ref Writing-Audio) to audio files.
+  - [Managing audio buffers](@ref Audio-Buffers).
+  - Making your app dramatically more efficient by using [vector processing operations](@ref Vector-Processing).
+  - Efficient, safe and simple [inter-thread synchronization](@ref Synchronization) using The Amazing Audio Engine's messaging system.
+  - How to [schedule events](@ref Timing-Receivers) with absolute accuracy.
  
 @page Other-Facilities Other Facilities
  
