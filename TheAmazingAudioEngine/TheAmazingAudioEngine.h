@@ -98,9 +98,11 @@
  
  **If you're including source files directly within your ARC-enabled project, please note**: The Amazing Audio Engine does not
  use ARC. Why? Because its origins are pre-ARC, and because much of The Engine is written in C for performance
- reasons so there isn't a great benefit from porting to ARC.
+ reasons so there isn't a great benefit from porting to ARC.  
  This means if you include the source files of The Amazing Audio Engine directly into your ARC-enabled project, you'll
- need to add the `-fno-objc-arc` flag to the build parameters for each source file.
+ need to add the `-fno-objc-arc` flag to the build parameters for each source file, which you can do by opening the
+ "Build Phases" tab of your app target, opening the "Compile Sources" section, and double-clicking in the
+ "Compiler Flags" column of the relevant source files.
  
  @section Meet-AEAudioController Meet AEAudioController
  
@@ -597,10 +599,6 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  - Receiving Audiobus audio that seamlessly replaces microphone/device audio input.
  - Sending Audiobus audio from any point in your app: The primary app output, or any channel or channel group.
  
- The Audiobus SDK is not yet publicly available - register to be notified when it is at
- http://audiob.us/#developers
- 
- <!--
  To integrate Audiobus into your The Amazing Audio Engine-based app, you need to register an account with 
  the [Audiobus Developer Center](http://developer.audiob.us), download the latest Audiobus SDK and
  follow the instructions in the [Audiobus Documentation](http://developer.audiob.us/doc)'s
@@ -617,7 +615,7 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
    @link AEAudioController::setAudiobusOutputPort:forChannel: setAudiobusOutputPort:forChannel: @endlink
  - Send a channel group via Audiobus by assigning a new Output Port via
    @link AEAudioController::setAudiobusOutputPort:forChannelGroup: setAudiobusOutputPort:forChannelGroup: @endlink
- -->
+
 
  
  -------------
