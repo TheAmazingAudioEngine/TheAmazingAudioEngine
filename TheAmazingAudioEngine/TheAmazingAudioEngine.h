@@ -83,7 +83,7 @@
  
  Here's the recommended way to do this:
  
- 1. Clone The Amazing Audio Engine's [git repository](http://github.com/michaeltyson/theamazingaudioengine/)
+ 1. Clone The Amazing Audio Engine's [git repository](https://github.com/TheAmazingAudioEngine/TheAmazingAudioEngine)
     (or just download it) into a folder within your project, such as `Library/The Amazing Audio Engine`.
  2. Drag `TheAmazingAudioEngine.xcodeproj` from that folder into your project's navigation tree in Xcode. It'll
     be added as a sub-project.
@@ -859,7 +859,7 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  
  Fantastic!
  
- You can fork the [GitHub repository](http://github.com/michaeltyson/theamazingaudioengine/), and submit pull requests to
+ You can fork the [GitHub repository](https://github.com/TheAmazingAudioEngine/TheAmazingAudioEngine), and submit pull requests to
  suggest changes.
  
  Alternatively, if you've got a module you'd like to make available, but you'd like to self-host it, let us know on the
