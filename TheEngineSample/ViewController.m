@@ -263,6 +263,8 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 }
 
 -(UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    BOOL isiPad = [[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad;
+    
     static NSString *cellIdentifier = @"cell";
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellIdentifier];
     
@@ -277,8 +279,8 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     switch ( indexPath.section ) {
         case 0: {
             cell.accessoryView = [[[UISwitch alloc] initWithFrame:CGRectZero] autorelease];
-            UISlider *slider = [[[UISlider alloc] initWithFrame:CGRectMake(cell.bounds.size.width - 100, 0, 100, cell.bounds.size.height)] autorelease];
-            slider.autoresizingMask = UIViewAutoresizingFlexibleRightMargin;
+            UISlider *slider = [[[UISlider alloc] initWithFrame:CGRectMake(cell.bounds.size.width - (isiPad ? 250 : 210), 0, 100, cell.bounds.size.height)] autorelease];
+            slider.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
             slider.tag = kAuxiliaryViewTag;
             slider.maximumValue = 1.0;
             slider.minimumValue = 0.0;
