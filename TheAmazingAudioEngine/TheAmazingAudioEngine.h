@@ -36,6 +36,7 @@
 #import "AEAudioUnitChannel.h"
 #import "AEAudioUnitFilter.h"
 #import "AEFloatConverter.h"
+#import "AEBlockScheduler.h"
 #import "AEUtilities.h"
 
 /*!
@@ -855,6 +856,41 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  generated (@link AEAudioTimingContextOutput @endlink). In both cases, the timing receivers will be notified before
  any of the audio receivers or channels are invoked, so that you can set app state that will affect the current time interval.
  
+ @subsection Scheduling Scheduling Events
+ 
+ AEBlockScheduler is a class you can use to schedule blocks for execution at a particular time. This implements the
+ @link AEAudioTimingReceiver @endlink protocol, and provides an interface for scheduling blocks with sample-level
+ accuracy.
+ 
+ To use it, instantiate AEBlockScheduler, add it as a timing receiver with [addTimingReceiver:](@ref AEAudioController::addTimingReceiver:),
+ then begin scheduling events using
+ @link AEBlockScheduler::scheduleBlock:atTime:timingContext:identifier: scheduleBlock:atTime:timingContext:identifier: @endlink:
+ 
+ @code
+ self.scheduler = [[AEBlockScheduler alloc] initWithAudioController:_audioController];
+ [_audioController addTimingReceiver:_scheduler];
+ 
+ ...
+ 
+ [_scheduler scheduleBlock:^(const AudioTimeStamp *time, UInt32 offset) {
+    // We are now on the Core Audio thread at *time*, which is *offset* frames
+    // before the time we scheduled, *timestamp*.
+                           }
+                  atTime:timestamp
+            timingContext:AEAudioTimingContextOutput
+               identifier:@"my event"];
+ @endcode
+ 
+ The block will be passed the current time, and the number of frames offset between the current time
+ and the scheduled time.
+ 
+ The alternate scheduling method, @link AEBlockScheduler::scheduleBlock:atTime:timingContext:identifier:mainThreadResponseBlock: scheduleBlock:atTime:timingContext:identifier:mainThreadResponseBlock: @endlink,
+ allows you to provide a block that will be called on the main thread after the schedule has completed.
+ 
+ There are a number of utilities you can use to construct and calculate timestamps, including
+ [now](@ref AEBlockScheduler::now), [timestampWithSecondsFromNow:](@ref AEBlockScheduler::timestampWithSecondsFromNow:), 
+ [hostTicksFromSeconds:](@ref AEBlockScheduler::hostTicksFromSeconds:) and
+ [secondsFromHostTicks:](@ref AEBlockScheduler::secondsFromHostTicks:).
  
 @page Contributing Contributing
  

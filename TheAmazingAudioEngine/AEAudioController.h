@@ -342,11 +342,13 @@ typedef enum {
  * @param receiver  The receiver object
  * @param audioController The Audio Controller
  * @param time      The time the audio was received (for input), or the time it will be played (for output), automatically compensated for hardware latency.
+ * @param frames    The number of frames for the current block
  * @param context   The timing context - either input, or output
  */
 typedef void (*AEAudioControllerTimingCallback) (id                        receiver,
                                                  AEAudioController        *audioController,
                                                  const AudioTimeStamp     *time,
+                                                 UInt32                    frames,
                                                  AEAudioTimingContext      context);
 
 /*!
