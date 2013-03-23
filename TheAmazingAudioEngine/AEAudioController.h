@@ -1022,7 +1022,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
 /*!
  * Enable audio input from Bluetooth devices
  *
- *  Default is YES.
+ *  Default is NO.
  */
 @property (nonatomic, assign) BOOL enableBluetoothInput;
 

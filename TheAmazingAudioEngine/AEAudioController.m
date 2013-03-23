@@ -1584,11 +1584,9 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
         checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryDefaultToSpeaker, sizeof (toSpeaker), &toSpeaker), "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryDefaultToSpeaker)");
     }
     
-    if ( category == kAudioSessionCategory_PlayAndRecord || category == kAudioSessionCategory_RecordAudio ) {
-        UInt32 allowBluetoothInput = _enableBluetoothInput;
-        OSStatus result = AudioSessionSetProperty (kAudioSessionProperty_OverrideCategoryEnableBluetoothInput, sizeof (allowBluetoothInput), &allowBluetoothInput);
-        checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryEnableBluetoothInput)");
-    }
+    UInt32 allowBluetoothInput = _enableBluetoothInput;
+    OSStatus result = AudioSessionSetProperty (kAudioSessionProperty_OverrideCategoryEnableBluetoothInput, sizeof (allowBluetoothInput), &allowBluetoothInput);
+    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryEnableBluetoothInput)");
     
     if ( category == kAudioSessionCategory_MediaPlayback || category == kAudioSessionCategory_PlayAndRecord ) {
         UInt32 allowMixing = YES;
@@ -1614,12 +1612,10 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 -(void)setEnableBluetoothInput:(BOOL)enableBluetoothInput {
     _enableBluetoothInput = enableBluetoothInput;
 
-    if ( _audioSessionCategory == kAudioSessionCategory_PlayAndRecord || _audioSessionCategory == kAudioSessionCategory_RecordAudio ) {
-        // Enable/disable bluetooth input
-        UInt32 allowBluetoothInput = _enableBluetoothInput;
-        OSStatus result = AudioSessionSetProperty (kAudioSessionProperty_OverrideCategoryEnableBluetoothInput, sizeof (allowBluetoothInput), &allowBluetoothInput);
-        checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryEnableBluetoothInput)");
-    }
+    // Enable/disable bluetooth
+    UInt32 allowBluetoothInput = _enableBluetoothInput;
+    OSStatus result = AudioSessionSetProperty (kAudioSessionProperty_OverrideCategoryEnableBluetoothInput, sizeof (allowBluetoothInput), &allowBluetoothInput);
+    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryEnableBluetoothInput)");
     
     if ( _audioSessionCategory == kAudioSessionCategory_MediaPlayback || _audioSessionCategory == kAudioSessionCategory_PlayAndRecord ) {
         UInt32 allowMixing = YES;
