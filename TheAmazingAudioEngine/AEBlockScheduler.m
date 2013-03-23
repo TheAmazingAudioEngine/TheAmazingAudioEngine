@@ -39,6 +39,7 @@ struct _schedule_t {
 @end
 
 @implementation AEBlockScheduler
+@synthesize scheduledIdentifiers = _scheduledIdentifiers;
 
 +(void)initialize {
     mach_timebase_info_data_t tinfo;
