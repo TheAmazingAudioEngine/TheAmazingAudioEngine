@@ -92,6 +92,9 @@ typedef void (^AEBlockSchedulerResponseBlock)();
  *  scheduled block was actually invoked will be passed to the block as an argument, as well
  *  as the number of frames into the time interval that the block is scheduled.
  *
+ *  Blocks that are to be performed during the same time interval will be performed in the
+ *  order in which they were scheduled.
+ *
  *  VERY IMPORTANT NOTE: This block will be invoked on the Core Audio thread. You must never
  *  call any Objective-C methods, allocate or free memory, or hold locks within this block,
  *  or you will cause audio glitches to occur.
@@ -113,6 +116,9 @@ typedef void (^AEBlockSchedulerResponseBlock)();
  *  The actual time corresponding to the beginning of the time interval in which the
  *  scheduled block was actually invoked will be passed to the block as an argument, as well
  *  as the number of frames into the time interval that the block is scheduled.
+ *
+ *  Blocks that are to be performed during the same time interval will be performed in the
+ *  order in which they were scheduled.
  *
  *  VERY IMPORTANT NOTE: This block will be invoked on the Core Audio thread. You must never
  *  call any Objective-C methods, allocate or free memory, or hold locks within this block,

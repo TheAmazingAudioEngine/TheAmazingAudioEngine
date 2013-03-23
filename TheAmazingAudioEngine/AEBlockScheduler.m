@@ -13,7 +13,7 @@
 static double __hostTicksToSeconds = 0.0;
 static double __secondsToHostTicks = 0.0;
 
-const int kMaximumSchedules = 30;
+const int kMaximumSchedules = 100;
 
 NSString const * AEBlockSchedulerKeyBlock = @"block";
 NSString const * AEBlockSchedulerKeyTimestampInHostTicks = @"time";
@@ -31,6 +31,8 @@ struct _schedule_t {
 
 @interface AEBlockScheduler () {
     struct _schedule_t _schedule[kMaximumSchedules];
+    int _head;
+    int _tail;
 }
 @property (nonatomic, retain) NSMutableArray *scheduledIdentifiers;
 @property (nonatomic, assign) AEAudioController *audioController;
@@ -96,23 +98,22 @@ struct _schedule_t {
 -(void)scheduleBlock:(AEBlockSchedulerBlock)block atTime:(uint64_t)time timingContext:(AEAudioTimingContext)context identifier:(id<NSCopying>)identifier mainThreadResponseBlock:(AEBlockSchedulerResponseBlock)response {
     NSAssert(identifier != nil && block != nil, @"Identifier and block must not be nil");
     
-    struct _schedule_t *schedule = [self scheduleWithIdentifier:nil];
-    if ( !schedule ) {
+    if ( (_head+1)%kMaximumSchedules == _tail ) {
         NSLog(@"Unable to schedule block %@: No space in scheduling table.", identifier);
         return;
     }
     
-    struct _schedule_t scheduleValue;
-    scheduleValue.identifier = [(NSObject*)identifier copy];
-    scheduleValue.block = [block copy];
-    scheduleValue.responseBlock = response ? [response copy] : nil;
-    scheduleValue.time = time;
-    scheduleValue.context = context;
+    struct _schedule_t *schedule = &_schedule[_head];
+    
+    schedule->identifier = [(NSObject*)identifier copy];
+    schedule->block = [block copy];
+    schedule->responseBlock = response ? [response copy] : nil;
+    schedule->time = time;
+    schedule->context = context;
     
     OSMemoryBarrier();
     
-    *schedule = scheduleValue;
-    
+    _head = (_head+1) % kMaximumSchedules;
     [_scheduledIdentifiers addObject:identifier];
 }
 
@@ -127,7 +128,7 @@ struct _schedule_t {
     struct _schedule_t values[kMaximumSchedules];
     int scheduleCount = 0;
     
-    for ( int i=0; i<kMaximumSchedules; i++ ) {
+    for ( int i=_tail; i != _head; i=(i+1)%kMaximumSchedules ) {
         if ( _schedule[i].identifier && [_schedule[i].identifier isEqual:identifier] ) {
             pointers[scheduleCount] = &_schedule[i];
             values[scheduleCount] = _schedule[i];
@@ -141,6 +142,11 @@ struct _schedule_t {
     [_audioController performSynchronousMessageExchangeWithBlock:^{
         for ( int i=0; i<scheduleCount; i++ ) {
             memset(pointers_array[i], 0, sizeof(struct _schedule_t));
+            if ( (pointers_array[i] - _schedule) == _tail ) {
+                while ( !_schedule[_tail].block ) {
+                    _tail = (_tail + 1) % kMaximumSchedules;
+                }
+            }
         }
     }];
 
@@ -169,8 +175,8 @@ struct _schedule_t {
 }
 
 - (struct _schedule_t*)scheduleWithIdentifier:(id<NSCopying>)identifier {
-    for ( int i=0; i<kMaximumSchedules; i++ ) {
-        if ( (identifier && _schedule[i].identifier && [_schedule[i].identifier isEqual:identifier]) || (!identifier && !_schedule[i].identifier) ) {
+    for ( int i=_tail; i != _head; i=(i+1)%kMaximumSchedules ) {
+        if ( (identifier && _schedule[i].identifier && [_schedule[i].identifier isEqual:identifier]) ) {
             return &_schedule[i];
         }
     }
@@ -200,7 +206,7 @@ static void timingReceiver(id                        receiver,
     AEBlockScheduler *THIS = receiver;
     uint64_t endTime = time->mHostTime + AEConvertFramesToSeconds(audioController, frames)*__secondsToHostTicks;
     
-    for ( int i=0; i<kMaximumSchedules; i++ ) {
+    for ( int i=THIS->_tail; i != THIS->_head; i=(i+1)%kMaximumSchedules ) {
         if ( THIS->_schedule[i].block && THIS->_schedule[i].context == context && THIS->_schedule[i].time && endTime >= THIS->_schedule[i].time ) {
             UInt32 offset = THIS->_schedule[i].time > time->mHostTime ? AEConvertSecondsToFrames(audioController, (THIS->_schedule[i].time - time->mHostTime)*__hostTicksToSeconds) : 0;
             THIS->_schedule[i].block(time, offset);
@@ -209,6 +215,11 @@ static void timingReceiver(id                        receiver,
                                                                  &(struct _timingReceiverFinishSchedule_t) { .schedule = THIS->_schedule[i], .THIS = THIS },
                                                                  sizeof(struct _timingReceiverFinishSchedule_t));
             memset(&THIS->_schedule[i], 0, sizeof(struct _schedule_t));
+            if ( i == THIS->_tail ) {
+                while ( !THIS->_schedule[THIS->_tail].block ) {
+                    THIS->_tail = (THIS->_tail + 1) % kMaximumSchedules;
+                }
+            }
         }
     }
 }
