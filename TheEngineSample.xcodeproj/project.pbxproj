@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4C09450A170001660054608E /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 4C094506170001660054608E /* Default-568h@2x.png */; };
+		4C09450B170001660054608E /* Default.png in Resources */ = {isa = PBXBuildFile; fileRef = 4C094507170001660054608E /* Default.png */; };
+		4C09450C170001660054608E /* Default@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 4C094508170001660054608E /* Default@2x.png */; };
+		4C09450D170001660054608E /* Default~ipad.png in Resources */ = {isa = PBXBuildFile; fileRef = 4C094509170001660054608E /* Default~ipad.png */; };
 		4C0C248A1599FADD00D23E13 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C0C24891599FADD00D23E13 /* UIKit.framework */; };
 		4C0C248C1599FADD00D23E13 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C0C248B1599FADD00D23E13 /* Foundation.framework */; };
 		4C0C248E1599FADD00D23E13 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C0C248D1599FADD00D23E13 /* CoreGraphics.framework */; };
@@ -54,6 +58,10 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		4C094506170001660054608E /* Default-568h@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "Default-568h@2x.png"; path = "Resources/Default-568h@2x.png"; sourceTree = "<group>"; };
+		4C094507170001660054608E /* Default.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Default.png; path = Resources/Default.png; sourceTree = "<group>"; };
+		4C094508170001660054608E /* Default@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "Default@2x.png"; path = "Resources/Default@2x.png"; sourceTree = "<group>"; };
+		4C094509170001660054608E /* Default~ipad.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "Default~ipad.png"; path = "Resources/Default~ipad.png"; sourceTree = "<group>"; };
 		4C0C24851599FADD00D23E13 /* TheEngineSample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TheEngineSample.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C0C24891599FADD00D23E13 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		4C0C248B1599FADD00D23E13 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
@@ -163,6 +171,10 @@
 		4C0C24901599FADD00D23E13 /* Supporting Files */ = {
 			isa = PBXGroup;
 			children = (
+				4C094506170001660054608E /* Default-568h@2x.png */,
+				4C094507170001660054608E /* Default.png */,
+				4C094508170001660054608E /* Default@2x.png */,
+				4C094509170001660054608E /* Default~ipad.png */,
 				4C0C24A91599FD5800D23E13 /* Icon-72.png */,
 				4C0C24AA1599FD5800D23E13 /* Icon.png */,
 				4C0C24AB1599FD5800D23E13 /* Icon@2x.png */,
@@ -302,6 +314,10 @@
 				4C0C24B31599FD5800D23E13 /* Southern Rock Drums.m4a in Resources */,
 				4C0C24B41599FD5800D23E13 /* Southern Rock Organ.m4a in Resources */,
 				4C7C680F16F1609800721E60 /* README.markdown in Resources */,
+				4C09450A170001660054608E /* Default-568h@2x.png in Resources */,
+				4C09450B170001660054608E /* Default.png in Resources */,
+				4C09450C170001660054608E /* Default@2x.png in Resources */,
+				4C09450D170001660054608E /* Default~ipad.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
