@@ -25,6 +25,8 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     return YES;
 }
 
+static const int kInputChannelsChangedContext;
+
 
 #define kAuxiliaryViewTag 251
 
@@ -108,10 +110,14 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     // Add these four channels
     [_audioController addChannels:[NSArray arrayWithObjects:_loop1, _loop2, _oscillator, _audioUnitPlayer, nil]];
     
+    [_audioController addObserver:self forKeyPath:@"numberOfInputChannels" options:0 context:(void*)&kInputChannelsChangedContext];
+    
     return self;
 }
 
 -(void)dealloc {
+    [_audioController removeObserver:self forKeyPath:@"numberOfInputChannels"];
+    
     if ( _audioUnitFile ) {
         AudioFileClose(_audioUnitFile);
     }
@@ -255,7 +261,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
             return 3;
             
         case 3:
-            return 1;
+            return 1 + (_audioController.numberOfInputChannels > 1 ? 1 : 0);
             
         default:
             return 0;
@@ -372,6 +378,36 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
                     cell.textLabel.text = @"Input Playthrough";
                     ((UISwitch*)cell.accessoryView).on = _playthrough != nil;
                     [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(playthroughSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                    break;
+                }
+                case 1: {
+                    cell.textLabel.text = @"Channels";
+                    
+                    int channelCount = _audioController.numberOfInputChannels;
+                    CGSize buttonSize = CGSizeMake(30, 30);
+
+                    UIScrollView *channelStrip = [[[UIScrollView alloc] initWithFrame:CGRectMake(0,
+                                                                                                 0,
+                                                                                                 MIN(channelCount * (buttonSize.width+5) + 5,
+                                                                                                     isiPad ? 400 : 200),
+                                                                                                 cell.bounds.size.height)] autorelease];
+                    channelStrip.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth;
+                    channelStrip.backgroundColor = [UIColor clearColor];
+                    
+                    for ( int i=0; i<channelCount; i++ ) {
+                        UIButton *button = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+                        button.frame = CGRectMake(i*(buttonSize.width+5), round((channelStrip.bounds.size.height-buttonSize.height)/2), buttonSize.width, buttonSize.height);
+                        [button setTitle:[NSString stringWithFormat:@"%d", i+1] forState:UIControlStateNormal];
+                        button.highlighted = [_audioController.inputChannelSelection containsObject:[NSNumber numberWithInt:i]];
+                        button.tag = i;
+                        [button addTarget:self action:@selector(channelButtonPressed:) forControlEvents:UIControlEventTouchUpInside];
+                        [channelStrip addSubview:button];
+                    }
+                    
+                    channelStrip.contentSize = CGSizeMake(channelCount * (buttonSize.width+5) + 5, channelStrip.bounds.size.height);
+                    
+                    cell.accessoryView = channelStrip;
+                    
                     break;
                 }
             }
@@ -522,6 +558,24 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     }
 }
 
+- (void)channelButtonPressed:(UIButton*)sender {
+    BOOL selected = [_audioController.inputChannelSelection containsObject:[NSNumber numberWithInt:sender.tag]];
+    selected = !selected;
+    if ( selected ) {
+        _audioController.inputChannelSelection = [[_audioController.inputChannelSelection arrayByAddingObject:[NSNumber numberWithInt:sender.tag]] sortedArrayUsingSelector:@selector(compare:)];
+        [self performSelector:@selector(highlightButtonDelayed:) withObject:sender afterDelay:0.01];
+    } else {
+        NSMutableArray *channels = [_audioController.inputChannelSelection mutableCopy];
+        [channels removeObject:[NSNumber numberWithInt:sender.tag]];
+        _audioController.inputChannelSelection = channels;
+        sender.highlighted = NO;
+    }
+}
+
+- (void)highlightButtonDelayed:(UIButton*)button {
+    button.highlighted = YES;
+}
+
 - (void)record:(id)sender {
     if ( _recorder ) {
         [_recorder finishRecording];
@@ -611,6 +665,12 @@ static inline float translate(float val, float min, float max) {
                                          10);
     
     [CATransaction commit];
+}
+
+-(void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
+    if ( context == &kInputChannelsChangedContext ) {
+        [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:3] withRowAnimation:UITableViewRowAnimationFade];
+    }
 }
 
 @end

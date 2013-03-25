@@ -679,6 +679,16 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(AEAudioController *aud
 - (void)addInputFilter:(id<AEAudioFilter>)filter;
 
 /*!
+ * Add an audio filter to the system input
+ *
+ *  Audio filters are used to process live audio.
+ *
+ * @param filter An object that implements the AEAudioFilter protocol
+ * @param channels An array of NSNumbers identifying by index the input channels to filter, or nil for default (the same as addInputFilter:)
+ */
+- (void)addInputFilter:(id<AEAudioFilter>)filter forChannels:(NSArray*)channels;
+
+/*!
  * Remove a filter from system output
  *
  * @param filter The filter to remove
@@ -823,9 +833,11 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(AEAudioController *aud
  *
  *  Input receivers receive audio that is being received by the microphone or another input device.
  *
- *  Note that the audio format provided to input receivers depends on the value of @link inputMode @endlink.
- *  Check the audio buffer list parameters to determine the kind of audio you are receiving (for example, if
- *  you are using an interleaved format such as @link interleaved16BitStereoAudioDescription @endlink
+ *  Note that the audio format provided to input receivers added via this method depends on the value
+ *  of @link inputMode @endlink. 
+ *
+ *  Check the audio buffer list parameters to determine the kind of audio you are receiving (for example, 
+ *  if you are using an interleaved format such as @link interleaved16BitStereoAudioDescription @endlink
  *  then the audio->mBuffers[0].mNumberOfChannels field will be 1 for mono, and 2 for stereo audio).  If you
  *  are using a non-interleaved format such as @link nonInterleaved16BitStereoAudioDescription @endlink, then
  *  audio->mNumberBuffers will be 1 for mono, and 2 for stereo.
@@ -833,6 +845,28 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(AEAudioController *aud
  * @param receiver An object that implements the AEAudioReceiver protocol
  */
 - (void)addInputReceiver:(id<AEAudioReceiver>)receiver;
+
+/*!
+ * Add an input receiver, specifying a channel selection
+ *
+ *  Input receivers receive audio that is being received by the microphone or another input device.
+ *
+ *  This method allows you to specify which input channels to receive by providing an
+ *  array of NSNumbers with indexes identifying the selected channels.
+ *
+ *  Note that the audio format provided to input receivers added via this method depends on the value
+ *  of @link inputMode @endlink.
+ *
+ *  Check the audio buffer list parameters to determine the kind of audio you are receiving (for example,
+ *  if you are using an interleaved format such as @link interleaved16BitStereoAudioDescription @endlink
+ *  then the audio->mBuffers[0].mNumberOfChannels field will be 1 for mono, and 2 for stereo audio).  If you
+ *  are using a non-interleaved format such as @link nonInterleaved16BitStereoAudioDescription @endlink, then
+ *  audio->mNumberBuffers will be 1 for mono, and 2 for stereo.
+ *
+ * @param receiver An object that implements the AEAudioReceiver protocol
+ * @param channels An array of NSNumbers identifying by index the input channels to receive, or nil for default (the same as addInputReceiver:)
+ */
+- (void)addInputReceiver:(id<AEAudioReceiver>)receiver forChannels:(NSArray*)channels;
 
 /*!
  * Remove an input receiver
@@ -1069,8 +1103,8 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
 /*! 
  * Input mode: How to handle incoming audio
  *
- *  If you are using a stereo audio format, this setting defines how the system
- *  receives incoming audio.
+ *  If you are using an audio format with more than one channel, this setting 
+ *  defines how the system receives incoming audio.
  *
  *  See @link AEInputMode @endlink for a description of the available options.
  *

@@ -62,7 +62,7 @@
   - A channel class for [playing and looping audio files](@ref Audio-Files).
   - An NSOperation class for [loading audio files into memory](@ref Reading-Audio).
   - A class for [writing audio to an audio file](@ref Writing-Audio).
-  - [Multi-channel input](@ref Multichannel-Input) hardware support.
+  - Sophisticated [multi-channel input](@ref Multichannel-Input) hardware support.
   - Utilities for [managing AudioBufferLists](@ref Audio-Buffers), the basic unit of audio.
   - [Timing Receivers](@ref Timing-Receivers), which are used for sequencing and synchronization.
   - A class for managing easy conversion to and from [floating-point format](@ref Vector-Processing) for use with the Accelerate vector processing framework.
@@ -579,12 +579,40 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  
  @code
  _audioController.inputChannelSelection = [NSArray arrayWithObjects:
-                                            [NSNumber numberWithInteger:2],
-                                            [NSNumber numberWithInteger:3,
+                                            [NSNumber numberWithInt:2],
+                                            [NSNumber numberWithInt:3,
                                             nil];
  @endcode
  
- Note that the [numberOfInputChannels](@ref AEAudioController::numberOfInputChannels) property is key-value observable.
+ You can also assign audio input receivers or filters for different selections of channels. For example, you can
+ have one AEAudioReceiver object receiving from the first channel of a stereo input device, and a different
+ object receiving from the second channel.
+ 
+ Use the @link AEAudioController::addInputReceiver:forChannels: addInputReceiver:forChannels: @endlink and
+ @link AEAudioController::addInputFilter:forChannels: addInputFilter:forChannels: @endlink methods to do this:
+ 
+ @code
+ [_audioController addInputReceiver:
+    [ABBlockAudioReceiver audioReceiverWithBlock:^(void                     *source,
+                                                   const AudioTimeStamp     *time,
+                                                   UInt32                    frames,
+                                                   AudioBufferList          *audio) {
+        // Receiving left channel
+    }]
+                        forChannels:[NSArray arrayWithObject:[NSNumber numberWithInt:0]]];
+ 
+ [_audioController addInputReceiver:
+    [ABBlockAudioReceiver audioReceiverWithBlock:^(void                     *source,
+                                                   const AudioTimeStamp     *time,
+                                                   UInt32                    frames,
+                                                   AudioBufferList          *audio) {
+        // Receiving right channel
+    }]
+                        forChannels:[NSArray arrayWithObject:[NSNumber numberWithInt:1]]];
+ @endcode
+ 
+ Note that the [numberOfInputChannels](@ref AEAudioController::numberOfInputChannels) property is key-value observable,
+ so you can use this to be notified when to display appopriate UI, etc.
  
  ----------
  
