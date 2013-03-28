@@ -38,6 +38,8 @@
  */
 - (id)initWithAudioController:(AEAudioController*)audioController;
 
-@property (nonatomic, readonly) float volume;
+@property (nonatomic, assign) float volume;
+@property (nonatomic, assign) float pan;
+@property (nonatomic, assign) BOOL channelIsMuted;
 @property (nonatomic, readonly) AudioStreamBasicDescription audioDescription;
 @end
