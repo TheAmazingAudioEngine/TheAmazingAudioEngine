@@ -928,7 +928,10 @@ static UInt32 _AEMixerBufferPeek(AEMixerBuffer *THIS, AudioTimeStamp *outNextTim
     }
     
     UInt32 frameCount = earliestEndFrames - latestStartFrames;
-    if ( frameCount > minFrameCount ) frameCount = minFrameCount;
+    int frameDiscrepancyThreshold = 2; // Account for small time discrepancies
+    if ( frameCount > (minFrameCount >= frameDiscrepancyThreshold ? minFrameCount - frameDiscrepancyThreshold : minFrameCount) ) {
+        frameCount = minFrameCount;
+    }
     
     dprintf(THIS, 3, "%lu frames available @ %0.5lfs", frameCount, latestStartTimestamp.mHostTime*__hostTicksToSeconds);
     
