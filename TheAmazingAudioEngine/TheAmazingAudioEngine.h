@@ -419,7 +419,12 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  You can then access the audio unit directly via the [audioUnit](@ref AEAudioUnitFilter::audioUnit) property:
  
  @code
- AudioUnitSetParameter(_reverb.audioUnit, kAudioUnitScope_Global, 0, kReverb2Param_DryWetMix, 100.f, 0);
+ AudioUnitSetParameter(_reverb.audioUnit, 
+                       kReverb2Param_DryWetMix, 
+                       kAudioUnitScope_Global,
+                       0,
+                       100.f,
+                       0);
  @endcode
  
  @section Adding-Filters Adding Filters
