@@ -99,6 +99,7 @@ static const int kInputChannelsChangedContext;
             ((SInt16*)audio->mBuffers[1].mData)[i] = x;
         }
     }];
+    _oscillator.audioDescription = [AEAudioController nonInterleaved16BitStereoAudioDescription];
     
     _oscillator.channelIsMuted = YES;
     
@@ -182,13 +183,13 @@ static const int kInputChannelsChangedContext;
     UIView *headerView = [[[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 100)] autorelease];
     headerView.backgroundColor = [UIColor groupTableViewBackgroundColor];
     
-    self.outputOscilloscope = [[[TPOscilloscopeLayer alloc] init] autorelease];
+    self.outputOscilloscope = [[[TPOscilloscopeLayer alloc] initWithAudioController:_audioController] autorelease];
     _outputOscilloscope.frame = CGRectMake(0, 0, headerView.bounds.size.width, 80);
     [headerView.layer addSublayer:_outputOscilloscope];
     [_audioController addOutputReceiver:_outputOscilloscope];
     [_outputOscilloscope start];
     
-    self.inputOscilloscope = [[[TPOscilloscopeLayer alloc] init] autorelease];
+    self.inputOscilloscope = [[[TPOscilloscopeLayer alloc] initWithAudioController:_audioController] autorelease];
     _inputOscilloscope.frame = CGRectMake(0, 0, headerView.bounds.size.width, 80);
     _inputOscilloscope.lineColor = [UIColor colorWithWhite:0.0 alpha:0.3];
     [headerView.layer addSublayer:_inputOscilloscope];

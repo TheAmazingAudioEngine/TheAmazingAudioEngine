@@ -13,6 +13,11 @@
 @interface TPOscilloscopeLayer : CALayer <AEAudioReceiver>
 
 /*!
+ * Initialize
+ */
+- (id)initWithAudioController:(AEAudioController*)audioController;
+
+/*!
  * Begin rendering
  *
  * Registers with the audio controller to start receiving
