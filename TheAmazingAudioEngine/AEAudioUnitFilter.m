@@ -138,15 +138,21 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     UInt32 maxFPS = 4096;
     AudioUnitSetProperty(_audioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFPS, sizeof(maxFPS));
     
+    
+    checkResult(AUGraphUpdate(_audioGraph, NULL), "AUGraphUpdate");
+    
+    checkResult(AudioUnitInitialize(_audioUnit), "AudioUnitInitialize");
+    
     if ( _inConverterUnit ) {
+        checkResult(AudioUnitInitialize(_inConverterUnit), "AudioUnitInitialize");
         AudioUnitSetProperty(_inConverterUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFPS, sizeof(maxFPS));
     }
     
     if ( _outConverterUnit ) {
+        checkResult(AudioUnitInitialize(_outConverterUnit), "AudioUnitInitialize");
         AudioUnitSetProperty(_outConverterUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFPS, sizeof(maxFPS));
     }
     
-    checkResult(AUGraphUpdate(_audioGraph, NULL), "AUGraphUpdate");
     
     return self;
 }
