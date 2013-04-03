@@ -33,6 +33,7 @@ static const int kInputChannelsChangedContext;
 
 @interface ViewController () {
     AudioFileID _audioUnitFile;
+    AEChannelGroupRef _group;
 }
 @property (nonatomic, retain) AEAudioController *audioController;
 @property (nonatomic, retain) AEAudioFilePlayer *loop1;
@@ -108,8 +109,12 @@ static const int kInputChannelsChangedContext;
                                                                      audioController:_audioController
                                                                                error:NULL] autorelease];
     
-    // Add these four channels
-    [_audioController addChannels:[NSArray arrayWithObjects:_loop1, _loop2, _oscillator, _audioUnitPlayer, nil]];
+    // Create a group for loop1, loop2 and oscillator
+    _group = [_audioController createChannelGroup];
+    [_audioController addChannels:[NSArray arrayWithObjects:_loop1, _loop2, _oscillator, nil] toChannelGroup:_group];
+    
+    // Finally, add the audio unit player
+    [_audioController addChannels:[NSArray arrayWithObjects:_audioUnitPlayer, nil]];
     
     [_audioController addObserver:self forKeyPath:@"numberOfInputChannels" options:0 context:(void*)&kInputChannelsChangedContext];
     
@@ -186,7 +191,7 @@ static const int kInputChannelsChangedContext;
     self.outputOscilloscope = [[[TPOscilloscopeLayer alloc] initWithAudioController:_audioController] autorelease];
     _outputOscilloscope.frame = CGRectMake(0, 0, headerView.bounds.size.width, 80);
     [headerView.layer addSublayer:_outputOscilloscope];
-    [_audioController addOutputReceiver:_outputOscilloscope];
+    [_audioController addOutputReceiver:_outputOscilloscope forChannelGroup:_group];
     [_outputOscilloscope start];
     
     self.inputOscilloscope = [[[TPOscilloscopeLayer alloc] initWithAudioController:_audioController] autorelease];
@@ -253,7 +258,7 @@ static const int kInputChannelsChangedContext;
 -(NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     switch ( section ) {
         case 0:
-            return 3;
+            return 4;
             
         case 1:
             return 2;
@@ -316,6 +321,14 @@ static const int kInputChannelsChangedContext;
                     slider.value = _oscillator.volume;
                     [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(oscillatorSwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     [slider addTarget:self action:@selector(oscillatorVolumeChanged:) forControlEvents:UIControlEventValueChanged];
+                    break;
+                }
+                case 3: {
+                    cell.textLabel.text = @"Group";
+                    ((UISwitch*)cell.accessoryView).on = ![_audioController channelGroupIsMuted:_group];
+                    slider.value = [_audioController volumeForChannelGroup:_group];
+                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(channelGroupSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                    [slider addTarget:self action:@selector(channelGroupVolumeChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
                 }
             }
@@ -442,6 +455,14 @@ static const int kInputChannelsChangedContext;
 
 - (void)oscillatorVolumeChanged:(UISlider*)sender {
     _oscillator.volume = sender.value;
+}
+
+- (void)channelGroupSwitchChanged:(UISwitch*)sender {
+    [_audioController setMuted:!sender.isOn forChannelGroup:_group];
+}
+
+- (void)channelGroupVolumeChanged:(UISlider*)sender {
+    [_audioController setVolume:sender.value forChannelGroup:_group];
 }
 
 - (void)oneshotPlayButtonPressed:(UIButton*)sender {
