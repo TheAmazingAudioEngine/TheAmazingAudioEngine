@@ -440,7 +440,7 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
         AEChannelGroupRef group = (AEChannelGroupRef)channel->ptr;
         
         // Tell mixer/mixer's converter unit to render into audio
-        OSStatus status = AudioUnitRender(group->converterUnit ? group->converterUnit : group->mixerAudioUnit, arg->ioActionFlags, &arg->inTimeStamp, 0, *frames, audio);
+        status = AudioUnitRender(group->converterUnit ? group->converterUnit : group->mixerAudioUnit, arg->ioActionFlags, &arg->inTimeStamp, 0, *frames, audio);
         if ( !checkResult(status, "AudioUnitRender") ) return status;
         
         if ( group->level_monitor_data.monitoringEnabled ) {
@@ -2559,7 +2559,6 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
             checkResult(result, "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)");
             
             if ( memcmp(&currentAudioDescription, &rawAudioDescription, sizeof(AudioStreamBasicDescription)) != 0 ) {
-                printf("assiginng %d\n", (unsigned int)rawAudioDescription.mChannelsPerFrame);
                 result = AudioUnitSetProperty(_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &rawAudioDescription, sizeof(AudioStreamBasicDescription));
                 checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
             }
