@@ -37,9 +37,16 @@
  * @var AEAudioControllerSessionInterruptionEndedNotification
  *  Notification that the audio session interrupted has ended, and control
  *  has been passed back to the application.
+ *
+ * @var AEAudioControllerDidRecreateGraphNotification
+ *  Notification that AEAudioController has shut down and re-initialized
+ *  the audio graph. This can happen in response to some unexpected system 
+ *  errors. Objects that use the graph directly (such as creating audio units)
+ *  should re-initialise the audio units.
  */
 extern NSString * AEAudioControllerSessionInterruptionBeganNotification;
 extern NSString * AEAudioControllerSessionInterruptionEndedNotification;
+extern NSString * AEAudioControllerDidRecreateGraphNotification;
 
 /*!
  * @enum AEInputMode

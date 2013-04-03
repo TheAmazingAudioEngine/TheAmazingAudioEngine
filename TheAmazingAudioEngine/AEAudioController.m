@@ -57,6 +57,7 @@ const NSTimeInterval kMaxBufferDurationWithVPIO = 0.01;
 
 NSString * AEAudioControllerSessionInterruptionBeganNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionBeganNotification";
 NSString * AEAudioControllerSessionInterruptionEndedNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionEndedNotification";
+NSString * AEAudioControllerDidRecreateGraphNotification = @"com.theamazingaudioengine.AEAudioControllerDidRecreateGraphNotification";
 
 const NSString *kAEAudioControllerCallbackKey = @"callback";
 const NSString *kAEAudioControllerUserInfoKey = @"userinfo";
@@ -3046,6 +3047,7 @@ static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef g
         checkResult(AudioSessionSetActive(true), "AudioSessionSetActive");
         
         if ( [self setup] ) {
+            [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerDidRecreateGraphNotification object:self];
             NSLog(@"TAAE: Successfully recovered from system error");
             _hasSystemError = NO;
             [self start:NULL];
