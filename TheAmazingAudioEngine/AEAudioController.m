@@ -157,7 +157,7 @@ typedef struct __audio_level_monitor_t {
     Float32             peak;
     Float32             average;
     AEFloatConverter   *floatConverter;
-    float             **scratchBuffer;
+    AudioBufferList    *scratchBuffer;
     int                 channels;
     BOOL                reset;
 } audio_level_monitor_t;
@@ -847,10 +847,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     TPCircularBufferCleanup(&_mainThreadMessageBuffer);
     
     if ( _inputLevelMonitorData.scratchBuffer ) {
-        for ( int i=0; i<_inputLevelMonitorData.channels; i++ ) {
-            free(_inputLevelMonitorData.scratchBuffer[i]);
-        }
-        free(_inputLevelMonitorData.scratchBuffer);
+        AEFreeAudioBufferList(_inputLevelMonitorData.scratchBuffer);
     }
     
     if ( _inputLevelMonitorData.floatConverter ) {
@@ -1560,11 +1557,8 @@ static BOOL AEAudioControllerHasPendingMainThreadMessages(AEAudioController *THI
             dispatch_async(dispatch_get_main_queue(), ^{ [self averagePowerLevel:NULL peakHoldLevel:NULL forGroup:group]; });
         } else {
             group->level_monitor_data.channels = group->channel->audioDescription.mChannelsPerFrame;
-            group->level_monitor_data.scratchBuffer = malloc(sizeof(float*) * group->level_monitor_data.channels);
-            for ( int i=0; i<group->level_monitor_data.channels; i++ ) {
-                group->level_monitor_data.scratchBuffer[i] = malloc(kLevelMonitorScratchBufferSize * sizeof(float));
-            }
             group->level_monitor_data.floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:group->channel->audioDescription];
+            group->level_monitor_data.scratchBuffer = AEAllocateAndInitAudioBufferList(group->channel->audioDescription, kLevelMonitorScratchBufferSize);
             OSMemoryBarrier();
             group->level_monitor_data.monitoringEnabled = YES;
             
@@ -1588,11 +1582,8 @@ static BOOL AEAudioControllerHasPendingMainThreadMessages(AEAudioController *THI
 - (void)inputAveragePowerLevel:(Float32*)averagePower peakHoldLevel:(Float32*)peakLevel {
     if ( !_inputLevelMonitorData.monitoringEnabled ) {
         _inputLevelMonitorData.channels = _rawInputAudioDescription.mChannelsPerFrame;
-        _inputLevelMonitorData.scratchBuffer = malloc(sizeof(float*) * _inputLevelMonitorData.channels);
-        for ( int i=0; i<_inputLevelMonitorData.channels; i++ ) {
-            _inputLevelMonitorData.scratchBuffer[i] = malloc(kLevelMonitorScratchBufferSize * sizeof(float));
-        }
         _inputLevelMonitorData.floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:_rawInputAudioDescription];
+        _inputLevelMonitorData.scratchBuffer = AEAllocateAndInitAudioBufferList(_rawInputAudioDescription, kLevelMonitorScratchBufferSize);
         OSMemoryBarrier();
         _inputLevelMonitorData.monitoringEnabled = YES;
     }
@@ -2445,11 +2436,8 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
                 
                 if ( inputLevelMonitorData.monitoringEnabled && memcmp(&_rawInputAudioDescription, &rawAudioDescription, sizeof(_rawInputAudioDescription)) != 0 ) {
                     inputLevelMonitorData.channels = rawAudioDescription.mChannelsPerFrame;
-                    inputLevelMonitorData.scratchBuffer = malloc(sizeof(float*) * inputLevelMonitorData.channels);
-                    for ( int i=0; i<inputLevelMonitorData.channels; i++ ) {
-                        inputLevelMonitorData.scratchBuffer[i] = malloc(kLevelMonitorScratchBufferSize * sizeof(float));
-                    }
                     inputLevelMonitorData.floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:rawAudioDescription];
+                    inputLevelMonitorData.scratchBuffer = AEAllocateAndInitAudioBufferList(rawAudioDescription, kLevelMonitorScratchBufferSize);
                 }
             }
             
@@ -2604,10 +2592,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
         [oldInputLevelMonitorData.floatConverter release];
     }
     if ( oldInputLevelMonitorData.scratchBuffer != inputLevelMonitorData.scratchBuffer ) {
-        for ( int i=0; i<oldInputLevelMonitorData.channels; i++ ) {
-            free(oldInputLevelMonitorData.scratchBuffer[i]);
-        }
-        free(oldInputLevelMonitorData.scratchBuffer);
+        AEFreeAudioBufferList(oldInputLevelMonitorData.scratchBuffer);
     }
     
     if ( inputChannelsChanged ) {
@@ -3009,10 +2994,7 @@ static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef g
     group->converterNode = 0;
     group->converterUnit = NULL;
     if ( group->level_monitor_data.scratchBuffer ) {
-        for ( int i=0; i<group->level_monitor_data.channels; i++ ) {
-            free(group->level_monitor_data.scratchBuffer[i]);
-        }
-        free(group->level_monitor_data.scratchBuffer);
+        AEFreeAudioBufferList(group->level_monitor_data.scratchBuffer);
     }
     if ( group->level_monitor_data.floatConverter ) {
         [group->level_monitor_data.floatConverter release];
@@ -3276,15 +3258,14 @@ static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferLi
     }
     
     UInt32 monitorFrames = min(numberFrames, kLevelMonitorScratchBufferSize);
-    
-    AEFloatConverterToFloat(monitor->floatConverter, buffer, monitor->scratchBuffer, monitorFrames);
-    
-    for ( int i=0; i<buffer->mNumberBuffers; i++ ) {
+    AEFloatConverterToFloatBufferList(monitor->floatConverter, buffer, monitor->scratchBuffer, monitorFrames);
+
+    for ( int i=0; i<monitor->scratchBuffer->mNumberBuffers; i++ ) {
         float peak = 0.0;
-        vDSP_maxmgv(monitor->scratchBuffer[i], 1, &peak, monitorFrames);
+        vDSP_maxmgv((float*)monitor->scratchBuffer->mBuffers[i].mData, 1, &peak, monitorFrames);
         if ( peak > monitor->peak ) monitor->peak = peak;
         float avg = 0.0;
-        vDSP_meamgv(monitor->scratchBuffer[i], 1, &avg, monitorFrames);
+        vDSP_meamgv((float*)monitor->scratchBuffer->mBuffers[i].mData, 1, &avg, monitorFrames);
         monitor->meanAccumulator += avg;
         monitor->meanBlockCount++;
         monitor->average = monitor->meanAccumulator / monitor->meanBlockCount;
