@@ -129,6 +129,7 @@ BOOL AEFloatConverterToFloat(AEFloatConverter* THIS, AudioBufferList *sourceBuff
     if ( frames == 0 ) return YES;
     
     if ( THIS->_toFloatConverter ) {
+        UInt32 priorDataByteSize = sourceBuffer->mBuffers[0].mDataByteSize;
         for ( int i=0; i<sourceBuffer->mNumberBuffers; i++ ) {
             sourceBuffer->mBuffers[i].mDataByteSize = frames * THIS->_sourceAudioDescription.mBytesPerFrame;
         }
@@ -164,6 +165,10 @@ BOOL AEFloatConverterToFloat(AEFloatConverter* THIS, AudioBufferList *sourceBuff
                                                           &frames,
                                                           THIS->_scratchFloatBufferList,
                                                           NULL);
+        
+        for ( int i=0; i<sourceBuffer->mNumberBuffers; i++ ) {
+            sourceBuffer->mBuffers[i].mDataByteSize = priorDataByteSize;
+        }
         
         if ( !checkResult(result, "AudioConverterConvertComplexBuffer") ) {
             return NO;
