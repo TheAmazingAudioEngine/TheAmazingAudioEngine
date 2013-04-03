@@ -108,4 +108,9 @@ BOOL AEFloatConverterFromFloatBufferList(AEFloatConverter* converter, AudioBuffe
  */
 @property (nonatomic, readonly) AudioStreamBasicDescription floatingPointAudioDescription;
 
+/*!
+ * The source audio format set at initialization
+ */
+@property (nonatomic, readonly) AudioStreamBasicDescription sourceFormat;
+
 @end

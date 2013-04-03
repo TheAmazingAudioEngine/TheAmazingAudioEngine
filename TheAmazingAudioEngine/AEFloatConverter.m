@@ -60,6 +60,7 @@ static OSStatus complexInputDataProc(AudioConverterRef             inAudioConver
 @end
 
 @implementation AEFloatConverter
+@synthesize sourceFormat = _sourceAudioDescription;
 
 -(id)initWithSourceFormat:(AudioStreamBasicDescription)sourceFormat {
     if ( !(self = [super init]) ) return nil;
