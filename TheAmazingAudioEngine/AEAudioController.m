@@ -1143,6 +1143,10 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
 }
 
+-(float)volumeForChannelGroup:(AEChannelGroupRef)group {
+    return group->channel->volume;
+}
+
 - (void)setPan:(float)pan forChannelGroup:(AEChannelGroupRef)group {
     int index;
     AEChannelGroupRef parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
@@ -1155,14 +1159,22 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)");
 }
 
+-(float)panForChannelGroup:(AEChannelGroupRef)group {
+    return group->channel->pan;
+}
+
 - (void)setMuted:(BOOL)muted forChannelGroup:(AEChannelGroupRef)group {
     int index;
     AEChannelGroupRef parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
     NSAssert(parentGroup != NULL, @"Channel not found");
-    
-    AudioUnitParameterValue value = group->channel->muted = muted;
+    group->channel->muted = muted;
+    AudioUnitParameterValue value = !muted && group->channel->playing;
     OSStatus result = AudioUnitSetParameter(parentGroup->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
     checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
+}
+
+-(BOOL)channelGroupIsMuted:(AEChannelGroupRef)group {
+    return group->channel->muted;
 }
 
 #pragma mark - Filters

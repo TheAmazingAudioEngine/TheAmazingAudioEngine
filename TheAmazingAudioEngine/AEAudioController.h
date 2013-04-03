@@ -616,6 +616,14 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(AEAudioController *aud
 - (void)setVolume:(float)volume forChannelGroup:(AEChannelGroupRef)group;
 
 /*!
+ * Get the volume level of a channel group
+ *
+ * @param group     Group identifier
+ * @return Group volume (0 - 1)
+ */
+- (float)volumeForChannelGroup:(AEChannelGroupRef)group;
+
+/*!
  * Set the pan of a channel group
  *
  * @param pan       Group pan (-1.0, left to 1.0, right)
@@ -624,12 +632,28 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(AEAudioController *aud
 - (void)setPan:(float)pan forChannelGroup:(AEChannelGroupRef)group;
 
 /*!
+ * Get the pan of a channel group
+ *
+ * @param group     Group identifier
+ * @return Group pan (-1.0, left to 1.0, right)
+ */
+- (float)panForChannelGroup:(AEChannelGroupRef)group;
+
+/*!
  * Set the mute status of a channel group
  *
  * @param muted     Whether group is muted
  * @param group     Group identifier
  */
 - (void)setMuted:(BOOL)muted forChannelGroup:(AEChannelGroupRef)group;
+
+/*!
+ * Get the mute status of a channel group
+ *
+ * @param group     Group identifier
+ * @return Whether group is muted
+ */
+- (BOOL)channelGroupIsMuted:(AEChannelGroupRef)group;
 
 ///@}
 #pragma mark - Filters
