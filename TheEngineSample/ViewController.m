@@ -191,7 +191,7 @@ static const int kInputChannelsChangedContext;
     self.outputOscilloscope = [[[TPOscilloscopeLayer alloc] initWithAudioController:_audioController] autorelease];
     _outputOscilloscope.frame = CGRectMake(0, 0, headerView.bounds.size.width, 80);
     [headerView.layer addSublayer:_outputOscilloscope];
-    [_audioController addOutputReceiver:_outputOscilloscope forChannelGroup:_group];
+    [_audioController addOutputReceiver:_outputOscilloscope];
     [_outputOscilloscope start];
     
     self.inputOscilloscope = [[[TPOscilloscopeLayer alloc] initWithAudioController:_audioController] autorelease];

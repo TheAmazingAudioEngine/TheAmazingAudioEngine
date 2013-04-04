@@ -1566,7 +1566,7 @@ static BOOL AEAudioControllerHasPendingMainThreadMessages(AEAudioController *THI
         } else {
             group->level_monitor_data.channels = group->channel->audioDescription.mChannelsPerFrame;
             group->level_monitor_data.floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:group->channel->audioDescription];
-            group->level_monitor_data.scratchBuffer = AEAllocateAndInitAudioBufferList(group->channel->audioDescription, kLevelMonitorScratchBufferSize);
+            group->level_monitor_data.scratchBuffer = AEAllocateAndInitAudioBufferList(group->level_monitor_data.floatConverter.floatingPointAudioDescription, kLevelMonitorScratchBufferSize);
             OSMemoryBarrier();
             group->level_monitor_data.monitoringEnabled = YES;
             
@@ -1592,7 +1592,7 @@ static BOOL AEAudioControllerHasPendingMainThreadMessages(AEAudioController *THI
     if ( !_inputLevelMonitorData.monitoringEnabled ) {
         _inputLevelMonitorData.channels = _rawInputAudioDescription.mChannelsPerFrame;
         _inputLevelMonitorData.floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:_rawInputAudioDescription];
-        _inputLevelMonitorData.scratchBuffer = AEAllocateAndInitAudioBufferList(_rawInputAudioDescription, kLevelMonitorScratchBufferSize);
+        _inputLevelMonitorData.scratchBuffer = AEAllocateAndInitAudioBufferList(_inputLevelMonitorData.floatConverter.floatingPointAudioDescription, kLevelMonitorScratchBufferSize);
         OSMemoryBarrier();
         _inputLevelMonitorData.monitoringEnabled = YES;
     }
@@ -2444,7 +2444,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
                 if ( inputLevelMonitorData.monitoringEnabled && memcmp(&_rawInputAudioDescription, &rawAudioDescription, sizeof(_rawInputAudioDescription)) != 0 ) {
                     inputLevelMonitorData.channels = rawAudioDescription.mChannelsPerFrame;
                     inputLevelMonitorData.floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:rawAudioDescription];
-                    inputLevelMonitorData.scratchBuffer = AEAllocateAndInitAudioBufferList(rawAudioDescription, kLevelMonitorScratchBufferSize);
+                    inputLevelMonitorData.scratchBuffer = AEAllocateAndInitAudioBufferList(_inputLevelMonitorData.floatConverter.floatingPointAudioDescription, kLevelMonitorScratchBufferSize);
                 }
             }
             
@@ -2713,14 +2713,20 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
             checkResult(AudioUnitGetProperty(subgroup->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &currentMixerOutputDescription, &size), "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)");
             
             // Determine what the output format should be (use TAAE's audio description if client code will see the audio)
-            AudioStreamBasicDescription mixerOutputDescription = (hasFilters || hasReceivers) && !subgroup->converterNode ? _audioDescription : currentMixerOutputDescription;
+            AudioStreamBasicDescription mixerOutputDescription = !subgroup->converterNode ? _audioDescription : currentMixerOutputDescription;
             mixerOutputDescription.mSampleRate = _audioDescription.mSampleRate;
             
             if ( memcmp(&currentMixerOutputDescription, &mixerOutputDescription, sizeof(mixerOutputDescription)) != 0 ) {
                 // Assign the output format if necessary
                 OSStatus result = AudioUnitSetProperty(subgroup->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &mixerOutputDescription, sizeof(mixerOutputDescription));
                 
-                if ( !subgroup->converterNode && (hasReceivers || hasFilters) && result == kAudioUnitErr_FormatNotSupported ) {
+                if ( hasUpstreamInteraction ) {
+                    // Disconnect node to force reconnection, in order to apply new audio format
+                    checkResult(AUGraphDisconnectNodeInput(_audioGraph, targetNode, targetBus), "AUGraphDisconnectNodeInput");
+                    hasUpstreamInteraction = NO;
+                }
+                
+                if ( !subgroup->converterNode && result == kAudioUnitErr_FormatNotSupported ) {
                     // The mixer only supports a subset of formats. If it doesn't support this one, then we'll add an audio converter
                     currentMixerOutputDescription.mSampleRate = mixerOutputDescription.mSampleRate;
                     AEAudioStreamBasicDescriptionSetChannelsPerFrame(&currentMixerOutputDescription, mixerOutputDescription.mChannelsPerFrame);
@@ -2744,11 +2750,6 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
                             channel->setRenderNotification = NO;
                         }
                         
-                        if ( hasUpstreamInteraction ) {
-                            checkResult(AUGraphDisconnectNodeInput(_audioGraph, targetNode, targetBus), "AUGraphDisconnectNodeInput");
-                            hasUpstreamInteraction = NO;
-                        }
-                        
                         checkResult(AUGraphConnectNodeInput(_audioGraph, subgroup->mixerNode, 0, subgroup->converterNode, 0), "AUGraphConnectNodeInput");
                     }
                 } else {
@@ -2762,7 +2763,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
                 checkResult(AudioUnitSetProperty(subgroup->converterUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &_audioDescription, sizeof(AudioStreamBasicDescription)), "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
                 channel->audioDescription = _audioDescription;
             } else {
-                channel->audioDescription = currentMixerOutputDescription;
+                channel->audioDescription = mixerOutputDescription;
             }
             
             if ( channel->audiobusFloatConverter ) {
@@ -2869,7 +2870,6 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
                             "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
             }
         }
-        
     }
 }
 

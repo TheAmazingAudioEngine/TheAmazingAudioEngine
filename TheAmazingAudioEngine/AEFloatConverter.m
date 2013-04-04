@@ -74,7 +74,7 @@ static OSStatus complexInputDataProc(AudioConverterRef             inAudioConver
     _floatAudioDescription.mBitsPerChannel    = 8 * sizeof(float);
     _floatAudioDescription.mSampleRate        = sourceFormat.mSampleRate;
     
-    memcpy(&_sourceAudioDescription, &sourceFormat, sizeof(AudioStreamBasicDescription));
+    _sourceAudioDescription = sourceFormat;
     
     if ( memcmp(&sourceFormat, &_floatAudioDescription, sizeof(AudioStreamBasicDescription)) != 0 ) {
         checkResult(AudioConverterNew(&sourceFormat, &_floatAudioDescription, &_toFloatConverter), "AudioConverterNew");
