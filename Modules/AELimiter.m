@@ -167,8 +167,9 @@ static void _AELimiterDequeue(AELimiter *THIS, float** buffers, UInt32 *ioLength
                 
                 // Continue attack up to next trigger value
                 stateDuration = min(THIS->_framesToNextTrigger, stateDuration);
-                
-                assert(stateDuration >= 0 && stateDuration <= *ioLength-frameNumber);
+#ifdef DEBUG
+                assert(stateDuration >= 0);
+#endif
                 
                 if ( stateDuration > 0 ) {
                     // Apply ramp
@@ -220,7 +221,9 @@ static void _AELimiterDequeue(AELimiter *THIS, float** buffers, UInt32 *ioLength
                 }
                 
                 stateDuration = min(*ioLength-frameNumber, stateDuration);
-                assert(stateDuration >= 0 && stateDuration <= *ioLength-frameNumber);
+#ifdef DEBUG
+                assert(stateDuration >= 0);
+#endif
                 
                 // Apply gain
                 for ( int i=0; i<numberOfBuffers; i++ ) {
@@ -249,7 +252,9 @@ static void _AELimiterDequeue(AELimiter *THIS, float** buffers, UInt32 *ioLength
                     }
                 }
                 
-                assert(stateDuration >= 0 && stateDuration <= *ioLength-frameNumber);
+#ifdef DEBUG
+                assert(stateDuration >= 0);
+#endif
                 
                 if ( stateDuration > 0 ) {
                     // Apply ramp
