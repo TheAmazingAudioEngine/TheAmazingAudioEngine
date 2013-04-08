@@ -2444,7 +2444,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
                 if ( inputLevelMonitorData.monitoringEnabled && memcmp(&_rawInputAudioDescription, &rawAudioDescription, sizeof(_rawInputAudioDescription)) != 0 ) {
                     inputLevelMonitorData.channels = rawAudioDescription.mChannelsPerFrame;
                     inputLevelMonitorData.floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:rawAudioDescription];
-                    inputLevelMonitorData.scratchBuffer = AEAllocateAndInitAudioBufferList(_inputLevelMonitorData.floatConverter.floatingPointAudioDescription, kLevelMonitorScratchBufferSize);
+                    inputLevelMonitorData.scratchBuffer = AEAllocateAndInitAudioBufferList(inputLevelMonitorData.floatConverter.floatingPointAudioDescription, kLevelMonitorScratchBufferSize);
                 }
             }
             
