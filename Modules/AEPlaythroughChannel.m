@@ -26,6 +26,7 @@
 #import "AEPlaythroughChannel.h"
 #import "TPCircularBuffer.h"
 #import "TPCircularBuffer+AudioBufferList.h"
+#import "AEAudioController+AudiobusStub.h"
 
 static const int kAudioBufferLength = 16384;
 
@@ -48,13 +49,14 @@ static const int kAudioBufferLength = 16384;
     TPCircularBufferInit(&_buffer, kAudioBufferLength);
     self.audioController = audioController;
     _volume = 1.0;
-    _bufferMaxLatencyInFrames = AEConvertSecondsToFrames(audioController, audioController.preferredBufferDuration);
+    _bufferMaxLatencyInFrames = 2 * AEConvertSecondsToFrames(audioController, audioController.preferredBufferDuration);
     return self;
 }
 
 - (void)dealloc {
     TPCircularBufferCleanup(&_buffer);
     self.audioController = nil;
+    self.inputPort = nil;
     [super dealloc];
 }
 
@@ -66,7 +68,11 @@ static void inputCallback(id                        receiver,
                           AudioBufferList          *audio) {
     AEPlaythroughChannel *THIS = receiver;
     
-    TPCircularBufferCopyAudioBufferList(&THIS->_buffer, audio, time, kTPCircularBufferCopyAll, NULL);
+    if ( THIS->_inputPort && ABInputPortIsConnected(THIS->_inputPort) ) {
+        // We'll dequeue from the input port when we render
+    } else {
+        TPCircularBufferCopyAudioBufferList(&THIS->_buffer, audio, time, kTPCircularBufferCopyAll, NULL);
+    }
 }
 
 -(AEAudioControllerAudioCallback)receiverCallback {
@@ -80,13 +86,34 @@ static OSStatus renderCallback(id                        channel,
                                AudioBufferList          *audio) {
     AEPlaythroughChannel *THIS = channel;
     
-    UInt32 fillCount = TPCircularBufferPeek(&THIS->_buffer, NULL, AEAudioControllerAudioDescription(audioController));
-    if ( fillCount >= frames+THIS->_bufferMaxLatencyInFrames ) {
-        UInt32 skip = fillCount - frames;
-        TPCircularBufferDequeueBufferListFrames(&THIS->_buffer, &skip, NULL, NULL, AEAudioControllerAudioDescription(audioController));
+    if ( THIS->_inputPort && ABInputPortIsConnected(THIS->_inputPort) ) {
+        ABInputPortReceiveLive(THIS->_inputPort, audio, frames, NULL);
+    } else {
+        while ( 1 ) {
+            // Discard any buffers with an incompatible format, in the event of a format change
+            AudioBufferList *nextBuffer = TPCircularBufferNextBufferList(&THIS->_buffer, NULL);
+            if ( !nextBuffer ) break;
+            if ( nextBuffer->mNumberBuffers == audio->mNumberBuffers ) break;
+            TPCircularBufferConsumeNextBufferList(&THIS->_buffer);
+        }
+        
+        UInt32 fillCount = TPCircularBufferPeek(&THIS->_buffer, NULL, AEAudioControllerAudioDescription(audioController));
+        if ( fillCount >= frames+THIS->_bufferMaxLatencyInFrames ) {
+            UInt32 skip = fillCount - frames;
+            TPCircularBufferDequeueBufferListFrames(&THIS->_buffer,
+                                                    &skip,
+                                                    NULL,
+                                                    NULL,
+                                                    AEAudioControllerAudioDescription(audioController));
+        }
+        
+        TPCircularBufferDequeueBufferListFrames(&THIS->_buffer,
+                                                &frames,
+                                                audio,
+                                                NULL,
+                                                AEAudioControllerAudioDescription(audioController));
     }
     
-    TPCircularBufferDequeueBufferListFrames(&THIS->_buffer, &frames, audio, NULL, AEAudioControllerAudioDescription(audioController));
     return noErr;
 }
 

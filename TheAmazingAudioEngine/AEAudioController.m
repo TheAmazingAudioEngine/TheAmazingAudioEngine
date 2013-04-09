@@ -2044,7 +2044,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     if ( achievedSampleRate != sampleRate ) {
         NSLog(@"Warning: Delivered sample rate is %f", achievedSampleRate);
         _audioDescription.mSampleRate = achievedSampleRate;
-        [extraInfo appendFormat:@", sample rate %0.2g", achievedSampleRate];
+        [extraInfo appendFormat:@", sample rate %f", achievedSampleRate];
     }
     
     UInt32 inputAvailable = NO;

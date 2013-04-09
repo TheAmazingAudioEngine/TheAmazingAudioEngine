@@ -30,6 +30,10 @@ __attribute__((weak)) void ABInputPortReceive(ABInputPort *inputPort, ABPort *so
     printf("ABInputPortReceive stub called\n");
 }
 
+__attribute__((weak)) void ABInputPortReceiveLive(ABInputPort *inputPort, AudioBufferList *bufferList, UInt32 lengthInFrames, AudioTimeStamp *outTimestamp) {
+    printf("ABInputPortReceiveLive stub called\n");   
+}
+
 __attribute__((weak)) UInt32 ABInputPortPeek(ABInputPort *inputPort, AudioTimeStamp *outNextTimestamp) {
     printf("ABInputPortPeek stub called\n");
     return 0;

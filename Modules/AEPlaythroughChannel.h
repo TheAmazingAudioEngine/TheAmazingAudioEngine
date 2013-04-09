@@ -42,4 +42,5 @@
 @property (nonatomic, assign) float pan;
 @property (nonatomic, assign) BOOL channelIsMuted;
 @property (nonatomic, readonly) AudioStreamBasicDescription audioDescription;
+@property (nonatomic, retain) ABInputPort *inputPort;
 @end
