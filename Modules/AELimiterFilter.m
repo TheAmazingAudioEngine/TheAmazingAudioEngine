@@ -47,7 +47,7 @@ const int kScratchBufferLength = 8192;
     self.audioController = audioController;
     _clientFormat = audioController.audioDescription;
     self.floatConverter = [[[AEFloatConverter alloc] initWithSourceFormat:_clientFormat] autorelease];
-    self.limiter = [[[AELimiter alloc] initWithNumberOfChannels:_clientFormat.mChannelsPerFrame] autorelease];
+    self.limiter = [[[AELimiter alloc] initWithNumberOfChannels:_clientFormat.mChannelsPerFrame sampleRate:_clientFormat.mSampleRate] autorelease];
     _hold = _limiter.hold;
     _attack = _limiter.attack;
     _decay = _limiter.decay;
@@ -85,7 +85,7 @@ const int kScratchBufferLength = 8192;
         assert(scratchBuffer[i]);
     }
     
-    AELimiter *limiter = [[AELimiter alloc] initWithNumberOfChannels:clientFormat.mChannelsPerFrame];
+    AELimiter *limiter = [[AELimiter alloc] initWithNumberOfChannels:clientFormat.mChannelsPerFrame sampleRate:clientFormat.mSampleRate];
     
     AELimiter *oldLimiter = _limiter;
     AEFloatConverter *oldFloatConverter = _floatConverter;

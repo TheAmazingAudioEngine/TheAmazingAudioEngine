@@ -49,8 +49,9 @@
  * Init
  * 
  * @param numberOfChannels Number of channels to use
+ * @param sampleRate Sample rate to use
  */
-- (id)initWithNumberOfChannels:(NSInteger)numberOfChannels;
+- (id)initWithNumberOfChannels:(NSInteger)numberOfChannels sampleRate:(Float32)sampleRate;
 
 /*!
  * Enqueue audio

@@ -64,7 +64,7 @@ static element_t findNextTriggerValueInRange(AELimiter *THIS, AudioBufferList *d
 @implementation AELimiter
 @synthesize hold = _hold, attack = _attack, decay = _decay, level = _level;
 
-- (id)initWithNumberOfChannels:(NSInteger)numberOfChannels {
+- (id)initWithNumberOfChannels:(NSInteger)numberOfChannels sampleRate:(Float32)sampleRate {
     if ( !(self = [super init]) ) return nil;
     
     TPCircularBufferInit(&_buffer, kBufferSize*numberOfChannels);
@@ -83,7 +83,7 @@ static element_t findNextTriggerValueInRange(AELimiter *THIS, AudioBufferList *d
     _audioDescription.mFramesPerPacket   = 1;
     _audioDescription.mBytesPerFrame     = sizeof(float);
     _audioDescription.mBitsPerChannel    = 8 * sizeof(float);
-    _audioDescription.mSampleRate        = 44100.0;
+    _audioDescription.mSampleRate        = sampleRate;
 
     return self;
 }
