@@ -76,7 +76,7 @@ typedef struct {
 } action_t;
 
 static const int kMaxSources                                = 10;
-static const NSTimeInterval kResyncTimestampThreshold       = 0.001;
+static const NSTimeInterval kResyncTimestampThreshold       = 0.002;
 static const NSTimeInterval kSourceTimestampIdleThreshold   = 1.0;
 static const UInt32 kConversionBufferLength                 = 16384;
 static const UInt32 kScratchBufferBytesPerChannel           = 16384;
@@ -928,7 +928,7 @@ static UInt32 _AEMixerBufferPeek(AEMixerBuffer *THIS, AudioTimeStamp *outNextTim
     }
     
     UInt32 frameCount = earliestEndFrames - latestStartFrames;
-    int frameDiscrepancyThreshold = 2; // Account for small time discrepancies
+    int frameDiscrepancyThreshold = kResyncTimestampThreshold * THIS->_clientFormat.mSampleRate; // Account for small time discrepancies
     if ( frameCount > (minFrameCount >= frameDiscrepancyThreshold ? minFrameCount - frameDiscrepancyThreshold : minFrameCount) ) {
         frameCount = minFrameCount;
     }
