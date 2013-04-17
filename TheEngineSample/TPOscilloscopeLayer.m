@@ -28,7 +28,7 @@
 static void audioCallback(id THIS, AEAudioController *audioController, void *source, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio);
 
 @implementation TPOscilloscopeLayer
-@synthesize lineColor=_lineColor;
+@synthesize lineColor=_lineColor, floatConverter=_floatConverter;
 
 - (id)initWithAudioController:(AEAudioController*)audioController {
     if ( !(self = [super init]) ) return nil;
