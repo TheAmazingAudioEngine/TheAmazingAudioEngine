@@ -145,6 +145,10 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     return _audioUnit;
 }
 
+-(AUNode)audioGraphNode {
+    return _node;
+}
+
 static OSStatus renderCallback(id                        channel,
                                AEAudioController        *audioController,
                                const AudioTimeStamp     *time,

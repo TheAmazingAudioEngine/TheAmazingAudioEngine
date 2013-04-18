@@ -82,4 +82,9 @@
  */
 @property (nonatomic, readonly) AudioUnit audioUnit;
 
+/*!
+ * The audio graph node
+ */
+@property (nonatomic, readonly) AUNode audioGraphNode;
+
 @end

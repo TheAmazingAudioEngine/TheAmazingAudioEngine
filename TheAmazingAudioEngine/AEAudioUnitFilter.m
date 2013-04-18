@@ -189,6 +189,10 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     return _audioUnit;
 }
 
+-(AUNode)audioGraphNode {
+    return _node;
+}
+
 static OSStatus filterCallback(id                        filter,
                                AEAudioController        *audioController,
                                AEAudioControllerFilterProducer producer,
