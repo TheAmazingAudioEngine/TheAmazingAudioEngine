@@ -2036,17 +2036,6 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareSampleRate, sizeof(sampleRate), &sampleRate);
     checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareSampleRate)");
     
-    // Fetch sample rate, in case we didn't get quite what we requested
-    Float64 achievedSampleRate;
-    UInt32 size = sizeof(achievedSampleRate);
-    result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareSampleRate, &size, &achievedSampleRate);
-    checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareSampleRate)");
-    if ( achievedSampleRate != sampleRate ) {
-        NSLog(@"Warning: Delivered sample rate is %f", achievedSampleRate);
-        _audioDescription.mSampleRate = achievedSampleRate;
-        [extraInfo appendFormat:@", sample rate %f", achievedSampleRate];
-    }
-    
     UInt32 inputAvailable = NO;
     if ( _inputEnabled ) {
         // See if input's available
@@ -2063,6 +2052,17 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     // Start session
     checkResult(AudioSessionSetActive(true), "AudioSessionSetActive");
     
+    // Fetch sample rate, in case we didn't get quite what we requested
+    Float64 achievedSampleRate;
+    UInt32 size = sizeof(achievedSampleRate);
+    result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareSampleRate, &size, &achievedSampleRate);
+    checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareSampleRate)");
+    if ( achievedSampleRate != sampleRate ) {
+        NSLog(@"Warning: Delivered sample rate is %f", achievedSampleRate);
+        _audioDescription.mSampleRate = achievedSampleRate;
+        [extraInfo appendFormat:@", sample rate %f", achievedSampleRate];
+    }
+
     // Determine audio route
     CFStringRef route;
     size = sizeof(route);
