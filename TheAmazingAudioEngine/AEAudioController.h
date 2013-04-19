@@ -1075,6 +1075,19 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  */
 @property (nonatomic, assign) UInt32 audioSessionCategory;
 
+/*!
+ * Whether to allow mixing audio with other apps
+ *
+ *  When this is YES, your app's audio will be mixed with the output of other applications.
+ *  If NO, then any other apps playing audio will be stopped when the audio engine is started.
+ *  
+ *  Note: If you are using remote controls with `UIApplication`'s `beginReceivingRemoteControlEvents`,
+ *  setting this to YES will stop the remote controls working. This is an iOS limitation.
+ *
+ *  Default: YES
+ */
+@property (nonatomic, assign) BOOL allowMixingWithOtherApps;
+
 /*! 
  * Mute output
  *
