@@ -2067,9 +2067,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareSampleRate, &size, &achievedSampleRate);
     checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareSampleRate)");
     if ( achievedSampleRate != sampleRate ) {
-        NSLog(@"Warning: Delivered sample rate is %f", achievedSampleRate);
-        _audioDescription.mSampleRate = achievedSampleRate;
-        [extraInfo appendFormat:@", sample rate %f", achievedSampleRate];
+        NSLog(@"Hardware sample rate is %f", achievedSampleRate);
     }
 
     // Determine audio route
