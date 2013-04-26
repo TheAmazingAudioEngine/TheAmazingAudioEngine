@@ -436,9 +436,9 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
         AEAudioControllerRenderCallback callback = (AEAudioControllerRenderCallback) channel->ptr;
         id<AEAudioPlayable> channelObj = (id<AEAudioPlayable>) channel->object;
         
-        for ( int i=0; i<audio->mNumberBuffers; i++ ) {
-            memset(audio->mBuffers[i].mData, 0, audio->mBuffers[i].mDataByteSize);
-        }
+//        for ( int i=0; i<audio->mNumberBuffers; i++ ) {
+//            memset(audio->mBuffers[i].mData, 0, audio->mBuffers[i].mDataByteSize);
+//        }
         
         status = callback(channelObj, channel->audioController, &channel->timeStamp, *frames, audio);
         channel->timeStamp.mSampleTime += *frames;
