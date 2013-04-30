@@ -300,9 +300,9 @@ static void serveAudiobusInputQueue(AEAudioController *THIS);
 #pragma mark - Audio session callbacks
 
 static void interruptionListener(void *inClientData, UInt32 inInterruption) {
-	AEAudioController *THIS = (AEAudioController *)inClientData;
+    AEAudioController *THIS = (AEAudioController *)inClientData;
     
-	if (inInterruption == kAudioSessionEndInterruption) {
+    if (inInterruption == kAudioSessionEndInterruption) {
         NSLog(@"TAAE: Audio session interruption ended");
         THIS->_interrupted = NO;
         
@@ -316,7 +316,7 @@ static void interruptionListener(void *inClientData, UInt32 inInterruption) {
         }
         
         [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionEndedNotification object:THIS];
-	} else if (inInterruption == kAudioSessionBeginInterruption) {
+    } else if (inInterruption == kAudioSessionBeginInterruption) {
         NSLog(@"TAAE: Audio session interrupted");
         THIS->_runningPriorToInterruption = THIS->_running;
         
@@ -2101,9 +2101,9 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
 
 - (BOOL)setup {
     // Create a new AUGraph
-	OSStatus result = NewAUGraph(&_audioGraph);
+    OSStatus result = NewAUGraph(&_audioGraph);
     if ( !checkResult(result, "NewAUGraph") ) return NO;
-	
+    
     BOOL useVoiceProcessing = [self usingVPIO];
     
     // Input/output unit description
@@ -2116,12 +2116,12 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     };
     
     // Create a node in the graph that is an AudioUnit, using the supplied AudioComponentDescription to find and open that unit
-	result = AUGraphAddNode(_audioGraph, &io_desc, &_ioNode);
-	if ( !checkResult(result, "AUGraphAddNode io") ) return NO;
+    result = AUGraphAddNode(_audioGraph, &io_desc, &_ioNode);
+    if ( !checkResult(result, "AUGraphAddNode io") ) return NO;
     
     // Open the graph - AudioUnits are open but not initialized (no resource allocation occurs here)
-	result = AUGraphOpen(_audioGraph);
-	if ( !checkResult(result, "AUGraphOpen") ) return NO;
+    result = AUGraphOpen(_audioGraph);
+    if ( !checkResult(result, "AUGraphOpen") ) return NO;
     
     // Get reference to IO audio unit
     result = AUGraphNodeInfo(_audioGraph, _ioNode, NULL, &_ioAudioUnit);
@@ -2159,7 +2159,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     checkResult(AudioUnitAddRenderNotify(_topGroup->mixerAudioUnit, &topRenderNotifyCallback, self), "AudioUnitAddRenderNotify");
     
     // Initialize the graph
-	result = AUGraphInitialize(_audioGraph);
+    result = AUGraphInitialize(_audioGraph);
     if ( !checkResult(result, "AUGraphInitialize") ) {
         self.lastError = [NSError audioControllerErrorWithMessage:@"Couldn't create audio graph" OSStatus:result];
         _hasSystemError = YES;
