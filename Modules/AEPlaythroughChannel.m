@@ -49,7 +49,7 @@ static const int kAudioBufferLength = 16384;
     TPCircularBufferInit(&_buffer, kAudioBufferLength);
     self.audioController = audioController;
     _volume = 1.0;
-    _bufferMaxLatencyInFrames = 2 * AEConvertSecondsToFrames(audioController, audioController.preferredBufferDuration);
+    _bufferMaxLatencyInFrames = 0;
     return self;
 }
 
