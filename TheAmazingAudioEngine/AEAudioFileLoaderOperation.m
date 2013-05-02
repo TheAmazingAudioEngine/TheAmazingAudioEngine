@@ -36,6 +36,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 }
 
 static const int kIncrementalLoadBufferSize = 4096;
+static const int kMaxAudioFileReadSize = 16384;
 
 @interface AEAudioFileLoaderOperation ()
 @property (nonatomic, retain) NSURL *url;
@@ -206,7 +207,7 @@ static const int kIncrementalLoadBufferSize = 4096;
             for ( int i=0; i<scratchBufferList->mNumberBuffers; i++ ) {
                 scratchBufferList->mBuffers[i].mNumberChannels = channelsPerBuffer;
                 scratchBufferList->mBuffers[i].mData = (char*)bufferList->mBuffers[i].mData + readFrames*_targetAudioDescription.mBytesPerFrame;
-                scratchBufferList->mBuffers[i].mDataByteSize = MIN(16384, (fileLengthInFrames-readFrames) * _targetAudioDescription.mBytesPerFrame);
+                scratchBufferList->mBuffers[i].mDataByteSize = MIN(kMaxAudioFileReadSize, (fileLengthInFrames-readFrames) * _targetAudioDescription.mBytesPerFrame);
             }
         }
         

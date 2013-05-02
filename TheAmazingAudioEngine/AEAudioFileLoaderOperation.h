@@ -77,7 +77,6 @@
  *
  * @param url URL to the file to load
  * @param audioDescription The target audio description
- * @param completionBlock The block to invoke upon completion or error
  */
 - (id)initWithFileURL:(NSURL*)url targetAudioDescription:(AudioStreamBasicDescription)audioDescription;
 
