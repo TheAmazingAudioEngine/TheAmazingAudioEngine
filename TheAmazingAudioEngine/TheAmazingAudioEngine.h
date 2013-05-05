@@ -392,7 +392,7 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  
  @section Audio-Unit-Filters Audio Unit Filters
  
- The AEAudioUnitChannel class allows you to use audio units to apply effects to audio.
+ The AEAudioUnitFilter class allows you to use audio units to apply effects to audio.
  
  To use it, call @link AEAudioUnitFilter::initWithComponentDescription:audioController:error: initWithComponentDescription:audioController:error: @endlink,
  passing in an `AudioComponentDescription` structure (you can use the utility function @link AEAudioComponentDescriptionMake @endlink for this),
@@ -419,8 +419,8 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  You can then access the audio unit directly via the [audioUnit](@ref AEAudioUnitFilter::audioUnit) property:
  
  @code
- AudioUnitSetParameter(_reverb.audioUnit, 
-                       kReverb2Param_DryWetMix, 
+ AudioUnitSetParameter(_reverb.audioUnit,
+                       kReverb2Param_DryWetMix,
                        kAudioUnitScope_Global,
                        0,
                        100.f,
