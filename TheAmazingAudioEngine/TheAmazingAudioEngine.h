@@ -248,7 +248,7 @@
  
  To use it, call @link AEAudioUnitChannel::initWithComponentDescription:audioController:error: initWithComponentDescription:audioController:error: @endlink,
  passing in an `AudioComponentDescription` structure (you can use the utility function @link AEAudioComponentDescriptionMake @endlink for this),
- along with a reference to the ABAudioController instance, and optionally, a pointer to an NSError to be filled if the audio unit
+ along with a reference to the AEAudioController instance, and optionally, a pointer to an NSError to be filled if the audio unit
  creation failed.
  
  @code
@@ -396,7 +396,7 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  
  To use it, call @link AEAudioUnitFilter::initWithComponentDescription:audioController:error: initWithComponentDescription:audioController:error: @endlink,
  passing in an `AudioComponentDescription` structure (you can use the utility function @link AEAudioComponentDescriptionMake @endlink for this),
- along with a reference to the ABAudioController instance, and optionally, a pointer to an NSError to be filled if the audio unit
+ along with a reference to the AEAudioController instance, and optionally, a pointer to an NSError to be filled if the audio unit
  creation failed.
  
  @code
