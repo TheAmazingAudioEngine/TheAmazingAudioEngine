@@ -54,6 +54,7 @@ const int kInputAudioBufferFrames               = 4096;
 const int kLevelMonitorScratchBufferSize        = 4096;
 const int kAudiobusSourceFlag                   = 1<<12;
 const NSTimeInterval kMaxBufferDurationWithVPIO = 0.01;
+#define kNoAudioErr                            -2222
 
 NSString * AEAudioControllerSessionInterruptionBeganNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionBeganNotification";
 NSString * AEAudioControllerSessionInterruptionEndedNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionEndedNotification";
@@ -596,10 +597,11 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
         }
     }
     
+    if ( inNumberFrames == 0 ) return kNoAudioErr;
+    
     OSStatus result = noErr;
     
     for ( int tableIndex = 0; tableIndex < THIS->_inputCallbackCount; tableIndex++ ) {
-        // Run through each set of channels for which there're receivers
         input_callback_table_t *table = &THIS->_inputCallbacks[tableIndex];
         
         if ( !table->audioBufferList ) continue;
@@ -3297,7 +3299,8 @@ static void serveAudiobusInputQueue(AEAudioController *THIS) {
         timestamp.mSampleTime = __sampleTime;
         __sampleTime += frames;
         
-        inputAvailableCallback(THIS, &flags, &timestamp, 0, frames, NULL);
+        OSStatus result = inputAvailableCallback(THIS, &flags, &timestamp, 0, frames, NULL);
+        if ( result == kNoAudioErr ) break;
     }
 }
 
