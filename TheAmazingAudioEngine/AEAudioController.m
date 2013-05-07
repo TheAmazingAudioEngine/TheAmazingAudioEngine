@@ -2554,7 +2554,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     int oldInputCallbackCount = _inputCallbackCount;
     audio_level_monitor_t oldInputLevelMonitorData = _inputLevelMonitorData;
     
-    if ( _audiobusInputPort ) {
+    if ( _audiobusInputPort && usingAudiobus ) {
         AudioStreamBasicDescription clientFormat = [_audiobusInputPort clientFormat];
         if ( memcmp(&clientFormat, &rawAudioDescription, sizeof(AudioStreamBasicDescription)) != 0 ) {
             [_audiobusInputPort setClientFormat:rawAudioDescription];
@@ -2585,6 +2585,13 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
         _usingAudiobusInput       = usingAudiobus;
         _inputLevelMonitorData    = inputLevelMonitorData;
     }];
+    
+    if ( _audiobusInputPort && !usingAudiobus ) {
+        AudioStreamBasicDescription clientFormat = [_audiobusInputPort clientFormat];
+        if ( memcmp(&clientFormat, &rawAudioDescription, sizeof(AudioStreamBasicDescription)) != 0 ) {
+            [_audiobusInputPort setClientFormat:rawAudioDescription];
+        }
+    }
     
     if ( oldInputBuffer && oldInputBuffer != inputAudioBufferList ) {
         AEFreeAudioBufferList(oldInputBuffer);
