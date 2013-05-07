@@ -1759,6 +1759,8 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 }
 
 -(void)setInputChannelSelection:(NSArray *)inputChannelSelection {
+    if ( (!inputChannelSelection && !_inputCallbacks[0].channelMap) || [inputChannelSelection isEqualToArray:_inputCallbacks[0].channelMap] ) return;
+    
     [inputChannelSelection retain];
     [_inputCallbacks[0].channelMap release];
     _inputCallbacks[0].channelMap = inputChannelSelection;
