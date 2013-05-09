@@ -158,7 +158,7 @@ static const int kMaxAudioFileReadSize = 16384;
             channelMap[outChannel] = inChannel;
             if ( inChannel+1 < fileAudioDescription.mChannelsPerFrame ) inChannel++;
         }
-        checkResult(AudioConverterSetProperty(converter, kAudioConverterChannelMap, sizeof(SInt32)*_targetAudioDescription.mChannelsPerFrame, &channelMap),
+        checkResult(AudioConverterSetProperty(converter, kAudioConverterChannelMap, sizeof(SInt32)*_targetAudioDescription.mChannelsPerFrame, channelMap),
                     "AudioConverterSetProperty(kAudioConverterChannelMap)");
         CFArrayRef config = NULL;
         checkResult(ExtAudioFileSetProperty(audioFile, kExtAudioFileProperty_ConverterConfig, sizeof(CFArrayRef), &config),
