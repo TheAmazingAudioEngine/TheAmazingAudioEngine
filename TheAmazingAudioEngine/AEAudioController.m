@@ -803,7 +803,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         _audioGraph = NULL;
     }
     
-    self.housekeepingTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(housekeeping) userInfo:nil repeats:YES];
+    self.housekeepingTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:[[[AEAudioControllerProxy alloc] initWithAudioController:self] autorelease] selector:@selector(housekeeping) userInfo:nil repeats:YES];
     
     return self;
 }
