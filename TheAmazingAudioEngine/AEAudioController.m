@@ -1026,15 +1026,22 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     AEChannelRef removedChannels[count];
     memset(removedChannels, 0, sizeof(removedChannels));
     AEChannelRef *removedChannels_p = removedChannels;
+    int priorCount = group->channelCount;
     [self performSynchronousMessageExchangeWithBlock:^{
         removeChannelsFromGroup(self, group, ptrMatchArray, objectMatchArray, removedChannels_p, count);
     }];
     free(ptrMatchArray);
     free(objectMatchArray);
     
-    [self configureChannelsInRange:NSMakeRange(0, group->channelCount) forGroup:group];
+    [self configureChannelsInRange:NSMakeRange(0, priorCount) forGroup:group];
     
     checkResult([self updateGraph], "Update graph");
+    
+    // Set new bus count of group
+    UInt32 busCount = group->channelCount;
+    if ( !checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &busCount, sizeof(busCount)),
+                      "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) return;
+
     
     // Release channel resources
     for ( int i=0; i<count; i++ ) {
@@ -2672,12 +2679,19 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
         AudioUnit targetUnit = group ? group->mixerAudioUnit : _ioAudioUnit;
         int targetBus = i;
         
+        if ( !channel ) {
+            // Removed channel - unset the input callback if necessary
+            if ( hasUpstreamInteraction ) {
+                checkResult(AUGraphDisconnectNodeInput(_audioGraph, targetNode, targetBus), "AUGraphDisconnectNodeInput");
+            }
+            AURenderCallbackStruct rcbs = { .inputProc = NULL, .inputProcRefCon = NULL };
+            checkResult(AUGraphSetNodeInputCallback(_audioGraph, targetNode, targetBus, &rcbs), "AUGraphSetNodeInputCallback");
+            continue;
+        }
+        
         if ( channel->type == kChannelTypeChannel ) {
             // Setup render callback struct, if necessary
-            AURenderCallbackStruct rcbs;
-            rcbs.inputProc = &renderCallback;
-            rcbs.inputProcRefCon = channel;
-                
+            AURenderCallbackStruct rcbs = { .inputProc = &renderCallback, .inputProcRefCon = channel };
             if ( 1 /* workaround for graph bug: http://wiki.theamazingaudioengine.com/graph-node-input-callback-bug */
                     || !hasUpstreamInteraction || upstreamInteraction.nodeInteractionType != kAUNodeInteraction_InputCallback || memcmp(&upstreamInteraction.nodeInteraction.inputCallback.cback, &rcbs, sizeof(rcbs)) != 0 ) {
                 if ( hasUpstreamInteraction ) {
@@ -2901,36 +2915,32 @@ static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef g
         int index = 0;
         for ( index=0; index < group->channelCount; index++ ) {
             if ( group->channels[index] && group->channels[index]->ptr == ptrs[i] && group->channels[index]->object == objects[i] ) {
-                group->channelCount--;
 
-                if ( outChannelReferences && outChannelReferencesCount < count ) outChannelReferences[outChannelReferencesCount++] = group->channels[index];
+                if ( outChannelReferences && outChannelReferencesCount < count ) {
+                    outChannelReferences[outChannelReferencesCount++] = group->channels[index];
+                }
                 
                 // Shuffle the later elements backwards one space
-                for ( int j=index; j<group->channelCount; j++ ) {
-                    if ( !group->channels[j] ) continue;
+                for ( int j=index; j<group->channelCount-1; j++ ) {
                     group->channels[j] = group->channels[j+1];
                 }
                 
-                group->channels[group->channelCount] = NULL;
+                group->channels[group->channelCount-1] = NULL;
+                group->channelCount--;
                 
                 // Disable this channel
                 AudioUnitParameterValue enabledValue = 0;
-                checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, group->channelCount, enabledValue, 0),
+                checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, enabledValue, 0),
                             "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
                 AURenderCallbackStruct rcbs;
-                rcbs.inputProc = &renderCallback;
+                rcbs.inputProc = NULL;
                 rcbs.inputProcRefCon = NULL;
-                checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, group->channelCount, &rcbs, sizeof(AURenderCallbackStruct)),
+                checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, index, &rcbs, sizeof(AURenderCallbackStruct)),
                             "AudioUnitSetProperty(kAudioUnitProperty_SetRenderCallback)") ;
 
             }
         }
     }
-    
-    // Set new bus count of group
-    UInt32 busCount = group->channelCount;
-    if ( !checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &busCount, sizeof(busCount)),
-                      "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) return;
 }
 
 - (void)gatherChannelsFromGroup:(AEChannelGroupRef)group intoArray:(NSMutableArray*)array {
