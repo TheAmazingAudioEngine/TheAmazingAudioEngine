@@ -2267,7 +2267,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
 
 - (void)teardown {
     checkResult(AUGraphClose(_audioGraph), "AUGraphClose");
-    checkResult(DisposeAUGraph(_audioGraph), "AUGraphClose");
+    checkResult(DisposeAUGraph(_audioGraph), "DisposeAUGraph");
     _audioGraph = NULL;
     _ioAudioUnit = NULL;
     
