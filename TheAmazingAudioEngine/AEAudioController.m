@@ -2701,6 +2701,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
                     checkResult(AUGraphDisconnectNodeInput(_audioGraph, targetNode, targetBus), "AUGraphDisconnectNodeInput");
                 }
                 checkResult(AUGraphSetNodeInputCallback(_audioGraph, targetNode, targetBus, &rcbs), "AUGraphSetNodeInputCallback");
+                upstreamInteraction.nodeInteractionType = kAUNodeInteraction_InputCallback;
             }
             
         } else if ( channel->type == kChannelTypeGroup ) {
@@ -2846,6 +2847,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
                         checkResult(AUGraphDisconnectNodeInput(_audioGraph, targetNode, targetBus), "AUGraphDisconnectNodeInput");
                     }
                     checkResult(AUGraphSetNodeInputCallback(_audioGraph, targetNode, targetBus, &rcbs), "AUGraphSetNodeInputCallback");
+                    upstreamInteraction.nodeInteractionType = kAUNodeInteraction_InputCallback;
                 }
                 
             } else {
@@ -2855,6 +2857,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
                         checkResult(AUGraphDisconnectNodeInput(_audioGraph, targetNode, targetBus), "AUGraphDisconnectNodeInput");
                     }
                     checkResult(AUGraphConnectNodeInput(_audioGraph, sourceNode, 0, targetNode, targetBus), "AUGraphConnectNodeInput");
+                    upstreamInteraction.nodeInteractionType = kAUNodeInteraction_Connection;
                 }
                 
                 if ( hasReceivers || subgroup->level_monitor_data.monitoringEnabled ) {
