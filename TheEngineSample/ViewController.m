@@ -590,6 +590,7 @@ static const int kInputChannelsChangedContext;
         NSMutableArray *channels = [_audioController.inputChannelSelection mutableCopy];
         [channels removeObject:[NSNumber numberWithInt:sender.tag]];
         _audioController.inputChannelSelection = channels;
+        [channels release];
         sender.highlighted = NO;
     }
 }
