@@ -39,7 +39,8 @@ const int kScratchBufferLength = 8192;
 @end
 
 @implementation AELimiterFilter
-@synthesize floatConverter = _floatConverter, hold = _hold, attack = _attack, decay = _decay, level = _level, limiter = _limiter, clientFormat = _clientFormat, audioController = _audioController;
+@synthesize floatConverter = _floatConverter, limiter = _limiter, clientFormat = _clientFormat, audioController = _audioController;
+@dynamic hold, attack, decay, level;
 
 - (id)initWithAudioController:(AEAudioController *)audioController {
     if ( !(self = [super init]) ) return nil;
@@ -48,10 +49,6 @@ const int kScratchBufferLength = 8192;
     _clientFormat = audioController.audioDescription;
     self.floatConverter = [[[AEFloatConverter alloc] initWithSourceFormat:_clientFormat] autorelease];
     self.limiter = [[[AELimiter alloc] initWithNumberOfChannels:_clientFormat.mChannelsPerFrame sampleRate:_clientFormat.mSampleRate] autorelease];
-    _hold = _limiter.hold;
-    _attack = _limiter.attack;
-    _decay = _limiter.decay;
-    _level = _limiter.level;
     
     _scratchBuffer = (float**)malloc(sizeof(float**) * _clientFormat.mChannelsPerFrame);
     assert(_scratchBuffer);
@@ -112,16 +109,32 @@ const int kScratchBufferLength = 8192;
     _limiter.hold = hold;
 }
 
+-(UInt32)hold {
+    return _limiter.hold;
+}
+
 -(void)setAttack:(UInt32)attack {
     _limiter.attack = attack;
+}
+
+-(UInt32)attack {
+    return _limiter.attack;
 }
 
 -(void)setDecay:(UInt32)decay {
     _limiter.decay = decay;
 }
 
+-(UInt32)decay {
+    return _limiter.decay;
+}
+
 -(void)setLevel:(float)level {
     _limiter.level = level;
+}
+
+-(float)level {
+    return _limiter.level;
 }
 
 static OSStatus filterCallback(id                        filter,
