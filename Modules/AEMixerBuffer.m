@@ -805,7 +805,6 @@ static UInt32 _AEMixerBufferPeek(AEMixerBuffer *THIS, AudioTimeStamp *outNextTim
     AudioTimeStamp latestStartTimestamp;
     memset(&latestStartTimestamp, 0, sizeof(latestStartTimestamp));
     source_t *earliestEndSource = NULL;
-    UInt32 earliestEndSourceFrameCount = 0;
     UInt32 minFrameCount = UINT32_MAX;
     BOOL hasActiveSources = NO;
     
@@ -864,7 +863,6 @@ static UInt32 _AEMixerBufferPeek(AEMixerBuffer *THIS, AudioTimeStamp *outNextTim
             if ( endTimestamp.mHostTime < earliestEndTimestamp.mHostTime ) {
                 earliestEndTimestamp = endTimestamp;
                 earliestEndSource = source;
-                earliestEndSourceFrameCount = frameCount;
             }
         }
     }
@@ -1358,6 +1356,7 @@ static void prepareSkipFadeBufferForSource(AEMixerBuffer *THIS, source_t* source
 
 @implementation AEMixerBufferPollProxy
 - (id)initWithMixerBuffer:(AEMixerBuffer*)mixerBuffer {
+    if ( !(self = [super init]) ) return nil;
     _mixerBuffer = mixerBuffer;
     return self;
 }

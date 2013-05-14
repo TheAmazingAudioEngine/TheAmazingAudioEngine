@@ -89,7 +89,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
         // The audio description isn't supported. Assign modified default audio description, and create an audio converter.
         AudioStreamBasicDescription defaultAudioDescription;
         UInt32 size = sizeof(defaultAudioDescription);
-        result = AudioUnitGetProperty(_audioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &defaultAudioDescription, &size);
+        AudioUnitGetProperty(_audioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &defaultAudioDescription, &size);
         defaultAudioDescription.mSampleRate = audioDescription.mSampleRate;
         AEAudioStreamBasicDescriptionSetChannelsPerFrame(&defaultAudioDescription, audioDescription.mChannelsPerFrame);
         if ( !checkResult(result=AudioUnitSetProperty(_audioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &defaultAudioDescription, size), "AudioUnitSetProperty") ) {

@@ -46,7 +46,7 @@ static inline long min(long a, long b) {
 AudioBufferList *TPCircularBufferPrepareEmptyAudioBufferList(TPCircularBuffer *buffer, int numberOfBuffers, int bytesPerBuffer, const AudioTimeStamp *inTimestamp) {
     int32_t availableBytes;
     TPCircularBufferABLBlockHeader *block = (TPCircularBufferABLBlockHeader*)TPCircularBufferHead(buffer, &availableBytes);
-    if ( availableBytes < sizeof(TPCircularBufferABLBlockHeader)+((numberOfBuffers-1)*sizeof(AudioBuffer))+(numberOfBuffers*bytesPerBuffer) ) return NULL;
+    if ( !block || availableBytes < sizeof(TPCircularBufferABLBlockHeader)+((numberOfBuffers-1)*sizeof(AudioBuffer))+(numberOfBuffers*bytesPerBuffer) ) return NULL;
     
     assert(!((unsigned long)block & 0xF) /* Beware unaligned accesses */);
     
@@ -87,6 +87,8 @@ AudioBufferList *TPCircularBufferPrepareEmptyAudioBufferList(TPCircularBuffer *b
 void TPCircularBufferProduceAudioBufferList(TPCircularBuffer *buffer, const AudioTimeStamp *inTimestamp) {
     int32_t availableBytes;
     TPCircularBufferABLBlockHeader *block = (TPCircularBufferABLBlockHeader*)TPCircularBufferHead(buffer, &availableBytes);
+    
+    assert(block);
     
     assert(!((unsigned long)block & 0xF) /* Beware unaligned accesses */);
     

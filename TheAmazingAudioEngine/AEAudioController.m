@@ -1017,6 +1017,9 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     // Remove the channels from the tables, on the core audio thread
     int count = [channels count];
+    
+    if ( count == 0 ) return;
+    
     void** ptrMatchArray = malloc(count * sizeof(void*));
     void** objectMatchArray = malloc(count * sizeof(void*));
     for ( int i=0; i<count; i++ ) {
@@ -2698,8 +2701,6 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
                     checkResult(AUGraphDisconnectNodeInput(_audioGraph, targetNode, targetBus), "AUGraphDisconnectNodeInput");
                 }
                 checkResult(AUGraphSetNodeInputCallback(_audioGraph, targetNode, targetBus, &rcbs), "AUGraphSetNodeInputCallback");
-                hasUpstreamInteraction = YES;
-                upstreamInteraction.nodeInteractionType = kAUNodeInteraction_InputCallback;
             }
             
         } else if ( channel->type == kChannelTypeGroup ) {
@@ -2845,8 +2846,6 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
                         checkResult(AUGraphDisconnectNodeInput(_audioGraph, targetNode, targetBus), "AUGraphDisconnectNodeInput");
                     }
                     checkResult(AUGraphSetNodeInputCallback(_audioGraph, targetNode, targetBus, &rcbs), "AUGraphSetNodeInputCallback");
-                    hasUpstreamInteraction = YES;
-                    upstreamInteraction.nodeInteractionType = kAUNodeInteraction_InputCallback;
                 }
                 
             } else {
@@ -2856,8 +2855,6 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
                         checkResult(AUGraphDisconnectNodeInput(_audioGraph, targetNode, targetBus), "AUGraphDisconnectNodeInput");
                     }
                     checkResult(AUGraphConnectNodeInput(_audioGraph, sourceNode, 0, targetNode, targetBus), "AUGraphConnectNodeInput");
-                    hasUpstreamInteraction = YES;
-                    upstreamInteraction.nodeInteractionType = kAUNodeInteraction_Connection;
                 }
                 
                 if ( hasReceivers || subgroup->level_monitor_data.monitoringEnabled ) {

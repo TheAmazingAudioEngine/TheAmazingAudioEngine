@@ -50,7 +50,7 @@ const int kScratchBufferLength = 8192;
     self.floatConverter = [[[AEFloatConverter alloc] initWithSourceFormat:_clientFormat] autorelease];
     self.limiter = [[[AELimiter alloc] initWithNumberOfChannels:_clientFormat.mChannelsPerFrame sampleRate:_clientFormat.mSampleRate] autorelease];
     
-    _scratchBuffer = (float**)malloc(sizeof(float**) * _clientFormat.mChannelsPerFrame);
+    _scratchBuffer = (float**)malloc(sizeof(float*) * _clientFormat.mChannelsPerFrame);
     assert(_scratchBuffer);
     for ( int i=0; i<_clientFormat.mChannelsPerFrame; i++ ) {
         _scratchBuffer[i] = malloc(sizeof(float) * kScratchBufferLength);
@@ -75,7 +75,7 @@ const int kScratchBufferLength = 8192;
     
     AEFloatConverter *floatConverter = [[[AEFloatConverter alloc] initWithSourceFormat:clientFormat] autorelease];
     
-    float **scratchBuffer = (float**)malloc(sizeof(float**) * clientFormat.mChannelsPerFrame);
+    float **scratchBuffer = (float**)malloc(sizeof(float*) * clientFormat.mChannelsPerFrame);
     assert(scratchBuffer);
     for ( int i=0; i<clientFormat.mChannelsPerFrame; i++ ) {
         scratchBuffer[i] = malloc(sizeof(float) * kScratchBufferLength);
