@@ -300,8 +300,10 @@ static void serveAudiobusInputQueue(AEAudioController *THIS);
 
 #pragma mark - Audio session callbacks
 
+static AEAudioController * __interruptionListenerSelf = nil;
+
 static void interruptionListener(void *inClientData, UInt32 inInterruption) {
-    AEAudioController *THIS = (AEAudioController *)inClientData;
+    AEAudioController *THIS = __interruptionListenerSelf;
     
     if (inInterruption == kAudioSessionEndInterruption) {
         NSLog(@"TAAE: Audio session interruption ended");
@@ -780,6 +782,8 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     NSAssert(audioDescription.mFormatID == kAudioFormatLinearPCM, @"Only linear PCM supported");
 
+    __interruptionListenerSelf = self;
+    
     _audioSessionCategory = enableInput ? kAudioSessionCategory_PlayAndRecord : kAudioSessionCategory_MediaPlayback;
     _allowMixingWithOtherApps = YES;
     _audioDescription = audioDescription;
@@ -809,6 +813,8 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 - (void)dealloc {
+    __interruptionListenerSelf = nil;
+    
     [_housekeepingTimer invalidate];
     self.housekeepingTimer = nil;
     
@@ -2040,7 +2046,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     NSMutableString *extraInfo = [NSMutableString string];
     
     // Initialise the audio session
-    OSStatus result = AudioSessionInitialize(NULL, NULL, interruptionListener, self);
+    OSStatus result = AudioSessionInitialize(NULL, NULL, interruptionListener, NULL);
     if ( result != kAudioSessionAlreadyInitialized && !checkResult(result, "AudioSessionInitialize") ) {
         self.lastError = [NSError audioControllerErrorWithMessage:@"Couldn't initialize audio session" OSStatus:result];
         _hasSystemError = YES;
