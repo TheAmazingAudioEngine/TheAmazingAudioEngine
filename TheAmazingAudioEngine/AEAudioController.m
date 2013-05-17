@@ -303,6 +303,8 @@ static void serveAudiobusInputQueue(AEAudioController *THIS);
 static AEAudioController * __interruptionListenerSelf = nil;
 
 static void interruptionListener(void *inClientData, UInt32 inInterruption) {
+    if ( !__interruptionListenerSelf ) return;
+    
     AEAudioController *THIS = __interruptionListenerSelf;
     
     if (inInterruption == kAudioSessionEndInterruption) {
