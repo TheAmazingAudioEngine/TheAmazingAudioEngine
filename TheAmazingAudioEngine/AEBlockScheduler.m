@@ -68,6 +68,11 @@ struct _schedule_t {
     return (timestamp - mach_absolute_time()) * __hostTicksToSeconds;
 }
 
++ (uint64_t)timestampWithSeconds:(NSTimeInterval)seconds fromTimestamp:(uint64_t)timeStamp
+{
+    return (timeStamp + (seconds * __secondsToHostTicks));
+}
+
 - (id)initWithAudioController:(AEAudioController *)audioController {
     if ( !(self = [super init]) ) return nil;
     
