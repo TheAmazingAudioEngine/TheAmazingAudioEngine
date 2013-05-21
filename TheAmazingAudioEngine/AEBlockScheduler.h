@@ -70,6 +70,11 @@ typedef void (^AEBlockSchedulerResponseBlock)();
 + (uint64_t)timestampWithSecondsFromNow:(NSTimeInterval)seconds;
 
 /*!
+ * Utility: Create a timestamp in host ticks the given number of seconds from a timestamp
+ */
++ (uint64_t)timestampWithSeconds:(NSTimeInterval)seconds fromTimestamp:(uint64_t)timeStamp;
+
+/*!
  * Utility: Determine the number of seconds until a given timestamp
  */
 + (NSTimeInterval)secondsUntilTimestamp:(uint64_t)timestamp;
