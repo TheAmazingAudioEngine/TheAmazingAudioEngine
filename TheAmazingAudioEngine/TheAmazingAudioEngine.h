@@ -85,7 +85,13 @@
  Here's the recommended way to do this:
  
  1. Clone The Amazing Audio Engine's [git repository](https://github.com/TheAmazingAudioEngine/TheAmazingAudioEngine)
-    (or just download it) into a folder within your project, such as `Library/The Amazing Audio Engine`.
+    (or just download it) into a folder within your project, such as `Library/The Amazing Audio Engine`.  
+      
+    *Note: If you are cloning the repository, you may wish to grab only the latest version, with the following command:*
+ 
+    @code
+    git clone --depth=1 https://github.com/TheAmazingAudioEngine/TheAmazingAudioEngine.git
+    @endcode
  2. Drag `TheAmazingAudioEngine.xcodeproj` from that folder into your project's navigation tree in Xcode. It'll
     be added as a sub-project.
  3. In the "Build Phases" tab of your main target, open up the "Target Dependencies" section, press the "+" button,
