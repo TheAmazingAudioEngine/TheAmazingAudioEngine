@@ -32,7 +32,6 @@ static const int kAudioBufferLength = 16384;
 
 @interface AEPlaythroughChannel () {
     TPCircularBuffer _buffer;
-    UInt32           _bufferMaxLatencyInFrames;
 }
 @property (nonatomic, retain) AEAudioController *audioController;
 @end
@@ -49,7 +48,6 @@ static const int kAudioBufferLength = 16384;
     TPCircularBufferInit(&_buffer, kAudioBufferLength);
     self.audioController = audioController;
     _volume = 1.0;
-    _bufferMaxLatencyInFrames = 0;
     return self;
 }
 
@@ -98,7 +96,7 @@ static OSStatus renderCallback(id                        channel,
         }
         
         UInt32 fillCount = TPCircularBufferPeek(&THIS->_buffer, NULL, AEAudioControllerAudioDescription(audioController));
-        if ( fillCount >= frames+THIS->_bufferMaxLatencyInFrames ) {
+        if ( fillCount >= frames ) {
             UInt32 skip = fillCount - frames;
             TPCircularBufferDequeueBufferListFrames(&THIS->_buffer,
                                                     &skip,
