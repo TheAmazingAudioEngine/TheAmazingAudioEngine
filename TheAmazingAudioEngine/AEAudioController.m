@@ -855,6 +855,10 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         [_inputLevelMonitorData.floatConverter release];
     }
     
+    if ( _inputAudioBufferList ) {
+        AEFreeAudioBufferList(_inputAudioBufferList);
+    }
+    
     for ( int i=0; i<_inputCallbackCount; i++ ) {
         if ( _inputCallbacks[i].channelMap ) {
             [_inputCallbacks[i].channelMap release];
