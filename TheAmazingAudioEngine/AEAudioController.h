@@ -682,6 +682,12 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(AEAudioController *aud
  */
 - (BOOL)channelGroupIsMuted:(AEChannelGroupRef)group;
 
+/*!
+ * Render main output into AudioBufferList.
+ * Use only while the AUGraph is not running.
+ */
+BOOL AEAudioControllerRenderMainOutput(AEAudioController *audioController, AudioTimeStamp inTimeStamp, UInt32 inNumberFrames, AudioBufferList *ioData);
+
 ///@}
 #pragma mark - Filters
 /** @name Filters */
