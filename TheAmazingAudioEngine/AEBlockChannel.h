@@ -23,6 +23,10 @@
 //  3. This notice may not be removed or altered from any source distribution.
 //
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #import <Foundation/Foundation.h>
 #import "TheAmazingAudioEngine.h"
 
@@ -77,3 +81,7 @@ typedef void (^AEBlockChannelBlock)(const AudioTimeStamp     *time,
 @property (nonatomic, assign) AudioStreamBasicDescription audioDescription;
 
 @end
+
+#ifdef __cplusplus
+}
+#endif
