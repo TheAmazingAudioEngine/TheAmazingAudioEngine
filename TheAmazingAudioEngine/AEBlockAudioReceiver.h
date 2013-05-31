@@ -23,6 +23,10 @@
 //  3. This notice may not be removed or altered from any source distribution.
 //
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #import <Foundation/Foundation.h>
 #import "TheAmazingAudioEngine.h"
 
@@ -44,3 +48,7 @@ typedef void (^AEBlockAudioReceiverBlock)(void                     *source,
 + (AEBlockAudioReceiver*)audioReceiverWithBlock:(AEBlockAudioReceiverBlock)block;
 
 @end
+
+#ifdef __cplusplus
+}
+#endif

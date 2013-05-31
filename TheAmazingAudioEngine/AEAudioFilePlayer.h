@@ -23,6 +23,10 @@
 //  3. This notice may not be removed or altered from any source distribution.
 //
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+    
 #import <Foundation/Foundation.h>
 #import "AEAudioController.h"
 
@@ -57,3 +61,7 @@
 @property (nonatomic, readwrite) BOOL removeUponFinish;     //!< Whether the track automatically removes itself from the audio controller after playback completes
 @property (nonatomic, copy) void(^completionBlock)();       //!< A block to be called when playback finishes
 @end
+
+#ifdef __cplusplus
+}
+#endif

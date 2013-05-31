@@ -6,6 +6,10 @@
 //  Copyright (c) 2013 A Tasty Pixel. All rights reserved.
 //
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #import <Foundation/Foundation.h>
 #import "AEAudioController.h"
 
@@ -168,3 +172,7 @@ typedef void (^AEBlockSchedulerResponseBlock)();
 - (void)cancelScheduleWithIdentifier:(id<NSCopying>)identifier;
 
 @end
+
+#ifdef __cplusplus
+}
+#endif

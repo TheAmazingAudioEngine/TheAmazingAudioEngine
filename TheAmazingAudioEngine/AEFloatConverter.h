@@ -23,6 +23,10 @@
 //  3. This notice may not be removed or altered from any source distribution.
 //
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #import <Foundation/Foundation.h>
 #import <AudioToolbox/AudioToolbox.h>
 
@@ -114,3 +118,7 @@ BOOL AEFloatConverterFromFloatBufferList(AEFloatConverter* converter, AudioBuffe
 @property (nonatomic, readonly) AudioStreamBasicDescription sourceFormat;
 
 @end
+
+#ifdef __cplusplus
+}
+#endif
