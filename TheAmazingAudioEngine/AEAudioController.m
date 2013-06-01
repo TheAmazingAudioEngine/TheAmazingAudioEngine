@@ -2670,7 +2670,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
 }
 
 - (void)configureChannelsInRange:(NSRange)range forGroup:(AEChannelGroupRef)group {
-    UInt32 numInteractions = group ? group->channelCount + 5 : 5;
+    UInt32 numInteractions = kMaximumChannelsPerGroup*2;
     AUNodeInteraction interactions[numInteractions];
     
     checkResult(AUGraphGetNodeInteractions(_audioGraph, group ? group->mixerNode : _ioNode, &numInteractions, interactions), "AUGraphGetNodeInteractions");
@@ -2699,8 +2699,6 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
             if ( hasUpstreamInteraction ) {
                 checkResult(AUGraphDisconnectNodeInput(_audioGraph, targetNode, targetBus), "AUGraphDisconnectNodeInput");
             }
-            AURenderCallbackStruct rcbs = { .inputProc = NULL, .inputProcRefCon = NULL };
-            checkResult(AUGraphSetNodeInputCallback(_audioGraph, targetNode, targetBus, &rcbs), "AUGraphSetNodeInputCallback");
             continue;
         }
         
@@ -2919,15 +2917,28 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
 }
 
 static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef group, void **ptrs, void **objects, AEChannelRef *outChannelReferences, int count) {
-    
-    int outChannelReferencesCount = 0;
+    // Disable matching channels first
     for ( int i=0; i < count; i++ ) {
-        
         // Find the channel in our fixed array
         int index = 0;
         for ( index=0; index < group->channelCount; index++ ) {
             if ( group->channels[index] && group->channels[index]->ptr == ptrs[i] && group->channels[index]->object == objects[i] ) {
-
+                // Disable this channel until we update the graph
+                AudioUnitParameterValue enabledValue = 0;
+                checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, enabledValue, 0),
+                            "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
+            }
+        }
+    }
+    
+    // Now remove the matching channels from the array
+    int outChannelReferencesCount = 0;
+    for ( int i=0; i < count; i++ ) {
+        
+        // Find the channel in our channel array
+        int index = 0;
+        for ( index=0; index < group->channelCount; index++ ) {
+            if ( group->channels[index] && group->channels[index]->ptr == ptrs[i] && group->channels[index]->object == objects[i] ) {
                 if ( outChannelReferences && outChannelReferencesCount < count ) {
                     outChannelReferences[outChannelReferencesCount++] = group->channels[index];
                 }
@@ -2939,17 +2950,6 @@ static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef g
                 
                 group->channels[group->channelCount-1] = NULL;
                 group->channelCount--;
-                
-                // Disable this channel
-                AudioUnitParameterValue enabledValue = 0;
-                checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, enabledValue, 0),
-                            "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
-                AURenderCallbackStruct rcbs;
-                rcbs.inputProc = NULL;
-                rcbs.inputProcRefCon = NULL;
-                checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, index, &rcbs, sizeof(AURenderCallbackStruct)),
-                            "AudioUnitSetProperty(kAudioUnitProperty_SetRenderCallback)") ;
-
             }
         }
     }
