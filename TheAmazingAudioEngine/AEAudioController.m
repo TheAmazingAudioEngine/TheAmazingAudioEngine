@@ -660,13 +660,12 @@ static OSStatus groupRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionF
 static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
     
     AEAudioController *THIS = (AEAudioController *)inRefCon;
-        
+
     if ( *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
         
         if ( !THIS->_hardwareInputAvailable && THIS->_audiobusInputPort && !(*ioActionFlags & kAudiobusSourceFlag) && THIS->_usingAudiobusInput ) {
-            // If Audiobus is connected, then serve Audiobus queue (here, rather than the input queue as hardware is stopped)
+            // If we have no input hardware and Audiobus is connected, then serve Audiobus queue (here, rather than the inactive input callback)
             serveAudiobusInputQueue(THIS);
-            return noErr;
         }
         
         // Before render: Perform timing callbacks
