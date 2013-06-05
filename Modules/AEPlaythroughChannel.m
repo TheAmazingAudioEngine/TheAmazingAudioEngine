@@ -96,7 +96,7 @@ static OSStatus renderCallback(id                        channel,
         }
         
         UInt32 fillCount = TPCircularBufferPeek(&THIS->_buffer, NULL, AEAudioControllerAudioDescription(audioController));
-        if ( fillCount >= frames ) {
+        if ( fillCount > frames ) {
             UInt32 skip = fillCount - frames;
             TPCircularBufferDequeueBufferListFrames(&THIS->_buffer,
                                                     &skip,
