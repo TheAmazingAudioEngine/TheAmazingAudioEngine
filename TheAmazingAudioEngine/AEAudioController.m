@@ -278,6 +278,7 @@ static void serveAudiobusInputQueue(AEAudioController *THIS);
 @property (nonatomic, assign) NSTimer *housekeepingTimer;
 @property (nonatomic, retain) ABInputPort *audiobusInputPort;
 @property (nonatomic, retain) ABOutputPort *audiobusOutputPort;
+@property (nonatomic, assign, readonly) dispatch_queue_t originalQueue;
 @end
 
 @implementation AEAudioController
@@ -295,7 +296,8 @@ static void serveAudiobusInputQueue(AEAudioController *THIS);
             audioGraph                  = _audioGraph,
             audioDescription            = _audioDescription,
             audioRoute                  = _audioRoute,
-            audiobusInputPort           = _audiobusInputPort;
+            audiobusInputPort           = _audiobusInputPort,
+            originalQueue               = _originalQueue;
 
 @dynamic    running, inputGainAvailable, inputGain, audiobusOutputPort, inputAudioDescription, inputChannelSelection;
 
@@ -3377,7 +3379,9 @@ static void serveAudiobusInputQueue(AEAudioController *THIS) {
     pthread_setname_np("com.theamazingaudioengine.AEAudioControllerMessagePollThread");
     while ( ![self isCancelled] ) {
         if ( AEAudioControllerHasPendingMainThreadMessages(_audioController) ) {
-            [_audioController performSelectorOnMainThread:@selector(pollForMessageResponses) withObject:nil waitUntilDone:NO];
+            dispatch_async(_audioController.originalQueue, ^{
+                [_audioController pollForMessageResponses];
+            });
         }
         usleep(_pollInterval*1.0e6);
     }
