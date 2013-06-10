@@ -258,6 +258,7 @@ typedef struct {
     TPCircularBuffer    _mainThreadMessageBuffer;
     AEAudioControllerMessagePollThread *_pollThread;
     int                 _pendingResponses;
+    dispatch_queue_t    _originalQueue;
     
     audio_level_monitor_t _inputLevelMonitorData;
     BOOL                _usingAudiobusInput;
@@ -277,6 +278,7 @@ static void serveAudiobusInputQueue(AEAudioController *THIS);
 @property (nonatomic, assign) NSTimer *housekeepingTimer;
 @property (nonatomic, retain) ABInputPort *audiobusInputPort;
 @property (nonatomic, retain) ABOutputPort *audiobusOutputPort;
+@property (nonatomic, assign, readonly) dispatch_queue_t originalQueue;
 @end
 
 @implementation AEAudioController
@@ -294,7 +296,8 @@ static void serveAudiobusInputQueue(AEAudioController *THIS);
             audioGraph                  = _audioGraph,
             audioDescription            = _audioDescription,
             audioRoute                  = _audioRoute,
-            audiobusInputPort           = _audiobusInputPort;
+            audiobusInputPort           = _audiobusInputPort,
+            originalQueue               = _originalQueue;
 
 @dynamic    running, inputGainAvailable, inputGain, audiobusOutputPort, inputAudioDescription, inputChannelSelection;
 
@@ -809,6 +812,8 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     }
     
     self.housekeepingTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:[[[AEAudioControllerProxy alloc] initWithAudioController:self] autorelease] selector:@selector(housekeeping) userInfo:nil repeats:YES];
+
+    _originalQueue = dispatch_get_current_queue();
     
     return self;
 }
@@ -1507,11 +1512,11 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
         TPCircularBufferProduce(&_realtimeThreadMessageBuffer, sizeof(message_t));
         
         if ( !self.running ) {
-            if ( [NSThread isMainThread] ) {
+            if ( dispatch_get_current_queue() == _originalQueue ) {
                 processPendingMessagesOnRealtimeThread(self);
                 [self pollForMessageResponses];
             } else {
-                dispatch_async(dispatch_get_main_queue(), ^{
+                dispatch_async(_originalQueue, ^{
                     processPendingMessagesOnRealtimeThread(self);
                     [self pollForMessageResponses];
                 });
@@ -1533,10 +1538,10 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
     // Wait for response
     uint64_t giveUpTime = mach_absolute_time() + (1.0 * __secondsToHostTicks);
     while ( !finished && mach_absolute_time() < giveUpTime ) {
-        if ( [NSThread isMainThread] ) {
+        if ( dispatch_get_current_queue() == _originalQueue ) {
             [self pollForMessageResponses];
         } else {
-            dispatch_async(dispatch_get_main_queue(), ^{
+            dispatch_async(_originalQueue, ^{
                 [self pollForMessageResponses];
             });
         }
@@ -1585,8 +1590,8 @@ static BOOL AEAudioControllerHasPendingMainThreadMessages(AEAudioController *THI
 
 - (void)averagePowerLevel:(Float32*)averagePower peakHoldLevel:(Float32*)peakLevel forGroup:(AEChannelGroupRef)group {
     if ( !group->level_monitor_data.monitoringEnabled ) {
-        if ( ![NSThread isMainThread] ) {
-            dispatch_async(dispatch_get_main_queue(), ^{ [self averagePowerLevel:NULL peakHoldLevel:NULL forGroup:group]; });
+        if ( dispatch_get_current_queue() != _originalQueue ) {
+            dispatch_async(_originalQueue, ^{ [self averagePowerLevel:NULL peakHoldLevel:NULL forGroup:group]; });
         } else {
             group->level_monitor_data.channels = group->channel->audioDescription.mChannelsPerFrame;
             group->level_monitor_data.floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:group->channel->audioDescription];
@@ -3374,7 +3379,9 @@ static void serveAudiobusInputQueue(AEAudioController *THIS) {
     pthread_setname_np("com.theamazingaudioengine.AEAudioControllerMessagePollThread");
     while ( ![self isCancelled] ) {
         if ( AEAudioControllerHasPendingMainThreadMessages(_audioController) ) {
-            [_audioController performSelectorOnMainThread:@selector(pollForMessageResponses) withObject:nil waitUntilDone:NO];
+            dispatch_async(_audioController.originalQueue, ^{
+                [_audioController pollForMessageResponses];
+            });
         }
         usleep(_pollInterval*1.0e6);
     }
