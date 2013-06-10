@@ -258,6 +258,7 @@ typedef struct {
     TPCircularBuffer    _mainThreadMessageBuffer;
     AEAudioControllerMessagePollThread *_pollThread;
     int                 _pendingResponses;
+    dispatch_queue_t    _originalQueue;
     
     audio_level_monitor_t _inputLevelMonitorData;
     BOOL                _usingAudiobusInput;
@@ -809,6 +810,8 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     }
     
     self.housekeepingTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:[[[AEAudioControllerProxy alloc] initWithAudioController:self] autorelease] selector:@selector(housekeeping) userInfo:nil repeats:YES];
+
+    _originalQueue = dispatch_get_current_queue();
     
     return self;
 }
@@ -1507,11 +1510,11 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
         TPCircularBufferProduce(&_realtimeThreadMessageBuffer, sizeof(message_t));
         
         if ( !self.running ) {
-            if ( [NSThread isMainThread] ) {
+            if ( dispatch_get_current_queue() == _originalQueue ) {
                 processPendingMessagesOnRealtimeThread(self);
                 [self pollForMessageResponses];
             } else {
-                dispatch_async(dispatch_get_main_queue(), ^{
+                dispatch_async(_originalQueue, ^{
                     processPendingMessagesOnRealtimeThread(self);
                     [self pollForMessageResponses];
                 });
@@ -1533,10 +1536,10 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
     // Wait for response
     uint64_t giveUpTime = mach_absolute_time() + (1.0 * __secondsToHostTicks);
     while ( !finished && mach_absolute_time() < giveUpTime ) {
-        if ( [NSThread isMainThread] ) {
+        if ( dispatch_get_current_queue() == _originalQueue ) {
             [self pollForMessageResponses];
         } else {
-            dispatch_async(dispatch_get_main_queue(), ^{
+            dispatch_async(_originalQueue, ^{
                 [self pollForMessageResponses];
             });
         }
@@ -1585,8 +1588,8 @@ static BOOL AEAudioControllerHasPendingMainThreadMessages(AEAudioController *THI
 
 - (void)averagePowerLevel:(Float32*)averagePower peakHoldLevel:(Float32*)peakLevel forGroup:(AEChannelGroupRef)group {
     if ( !group->level_monitor_data.monitoringEnabled ) {
-        if ( ![NSThread isMainThread] ) {
-            dispatch_async(dispatch_get_main_queue(), ^{ [self averagePowerLevel:NULL peakHoldLevel:NULL forGroup:group]; });
+        if ( dispatch_get_current_queue() != _originalQueue ) {
+            dispatch_async(_originalQueue, ^{ [self averagePowerLevel:NULL peakHoldLevel:NULL forGroup:group]; });
         } else {
             group->level_monitor_data.channels = group->channel->audioDescription.mChannelsPerFrame;
             group->level_monitor_data.floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:group->channel->audioDescription];
