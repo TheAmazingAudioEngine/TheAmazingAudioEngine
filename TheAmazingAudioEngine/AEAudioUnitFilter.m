@@ -108,10 +108,35 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
         }
     }
     
-    // Try to set the input audio description
     audioDescription = _audioController.audioDescription;
-    result = AudioUnitSetProperty(_audioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &audioDescription, sizeof(AudioStreamBasicDescription));
-    if ( result == kAudioUnitErr_FormatNotSupported ) {
+    
+    // Get the desired input audio description from the unit
+    AudioStreamBasicDescription desiredInputFormat;
+    UInt32 propSize = sizeof(AudioStreamBasicDescription);
+    memset(&desiredInputFormat, 0, propSize);
+    result = AudioUnitGetProperty(_audioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &desiredInputFormat, &propSize);
+     
+    // create a converter if the desired format is different from the controller's format
+    // (TODO: move this into a global AE helper macro/function)
+    if (desiredInputFormat.mSampleRate != audioDescription.mSampleRate || desiredInputFormat.mFormatID != audioDescription.mFormatID || desiredInputFormat.mFormatFlags != audioDescription.mFormatFlags || desiredInputFormat.mBytesPerPacket != audioDescription.mBytesPerPacket || desiredInputFormat.mBytesPerFrame != audioDescription.mBytesPerFrame || desiredInputFormat.mChannelsPerFrame != audioDescription.mChannelsPerFrame || desiredInputFormat.mBitsPerChannel != audioDescription.mBitsPerChannel) {
+        if ( !checkResult(result=AudioUnitSetProperty(_audioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &desiredInputFormat, propSize), "AudioUnitSetProperty") ) {
+            if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:result userInfo:[NSDictionary dictionaryWithObject:@"Incompatible audio format" forKey:NSLocalizedDescriptionKey]];
+            return NO;
+        }
+        AudioComponentDescription audioConverterDescription = AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_FormatConverter, kAudioUnitSubType_AUConverter);
+        
+        if ( !checkResult(result=AUGraphAddNode(_audioGraph, &audioConverterDescription, &_inConverterNode), "AUGraphAddNode") ||
+            !checkResult(result=AUGraphNodeInfo(_audioGraph, _inConverterNode, NULL, &_inConverterUnit), "AUGraphNodeInfo") ||
+            !checkResult(result=AudioUnitSetProperty(_inConverterUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &desiredInputFormat, sizeof(AudioStreamBasicDescription)), "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)") || !checkResult(result=AUGraphConnectNodeInput(_audioGraph, _inConverterNode, 0, _node, 0), "AUGraphConnectNodeInput") ||
+            !checkResult(result=AudioUnitSetProperty(_inConverterUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &audioDescription, sizeof(AudioStreamBasicDescription)), "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)") ) {
+            
+            if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:result userInfo:[NSDictionary dictionaryWithObject:@"Couldn't setup converter audio unit" forKey:NSLocalizedDescriptionKey]];
+            return NO;
+        }
+
+    }
+    // otherwise try to set the controller's format on the unit's input
+    else if (AudioUnitSetProperty(_audioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &audioDescription, sizeof(AudioStreamBasicDescription) == kAudioUnitErr_FormatNotSupported)) {
         // The audio description isn't supported. Assign modified default audio description, and create an audio converter.
         AudioStreamBasicDescription defaultAudioDescription;
         UInt32 size = sizeof(defaultAudioDescription);
