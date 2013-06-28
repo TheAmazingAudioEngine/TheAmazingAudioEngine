@@ -23,9 +23,13 @@
 //  3. This notice may not be removed or altered from any source distribution.
 //
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+    
 #import <Foundation/Foundation.h>
 #import "TheAmazingAudioEngine.h"
-
+    
 /*!
  * Audio Unit Filter
  *
@@ -49,6 +53,23 @@
                              error:(NSError**)error;
 
 /*!
+ * Create a new Audio Unit filter, using the default input audio description
+ *
+ * @param audioComponentDescription The structure that identifies the audio unit
+ * @param audioController The audio controller
+ * @param useDefaultInputFormat Whether to always use the audio unit's default input audio format.
+ *              This can be used as a workaround for audio units that misidentify the TAAE system
+ *              audio description as being compatible. Audio will automatically be converted from
+ *              the source audio format to this format.
+ * @param error On output, if not NULL, will point to an error if a problem occurred
+ * @return The initialised filter, or nil if an error occurred
+ */
+- (id)initWithComponentDescription:(AudioComponentDescription)audioComponentDescription
+                   audioController:(AEAudioController*)audioController
+             useDefaultInputFormat:(BOOL)useDefaultInputFormat
+                             error:(NSError**)error;
+
+/*!
  * The audio unit
  */
 @property (nonatomic, readonly) AudioUnit audioUnit;
@@ -59,3 +80,7 @@
 @property (nonatomic, readonly) AUNode audioGraphNode;
 
 @end
+    
+#ifdef __cplusplus
+}
+#endif
