@@ -79,6 +79,12 @@ extern NSString * kAERecorderErrorKey;
  * The path
  */
 @property (nonatomic, retain, readonly) NSString *path;
+
+/*!
+ * Current recorded time in seconds
+ */
+@property (nonatomic, readonly) double currentTime;
+
 @end
 
 #ifdef __cplusplus
