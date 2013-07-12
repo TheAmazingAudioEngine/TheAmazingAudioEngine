@@ -169,6 +169,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
         AudioStreamBasicDescription audioDescription = _audioDescription;
         audioDescription.mFormatFlags = (fileType == kAudioFileAIFFType ? kLinearPCMFormatFlagIsBigEndian : 0) | kLinearPCMFormatFlagIsSignedInteger | kLinearPCMFormatFlagIsPacked;
         audioDescription.mFormatID = kAudioFormatLinearPCM;
+        audioDescription.mBitsPerChannel = 16;
         audioDescription.mBytesPerPacket =
             audioDescription.mBytesPerFrame = audioDescription.mChannelsPerFrame * (audioDescription.mBitsPerChannel/8);
         audioDescription.mFramesPerPacket = 1;
