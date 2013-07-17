@@ -61,8 +61,26 @@ extern NSString * kAERecorderErrorKey;
 - (id)initWithAudioController:(AEAudioController*)audioController;
 
 /*!
- * Prepare recording and set up internal data structures.
- * When this method returns, the recorder is ready to record.
+ * Prepare and begin recording
+ *
+ *  Prepare to record, then start recording immediately, without
+ *  needing to call AERecorderStartRecording
+ *
+ * @param path The path to record to
+ * @param fileType The kind of file to create
+ * @param error The error, if not NULL and if an error occurs
+ * @return YES on success, NO on failure.
+ */
+- (BOOL)beginRecordingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType error:(NSError**)error;
+
+/*!
+ * Prepare to record
+ *
+ *  Prepare recording and set up internal data structures.
+ *  When this method returns, the recorder is ready to record.
+ *
+ *  Start recording by calling AERecorderStartRecording. This allows
+ *  you to record synchronously with other audio events.
  *
  * @param path The path to record to
  * @param fileType The kind of file to create
@@ -72,10 +90,16 @@ extern NSString * kAERecorderErrorKey;
 - (BOOL)prepareRecordingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType error:(NSError**)error;
 
 /*!
- * Start recording into the file.
- * This is thread-safe and can be used from the audio thread.
+ * Start recording
+ *
+ *  If you prepared recording by calling @link prepareRecordingToFileAtPath:fileType:error: @endlink,
+ *  call this method to actually begin recording.
+ *
+ *  This is thread-safe and can be used from the audio thread.
+ *
+ * @param recorder The recorder
  */
-void AERecorderStartRecording(AERecorder* THIS);
+void AERecorderStartRecording(AERecorder* recorder);
 
 /*!
  * Finish recording and close file
