@@ -2277,6 +2277,11 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
             checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
         }
     }
+    
+    // Set the audio unit to handle up to 4096 frames per slice to keep rendering during screen lock
+    UInt32 maxFPS = 4096;
+    checkResult(AudioUnitSetProperty(_ioAudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFPS, sizeof(maxFPS)),
+                "AudioUnitSetProperty(kAudioUnitProperty_MaximumFramesPerSlice)");
 }
 
 - (void)teardown {
