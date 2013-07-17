@@ -67,11 +67,14 @@ NSString * kAERecorderErrorKey = @"error";
     [super dealloc];
 }
 
-- (BOOL)beginRecordingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType error:(NSError**)error {
+- (BOOL)prepareRecordingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType error:(NSError**)error {
     _currentTime = 0.0;
     BOOL result = [_writer beginWritingToFileAtPath:path fileType:fileType error:error];
-    if ( result ) _recording = YES;
     return result;
+}
+
+void AERecorderStartRecording(AERecorder* THIS) {
+    THIS->_recording = YES;
 }
 
 - (void)finishRecording {
