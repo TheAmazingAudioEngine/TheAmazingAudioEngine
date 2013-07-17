@@ -2207,6 +2207,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
         .componentFlagsMask = 0
     };
     
+    BOOL wasRunning = _running;
     _running = NO;
     
     if ( !checkResult(AUGraphStop(_audioGraph), "AUGraphStop") // Stop graph
@@ -2234,7 +2235,11 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     
     checkResult([self updateGraph], "Update graph");
     
-    _running = YES;
+    if ( wasRunning ) {
+        if ( checkResult(AUGraphStart(_audioGraph), "AUGraphStart") ) {
+            _running = YES;
+        }
+    }
 }
 
 - (void)configureAudioUnit {
