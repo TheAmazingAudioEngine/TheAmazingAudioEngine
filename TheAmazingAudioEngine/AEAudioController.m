@@ -2594,18 +2594,6 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     
     // Set input stream format and update the properties, on the realtime thread
     [self performSynchronousMessageExchangeWithBlock:^{
-        if ( inputAvailable && (!_audiobusInputPort || !ABInputPortIsConnected(_audiobusInputPort)) ) {
-            AudioStreamBasicDescription currentAudioDescription;
-            UInt32 size = sizeof(currentAudioDescription);
-            OSStatus result = AudioUnitGetProperty(_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &currentAudioDescription, &size);
-            checkResult(result, "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)");
-            
-            if ( memcmp(&currentAudioDescription, &rawAudioDescription, sizeof(AudioStreamBasicDescription)) != 0 ) {
-                result = AudioUnitSetProperty(_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &rawAudioDescription, sizeof(AudioStreamBasicDescription));
-                checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
-            }
-        }
-        
         _numberOfInputChannels    = numberOfInputChannels;
         _rawInputAudioDescription = rawAudioDescription;
         _inputAudioBufferList     = inputAudioBufferList;
@@ -2616,6 +2604,18 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
         _usingAudiobusInput       = usingAudiobus;
         _inputLevelMonitorData    = inputLevelMonitorData;
     }];
+    
+    if ( inputAvailable && (!_audiobusInputPort || !ABInputPortIsConnected(_audiobusInputPort)) ) {
+        AudioStreamBasicDescription currentAudioDescription;
+        UInt32 size = sizeof(currentAudioDescription);
+        OSStatus result = AudioUnitGetProperty(_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &currentAudioDescription, &size);
+        checkResult(result, "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)");
+        
+        if ( memcmp(&currentAudioDescription, &rawAudioDescription, sizeof(AudioStreamBasicDescription)) != 0 ) {
+            result = AudioUnitSetProperty(_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &rawAudioDescription, sizeof(AudioStreamBasicDescription));
+            checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
+        }
+    }
     
     if ( _audiobusInputPort && !usingAudiobus ) {
         AudioStreamBasicDescription clientFormat = [_audiobusInputPort clientFormat];
