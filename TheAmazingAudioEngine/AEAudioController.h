@@ -48,9 +48,9 @@ extern "C" {
  *  errors. Objects that use the graph directly (such as creating audio units)
  *  should re-initialise the audio units.
  */
-extern NSString * AEAudioControllerSessionInterruptionBeganNotification;
-extern NSString * AEAudioControllerSessionInterruptionEndedNotification;
-extern NSString * AEAudioControllerDidRecreateGraphNotification;
+extern NSString * const AEAudioControllerSessionInterruptionBeganNotification;
+extern NSString * const AEAudioControllerSessionInterruptionEndedNotification;
+extern NSString * const AEAudioControllerDidRecreateGraphNotification;
 
 /*!
  * @enum AEInputMode

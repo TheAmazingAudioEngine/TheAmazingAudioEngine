@@ -30,7 +30,7 @@ extern "C" {
 #import <Foundation/Foundation.h>
 #import <AudioToolbox/AudioToolbox.h>
 
-extern NSString * AEAudioFileWriterErrorDomain;
+extern NSString * const AEAudioFileWriterErrorDomain;
 
 enum {
     kAEAudioFileWriterFormatError

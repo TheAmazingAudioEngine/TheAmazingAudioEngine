@@ -56,9 +56,9 @@ const int kAudiobusSourceFlag                   = 1<<12;
 const NSTimeInterval kMaxBufferDurationWithVPIO = 0.01;
 #define kNoAudioErr                            -2222
 
-NSString * AEAudioControllerSessionInterruptionBeganNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionBeganNotification";
-NSString * AEAudioControllerSessionInterruptionEndedNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionEndedNotification";
-NSString * AEAudioControllerDidRecreateGraphNotification = @"com.theamazingaudioengine.AEAudioControllerDidRecreateGraphNotification";
+NSString * const AEAudioControllerSessionInterruptionBeganNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionBeganNotification";
+NSString * const AEAudioControllerSessionInterruptionEndedNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionEndedNotification";
+NSString * const AEAudioControllerDidRecreateGraphNotification = @"com.theamazingaudioengine.AEAudioControllerDidRecreateGraphNotification";
 
 const NSString *kAEAudioControllerCallbackKey = @"callback";
 const NSString *kAEAudioControllerUserInfoKey = @"userinfo";
