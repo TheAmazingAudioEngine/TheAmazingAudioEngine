@@ -52,7 +52,6 @@ const NSTimeInterval kIdleMessagingPollDuration = 0.1;
 const int kScratchBufferFrames                  = 4096;
 const int kInputAudioBufferFrames               = 4096;
 const int kLevelMonitorScratchBufferSize        = 4096;
-const int kAudiobusSourceFlag                   = 1<<12;
 const NSTimeInterval kMaxBufferDurationWithVPIO = 0.01;
 #define kNoAudioErr                            -2222
 
@@ -269,7 +268,6 @@ typedef struct {
 static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS);
 static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp *inTimeStamp, UInt32 inNumberFrames, AudioBufferList *ioData);
 static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferList *buffer, UInt32 numberFrames);
-static void serveAudiobusInputQueue(AEAudioController *THIS);
 
 @property (nonatomic, retain, readwrite) NSString *audioRoute;
 @property (nonatomic, assign, readwrite) float currentBufferDuration;
@@ -564,17 +562,22 @@ static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt3
 
 static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
     AEAudioController *THIS = (AEAudioController *)inRefCon;
-
+    
+    if ( !THIS->_inputAudioBufferList ) return noErr;
+    
     AudioTimeStamp timestamp = *inTimeStamp;
-    if ( !(*ioActionFlags & kAudiobusSourceFlag) ) {
+    
+    BOOL useAudiobus = THIS->_audiobusInputPort && THIS->_usingAudiobusInput;
+    
+    if ( useAudiobus ) {
+        // If Audiobus is connected, then serve Audiobus queue rather than serving system input queue
+        static Float64 __sampleTime = 0;
+        ABInputPortReceiveLive(THIS->_audiobusInputPort, THIS->_inputAudioBufferList, inNumberFrames, &timestamp);
+        timestamp.mSampleTime = __sampleTime;
+        __sampleTime += inNumberFrames;
+    } else {
         // Adjust timestamp to factor in hardware input latency
         timestamp.mHostTime += AEAudioControllerInputLatency(THIS)*__secondsToHostTicks;
-    }
-    
-    if ( THIS->_audiobusInputPort && !(*ioActionFlags & kAudiobusSourceFlag) && THIS->_usingAudiobusInput ) {
-        // If Audiobus is connected, then serve Audiobus queue rather than serving system input queue
-        serveAudiobusInputQueue(THIS);
-        return noErr;
     }
 
     for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
@@ -582,16 +585,12 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
         ((AEAudioControllerTimingCallback)callback->callback)(callback->userInfo, THIS, &timestamp, inNumberFrames, AEAudioTimingContextInput);
     }
     
-    if ( !THIS->_inputAudioBufferList ) return noErr;
-    
     for ( int i=0; i<THIS->_inputAudioBufferList->mNumberBuffers; i++ ) {
         THIS->_inputAudioBufferList->mBuffers[i].mDataByteSize = kInputAudioBufferFrames * THIS->_rawInputAudioDescription.mBytesPerFrame;
     }
     
     // Render audio into buffer
-    if ( *ioActionFlags & kAudiobusSourceFlag && ABInputPortReceive != NULL ) {
-        ABInputPortReceive(THIS->_audiobusInputPort, nil, THIS->_inputAudioBufferList, &inNumberFrames, NULL, NULL);
-    } else {
+    if ( !useAudiobus ) {
         for ( int i=0; i<THIS->_inputAudioBufferList->mNumberBuffers; i++ ) {
             THIS->_inputAudioBufferList->mBuffers[i].mDataByteSize = inNumberFrames * THIS->_rawInputAudioDescription.mBytesPerFrame;
         }
@@ -662,12 +661,6 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     AEAudioController *THIS = (AEAudioController *)inRefCon;
 
     if ( *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
-        
-        if ( !THIS->_hardwareInputAvailable && THIS->_audiobusInputPort && !(*ioActionFlags & kAudiobusSourceFlag) && THIS->_usingAudiobusInput ) {
-            // If we have no input hardware and Audiobus is connected, then serve Audiobus queue (here, rather than the inactive input callback)
-            serveAudiobusInputQueue(THIS);
-        }
-        
         // Before render: Perform timing callbacks
         for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
             callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
@@ -3323,24 +3316,6 @@ static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferLi
         monitor->meanAccumulator += avg;
         monitor->meanBlockCount++;
         monitor->average = monitor->meanAccumulator / monitor->meanBlockCount;
-    }
-}
-
-static void serveAudiobusInputQueue(AEAudioController *THIS) {
-    UInt32 ioBufferLength = AEConvertSecondsToFrames(THIS, THIS->_preferredBufferDuration ? THIS->_preferredBufferDuration : 0.005);
-    AudioTimeStamp timestamp;
-    static Float64 __sampleTime = 0;
-    AudioUnitRenderActionFlags flags = kAudiobusSourceFlag;
-    while ( 1 ) {
-        UInt32 frames = ABInputPortPeek(THIS->_audiobusInputPort, &timestamp);
-        if ( frames == 0 ) break;
-        
-        frames = MIN(ioBufferLength, frames);
-        timestamp.mSampleTime = __sampleTime;
-        __sampleTime += frames;
-        
-        OSStatus result = inputAvailableCallback(THIS, &flags, &timestamp, 0, frames, NULL);
-        if ( result == kNoAudioErr ) break;
     }
 }
 
