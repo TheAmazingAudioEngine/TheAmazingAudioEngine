@@ -728,12 +728,6 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
         }
     }
     
-    if ( bufferList ) {
-        for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
-            bufferList->mBuffers[i].mDataByteSize = *ioLengthInFrames * audioDescription.mBytesPerFrame;
-        }
-    }
-    
     if ( !THIS->_automaticSingleSourceDequeueing ) {
         // If we're pulling the sources individually...
         
