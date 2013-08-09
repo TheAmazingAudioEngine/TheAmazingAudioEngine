@@ -403,14 +403,11 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
         return;
     }
     
-    // We'll advance the buffer list pointers as we add audio - save the originals to restore later
-    void *savedmData[bufferList ? bufferList->mNumberBuffers : 1];
-    if ( bufferList ) {
-        for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
-            savedmData[i] = bufferList->mBuffers[i].mData;
-        }
-    }
-    
+    // We'll advance the buffer list pointers as we add audio - save the original buffer list to restore later
+    char savedBufferListSpace[sizeof(AudioBufferList)+(bufferList->mNumberBuffers-1)*sizeof(AudioBuffer)];
+    AudioBufferList *savedBufferList = (AudioBufferList*)savedBufferListSpace;
+    memcpy(savedBufferList, bufferList, sizeof(savedBufferListSpace));
+
     THIS->_automaticSingleSourceDequeueing = YES;
     int framesToGo = MIN(*ioLengthInFrames, bufferList->mBuffers[0].mDataByteSize / THIS->_clientFormat.mBytesPerFrame);
     
@@ -491,12 +488,7 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
     }
     
     // Restore buffers
-    if ( bufferList ) {
-        for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
-            bufferList->mBuffers[i].mData = savedmData[i];
-            bufferList->mBuffers[i].mDataByteSize = *ioLengthInFrames * THIS->_clientFormat.mBytesPerFrame;
-        }
-    }
+    memcpy(bufferList, savedBufferList, sizeof(savedBufferListSpace));
 }
 
 
@@ -547,11 +539,6 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
     }
     
     if ( !source ) {
-        if ( bufferList ) {
-            for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
-                bufferList->mBuffers[i].mDataByteSize = THIS->_clientFormat.mBytesPerFrame * *ioLengthInFrames;
-            }
-        }
         return;
     }
     
