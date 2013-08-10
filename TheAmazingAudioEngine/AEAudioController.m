@@ -725,6 +725,20 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     return audioDescription;
 }
 
++ (AudioStreamBasicDescription)nonInterleaved16BitMonoAudioDescription {
+    AudioStreamBasicDescription audioDescription;
+    memset(&audioDescription, 0, sizeof(audioDescription));
+    audioDescription.mFormatID          = kAudioFormatLinearPCM;
+    audioDescription.mFormatFlags       = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked | kAudioFormatFlagsNativeEndian | kAudioFormatFlagIsNonInterleaved;
+    audioDescription.mChannelsPerFrame  = 1;
+    audioDescription.mBytesPerPacket    = sizeof(SInt16);
+    audioDescription.mFramesPerPacket   = 1;
+    audioDescription.mBytesPerFrame     = sizeof(SInt16);
+    audioDescription.mBitsPerChannel    = 8 * sizeof(SInt16);
+    audioDescription.mSampleRate        = 44100.0;
+    return audioDescription;
+}
+
 + (AudioStreamBasicDescription)nonInterleavedFloatStereoAudioDescription {
     AudioStreamBasicDescription audioDescription;
     memset(&audioDescription, 0, sizeof(audioDescription));

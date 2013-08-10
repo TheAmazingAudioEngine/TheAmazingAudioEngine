@@ -450,6 +450,14 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(AEAudioController *aud
 + (AudioStreamBasicDescription)nonInterleaved16BitStereoAudioDescription;
 
 /*!
+ * 16-bit mono audio description, non-interleaved
+ *
+ *  This is a 16-bit signed PCM, mono, non-interleaved format at 44.1kHz that can be used
+ *  with @link initWithAudioDescription: @endlink.
+ */
++ (AudioStreamBasicDescription)nonInterleaved16BitMonoAudioDescription;
+
+/*!
  * Floating-point stereo audio description, non-interleaved
  *
  *  This is a floating-point PCM, stereo, non-interleaved format at 44.1kHz that can be used
