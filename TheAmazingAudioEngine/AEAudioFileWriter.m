@@ -78,7 +78,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     }
     
     for (UInt32 i=0; i < numEncoders; ++i) {
-        if ( encoderDescriptions[i].mSubType == kAudioFormatMPEG4AAC && encoderDescriptions[i].mManufacturer == kAppleHardwareAudioCodecManufacturer ) {
+        if ( encoderDescriptions[i].mSubType == kAudioFormatMPEG4AAC && encoderDescriptions[i].mManufacturer == kAppleSoftwareAudioCodecManufacturer ) {
             available_set = YES;
             available = YES;
             return YES;
@@ -163,6 +163,18 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
             return NO;
         }
         
+        UInt32 codecManfacturer = kAppleSoftwareAudioCodecManufacturer;
+        status = ExtAudioFileSetProperty(_audioFile, kExtAudioFileProperty_CodecManufacturer, sizeof(UInt32), &codecManfacturer);
+        
+        if ( !checkResult(status, "ExtAudioFileSetProperty(kExtAudioFileProperty_CodecManufacturer") ) {
+            int fourCC = CFSwapInt32HostToBig(status);
+            if (error) *error = [NSError errorWithDomain:NSOSStatusErrorDomain
+                                                    code:status
+                                                userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't set audio codec (error %d/%4.4s)", @""), status, (char*)&fourCC]
+                                                                                     forKey:NSLocalizedDescriptionKey]];
+            ExtAudioFileDispose(_audioFile);
+            return NO;
+        }
     } else {
         
         // Derive the output audio description from the client format, but with interleaved, big endian (if AIFF) signed integers.
