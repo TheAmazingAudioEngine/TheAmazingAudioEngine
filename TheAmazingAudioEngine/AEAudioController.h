@@ -1102,6 +1102,14 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
 @property (nonatomic, assign) BOOL muteOutput;
 
 /*!
+ * Access the master output volume
+ *
+ *  Note that this value affects the output of the audio engine; it doesn't modify
+ *  the hardware volume setting.
+ */
+@property (nonatomic, assign) float masterOutputVolume;
+
+/*!
  * Enable audio input from Bluetooth devices
  *
  *  Default is NO.
