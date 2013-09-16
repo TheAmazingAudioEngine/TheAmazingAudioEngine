@@ -1735,7 +1735,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 }
 
 -(NSString*)audioRoute {
-    if ( _topChannel->audiobusOutputPort && ABOutputPortGetConnectedPortAttributes(_topChannel->audiobusOutputPort) & ABInputPortAttributePlaysLiveAudio ) {
+    if ( _topChannel && _topChannel->audiobusOutputPort && ABOutputPortGetConnectedPortAttributes(_topChannel->audiobusOutputPort) & ABInputPortAttributePlaysLiveAudio ) {
         return @"Audiobus";
     } else {
         return _audioRoute;
@@ -1743,7 +1743,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 }
 
 -(BOOL)playingThroughDeviceSpeaker {
-    if ( _topChannel->audiobusOutputPort && ABOutputPortGetConnectedPortAttributes(_topChannel->audiobusOutputPort) & ABInputPortAttributePlaysLiveAudio ) {
+    if ( _topChannel && _topChannel->audiobusOutputPort && ABOutputPortGetConnectedPortAttributes(_topChannel->audiobusOutputPort) & ABInputPortAttributePlaysLiveAudio ) {
         return NO;
     } else {
         return _playingThroughDeviceSpeaker;
@@ -2214,6 +2214,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
 }
 
 - (void)replaceIONode {
+    if ( !_topChannel ) return;
     BOOL useVoiceProcessing = [self usingVPIO];
     
     AudioComponentDescription io_desc = {
@@ -2346,7 +2347,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
 }
 
 - (BOOL)mustUpdateVoiceProcessingSettings {
-    
+    if ( !_audioGraph ) return NO;
     BOOL useVoiceProcessing = [self usingVPIO];
 
     AudioComponentDescription target_io_desc = {
@@ -2376,6 +2377,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
 }
 
 - (BOOL)updateInputDeviceStatus {
+    if ( !_audioGraph ) return NO;
     NSAssert(_inputEnabled, @"Input must be enabled");
     
     BOOL success = YES;
