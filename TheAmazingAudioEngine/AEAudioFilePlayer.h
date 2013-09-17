@@ -60,6 +60,7 @@ extern "C" {
 @property (nonatomic, readwrite) BOOL channelIsMuted;       //!< Whether the track is muted
 @property (nonatomic, readwrite) BOOL removeUponFinish;     //!< Whether the track automatically removes itself from the audio controller after playback completes
 @property (nonatomic, copy) void(^completionBlock)();       //!< A block to be called when playback finishes
+@property (nonatomic, copy) void(^startLoopBlock)();        //!< A block to be called when in loop playback the loop restarts
 @end
 
 #ifdef __cplusplus
