@@ -96,7 +96,7 @@
     _playhead = (int32_t)((currentTime / [self duration]) * _lengthInFrames) % _lengthInFrames;
 }
 
-static void notifyLoopStart(AEAudioController *audioController, void *userInfo, int length) {
+static void notifyLoopRestart(AEAudioController *audioController, void *userInfo, int length) {
     AEAudioFilePlayer *THIS = *(AEAudioFilePlayer**)userInfo;
     
     if ( THIS.startLoopBlock ) THIS.startLoopBlock();
@@ -158,8 +158,10 @@ static OSStatus renderCallback(AEAudioFilePlayer *THIS, AEAudioController *audio
             // Reached the end of the audio - either loop, or stop
             if ( THIS->_loop ) {
                 playhead = 0;
-                // Notify main thread that the loop playback has start again
-                AEAudioControllerSendAsynchronousMessageToMainThread(audioController, notifyLoopStart, &THIS, sizeof(AEAudioFilePlayer*));
+                if ( THIS->_startLoopBlock ) {
+                    // Notify main thread that the loop playback has restarted
+                    AEAudioControllerSendAsynchronousMessageToMainThread(audioController, notifyLoopRestart, &THIS, sizeof(AEAudioFilePlayer*));
+                }
             } else {
                 // Notify main thread that playback has finished
                 AEAudioControllerSendAsynchronousMessageToMainThread(audioController, notifyPlaybackStopped, &THIS, sizeof(AEAudioFilePlayer*));
