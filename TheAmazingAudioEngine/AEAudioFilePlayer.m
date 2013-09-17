@@ -100,8 +100,6 @@ static void notifyLoopStart(AEAudioController *audioController, void *userInfo, 
     AEAudioFilePlayer *THIS = *(AEAudioFilePlayer**)userInfo;
     
     if ( THIS.startLoopBlock ) THIS.startLoopBlock();
-    
-    THIS->_playhead = 0;
 }
 
 static void notifyPlaybackStopped(AEAudioController *audioController, void *userInfo, int length) {
