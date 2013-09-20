@@ -48,6 +48,8 @@ typedef void (^ABInputPortAudioInputBlock)(ABInputPort *inputPort, UInt32 length
 - (void)setClientFormat:(AudioStreamBasicDescription)clientFormat;
 - (void)setAudioInputBlock:(ABInputPortAudioInputBlock)audioInputBlock;
 - (void)setConnectedPortAttributes:(NSInteger)connectedPortAttributes;
+- (void)setMuteLiveAudioInputWhenConnectedToSelf:(BOOL)self;
+- (BOOL)connectedToSelf;
 @end
 
 enum {
