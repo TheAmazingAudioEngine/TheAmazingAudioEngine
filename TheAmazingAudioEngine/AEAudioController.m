@@ -44,15 +44,15 @@ static Float32 __cachedInputLatency = 0;
 static Float32 __cachedOutputLatency = 0;
 
 
-const int kMaximumChannelsPerGroup              = 100;
-const int kMaximumCallbacksPerSource            = 15;
-const int kMessageBufferLength                  = 8192;
-const int kMaxMessageDataSize                   = 2048;
-const NSTimeInterval kIdleMessagingPollDuration = 0.1;
-const int kScratchBufferFrames                  = 4096;
-const int kInputAudioBufferFrames               = 4096;
-const int kLevelMonitorScratchBufferSize        = 4096;
-const NSTimeInterval kMaxBufferDurationWithVPIO = 0.01;
+static const int kMaximumChannelsPerGroup              = 100;
+static const int kMaximumCallbacksPerSource            = 15;
+static const int kMessageBufferLength                  = 8192;
+static const int kMaxMessageDataSize                   = 2048;
+static const NSTimeInterval kIdleMessagingPollDuration = 0.1;
+static const int kScratchBufferFrames                  = 4096;
+static const int kInputAudioBufferFrames               = 4096;
+static const int kLevelMonitorScratchBufferSize        = 4096;
+static const NSTimeInterval kMaxBufferDurationWithVPIO = 0.01;
 #define kNoAudioErr                            -2222
 
 NSString * const AEAudioControllerSessionInterruptionBeganNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionBeganNotification";
