@@ -920,8 +920,10 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         if ( checkResult(status=AUGraphStart(_audioGraph), "AUGraphStart") ) {
             _running = YES;
         } else {
-            if ( error ) *error = [NSError audioControllerErrorWithMessage:@"Couldn't start audio engine" OSStatus:status];
-            return NO;
+            if ( ![self attemptRecoveryFromSystemError:error] ) {
+                if ( error && !*error ) *error = [NSError audioControllerErrorWithMessage:@"Couldn't start audio engine" OSStatus:status];
+                return NO;
+            }
         }
     }
     
@@ -2046,7 +2048,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
         [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionEndedNotification object:self];
     }
     
-    if ( _hasSystemError ) [self attemptRecoveryFromSystemError];
+    if ( _hasSystemError ) [self attemptRecoveryFromSystemError:NULL];
 }
 
 -(void)audiobusConnectionsChanged:(NSNotification*)notification {
@@ -2232,7 +2234,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
             || !checkResult(AUGraphRemoveNode(_audioGraph, _ioNode), "AUGraphRemoveNode") // Remove the old IO node
             || !checkResult(AUGraphAddNode(_audioGraph, &io_desc, &_ioNode), "AUGraphAddNode io") // Create new IO node
             || !checkResult(AUGraphNodeInfo(_audioGraph, _ioNode, NULL, &_ioAudioUnit), "AUGraphNodeInfo") ) { // Get reference to input audio unit
-        [self attemptRecoveryFromSystemError];
+        [self attemptRecoveryFromSystemError:NULL];
         return;
     }
     
@@ -2240,7 +2242,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     
     OSStatus result = AUGraphUpdate(_audioGraph, NULL);
     if ( result != kAUGraphErr_NodeNotFound /* Ignore this error */ && !checkResult(result, "AUGraphUpdate") ) {
-        [self attemptRecoveryFromSystemError];
+        [self attemptRecoveryFromSystemError:NULL];
         return;
     }
 
@@ -2464,7 +2466,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
                 }
             }
             
-            if ( memcmp(&audioDescription, &entry->audioDescription, sizeof(audioDescription)) != 0 ) {
+            if ( !entry->audioBufferList || memcmp(&audioDescription, &entry->audioDescription, sizeof(audioDescription)) != 0 ) {
                 if ( entryIndex == 0 ) {
                     inputDescriptionChanged = YES;
                 }
@@ -3086,7 +3088,7 @@ static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef g
     return _voiceProcessingEnabled && _inputEnabled && (!_voiceProcessingOnlyForSpeakerAndMicrophone || _playingThroughDeviceSpeaker);
 }
 
-- (void)attemptRecoveryFromSystemError {
+- (BOOL)attemptRecoveryFromSystemError:(NSError**)error {
     int retries = 3;
     while ( retries > 0 ) {
         NSLog(@"TAAE: Trying to recover from system error (%d retries remain)", retries);
@@ -3103,13 +3105,14 @@ static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef g
             [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerDidRecreateGraphNotification object:self];
             NSLog(@"TAAE: Successfully recovered from system error");
             _hasSystemError = NO;
-            [self start:NULL];
-            return;
+            return [self start:error];
         }
     }
     
     NSLog(@"TAAE: Could not recover from system error.");
+    if ( error ) *error = self.lastError;
     _hasSystemError = YES;
+    return NO;
 }
 
 #pragma mark - Callback management
