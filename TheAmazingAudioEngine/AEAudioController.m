@@ -40,10 +40,6 @@
 static double __hostTicksToSeconds = 0.0;
 static double __secondsToHostTicks = 0.0;
 
-static Float32 __cachedInputLatency = 0;
-static Float32 __cachedOutputLatency = 0;
-
-
 static const int kMaximumChannelsPerGroup              = 100;
 static const int kMaximumCallbacksPerSource            = 15;
 static const int kMessageBufferLength                  = 8192;
@@ -53,7 +49,11 @@ static const int kScratchBufferFrames                  = 4096;
 static const int kInputAudioBufferFrames               = 4096;
 static const int kLevelMonitorScratchBufferSize        = 4096;
 static const NSTimeInterval kMaxBufferDurationWithVPIO = 0.01;
+static const Float32 kNoValue                          = -1.0;
 #define kNoAudioErr                            -2222
+
+static Float32 __cachedInputLatency = kNoValue;
+static Float32 __cachedOutputLatency = kNoValue;
 
 NSString * const AEAudioControllerSessionInterruptionBeganNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionBeganNotification";
 NSString * const AEAudioControllerSessionInterruptionEndedNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionEndedNotification";
@@ -341,8 +341,8 @@ static void interruptionListener(void *inClientData, UInt32 inInterruption) {
 static void audioSessionPropertyListener(void *inClientData, AudioSessionPropertyID inID, UInt32 inDataSize, const void *inData) {
     AEAudioController *THIS = (AEAudioController *)inClientData;
     
-    __cachedInputLatency = 0;
-    __cachedOutputLatency = 0;
+    __cachedInputLatency = kNoValue;
+    __cachedOutputLatency = kNoValue;
     
     if (inID == kAudioSessionProperty_AudioRouteChange) {
         int reason = [[(NSDictionary*)inData objectForKey:[NSString stringWithCString:kAudioSession_AudioRouteChangeKey_Reason encoding:NSUTF8StringEncoding]] intValue];
@@ -1831,9 +1831,12 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 }
 
 NSTimeInterval AEAudioControllerInputLatency(AEAudioController *controller) {
-    if ( !__cachedInputLatency ) {
+    if ( __cachedInputLatency == kNoValue ) {
         UInt32 size = sizeof(__cachedInputLatency);
-        AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputLatency, &size, &__cachedInputLatency);
+        if ( !checkResult(AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputLatency, &size, &__cachedInputLatency),
+                          "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputLatency)") ) {
+            __cachedInputLatency = 0;
+        }
     }
     return __cachedInputLatency;
 }
@@ -1843,9 +1846,12 @@ NSTimeInterval AEAudioControllerInputLatency(AEAudioController *controller) {
 }
 
 NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
-    if ( !__cachedOutputLatency ) {
+    if ( __cachedOutputLatency == kNoValue ) {
         UInt32 size = sizeof(__cachedOutputLatency);
-        AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareOutputLatency, &size, &__cachedOutputLatency);
+        if ( !checkResult(AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareOutputLatency, &size, &__cachedOutputLatency),
+                          "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareOutputLatency)") ) {
+            __cachedOutputLatency = 0;
+        }
     }
     return __cachedOutputLatency;
 }
