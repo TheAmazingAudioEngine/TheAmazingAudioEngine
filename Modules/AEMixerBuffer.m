@@ -260,7 +260,7 @@ static void prepareSkipFadeBufferForSource(AEMixerBuffer *THIS, source_t* source
 }
 
 void AEMixerBufferEnqueue(AEMixerBuffer *THIS, AEMixerBufferSource sourceID, AudioBufferList *audio, UInt32 lengthInFrames, const AudioTimeStamp *timestamp) {
-    dprintf(THIS, 1, "Enqueue %lu frames at time %0.5lfs for source %p", lengthInFrames, timestamp ? timestamp->mHostTime*__hostTicksToSeconds : 0, sourceID);
+    dprintf(THIS, 1, "Enqueue %u frames at time %0.5lfs for source %p", (unsigned int)lengthInFrames, timestamp ? timestamp->mHostTime*__hostTicksToSeconds : 0, sourceID);
     source_t *source = sourceWithID(THIS, sourceID, NULL);
     if ( !source ) {
         if ( pthread_main_np() != 0 ) {
@@ -323,7 +323,7 @@ static OSStatus fillComplexBufferInputProc(AudioConverterRef             inAudio
 }
 
 void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, AudioTimeStamp *outTimestamp) {
-    dprintf(THIS, 1, "Dequeue %lu frames", *ioLengthInFrames);
+    dprintf(THIS, 1, "Dequeue %u frames", (unsigned int)*ioLengthInFrames);
     
     unregisterSources(THIS);
     
@@ -495,7 +495,7 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
 void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource sourceID, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, AudioTimeStamp *outTimestamp) {
     source_t *source = sourceWithID(THIS, sourceID, NULL);
     
-    dprintf(THIS, 1, "Dequeue %lu frames from source %p", *ioLengthInFrames, sourceID);
+    dprintf(THIS, 1, "Dequeue %u frames from source %p", (unsigned int)*ioLengthInFrames, sourceID);
     
     AudioTimeStamp sliceTimestamp = THIS->_currentSliceTimestamp;
     UInt32 sliceFrameCount = THIS->_currentSliceFrameCount;
@@ -553,14 +553,14 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
             if ( sourceFrameCount == AEMixerBufferSourceInactive ) {
                 dprintf(THIS, 3, "Source %p is inactive", source->source);
             } else {
-                dprintf(THIS, 3, "Source %p: %lu frames @ %0.5lfs", source->source, sourceFrameCount, sourceTimestamp.mHostTime*__hostTicksToSeconds);
+                dprintf(THIS, 3, "Source %p: %u frames @ %0.5lfs", source->source, (unsigned int)sourceFrameCount, sourceTimestamp.mHostTime*__hostTicksToSeconds);
             }
             if ( sourceFrameCount != AEMixerBufferSourceInactive && THIS->_assumeInfiniteSources ) sourceFrameCount = UINT32_MAX;
             if ( sourceFrameCount == AEMixerBufferSourceInactive ) sourceFrameCount = 0;
             
         } else {
             sourceFrameCount = TPCircularBufferPeek(&source->buffer, &sourceTimestamp, &audioDescription);
-            dprintf(THIS, 3, "Source %p: %lu frames @ %0.5lfs", source->source, sourceFrameCount, sourceTimestamp.mHostTime*__hostTicksToSeconds);
+            dprintf(THIS, 3, "Source %p: %u frames @ %0.5lfs", source->source, (unsigned int)sourceFrameCount, sourceTimestamp.mHostTime*__hostTicksToSeconds);
         }
     }
     
@@ -605,7 +605,7 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
                     source->skipFadeBuffer->mBuffers[i].mDataByteSize = audioDescription.mBytesPerFrame * microfadeFrames;
                 }
                 
-                dprintf(THIS, 3, "Taking %lu frames for microfade", microfadeFrames);
+                dprintf(THIS, 3, "Taking %u frames for microfade", (unsigned int)microfadeFrames);
                 
                 if ( source->renderCallback ) {
                     source->renderCallback(source->source, microfadeFrames, source->skipFadeBuffer, source->callbackUserinfo);
@@ -653,7 +653,7 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
             
             // Take the fresh audio
             UInt32 freshFrames = *ioLengthInFrames;
-            dprintf(THIS, 3, "Dequeuing %lu fresh frames", freshFrames);
+            dprintf(THIS, 3, "Dequeuing %u fresh frames", (unsigned int)freshFrames);
             if ( source->renderCallback ) {
                 source->renderCallback(source->source, freshFrames, bufferList, source->callbackUserinfo);
             } else {
@@ -706,7 +706,7 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
             }
         } else {
             // Consume audio
-            dprintf(THIS, 3, "Consuming %lu frames", *ioLengthInFrames);
+            dprintf(THIS, 3, "Consuming %u frames", (unsigned int)*ioLengthInFrames);
             if ( source->renderCallback ) {
                 source->renderCallback(source->source, *ioLengthInFrames, bufferList, source->callbackUserinfo);
             } else {
@@ -732,7 +732,7 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
         }
         
         if ( minConsumedFrameCount > 0 ) {
-            dprintf(THIS, 3, "Increasing timeline by %lu frames", minConsumedFrameCount);
+            dprintf(THIS, 3, "Increasing timeline by %u frames", (unsigned int)minConsumedFrameCount);
             
             // Increment sample time
             THIS->_sampleTime += minConsumedFrameCount;
@@ -813,7 +813,7 @@ static UInt32 _AEMixerBufferPeek(AEMixerBuffer *THIS, AudioTimeStamp *outNextTim
             if ( frameCount == AEMixerBufferSourceInactive ) {
                 dprintf(THIS, 3, "Source %p is inactive", source->source);
             } else {
-                dprintf(THIS, 3, "Source %p: %lu frames @ %0.5lfs", source->source, frameCount, timestamp.mHostTime*__hostTicksToSeconds);
+                dprintf(THIS, 3, "Source %p: %u frames @ %0.5lfs", source->source, (unsigned int)frameCount, timestamp.mHostTime*__hostTicksToSeconds);
             }
             
             if ( (frameCount == 0 && (now - source->lastAudioTimestamp) * __hostTicksToSeconds > THIS->_sourceIdleThreshold)
@@ -866,9 +866,9 @@ static UInt32 _AEMixerBufferPeek(AEMixerBuffer *THIS, AudioTimeStamp *outNextTim
             if ( latestStartFrames >= sourceEndFrames ) {
                 
                 #ifdef DEBUG
-                dprintf(THIS, 1, "Mixer buffer %p skipping %ld frames of source %p (ends %0.4lfs/%d frames before earliest source starts)",
+                dprintf(THIS, 1, "Mixer buffer %p skipping %u frames of source %p (ends %0.4lfs/%d frames before earliest source starts)",
                        THIS,
-                       peekEntries[i].frameCount,
+                       (unsigned int)peekEntries[i].frameCount,
                        peekEntries[i].source->source,
                        (latestStartTimestamp.mHostTime-peekEntries[i].endHostTime)*__hostTicksToSeconds,
                        (int)(latestStartFrames-sourceEndFrames));
@@ -906,13 +906,13 @@ static UInt32 _AEMixerBufferPeek(AEMixerBuffer *THIS, AudioTimeStamp *outNextTim
         return 0;
     }
     
-    UInt32 frameCount = earliestEndFrames - latestStartFrames;
+    UInt32 frameCount = (UInt32)(earliestEndFrames - latestStartFrames);
     int frameDiscrepancyThreshold = kResyncTimestampThreshold * THIS->_clientFormat.mSampleRate; // Account for small time discrepancies
     if ( frameCount > (minFrameCount >= frameDiscrepancyThreshold ? minFrameCount - frameDiscrepancyThreshold : minFrameCount) ) {
         frameCount = minFrameCount;
     }
     
-    dprintf(THIS, 3, "%lu frames available @ %0.5lfs", frameCount, latestStartTimestamp.mHostTime*__hostTicksToSeconds);
+    dprintf(THIS, 3, "%u frames available @ %0.5lfs", (unsigned int)frameCount, latestStartTimestamp.mHostTime*__hostTicksToSeconds);
     
     if ( frameCount < kMinimumFrameCount ) {
         dprintf(THIS, 3, "Less than minimum frame count");
@@ -948,7 +948,7 @@ void AEMixerBufferEndTimeInterval(AEMixerBuffer *THIS) {
         for ( int i=0; i<kMaxSources; i++ ) {
             if ( THIS->_table[i].source && THIS->_table[i].consumedFramesInCurrentTimeSlice == 0 ) {
                 UInt32 frames = minConsumedFrameCount;
-                dprintf(THIS, 3, "Discarding %lu frames from source %p", frames, THIS->_table[i].source);
+                dprintf(THIS, 3, "Discarding %u frames from source %p", (unsigned int)frames, THIS->_table[i].source);
                 AEMixerBufferDequeueSingleSource(THIS, THIS->_table[i].source, NULL, &frames, NULL);
             }
         }

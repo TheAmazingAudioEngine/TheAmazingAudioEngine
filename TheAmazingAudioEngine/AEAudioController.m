@@ -993,7 +993,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         group->channels[group->channelCount++] = channelElement;
     }
 
-    int channelCount = [channels count];
+    int channelCount = (int)[channels count];
     
     // Set bus count
     UInt32 busCount = group->channelCount;
@@ -1034,7 +1034,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 - (void)removeChannels:(NSArray*)channels fromChannelGroup:(AEChannelGroupRef)group {
     
     // Remove the channels from the tables, on the core audio thread
-    int count = [channels count];
+    int count = (int)[channels count];
     
     if ( count == 0 ) return;
     
@@ -2468,7 +2468,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
                 
                 if ( [_inputCallbacks[entryIndex].channelMap count] > 0 ) {
                     // Set the target input audio description channels to the number of selected channels
-                    AEAudioStreamBasicDescriptionSetChannelsPerFrame(&audioDescription, [_inputCallbacks[entryIndex].channelMap count]);
+                    AEAudioStreamBasicDescriptionSetChannelsPerFrame(&audioDescription, (int)[_inputCallbacks[entryIndex].channelMap count]);
                 }
             }
             
@@ -2691,8 +2691,8 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     
     if ( inputChannelsChanged || inputAvailableChanged || inputDescriptionChanged ) {
         if ( inputAvailable ) {
-            NSLog(@"TAAE: Input status updated (%lu channel, %@%@%@%@)",
-                  numberOfInputChannels,
+            NSLog(@"TAAE: Input status updated (%u channel, %@%@%@%@)",
+                  (unsigned int)numberOfInputChannels,
                   usingAudiobus ? @"using Audiobus, " : @"",
                   rawAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? @"non-interleaved" : @"interleaved",
                   [self usingVPIO] ? @", using voice processing" : @"",
@@ -2711,7 +2711,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     
     checkResult(AUGraphGetNodeInteractions(_audioGraph, group ? group->mixerNode : _ioNode, &numInteractions, interactions), "AUGraphGetNodeInteractions");
     
-    for ( int i = range.location; i < range.location+range.length; i++ ) {
+    for ( int i = (int)range.location; i < range.location+range.length; i++ ) {
         AEChannelRef channel = group ? group->channels[i] : _topChannel;
         
         // Find the existing upstream connection

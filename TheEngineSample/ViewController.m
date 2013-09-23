@@ -515,7 +515,7 @@ static const int kInputChannelsChangedContext;
 	region.mAudioFile = _audioUnitFile;
 	region.mLoopCount = 0;
 	region.mStartFrame = 0;
-	region.mFramesToPlay = packetCount * dataFormat.mFramesPerPacket;
+	region.mFramesToPlay = (UInt32)packetCount * dataFormat.mFramesPerPacket;
 	checkResult(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFileRegion, kAudioUnitScope_Global, 0, &region, sizeof(region)),
                 "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileRegion)");
 	

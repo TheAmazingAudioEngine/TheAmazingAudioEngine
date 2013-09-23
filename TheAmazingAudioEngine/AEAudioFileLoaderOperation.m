@@ -88,7 +88,7 @@ static const int kMaxAudioFileReadSize = 16384;
                                                                                        forKey:NSLocalizedDescriptionKey]];
             return NO;
         }
-        *lengthInFrames = fileLengthInFrames;
+        *lengthInFrames = (UInt32)fileLengthInFrames;
     }
     
     ExtAudioFileDispose(audioFile);
@@ -183,7 +183,7 @@ static const int kMaxAudioFileReadSize = 16384;
     // Prepare buffers
     int bufferCount = (_targetAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? _targetAudioDescription.mChannelsPerFrame : 1;
     int channelsPerBuffer = (_targetAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? 1 : _targetAudioDescription.mChannelsPerFrame;
-    AudioBufferList *bufferList = AEAllocateAndInitAudioBufferList(_targetAudioDescription, _audioReceiverBlock ? kIncrementalLoadBufferSize : fileLengthInFrames);
+    AudioBufferList *bufferList = AEAllocateAndInitAudioBufferList(_targetAudioDescription, _audioReceiverBlock ? kIncrementalLoadBufferSize : (UInt32)fileLengthInFrames);
     if ( !bufferList ) {
         ExtAudioFileDispose(audioFile);
         self.error = [NSError errorWithDomain:NSPOSIXErrorDomain code:ENOMEM 
@@ -200,14 +200,14 @@ static const int kMaxAudioFileReadSize = 16384;
         if ( _audioReceiverBlock ) {
             memcpy(scratchBufferList, bufferList, sizeof(AudioBufferList)+(bufferCount-1)*sizeof(AudioBuffer));
             for ( int i=0; i<scratchBufferList->mNumberBuffers; i++ ) {
-                scratchBufferList->mBuffers[i].mDataByteSize = MIN(kIncrementalLoadBufferSize * _targetAudioDescription.mBytesPerFrame,
+                scratchBufferList->mBuffers[i].mDataByteSize = (UInt32)MIN(kIncrementalLoadBufferSize * _targetAudioDescription.mBytesPerFrame,
                                                                    (fileLengthInFrames-readFrames) * _targetAudioDescription.mBytesPerFrame);
             }
         } else {
             for ( int i=0; i<scratchBufferList->mNumberBuffers; i++ ) {
                 scratchBufferList->mBuffers[i].mNumberChannels = channelsPerBuffer;
                 scratchBufferList->mBuffers[i].mData = (char*)bufferList->mBuffers[i].mData + readFrames*_targetAudioDescription.mBytesPerFrame;
-                scratchBufferList->mBuffers[i].mDataByteSize = MIN(kMaxAudioFileReadSize, (fileLengthInFrames-readFrames) * _targetAudioDescription.mBytesPerFrame);
+                scratchBufferList->mBuffers[i].mDataByteSize = (UInt32)MIN(kMaxAudioFileReadSize, (fileLengthInFrames-readFrames) * _targetAudioDescription.mBytesPerFrame);
             }
         }
         
@@ -256,7 +256,7 @@ static const int kMaxAudioFileReadSize = 16384;
         }
     } else {
         _bufferList = bufferList;
-        _lengthInFrames = fileLengthInFrames;
+        _lengthInFrames = (UInt32)fileLengthInFrames;
     }
 }
 
