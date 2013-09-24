@@ -873,6 +873,10 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 -(BOOL)start:(NSError **)error {
+    return [self start:error recoveringFromErrors:YES];
+}
+
+-(BOOL)start:(NSError**)error recoveringFromErrors:(BOOL)recoverFromErrors {
     OSStatus status;
     
     NSLog(@"TAAE: Starting Engine");
@@ -920,7 +924,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         if ( checkResult(status=AUGraphStart(_audioGraph), "AUGraphStart") ) {
             _running = YES;
         } else {
-            if ( ![self attemptRecoveryFromSystemError:error] ) {
+            if ( !recoverFromErrors || ![self attemptRecoveryFromSystemError:error] ) {
                 if ( error && !*error ) *error = [NSError audioControllerErrorWithMessage:@"Couldn't start audio engine" OSStatus:status];
                 return NO;
             }
@@ -3107,11 +3111,10 @@ static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef g
         
         checkResult(AudioSessionSetActive(true), "AudioSessionSetActive");
         
-        if ( [self setup] ) {
+        if ( [self setup] && [self start:error recoveringFromErrors:NO] ) {
             [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerDidRecreateGraphNotification object:self];
             NSLog(@"TAAE: Successfully recovered from system error");
             _hasSystemError = NO;
-            return [self start:error];
         }
     }
     
