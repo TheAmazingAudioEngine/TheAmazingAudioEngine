@@ -3115,6 +3115,7 @@ static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef g
             [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerDidRecreateGraphNotification object:self];
             NSLog(@"TAAE: Successfully recovered from system error");
             _hasSystemError = NO;
+            return YES;
         }
     }
     
