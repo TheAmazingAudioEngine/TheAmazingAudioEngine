@@ -419,7 +419,7 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
     OSStatus status = noErr;
     
     // See if there's another filter
-    for ( int i=0, filterIndex=0; i<channel->callbacks.count; i++ ) {
+    for ( int i=channel->callbacks.count-1, filterIndex=0; i>=0; i-- ) {
         callback_t *callback = &channel->callbacks.callbacks[i];
         if ( callback->flags & kFilterFlag ) {
             if ( filterIndex == arg->nextFilterIndex ) {
@@ -535,7 +535,7 @@ static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt3
     AEAudioController *THIS = arg->THIS;
     
     // See if there's another filter
-    for ( int i=0, filterIndex=0; i<arg->table->callbacks.count; i++ ) {
+    for ( int i=arg->table->callbacks.count-1, filterIndex=0; i>=0; i-- ) {
         callback_t *callback = &arg->table->callbacks.callbacks[i];
         if ( callback->flags & kFilterFlag ) {
             if ( filterIndex == arg->nextFilterIndex ) {
