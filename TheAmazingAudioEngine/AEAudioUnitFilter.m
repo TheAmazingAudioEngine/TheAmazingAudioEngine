@@ -56,12 +56,20 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 - (id)initWithComponentDescription:(AudioComponentDescription)audioComponentDescription
                    audioController:(AEAudioController*)audioController
                              error:(NSError**)error {
-    return [self initWithComponentDescription:audioComponentDescription audioController:audioController useDefaultInputFormat:NO error:error];
+    return [self initWithComponentDescription:audioComponentDescription audioController:audioController useDefaultInputFormat:NO preInitializeBlock:nil error:error];
 }
 
 -(id)initWithComponentDescription:(AudioComponentDescription)audioComponentDescription
                   audioController:(AEAudioController *)audioController
             useDefaultInputFormat:(BOOL)useDefaultInputFormat
+                            error:(NSError **)error {
+    return [self initWithComponentDescription:audioComponentDescription audioController:audioController useDefaultInputFormat:useDefaultInputFormat preInitializeBlock:nil error:error];
+}
+
+-(id)initWithComponentDescription:(AudioComponentDescription)audioComponentDescription
+                  audioController:(AEAudioController *)audioController
+            useDefaultInputFormat:(BOOL)useDefaultInputFormat
+               preInitializeBlock:(void(^)(AudioUnit audioUnit))block
                             error:(NSError **)error {
     if ( !(self = [super init]) ) return nil;
     
@@ -71,16 +79,18 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     _useDefaultInputFormat = useDefaultInputFormat;
     _audioGraph = audioController.audioGraph;
 	
-    if ( ![self setup:error] ) {
+    if ( ![self setup:block error:error] ) {
         [self release];
         return nil;
     }
-    
+
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didRecreateGraph:) name:AEAudioControllerDidRecreateGraphNotification object:_audioController];
+
     return self;
 }
 
-- (BOOL)setup:(NSError**)error {
-    
+- (BOOL)setup:(void(^)(AudioUnit audioUnit))block error:(NSError**)error {
+
     OSStatus result;
     if ( !checkResult(result=AUGraphAddNode(_audioGraph, &_componentDescription, &_node), "AUGraphAddNode") ||
         !checkResult(result=AUGraphNodeInfo(_audioGraph, _node, NULL, &_audioUnit), "AUGraphNodeInfo") ) {
@@ -175,7 +185,9 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
                 "AudioUnitSetProperty(kAudioUnitProperty_SetRenderCallback)");
     
     checkResult(AUGraphUpdate(_audioGraph, NULL), "AUGraphUpdate");
-    
+
+    if(block) block(_audioUnit);
+
     checkResult(AudioUnitInitialize(_audioUnit), "AudioUnitInitialize");
     
     if ( _inConverterUnit ) {
@@ -185,7 +197,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     if ( _outConverterUnit ) {
         checkResult(AudioUnitInitialize(_outConverterUnit), "AudioUnitInitialize");
     }
-    
+
     return YES;
 }
 
@@ -255,7 +267,7 @@ static OSStatus audioUnitRenderCallback(void                       *inRefCon,
     _outConverterNode = 0;
     _outConverterUnit = NULL;
     _audioGraph = _audioController.audioGraph;
-    [self setup:NULL];
+    [self setup:nil error:NULL];
 }
 
 @end
