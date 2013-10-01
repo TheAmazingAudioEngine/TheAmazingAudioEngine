@@ -83,7 +83,9 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
         [self release];
         return nil;
     }
-    
+
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didRecreateGraph:) name:AEAudioControllerDidRecreateGraphNotification object:_audioController];
+
     return self;
 }
 
