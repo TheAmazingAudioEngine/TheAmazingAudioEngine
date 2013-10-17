@@ -30,7 +30,6 @@
 #import "AEAudioController+AudiobusStub.h"
 
 static const int kAudioBufferLength = 16384;
-static const int kAudiobusInputPortChanged;
 static const int kAudiobusInputPortConnectedToSelfChanged;
 
 @interface AEPlaythroughChannel () {
@@ -64,7 +63,6 @@ static const int kAudiobusInputPortConnectedToSelfChanged;
 -(void)setAudioController:(AEAudioController *)audioController {
     if ( _audioController ) {
         [_audioController removeObserver:self forKeyPath:@"audiobusInputPort.connectedToSelf"];
-        [_audioController removeObserver:self forKeyPath:@"audiobusInputPort"];
     }
     
     [audioController retain];
@@ -72,12 +70,7 @@ static const int kAudiobusInputPortConnectedToSelfChanged;
     _audioController = audioController;
 
     if ( _audioController ) {
-        [_audioController addObserver:self forKeyPath:@"audiobusInputPort" options:0 context:(void*)&kAudiobusInputPortChanged];
         [_audioController addObserver:self forKeyPath:@"audiobusInputPort.connectedToSelf" options:0 context:(void*)&kAudiobusInputPortConnectedToSelfChanged];
-        
-        if ( _audioController.audiobusInputPort && [_audioController.audiobusInputPort respondsToSelector:@selector(connectedToSelf)] ) {
-            [_audioController.audiobusInputPort setMuteLiveAudioInputWhenConnectedToSelf:NO];
-        }
     }
 }
 
@@ -143,10 +136,6 @@ static OSStatus renderCallback(id                        channel,
         _audiobusConnectedToSelf = _audioController.audiobusInputPort
                                     && [_audioController.audiobusInputPort respondsToSelector:@selector(connectedToSelf)]
                                     && [_audioController.audiobusInputPort connectedToSelf];
-    } else if ( context == &kAudiobusInputPortChanged ) {
-        if ( _audioController.audiobusInputPort && [_audioController.audiobusInputPort respondsToSelector:@selector(connectedToSelf)] ) {
-            [_audioController.audiobusInputPort setMuteLiveAudioInputWhenConnectedToSelf:NO];
-        }
     }
 }
 

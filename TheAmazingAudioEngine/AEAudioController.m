@@ -1885,6 +1885,11 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     [_audiobusInputPort release];
     _audiobusInputPort = audiobusInputPort;
 
+    if ( _audiobusInputPort && [_audiobusInputPort respondsToSelector:@selector(setMuteLiveAudioInputWhenConnectedToSelf:)] ) {
+        // Don't mute live audio input when we're connected to ourselves, as AEPlaythroughChannel will handle this case correctly
+        [_audiobusInputPort setMuteLiveAudioInputWhenConnectedToSelf:NO];
+    }
+    
     if ( _inputEnabled ) {
         [self updateInputDeviceStatus];
     }
