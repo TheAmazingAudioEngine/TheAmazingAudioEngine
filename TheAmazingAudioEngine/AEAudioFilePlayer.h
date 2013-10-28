@@ -37,6 +37,11 @@ extern "C" {
  *  It will play any audio file format supported by iOS.
  *
  *  To use, create an instance, then add it to the audio controller.
+ *
+ *  To play larger audio files, you may want to consider
+ *  @link AEAudioFilePlayerStreaming AEAudioFilePlayerStreaming @endlink.  It
+ *  plays audio files by streaming them from disk, dramatically reducing the
+ *  memory usage needed to play back an audio file at the cost of slightly more cpu usage.
  */
 @interface AEAudioFilePlayer : NSObject <AEAudioPlayable>
 

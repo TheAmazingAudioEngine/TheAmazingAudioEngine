@@ -33,6 +33,7 @@ extern "C" {
 #import "AEAudioController+Audiobus.h"
 #import "AEAudioFileLoaderOperation.h"
 #import "AEAudioFilePlayer.h"
+#import "AEAudioFilePlayerStreaming.h"
 #import "AEAudioFileWriter.h"
 #import "AEBlockChannel.h"
 #import "AEBlockFilter.h"
@@ -163,7 +164,7 @@ extern "C" {
  
  There are a number of ways you can create audio with The Amazing Audio Engine:
 
- - You can play an audio file, with AEAudioFilePlayer.
+ - You can play an audio file, with AEAudioFilePlayer or AEAudioFilePlayerStreaming (for large files).
  - You can create a block to generate audio programmatically, using AEBlockChannel.
  - You can create an Objective-C class that implements the AEAudioPlayable protocol.
  - You can even use an Audio Unit, using the AEAudioUnitChannel class.
@@ -190,8 +191,36 @@ extern "C" {
  If you'd like the audio to loop, you can set [loop](@ref AEAudioFilePlayer::loop) to `YES`. Take a look at the class
  documentation for more things you can do.
  
- @section Block-Channels Block Channels
+ AEAudioFilePlayer reads the entire audio file into memory before playing it.  This works well for small files and those
+ that require extremely low latency.  For larger files, you can dramatically reduce the memory used during audio playback (up to 10x) by
+ playing your audio with AEAudioFilePlayerStreaming.  It has a number of handy features:
  
+ - Playback directly from file to minimize memory usage
+ - Playback within a designated section of a file (e.g. from time t1 to t2)
+ - Pan, volume, mute
+ 
+ To use it, call @link AEAudioFilePlayerStreaming::audioFilePlayerWithURL:audioController: audioFilePlayerWithURL:audioController: @endlink or
+ @link AEAudioFilePlayerStreaming::audioFilePlayerWithURL:audioController:playbackStartTime:playbackEndTime: audioFilePlayerWithURL:audioController:playbackStartTime:playbackEndTime: @endlink,
+ like so:
+
+ @code
+ NSURL *file = [[NSBundle mainBundle] URLForResource:@"somesong" withExtension:@"m4a"];
+ self.player = [AEAudioFilePlayer audioFilePlayerWithURL:file
+ audioController:_audioController];
+ @endcode
+
+ You can also play songs from your device's song library (the iPod music library) as
+ 
+ @code
+ MPMediaItem* mediaItem = ...; // Some item from your device's media library (e.g. from an MPMediaQuery)
+ NSURL itemUrl = [mediaItem valueForProgperty:KMediatItemPropertyAssetURL];
+ self.player = [AEAudioFilePlayer audioFilePlayerWithURL:url
+ audioController:_audioController];
+ #endcode
+
+
+ @section Block-Channels Block Channels
+
  AEBlockChannel is a class that allows you to create a block to generate audio programmatically. Call
  [channelWithBlock:](@ref AEBlockChannel::channelWithBlock:), passing in your block implementation in the form
  defined by @link AEBlockChannelBlock @endlink:
