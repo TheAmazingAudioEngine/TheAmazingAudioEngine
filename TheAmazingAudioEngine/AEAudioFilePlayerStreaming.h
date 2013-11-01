@@ -116,6 +116,8 @@ extern "C" {
 # pragma mark - Custom Properties
 
 @property (nonatomic, readonly, retain) NSURL* url; //!< Original media URL; must be a local file or MPMediaItem asset url
+@property (nonatomic, readonly) NSNumber* currentPlaybackProgress; //!< Current playback progress in [0.0, 1.0] if playing and playback has started, else nil; 0 means at playbackStartTime, 1 at playbackEndTime
+@property (nonatomic, copy) void (^completionBlock)(AEAudioFilePlayerStreaming* callingPlayer); //!< Optional block to call when playback has finished
 
 # pragma mark - AEAudioPlayable Properties: Mutable, may be altered
 

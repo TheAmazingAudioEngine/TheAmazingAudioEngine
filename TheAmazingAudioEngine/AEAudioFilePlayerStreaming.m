@@ -44,7 +44,6 @@
 @property (nonatomic, readwrite, retain) NSURL* url;
 @property (nonatomic, readwrite) AudioStreamBasicDescription audioDescription;
 @property (nonatomic, assign) ExtAudioFileRef audioFileRef;
-@property (nonatomic, assign) AudioBufferList *audioBufferList;
 @property (nonatomic) SInt64 playbackStartFrame;
 @property (nonatomic) SInt64 playbackEndFrame;
 @property (nonatomic) SInt64 lastPlayedbackFrame;
@@ -53,7 +52,8 @@
 
 @implementation AEAudioFilePlayerStreaming
 
-@dynamic renderCallback;
+@synthesize completionBlock = _completionBlock;
+@dynamic renderCallback, currentPlaybackProgress;
 
 #pragma mark - Initialization and Dealloc
 
@@ -74,10 +74,6 @@
 
     status = ExtAudioFileSetProperty(player.audioFileRef, kExtAudioFileProperty_ClientDataFormat, sizeof(player->_audioDescription), &player->_audioDescription);
     if (status != noErr) return nil;
-
-    AudioBufferList* bufferList = AEAllocateAndInitAudioBufferList(player.audioDescription, kMaxNumberOfFramesToReadAtOnce);
-    if (!bufferList) return nil;
-    player.audioBufferList = bufferList;
 
     /*
      * Translate playbackStartTime and playbackEndTime to frames so we can
@@ -145,14 +141,8 @@
         ExtAudioFileDispose(_audioFileRef);
     }
 
-    if (_audioBufferList) {
-        for (int i = 0; i < _audioBufferList->mNumberBuffers; ++i) {
-            if (_audioBufferList->mBuffers[i].mData) free(_audioBufferList->mBuffers[i].mData);
-        }
-        free(_audioBufferList);
-    }
-
     [_url release];
+    [_completionBlock release];
 
     [super dealloc];
 }
@@ -165,6 +155,19 @@
     return MyAudioCallback;
 }
 
+- (NSNumber*)currentPlaybackProgress
+{
+    if (!self.channelIsPlaying || self.lastPlayedbackFrame < 0) {
+        return nil;
+    }
+    else {
+        SInt64 playbackDurationFrames = self.playbackEndFrame - self.playbackStartFrame;
+        double progress = playbackDurationFrames > 0 ? (self.lastPlayedbackFrame - self.playbackStartFrame) / (double)playbackDurationFrames : 1.0;
+        progress = MAX(progress, 0.0);
+        progress = MIN(progress, 1.0);
+        return @(progress);
+    }
+}
 
 #pragma mark - Audio Callback
 
@@ -177,6 +180,8 @@ static OSStatus MyAudioCallback(id channel, AEAudioController *audioController, 
     if (!THIS->_channelIsPlaying) return noErr;
 
     if (THIS->_lastPlayedbackFrame >= THIS->_playbackEndFrame) {
+        // Notify main thread that playback has finished
+        AEAudioControllerSendAsynchronousMessageToMainThread(audioController, notifyPlaybackStopped, &THIS, sizeof(AEAudioFilePlayerStreaming*));
         // We're done playback
         THIS->_channelIsPlaying = NO;
         return noErr;
@@ -196,13 +201,8 @@ static OSStatus MyAudioCallback(id channel, AEAudioController *audioController, 
     //
     // If we start to see dropouts, we might want to use a TPCircularBuffer and do file reads on a separate thread and only read from the
     // circular buffer here, but that requires a lot of scheduling, queues, etc., so no need for now as this works just fine.
-    OSStatus status = ExtAudioFileRead(THIS->_audioFileRef, &framesRead, THIS->_audioBufferList);
+    OSStatus status = ExtAudioFileRead(THIS->_audioFileRef, &framesRead, audio);
     if (status != noErr) return status;
-
-    for (int i = 0; i < audio->mNumberBuffers; ++i) {
-        size_t bytesToCopy = framesRead * THIS->_audioDescription.mBytesPerFrame;
-        memcpy(audio->mBuffers[i].mData, THIS->_audioBufferList->mBuffers[i].mData, bytesToCopy);
-    }
 
     if (framesRead > 0) {
         THIS->_lastPlayedbackFrame = THIS->_lastPlayedbackFrame >= 0 ? THIS->_lastPlayedbackFrame + framesRead : THIS->_playbackStartFrame + framesRead - 1;
@@ -211,10 +211,23 @@ static OSStatus MyAudioCallback(id channel, AEAudioController *audioController, 
     if (framesRead == 0 || framesRead < frames || THIS->_lastPlayedbackFrame >= THIS->_playbackEndFrame) {
         // We've exhausted the contents of the audio file and there's nothing more to read
         // or we've read the entire playback section we defined in playback[Start,End]Time.
+        AEAudioControllerSendAsynchronousMessageToMainThread(audioController, notifyPlaybackStopped, &THIS, sizeof(AEAudioFilePlayerStreaming*));
         THIS->_channelIsPlaying = NO;
     }
 
     return noErr;
+}
+
+
+#pragma mark - Other Callbacks
+
+static void notifyPlaybackStopped(AEAudioController *audioController, void *userInfo, int length) {
+    AEAudioFilePlayerStreaming *THIS = *(AEAudioFilePlayerStreaming**)userInfo;
+    THIS.channelIsPlaying = NO;
+
+    if ( THIS.completionBlock ) THIS.completionBlock(THIS);
+
+    THIS->_lastPlayedbackFrame = -1;
 }
 
 @end
