@@ -69,7 +69,7 @@ extern "C" {
  *  @code
  *      // Get an iPod Library song
  *      MPMediaItem *mediaItem = ...;
- *      NSURL *url = [mediaItem valueForProperty:(MPMediaItemPropertyAssetURL];
+ *      NSURL *url = [mediaItem valueForProperty:MPMediaItemPropertyAssetURL];
  *
  *      // Play it
  *      AEAudioController audioController = ...;
