@@ -1616,10 +1616,9 @@ static BOOL AEAudioControllerHasPendingMainThreadMessages(AEAudioController *THI
             checkResult([self updateGraph], "Update graph");
         }
     }
-    
-    if ( averagePower ) *averagePower = 10.0 * log10((double)group->level_monitor_data.average);
-    if ( peakLevel ) *peakLevel = 10.0 * log10((double)group->level_monitor_data.peak);
-    
+    if ( averagePower ) *averagePower = 10.0f * log10f(group->level_monitor_data.average);
+    if ( peakLevel ) *peakLevel = 10.0f * log10f((double)group->level_monitor_data.peak);
+
     group->level_monitor_data.reset = YES;
 }
 
@@ -1632,8 +1631,8 @@ static BOOL AEAudioControllerHasPendingMainThreadMessages(AEAudioController *THI
         _inputLevelMonitorData.monitoringEnabled = YES;
     }
     
-    if ( averagePower ) *averagePower = 10.0 * log10((double)_inputLevelMonitorData.average);
-    if ( peakLevel ) *peakLevel = 10.0 * log10((double)_inputLevelMonitorData.peak);
+    if ( averagePower ) *averagePower = 10.0f * log10f(_inputLevelMonitorData.average);
+    if ( peakLevel ) *peakLevel = 10.0f * log10f(_inputLevelMonitorData.peak);
     
     _inputLevelMonitorData.reset = YES;
 }
