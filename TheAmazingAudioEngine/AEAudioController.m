@@ -152,10 +152,10 @@ typedef struct __input_callback_table_t {
  */
 typedef struct __audio_level_monitor_t {
     BOOL                monitoringEnabled;
-    float               meanAccumulator;
+    double              meanAccumulator;
     int                 meanBlockCount;
-    Float32             peak;
-    Float32             average;
+    float               peak;
+    float               average;
     AEFloatConverter   *floatConverter;
     AudioBufferList    *scratchBuffer;
     int                 channels;
@@ -1617,8 +1617,8 @@ static BOOL AEAudioControllerHasPendingMainThreadMessages(AEAudioController *THI
         }
     }
     
-    if ( averagePower ) *averagePower = 10.0 * log10f(group->level_monitor_data.average);
-    if ( peakLevel ) *peakLevel = 10.0 * log10f(group->level_monitor_data.peak);
+    if ( averagePower ) *averagePower = 10.0f * log10f(group->level_monitor_data.average);
+    if ( peakLevel ) *peakLevel = 10.0f * log10f(group->level_monitor_data.peak);
     
     group->level_monitor_data.reset = YES;
 }
@@ -1632,8 +1632,8 @@ static BOOL AEAudioControllerHasPendingMainThreadMessages(AEAudioController *THI
         _inputLevelMonitorData.monitoringEnabled = YES;
     }
     
-    if ( averagePower ) *averagePower = 10.0 * log10f(_inputLevelMonitorData.average);
-    if ( peakLevel ) *peakLevel = 10.0 * log10f(_inputLevelMonitorData.peak);
+    if ( averagePower ) *averagePower = 10.0f * log10f(_inputLevelMonitorData.average);
+    if ( peakLevel ) *peakLevel = 10.0f * log10f(_inputLevelMonitorData.peak);
     
     _inputLevelMonitorData.reset = YES;
 }
@@ -3359,7 +3359,7 @@ static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferLi
         vDSP_meamgv((float*)monitor->scratchBuffer->mBuffers[i].mData, 1, &avg, monitorFrames);
         monitor->meanAccumulator += avg;
         monitor->meanBlockCount++;
-        monitor->average = monitor->meanAccumulator / monitor->meanBlockCount;
+        monitor->average = monitor->meanAccumulator / (double)monitor->meanBlockCount;
     }
 }
 
