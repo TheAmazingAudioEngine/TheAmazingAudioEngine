@@ -1205,6 +1205,11 @@ static OSStatus sourceInputCallback(void *inRefCon, AudioUnitRenderActionFlags *
     result = AUGraphNodeInfo(_graph, _mixerNode, NULL, &_mixerUnit);
     if ( !checkResult(result, "AUGraphNodeInfo") ) return;
     
+    // Set the audio unit to handle up to 4096 frames per slice to keep rendering during screen lock
+    UInt32 maxFPS = 4096;
+    checkResult(AudioUnitSetProperty(_mixerUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFPS, sizeof(maxFPS)),
+                "AudioUnitSetProperty(kAudioUnitProperty_MaximumFramesPerSlice)");
+    
     // Try to set mixer's output stream format to our client format
     result = AudioUnitSetProperty(_mixerUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &_clientFormat, sizeof(_clientFormat));
     
