@@ -2835,6 +2835,11 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
                             hasFilters = hasReceivers = NO;
                         }
                         
+                        // Set the audio unit to handle up to 4096 frames per slice to keep rendering during screen lock
+                        UInt32 maxFPS = 4096;
+                        checkResult(AudioUnitSetProperty(subgroup->converterUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFPS, sizeof(maxFPS)),
+                                    "AudioUnitSetProperty(kAudioUnitProperty_MaximumFramesPerSlice)");
+                        
                         if ( channel->setRenderNotification ) {
                             checkResult(AudioUnitRemoveRenderNotify(subgroup->mixerAudioUnit, &groupRenderNotifyCallback, channel), "AudioUnitRemoveRenderNotify");
                             channel->setRenderNotification = NO;

@@ -118,6 +118,11 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
             if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:result userInfo:[NSDictionary dictionaryWithObject:@"Couldn't setup converter audio unit" forKey:NSLocalizedDescriptionKey]];
             return NO;
         }
+        
+        // Set the audio unit to handle up to 4096 frames per slice to keep rendering during screen lock
+        UInt32 maxFPS = 4096;
+        checkResult(AudioUnitSetProperty(_converterUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFPS, sizeof(maxFPS)),
+                    "AudioUnitSetProperty(kAudioUnitProperty_MaximumFramesPerSlice)");
     }
     
     checkResult(AUGraphUpdate(_audioGraph, NULL), "AUGraphUpdate");
