@@ -75,7 +75,7 @@ typedef struct {
     void *userInfo;
 } action_t;
 
-static const int kMaxSources                                = 10;
+static const int kMaxSources                                = 30;
 static const NSTimeInterval kResyncTimestampThreshold       = 0.002;
 static const NSTimeInterval kSourceTimestampIdleThreshold   = 1.0;
 static const UInt32 kConversionBufferLength                 = 16384;
@@ -500,7 +500,7 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
     AudioTimeStamp sliceTimestamp = THIS->_currentSliceTimestamp;
     UInt32 sliceFrameCount = THIS->_currentSliceFrameCount;
     
-    if ( sliceTimestamp.mFlags == 0 ) {
+    if ( sliceTimestamp.mFlags == 0 || sliceFrameCount == 0 ) {
         // Determine how many frames are available globally
         sliceFrameCount = _AEMixerBufferPeek(THIS, &sliceTimestamp, YES);
         THIS->_currentSliceTimestamp = sliceTimestamp;
@@ -734,12 +734,11 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
         if ( minConsumedFrameCount > 0 ) {
             dprintf(THIS, 3, "Increasing timeline by %u frames", (unsigned int)minConsumedFrameCount);
             
-            // Increment sample time
+            // Increment time slice info
             THIS->_sampleTime += minConsumedFrameCount;
-            
-            // Reset time slice info
-            THIS->_currentSliceFrameCount = 0;
-            memset(&THIS->_currentSliceTimestamp, 0, sizeof(AudioTimeStamp));
+            THIS->_currentSliceFrameCount -= minConsumedFrameCount;
+            THIS->_currentSliceTimestamp.mSampleTime += minConsumedFrameCount;
+            THIS->_currentSliceTimestamp.mHostTime += ((double)minConsumedFrameCount/THIS->_clientFormat.mSampleRate) * __secondsToHostTicks;
             for ( int i=0; i<kMaxSources; i++ ) {
                 if ( THIS->_table[i].source ) THIS->_table[i].consumedFramesInCurrentTimeSlice = 0;
             }
