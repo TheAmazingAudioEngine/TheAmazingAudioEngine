@@ -65,7 +65,7 @@ struct _schedule_t {
 }
 
 + (NSTimeInterval)secondsUntilTimestamp:(uint64_t)timestamp {
-    return (timestamp - mach_absolute_time()) * __hostTicksToSeconds;
+    return (int64_t)(timestamp - mach_absolute_time()) * __hostTicksToSeconds;
 }
 
 + (uint64_t)timestampWithSeconds:(NSTimeInterval)seconds fromTimestamp:(uint64_t)timeStamp
