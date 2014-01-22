@@ -30,7 +30,8 @@
 #import "AEAudioController+AudiobusStub.h"
 
 static const int kAudioBufferLength = 16384;
-static const int kAudiobusInputPortConnectedToSelfChanged;
+static const int kAudiobusReceiverPortChanged;
+static const int kAudiobusReceiverPortConnectedToSelfChanged;
 
 @interface AEPlaythroughChannel () {
     TPCircularBuffer _buffer;
@@ -62,7 +63,8 @@ static const int kAudiobusInputPortConnectedToSelfChanged;
 
 -(void)setAudioController:(AEAudioController *)audioController {
     if ( _audioController ) {
-        [_audioController removeObserver:self forKeyPath:@"audiobusInputPort.connectedToSelf"];
+        [_audioController removeObserver:self forKeyPath:@"audiobusReceiverPort.connectedToSelf"];
+        [_audioController removeObserver:self forKeyPath:@"audiobusReceiverPort"];
     }
     
     [audioController retain];
@@ -70,7 +72,12 @@ static const int kAudiobusInputPortConnectedToSelfChanged;
     _audioController = audioController;
 
     if ( _audioController ) {
-        [_audioController addObserver:self forKeyPath:@"audiobusInputPort.connectedToSelf" options:0 context:(void*)&kAudiobusInputPortConnectedToSelfChanged];
+        [_audioController addObserver:self forKeyPath:@"audiobusReceiverPort" options:0 context:(void*)&kAudiobusReceiverPortChanged];
+        [_audioController addObserver:self forKeyPath:@"audiobusReceiverPort.connectedToSelf" options:0 context:(void*)&kAudiobusReceiverPortConnectedToSelfChanged];
+        
+        if ( _audioController.audiobusReceiverPort && [_audioController.audiobusReceiverPort respondsToSelector:@selector(connectedToSelf)] ) {
+            [_audioController.audiobusReceiverPort setMuteLiveAudioInputWhenConnectedToSelf:NO];
+        }
     }
 }
 
@@ -132,10 +139,14 @@ static OSStatus renderCallback(id                        channel,
 }
 
 -(void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
-    if ( context == &kAudiobusInputPortConnectedToSelfChanged ) {
-        _audiobusConnectedToSelf = _audioController.audiobusInputPort
-                                    && [_audioController.audiobusInputPort respondsToSelector:@selector(connectedToSelf)]
-                                    && [_audioController.audiobusInputPort connectedToSelf];
+    if ( context == &kAudiobusReceiverPortConnectedToSelfChanged ) {
+        _audiobusConnectedToSelf = _audioController.audiobusReceiverPort
+                                    && [_audioController.audiobusReceiverPort respondsToSelector:@selector(connectedToSelf)]
+                                    && [_audioController.audiobusReceiverPort connectedToSelf];
+    } else if ( context == &kAudiobusReceiverPortChanged ) {
+        if ( _audioController.audiobusReceiverPort && [_audioController.audiobusReceiverPort respondsToSelector:@selector(connectedToSelf)] ) {
+            [_audioController.audiobusReceiverPort setMuteLiveAudioInputWhenConnectedToSelf:NO];
+        }
     }
 }
 
