@@ -2409,11 +2409,18 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     checkResult(result, "AudioSessionGetProperty");
     hardwareInputAvailable = inputAvailable;
     
+    UInt32 usingIAA = 0;
+    size = sizeof(usingIAA);
+    AudioUnitGetProperty(_ioAudioUnit, kAudioUnitProperty_IsInterAppConnected, kAudioUnitScope_Global, 0, &usingIAA, &size);
+
     // Determine if audio input is available, and the number of input channels available
     if ( _audiobusInputPort && ABInputPortIsConnected(_audiobusInputPort) ) {
         inputAvailable          = YES;
         numberOfInputChannels   = 2;
         usingAudiobus           = YES;
+    } else if(usingIAA) {
+        inputAvailable          = YES;
+        numberOfInputChannels   = 2;
     } else {
         size = sizeof(numberOfInputChannels);
         if ( inputAvailable ) {
