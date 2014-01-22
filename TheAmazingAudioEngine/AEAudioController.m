@@ -1881,6 +1881,11 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     [_audiobusReceiverPort release];
     _audiobusReceiverPort = audiobusReceiverPort;
 
+    if ( _audiobusReceiverPort && [_audiobusReceiverPort respondsToSelector:@selector(setMuteLiveAudioInputWhenConnectedToSelf:)] ) {
+        // Don't mute live audio input when we're connected to ourselves, as AEPlaythroughChannel will handle this case correctly
+        [_audiobusReceiverPort setMuteLiveAudioInputWhenConnectedToSelf:NO];
+    }
+    
     if ( _inputEnabled ) {
         [self updateInputDeviceStatus];
     }
@@ -2632,7 +2637,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
         _inputLevelMonitorData    = inputLevelMonitorData;
     }];
     
-    if ( inputAvailable ) {
+    if ( inputAvailable && (!_audiobusReceiverPort || !ABReceiverPortIsConnected(_audiobusReceiverPort)) ) {
         AudioStreamBasicDescription currentAudioDescription;
         UInt32 size = sizeof(currentAudioDescription);
         OSStatus result = AudioUnitGetProperty(_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &currentAudioDescription, &size);
