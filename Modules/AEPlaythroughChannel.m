@@ -77,6 +77,10 @@ static const int kAudiobusReceiverPortConnectedToSelfChanged;
         
         if ( _audioController.audiobusReceiverPort && [_audioController.audiobusReceiverPort respondsToSelector:@selector(connectedToSelf)] ) {
             [_audioController.audiobusReceiverPort setMuteLiveAudioInputWhenConnectedToSelf:NO];
+            
+            _audiobusConnectedToSelf = _audioController.audiobusReceiverPort
+                                    && [_audioController.audiobusReceiverPort respondsToSelector:@selector(connectedToSelf)]
+                                    && [_audioController.audiobusReceiverPort connectedToSelf];
         }
     }
 }
