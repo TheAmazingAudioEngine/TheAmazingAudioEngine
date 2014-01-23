@@ -511,11 +511,6 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(AEAudioController *aud
  */
 - (void)stop;
 
-/*!
- * Update input device status
- */
-- (BOOL)updateInputDeviceStatus;
-
 ///@}
 #pragma mark - Channel and channel group management
 /** @name Channel and channel group management */
