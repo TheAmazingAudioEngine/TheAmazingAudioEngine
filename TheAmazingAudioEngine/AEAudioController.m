@@ -2940,6 +2940,10 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
         
         
         if ( group ) {
+            // Ensure that we have enough input buses in the mixer
+            UInt32 busCount = group->channelCount;
+            checkResult(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &busCount, sizeof(busCount)), "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)");
+
             // Set volume
             AudioUnitParameterValue volumeValue = channel->volume;
             checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, i, volumeValue, 0),
