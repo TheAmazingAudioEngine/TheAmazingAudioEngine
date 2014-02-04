@@ -3089,6 +3089,12 @@ static void removeChannelsFromGroup(AEAudioController *THIS, AEChannelGroupRef g
         group->mixerNode = 0;
         group->mixerAudioUnit = NULL;
     }
+
+    if ( group->converterNode ) {
+        checkResult(AUGraphRemoveNode(_audioGraph, group->converterNode), "AUGraphRemoveNode");
+        group->converterNode = 0;
+        group->converterUnit = NULL;
+    }
     
     // Release channel resources too
     for ( int i=0; i<group->channelCount; i++ ) {
