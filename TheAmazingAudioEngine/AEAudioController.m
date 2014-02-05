@@ -2473,7 +2473,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
                 
                 if ( [_inputCallbacks[entryIndex].channelMap count] > 0 ) {
                     // Set the target input audio description channels to the number of selected channels
-                    AEAudioStreamBasicDescriptionSetChannelsPerFrame(&audioDescription, [_inputCallbacks[entryIndex].channelMap count]);
+                    AEAudioStreamBasicDescriptionSetChannelsPerFrame(&audioDescription, (int)[_inputCallbacks[entryIndex].channelMap count]);
                 }
             }
             
@@ -2689,8 +2689,8 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     
     if ( inputChannelsChanged || inputAvailableChanged || inputDescriptionChanged ) {
         if ( inputAvailable ) {
-            NSLog(@"TAAE: Input status updated (%lu channel, %@%@%@%@)",
-                  numberOfInputChannels,
+            NSLog(@"TAAE: Input status updated (%u channel, %@%@%@%@)",
+                  (unsigned int)numberOfInputChannels,
                   usingAudiobus ? @"using Audiobus, " : @"",
                   rawAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? @"non-interleaved" : @"interleaved",
                   [self usingVPIO] ? @", using voice processing" : @"",
