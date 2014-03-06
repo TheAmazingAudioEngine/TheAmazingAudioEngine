@@ -44,7 +44,6 @@ typedef void (^ABReceiverPortAudioInputBlock)(ABReceiverPort *receiverPort, UInt
 - (AudioStreamBasicDescription)clientFormat;
 - (void)setClientFormat:(AudioStreamBasicDescription)clientFormat;
 - (void)setConnectedPortAttributes:(NSInteger)connectedPortAttributes;
-- (void)setMuteLiveAudioInputWhenConnectedToSelf:(BOOL)self;
 - (BOOL)connectedToSelf;
 @end
 
