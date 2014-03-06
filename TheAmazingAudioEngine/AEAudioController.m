@@ -43,7 +43,6 @@ static double __secondsToHostTicks = 0.0;
 static const int kMaximumChannelsPerGroup              = 100;
 static const int kMaximumCallbacksPerSource            = 15;
 static const int kMessageBufferLength                  = 8192;
-static const int kMaxMessageDataSize                   = 2048;
 static const NSTimeInterval kIdleMessagingPollDuration = 0.1;
 static const int kScratchBufferFrames                  = 4096;
 static const int kInputAudioBufferFrames               = 4096;

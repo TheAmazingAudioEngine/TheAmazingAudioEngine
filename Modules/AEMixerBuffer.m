@@ -84,7 +84,6 @@ static const UInt32 kSourceBufferFrames                     = 8192;
 static const int kActionBufferSize                          = 2048;
 static const NSTimeInterval kActionMainThreadPollDuration   = 0.2;
 static const int kMinimumFrameCount                         = 64;
-static const int64_t kNoValue                               = INT64_MAX;
 static const UInt32 kMaxMicrofadeDuration                   = 512;
 
 @interface AEMixerBuffer () {
