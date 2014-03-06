@@ -83,9 +83,20 @@ static OSStatus complexInputDataProc(AudioConverterRef             inAudioConver
 }
 
 -(void)setSourceFormat:(AudioStreamBasicDescription)sourceFormat {
-    if ( _toFloatConverter ) AudioConverterDispose(_toFloatConverter);
-    if ( _fromFloatConverter ) AudioConverterDispose(_fromFloatConverter);
-    if ( _scratchFloatBufferList ) free(_scratchFloatBufferList);
+    if ( !memcmp(&sourceFormat, &_sourceAudioDescription, sizeof(sourceFormat)) ) return;
+    
+    if ( _toFloatConverter ) {
+        AudioConverterDispose(_toFloatConverter);
+        _toFloatConverter = NULL;
+    }
+    if ( _fromFloatConverter ) {
+        AudioConverterDispose(_fromFloatConverter);
+        _fromFloatConverter = NULL;
+    }
+    if ( _scratchFloatBufferList ) {
+        free(_scratchFloatBufferList);
+        _scratchFloatBufferList = NULL;
+    }
     
     _sourceAudioDescription = sourceFormat;
     
