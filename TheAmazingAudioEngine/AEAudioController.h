@@ -1290,6 +1290,12 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
 /*!
  * Input latency (in seconds)
  *
+ *  To account for hardware latency, you can use this function to offset audio timestamps.
+ *
+ *  For example:
+ *
+ *      timestamp.mHostTime += AEAudioControllerInputLatency(audioController)*__secondsToHostTicks;
+ *
  * @param controller The audio controller
  * @returns The currently-reported hardware input latency
  */
@@ -1297,6 +1303,12 @@ NSTimeInterval AEAudioControllerInputLatency(AEAudioController *controller);
 
 /*!
  * Output latency (in seconds)
+ *
+ *  To account for hardware latency, you can use this function to offset audio timestamps.
+ *
+ *  For example:
+ *
+ *      timestamp.mHostTime += AEAudioControllerOutputLatency(audioController)*__secondsToHostTicks;
  *
  * @param controller The audio controller
  * @returns The currently-reported hardware output latency
