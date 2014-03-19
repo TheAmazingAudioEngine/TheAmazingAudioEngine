@@ -39,7 +39,6 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     AEAudioController *_audioController;
     AudioComponentDescription _componentDescription;
     AUNode _node;
-    AudioUnit _audioUnit;
     AUNode _converterNode;
     AudioUnit _converterUnit;
     AUGraph _audioGraph;
@@ -167,6 +166,7 @@ static OSStatus renderCallback(id                        channel,
                                UInt32                    frames,
                                AudioBufferList          *audio) {
     AEAudioUnitChannel *THIS = (AEAudioUnitChannel*)channel;
+    THIS->_audioTimeStamp = *time;
     AudioUnitRenderActionFlags flags = 0;
     checkResult(AudioUnitRender(THIS->_converterUnit ? THIS->_converterUnit : THIS->_audioUnit, &flags, time, 0, frames, audio), "AudioUnitRender");
     return noErr;
