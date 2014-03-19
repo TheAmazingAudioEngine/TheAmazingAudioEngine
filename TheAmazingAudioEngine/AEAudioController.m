@@ -278,6 +278,7 @@ static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferLi
 @property (nonatomic, assign) NSTimer *housekeepingTimer;
 @property (nonatomic, retain) ABInputPort *audiobusInputPort;
 @property (nonatomic, retain) ABOutputPort *audiobusOutputPort;
+@property (nonatomic, retain) NSThread *thread;
 @end
 
 @implementation AEAudioController
@@ -798,6 +799,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     _voiceProcessingOnlyForSpeakerAndMicrophone = YES;
     _inputCallbacks = (input_callback_table_t*)calloc(sizeof(input_callback_table_t), 1);
     _inputCallbackCount = 1;
+    _thread = [NSThread currentThread];
     
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationWillEnterForeground:) name:UIApplicationWillEnterForegroundNotification object:nil];
     
@@ -1530,7 +1532,7 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
         TPCircularBufferProduce(&_realtimeThreadMessageBuffer, sizeof(message_t));
         
         if ( !self.running ) {
-            if ( [NSThread isMainThread] ) {
+            if ( [[NSThread currentThread] isEqual:self.thread] ) {
                 processPendingMessagesOnRealtimeThread(self);
                 [self pollForMessageResponses];
             } else {
@@ -1556,7 +1558,7 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
     // Wait for response
     uint64_t giveUpTime = mach_absolute_time() + (1.0 * __secondsToHostTicks);
     while ( !finished && mach_absolute_time() < giveUpTime ) {
-        if ( [NSThread isMainThread] ) {
+        if ( [[NSThread currentThread] isEqual:self.thread] ) {
             [self pollForMessageResponses];
         } else {
             dispatch_async(dispatch_get_main_queue(), ^{
@@ -1608,7 +1610,7 @@ static BOOL AEAudioControllerHasPendingMainThreadMessages(AEAudioController *THI
 
 - (void)averagePowerLevel:(Float32*)averagePower peakHoldLevel:(Float32*)peakLevel forGroup:(AEChannelGroupRef)group {
     if ( !group->level_monitor_data.monitoringEnabled ) {
-        if ( ![NSThread isMainThread] ) {
+        if ( ![[NSThread currentThread] isEqual:self.thread] ) {
             dispatch_async(dispatch_get_main_queue(), ^{ [self averagePowerLevel:NULL peakHoldLevel:NULL forGroup:group]; });
         } else {
             group->level_monitor_data.channels = group->channel->audioDescription.mChannelsPerFrame;
