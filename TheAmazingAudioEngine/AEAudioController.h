@@ -1285,6 +1285,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  */
 @property (nonatomic, readonly) AUGraph audioGraph;
 
+#if TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR
 #pragma mark - C access to properties
 
 /*!
@@ -1314,6 +1315,7 @@ NSTimeInterval AEAudioControllerInputLatency(AEAudioController *controller);
  * @returns The currently-reported hardware output latency
  */
 NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller);
+#endif
 
 @end
 
