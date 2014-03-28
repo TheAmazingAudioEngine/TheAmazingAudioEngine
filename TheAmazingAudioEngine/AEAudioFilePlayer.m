@@ -47,7 +47,7 @@
 
 + (id)audioFilePlayerWithURL:(NSURL*)url audioController:(AEAudioController *)audioController error:(NSError **)error {
     
-    AEAudioFilePlayer *player = [[[AEAudioFilePlayer alloc] init] autorelease];
+    AEAudioFilePlayer *player = [[[self alloc] init] autorelease];
     player->_volume = 1.0;
     player->_channelIsPlaying = YES;
     player->_audioDescription = audioController.audioDescription;
