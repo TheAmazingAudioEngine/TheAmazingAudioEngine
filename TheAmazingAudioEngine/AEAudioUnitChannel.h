@@ -39,6 +39,10 @@ extern "C" {
  *
  */
 @interface AEAudioUnitChannel : NSObject <AEAudioPlayable>
+{
+    AudioUnit _audioUnit;
+    AudioTimeStamp _audioTimeStamp;
+}
 
 /*!
  * Create a new Audio Unit channel
