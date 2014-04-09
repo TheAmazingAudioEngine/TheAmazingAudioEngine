@@ -44,9 +44,10 @@ static const int kMaximumChannelsPerGroup              = 100;
 static const int kMaximumCallbacksPerSource            = 15;
 static const int kMessageBufferLength                  = 8192;
 static const NSTimeInterval kIdleMessagingPollDuration = 0.1;
-static const int kScratchBufferFrames                  = 4096;
-static const int kInputAudioBufferFrames               = 4096;
-static const int kLevelMonitorScratchBufferSize        = 4096;
+static const UInt32 kMaxFramesPerSlice                 = 4096;
+static const int kScratchBufferFrames                  = kMaxFramesPerSlice;
+static const int kInputAudioBufferFrames               = kMaxFramesPerSlice;
+static const int kLevelMonitorScratchBufferSize        = kMaxFramesPerSlice;
 static const NSTimeInterval kMaxBufferDurationWithVPIO = 0.01;
 static const Float32 kNoValue                          = -1.0;
 #define kNoAudioErr                            -2222
@@ -2314,8 +2315,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     }
     
     // Set the audio unit to handle up to 4096 frames per slice to keep rendering during screen lock
-    UInt32 maxFPS = 4096;
-    checkResult(AudioUnitSetProperty(_ioAudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFPS, sizeof(maxFPS)),
+    checkResult(AudioUnitSetProperty(_ioAudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &kMaxFramesPerSlice, sizeof(kMaxFramesPerSlice)),
                 "AudioUnitSetProperty(kAudioUnitProperty_MaximumFramesPerSlice)");
 }
 
@@ -2778,8 +2778,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
                 }
                 
                 // Set the mixer unit to handle up to 4096 frames per slice to keep rendering during screen lock
-                UInt32 maxFPS = 4096;
-                AudioUnitSetProperty(subgroup->mixerAudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFPS, sizeof(maxFPS));
+                AudioUnitSetProperty(subgroup->mixerAudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &kMaxFramesPerSlice, sizeof(kMaxFramesPerSlice));
             }
             
             // Set bus count
@@ -2825,8 +2824,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
                         }
                         
                         // Set the audio unit to handle up to 4096 frames per slice to keep rendering during screen lock
-                        UInt32 maxFPS = 4096;
-                        checkResult(AudioUnitSetProperty(subgroup->converterUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFPS, sizeof(maxFPS)),
+                        checkResult(AudioUnitSetProperty(subgroup->converterUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &kMaxFramesPerSlice, sizeof(kMaxFramesPerSlice)),
                                     "AudioUnitSetProperty(kAudioUnitProperty_MaximumFramesPerSlice)");
                         
                         if ( channel->setRenderNotification ) {
