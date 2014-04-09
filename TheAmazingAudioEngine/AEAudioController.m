@@ -176,6 +176,7 @@ typedef struct __channel_t {
     ChannelType      type;
     void            *ptr;
     void            *object;
+    AEChannelGroupRef parentGroup;
     BOOL             playing;
     float            volume;
     float            pan;
@@ -270,6 +271,7 @@ typedef struct {
 static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS);
 static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp *inTimeStamp, UInt32 inNumberFrames, AudioBufferList *ioData);
 static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferList *buffer, UInt32 numberFrames);
+static BOOL muteChannelForAudiobus(AEChannelRef channel);
 
 @property (nonatomic, retain, readwrite) NSString *audioRoute;
 @property (nonatomic, assign, readwrite) float currentBufferDuration;
@@ -470,7 +472,7 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     
     AudioTimeStamp timestamp = *inTimeStamp;
     
-    if ( channel->audiobusSenderPort && ABSenderPortGetConnectedPortAttributes(channel->audiobusSenderPort) & ABReceiverPortAttributePlaysLiveAudio ) {
+    if ( channel->audiobusSenderPort && ABSenderPortGetIsMuted(channel->audiobusSenderPort) ) {
         // We're sending via the sender port, and the receiver plays live - offset the timestamp by the reported latency
         timestamp.mHostTime += ABSenderPortGetAverageLatency(channel->audiobusSenderPort)*__secondsToHostTicks;
     } else {
@@ -512,10 +514,11 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
         
         // Send via Audiobus
         ABSenderPortSendAudio(channel->audiobusSenderPort, channel->audiobusScratchBuffer, inNumberFrames, &timestamp);
-        if ( ABSenderPortGetConnectedPortAttributes(channel->audiobusSenderPort) & ABReceiverPortAttributePlaysLiveAudio ) {
-            // Silence output after sending
-            for ( int i=0; i<ioData->mNumberBuffers; i++ ) memset(ioData->mBuffers[i].mData, 0, ioData->mBuffers[i].mDataByteSize);
-        }
+    }
+    
+    if ( channel != channel->audioController->_topChannel && muteChannelForAudiobus(channel) ) {
+        // Silence output
+        for ( int i=0; i<ioData->mNumberBuffers; i++ ) memset(ioData->mBuffers[i].mData, 0, ioData->mBuffers[i].mDataByteSize);
     }
     
     return result;
@@ -985,6 +988,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         channelElement->type        = kChannelTypeChannel;
         channelElement->ptr         = channel.renderCallback;
         channelElement->object      = channel;
+        channelElement->parentGroup = group;
         channelElement->playing     = [channel respondsToSelector:@selector(channelIsPlaying)] ? channel.channelIsPlaying : YES;
         channelElement->volume      = [channel respondsToSelector:@selector(volume)] ? channel.volume : 1.0;
         channelElement->pan         = [channel respondsToSelector:@selector(pan)] ? channel.pan : 0.0;
@@ -1132,6 +1136,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     channel->type    = kChannelTypeGroup;
     channel->ptr     = group;
+    channel->parentGroup = parentGroup;
     channel->playing = YES;
     channel->volume  = 1.0;
     channel->pan     = 0.0;
@@ -1740,7 +1745,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 }
 
 -(NSString*)audioRoute {
-    if ( _topChannel->audiobusSenderPort && ABSenderPortGetConnectedPortAttributes(_topChannel->audiobusSenderPort) & ABReceiverPortAttributePlaysLiveAudio ) {
+    if ( _topChannel->audiobusSenderPort && ABSenderPortGetIsMuted(_topChannel->audiobusSenderPort) ) {
         return @"Audiobus";
     } else {
         return _audioRoute;
@@ -1748,7 +1753,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 }
 
 -(BOOL)playingThroughDeviceSpeaker {
-    if ( _topChannel->audiobusSenderPort && ABSenderPortGetConnectedPortAttributes(_topChannel->audiobusSenderPort) & ABReceiverPortAttributePlaysLiveAudio ) {
+    if ( _topChannel->audiobusSenderPort && ABSenderPortGetIsMuted(_topChannel->audiobusSenderPort) ) {
         return NO;
     } else {
         return _playingThroughDeviceSpeaker;
@@ -2485,7 +2490,8 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
                                             || (entry->channelMap && [entry->channelMap count] != entry->audioDescription.mChannelsPerFrame);
             if ( !converterRequired && entry->channelMap ) {
                 for ( int i=0; i<[entry->channelMap count]; i++ ) {
-                    if ( [[entry->channelMap objectAtIndex:i] intValue] != i ) {
+                    id channelEntry = [entry->channelMap objectAtIndex:i];
+                    if ( ([channelEntry isKindOfClass:[NSArray class]] && ([channelEntry count] > 1 || [[channelEntry objectAtIndex:0] intValue] != i)) || ([channelEntry isKindOfClass:[NSNumber class]] && [channelEntry intValue] != i) ) {
                         converterRequired = YES;
                         break;
                     }
@@ -3349,6 +3355,23 @@ static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferLi
         monitor->meanBlockCount++;
         monitor->average = monitor->meanAccumulator / (double)monitor->meanBlockCount;
     }
+}
+
+static BOOL muteChannelForAudiobus(AEChannelRef channel) {
+    if ( channel->audiobusSenderPort && ABSenderPortGetIsMuted(channel->audiobusSenderPort) ) {
+        return YES;
+    }
+    
+    if ( channel->audiobusSenderPort && ABSenderPortIsConnected(channel->audiobusSenderPort) ) {
+        return NO;
+    }
+         
+    if ( channel->parentGroup ) {
+        AEChannelRef parentGroupChannel = channel->parentGroup->channel;
+        return muteChannelForAudiobus(parentGroupChannel);
+    }
+    
+    return NO;
 }
 
 - (void)housekeeping {

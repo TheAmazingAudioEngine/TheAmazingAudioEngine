@@ -36,7 +36,7 @@ void ABReceiverPortReceive(ABReceiverPort *receiverPort, ABPort *sourcePortOrNil
 BOOL ABReceiverPortIsConnected(ABReceiverPort *receiverPort);
 BOOL ABSenderPortSendAudio(ABSenderPort* senderPort, const AudioBufferList *audio, UInt32 lengthInFrames, const AudioTimeStamp *timestamp);
 BOOL ABSenderPortIsConnected(ABSenderPort *senderPort);
-ABReceiverPortAttributes ABSenderPortGetConnectedPortAttributes(ABSenderPort *senderPort);
+BOOL ABSenderPortGetIsMuted(ABSenderPort *senderPort);
 NSTimeInterval ABSenderPortGetAverageLatency(ABSenderPort *senderPort);
 typedef void (^ABReceiverPortAudioInputBlock)(ABReceiverPort *receiverPort, UInt32 lengthInFrames, AudioTimeStamp nextTimestamp, ABPort *sourcePortOrNil);
 

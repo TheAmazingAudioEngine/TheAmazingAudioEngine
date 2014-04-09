@@ -45,9 +45,9 @@ __attribute__((weak)) BOOL ABSenderPortIsConnected(ABSenderPort *senderPort) {
     return NO;
 }
 
-__attribute__((weak)) ABReceiverPortAttributes ABSenderPortGetConnectedPortAttributes(ABSenderPort *senderPort) {
-    printf("ABSenderPortGetConnectedPortAttributes stub called\n");
-    return 0;
+__attribute__((weak)) BOOL ABSenderPortGetIsMuted(ABSenderPort *senderPort) {
+    printf("ABSenderPortGetIsMuted stub called\n");
+    return NO;
 }
 
 __attribute__((weak)) NSTimeInterval ABSenderPortGetAverageLatency(ABSenderPort *senderPort) {
