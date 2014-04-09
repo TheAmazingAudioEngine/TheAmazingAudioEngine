@@ -48,6 +48,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     AUGraph _audioGraph;
     AEAudioControllerFilterProducer _currentProducer;
     void *_currentProducerToken;
+    bool _wasBypassed;
 }
 @end
 
@@ -83,6 +84,9 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
         [self release];
         return nil;
     }
+
+    self.bypassed = false;
+    _wasBypassed  = false;
 
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didRecreateGraph:) name:AEAudioControllerDidRecreateGraphNotification object:_audioController];
 
@@ -250,7 +254,17 @@ static OSStatus filterCallback(id                        filter,
     THIS->_currentProducerToken = producerToken;
     
     AudioUnitRenderActionFlags flags = 0;
-    checkResult(AudioUnitRender(THIS->_outConverterUnit ? THIS->_outConverterUnit : THIS->_audioUnit, &flags, time, 0, frames, audio), "AudioUnitRender");
+    
+    if(THIS->_bypassed){
+        // Bypassed: just advance.
+        THIS->_currentProducer(THIS->_currentProducerToken, audio, &frames);
+    }else{
+        // First check if it was bypassed last time (if so give it a reset so things like reverb don't ring from previous audio).
+        if(THIS->_wasBypassed) AudioUnitReset (THIS->_audioUnit, kAudioUnitScope_Global, 0);
+        // Render the AudioUnit.
+        checkResult(AudioUnitRender(THIS->_outConverterUnit ? THIS->_outConverterUnit : THIS->_audioUnit, &flags, time, 0, frames, audio), "AudioUnitRender");
+    }
+    THIS->_wasBypassed = THIS->_bypassed;
     
     return noErr;
 }
