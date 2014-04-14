@@ -198,6 +198,8 @@ static void prepareSkipFadeBufferForSource(AEMixerBuffer *THIS, source_t* source
 }
 
 -(void)setClientFormat:(AudioStreamBasicDescription)clientFormat {
+    if ( memcmp(&_clientFormat, &clientFormat, sizeof(AudioStreamBasicDescription)) == 0 ) return;
+    
     _clientFormat = clientFormat;
     
     [self respondToChannelCountChange];
