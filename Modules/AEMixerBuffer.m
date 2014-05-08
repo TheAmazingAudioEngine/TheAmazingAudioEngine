@@ -428,10 +428,7 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
     
         if ( THIS->_audioConverter ) {
             // Initialise output buffer (to receive audio in mixer format)
-            intermediateBufferList = TPCircularBufferPrepareEmptyAudioBufferList(&THIS->_audioConverterBuffer, 
-                                                                                 THIS->_mixerOutputFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? THIS->_mixerOutputFormat.mChannelsPerFrame : 1, 
-                                                                                 frames * THIS->_mixerOutputFormat.mBytesPerFrame,
-                                                                                 NULL);
+            intermediateBufferList = TPCircularBufferPrepareEmptyAudioBufferListWithAudioFormat(&THIS->_audioConverterBuffer, &THIS->_mixerOutputFormat, frames, NULL);
             assert(intermediateBufferList != NULL);
             
             for ( int i=0; i<intermediateBufferList->mNumberBuffers; i++ ) {
