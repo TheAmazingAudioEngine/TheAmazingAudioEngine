@@ -34,9 +34,9 @@ extern NSString * ABConnectionsChangedNotification;
 typedef NSUInteger ABReceiverPortAttributes;
 void ABReceiverPortReceive(ABReceiverPort *receiverPort, ABPort *sourcePortOrNil, AudioBufferList *bufferList, UInt32 lengthInFrames, AudioTimeStamp *outTimestamp);
 BOOL ABReceiverPortIsConnected(ABReceiverPort *receiverPort);
-BOOL ABSenderPortSendAudio(ABSenderPort* senderPort, const AudioBufferList *audio, UInt32 lengthInFrames, const AudioTimeStamp *timestamp);
+BOOL ABSenderPortSend(ABSenderPort* senderPort, const AudioBufferList *audio, UInt32 lengthInFrames, const AudioTimeStamp *timestamp);
 BOOL ABSenderPortIsConnected(ABSenderPort *senderPort);
-BOOL ABSenderPortGetIsMuted(ABSenderPort *senderPort);
+BOOL ABSenderPortIsMuted(ABSenderPort *senderPort);
 NSTimeInterval ABSenderPortGetAverageLatency(ABSenderPort *senderPort);
 typedef void (^ABReceiverPortAudioInputBlock)(ABReceiverPort *receiverPort, UInt32 lengthInFrames, AudioTimeStamp nextTimestamp, ABPort *sourcePortOrNil);
 

@@ -658,7 +658,7 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  
  - Receive Audiobus audio by creating an Audiobus Sender port and passing it to The Amazing Audio Engine
    via AEAudioController's [audiobusReceiverPort](@ref AEAudioController::audiobusReceiverPort).
- - Send your app's audio output via Audiobus by creating an Sender port and assigning it to 
+ - Send your app's audio output via Audiobus by creating a sender port and assigning it to 
    audiobusSenderPort](@ref AEAudioController::audiobusSenderPort).
  - Send one individual channel via Audiobus by assigning a new Sender port via
    @link AEAudioController::setAudiobusSenderPort:forChannel: setAudiobusSenderPort:forChannel: @endlink

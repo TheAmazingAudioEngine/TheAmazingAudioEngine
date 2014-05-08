@@ -477,7 +477,7 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     
     AudioTimeStamp timestamp = *inTimeStamp;
     
-    if ( channel->audiobusSenderPort && ABSenderPortGetIsMuted(channel->audiobusSenderPort) ) {
+    if ( channel->audiobusSenderPort && ABSenderPortIsMuted(channel->audiobusSenderPort) ) {
         // We're sending via the sender port, and the receiver plays live - offset the timestamp by the reported latency
         timestamp.mHostTime += ABSenderPortGetAverageLatency(channel->audiobusSenderPort)*__secondsToHostTicks;
     } else {
@@ -518,9 +518,9 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
         }
         
         // Send via Audiobus
-        ABSenderPortSendAudio(channel->audiobusSenderPort, channel->audiobusScratchBuffer, inNumberFrames, &timestamp);
+        ABSenderPortSend(channel->audiobusSenderPort, channel->audiobusScratchBuffer, inNumberFrames, &timestamp);
         
-        if ( !ABSenderPortGetIsMuted(channel->audiobusSenderPort) && upstreamChannelsMutedByAudiobus(channel) && channel->audioController->_audiobusMonitorBuffer ) {
+        if ( !ABSenderPortIsMuted(channel->audiobusSenderPort) && upstreamChannelsMutedByAudiobus(channel) && channel->audioController->_audiobusMonitorBuffer ) {
             // Mix with monitoring buffer
             AudioBufferList *monitorBuffer = channel->audioController->_audiobusMonitorBuffer;
             for ( int i=0; i<MIN(monitorBuffer->mNumberBuffers, channel->audiobusScratchBuffer->mNumberBuffers); i++ ) {
@@ -529,7 +529,7 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
         }
     }
     
-    if ( channel->audiobusSenderPort && ABSenderPortGetIsMuted(channel->audiobusSenderPort) ) {
+    if ( channel->audiobusSenderPort && ABSenderPortIsMuted(channel->audiobusSenderPort) ) {
         // Silence output
         for ( int i=0; i<ioData->mNumberBuffers; i++ ) memset(ioData->mBuffers[i].mData, 0, ioData->mBuffers[i].mDataByteSize);
     }
@@ -1763,7 +1763,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 }
 
 -(NSString*)audioRoute {
-    if ( _topChannel->audiobusSenderPort && ABSenderPortGetIsMuted(_topChannel->audiobusSenderPort) ) {
+    if ( _topChannel->audiobusSenderPort && ABSenderPortIsMuted(_topChannel->audiobusSenderPort) ) {
         return @"Audiobus";
     } else {
         return _audioRoute;
@@ -1771,7 +1771,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *THIS, long frames) {
 }
 
 -(BOOL)playingThroughDeviceSpeaker {
-    if ( _topChannel->audiobusSenderPort && ABSenderPortGetIsMuted(_topChannel->audiobusSenderPort) ) {
+    if ( _topChannel->audiobusSenderPort && ABSenderPortIsMuted(_topChannel->audiobusSenderPort) ) {
         return NO;
     } else {
         return _playingThroughDeviceSpeaker;
@@ -3418,7 +3418,7 @@ static BOOL upstreamChannelsMutedByAudiobus(AEChannelRef channel) {
     if ( !channel->parentGroup ) return NO;
     
     AEChannelRef parentGroupChannel = channel->parentGroup->channel;
-    if ( parentGroupChannel->audiobusSenderPort && ABSenderPortGetIsMuted(channel->audiobusSenderPort) ) {
+    if ( parentGroupChannel->audiobusSenderPort && ABSenderPortIsMuted(channel->audiobusSenderPort) ) {
         return YES;
     }
     

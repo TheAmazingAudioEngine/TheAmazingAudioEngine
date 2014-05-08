@@ -35,8 +35,8 @@ __attribute__((weak)) BOOL ABReceiverPortIsConnected(ABReceiverPort *receiverPor
     return NO;
 }
 
-__attribute__((weak)) BOOL ABSenderPortSendAudio(ABSenderPort* senderPort, const AudioBufferList *audio, UInt32 lengthInFrames, const AudioTimeStamp *timestamp) {
-    printf("ABSenderPortSendAudio stub called\n");
+__attribute__((weak)) BOOL ABSenderPortSend(ABSenderPort* senderPort, const AudioBufferList *audio, UInt32 lengthInFrames, const AudioTimeStamp *timestamp) {
+    printf("ABSenderPortSend stub called\n");
     return NO;
 }
 
@@ -45,8 +45,8 @@ __attribute__((weak)) BOOL ABSenderPortIsConnected(ABSenderPort *senderPort) {
     return NO;
 }
 
-__attribute__((weak)) BOOL ABSenderPortGetIsMuted(ABSenderPort *senderPort) {
-    printf("ABSenderPortGetIsMuted stub called\n");
+__attribute__((weak)) BOOL ABSenderPortIsMuted(ABSenderPort *senderPort) {
+    printf("ABSenderPortIsMuted stub called\n");
     return NO;
 }
 
