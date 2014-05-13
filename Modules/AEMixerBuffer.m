@@ -549,6 +549,7 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
         // Now determine the frame count and timestamp on the current source
         if ( source->peekCallback ) {
             sourceFrameCount = source->peekCallback(source->source, &sourceTimestamp, source->callbackUserinfo);
+            assert(sourceFrameCount == 0 || sourceFrameCount == AEMixerBufferSourceInactive || sourceTimestamp.mFlags & kAudioTimeStampHostTimeValid);
             if ( sourceFrameCount == AEMixerBufferSourceInactive ) {
                 dprintf(THIS, 3, "Source %p is inactive", source->source);
             } else {
@@ -812,6 +813,7 @@ static UInt32 _AEMixerBufferPeek(AEMixerBuffer *THIS, AudioTimeStamp *outNextTim
             
             if ( source->peekCallback ) {
                 frameCount = source->peekCallback(source->source, &timestamp, source->callbackUserinfo);
+                assert(frameCount == 0 || frameCount == AEMixerBufferSourceInactive || timestamp.mFlags & kAudioTimeStampHostTimeValid);
                 if ( frameCount != AEMixerBufferSourceInactive && respectInfiniteSourceFlag && THIS->_assumeInfiniteSources ) frameCount = UINT32_MAX;
             } else {
                 frameCount = TPCircularBufferPeek(&source->buffer, &timestamp, &audioDescription);
