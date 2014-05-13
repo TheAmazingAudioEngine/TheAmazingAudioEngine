@@ -606,10 +606,13 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
                 dprintf(THIS, 3, "Taking %u frames for microfade", (unsigned int)microfadeFrames);
                 
                 if ( source->renderCallback ) {
-                    source->renderCallback(source->source, microfadeFrames, source->skipFadeBuffer, source->callbackUserinfo);
+                    source->renderCallback(source->source, microfadeFrames, source->skipFadeBuffer, &sourceTimestamp, source->callbackUserinfo);
                 } else {
                     TPCircularBufferDequeueBufferListFrames(&source->buffer, &microfadeFrames, source->skipFadeBuffer, NULL, &audioDescription);
                 }
+                
+                sourceTimestamp.mSampleTime += microfadeFrames;
+                sourceTimestamp.mHostTime += ((double)microfadeFrames / (double)source->audioDescription.mSampleRate) * __secondsToHostTicks;
                 
                 skipFrames -= microfadeFrames;
             }
@@ -639,10 +642,13 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
                 dprintf(THIS, 3, "Discarding %d frames", skipFrames);
                 UInt32 discardFrames = skipFrames;
                 if ( source->renderCallback ) {
-                    source->renderCallback(source->source, discardFrames, NULL, source->callbackUserinfo);
+                    source->renderCallback(source->source, discardFrames, NULL, &sourceTimestamp, source->callbackUserinfo);
                 } else {
                     TPCircularBufferDequeueBufferListFrames(&source->buffer, &discardFrames, NULL, NULL, &audioDescription);
                 }
+                
+                sourceTimestamp.mSampleTime += discardFrames;
+                sourceTimestamp.mHostTime += ((double)discardFrames / (double)source->audioDescription.mSampleRate) * __secondsToHostTicks;
             }
             
             for ( int i=0; i<source->skipFadeBuffer->mNumberBuffers; i++ ) {
@@ -653,10 +659,13 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
             UInt32 freshFrames = *ioLengthInFrames;
             dprintf(THIS, 3, "Dequeuing %u fresh frames", (unsigned int)freshFrames);
             if ( source->renderCallback ) {
-                source->renderCallback(source->source, freshFrames, bufferList, source->callbackUserinfo);
+                source->renderCallback(source->source, freshFrames, bufferList, &sourceTimestamp, source->callbackUserinfo);
             } else {
                 TPCircularBufferDequeueBufferListFrames(&source->buffer, &freshFrames, bufferList, NULL, &audioDescription);
             }
+            sourceTimestamp.mSampleTime += freshFrames;
+            sourceTimestamp.mHostTime += ((double)freshFrames / (double)source->audioDescription.mSampleRate) * __secondsToHostTicks;
+            
             microfadeFrames = MIN(microfadeFrames, freshFrames);
             
             if ( bufferList ) {
@@ -706,7 +715,7 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
             // Consume audio
             dprintf(THIS, 3, "Consuming %u frames", (unsigned int)*ioLengthInFrames);
             if ( source->renderCallback ) {
-                source->renderCallback(source->source, *ioLengthInFrames, bufferList, source->callbackUserinfo);
+                source->renderCallback(source->source, *ioLengthInFrames, bufferList, &sourceTimestamp, source->callbackUserinfo);
             } else {
                 TPCircularBufferDequeueBufferListFrames(&source->buffer, ioLengthInFrames, bufferList, NULL, &audioDescription);
             }
@@ -786,7 +795,7 @@ static UInt32 _AEMixerBufferPeek(AEMixerBuffer *THIS, AudioTimeStamp *outNextTim
     UInt32 minFrameCount = UINT32_MAX;
     BOOL hasActiveSources = NO;
     
-    struct { source_t *source; uint64_t endHostTime; UInt32 frameCount; } peekEntries[kMaxSources];
+    struct { source_t *source; uint64_t endHostTime; UInt32 frameCount; AudioTimeStamp timestamp; } peekEntries[kMaxSources];
     memset(&peekEntries, 0, sizeof(peekEntries));
     int peekEntriesCount = 0;
      
@@ -833,6 +842,7 @@ static UInt32 _AEMixerBufferPeek(AEMixerBuffer *THIS, AudioTimeStamp *outNextTim
             peekEntries[peekEntriesCount].source = source;
             peekEntries[peekEntriesCount].endHostTime = endTimestamp.mHostTime;
             peekEntries[peekEntriesCount].frameCount = frameCount;
+            peekEntries[peekEntriesCount].timestamp = timestamp;
             peekEntriesCount++;
             
             if ( timestamp.mHostTime > latestStartTimestamp.mHostTime ) {
@@ -883,15 +893,17 @@ static UInt32 _AEMixerBufferPeek(AEMixerBuffer *THIS, AudioTimeStamp *outNextTim
                         peekEntries[i].source->skipFadeBuffer->mBuffers[j].mDataByteSize = sourceASBD.mBytesPerFrame * microfadeFrames;
                     }
                     if ( peekEntries[i].source->renderCallback ) {
-                        peekEntries[i].source->renderCallback(peekEntries[i].source->source, microfadeFrames, peekEntries[i].source->skipFadeBuffer, peekEntries[i].source->callbackUserinfo);
+                        peekEntries[i].source->renderCallback(peekEntries[i].source->source, microfadeFrames, peekEntries[i].source->skipFadeBuffer, &peekEntries[i].timestamp, peekEntries[i].source->callbackUserinfo);
                     } else {
                         TPCircularBufferDequeueBufferListFrames(&peekEntries[i].source->buffer, &microfadeFrames, peekEntries[i].source->skipFadeBuffer, NULL, &sourceASBD);
                     }
+                    peekEntries[i].timestamp.mSampleTime += microfadeFrames;
+                    peekEntries[i].timestamp.mHostTime += ((double)microfadeFrames / (double)peekEntries[i].source->audioDescription.mSampleRate) * __secondsToHostTicks;
                 }
                 
                 if ( skipFrames > 0 ) {
                     if ( peekEntries[i].source->renderCallback ) {
-                        peekEntries[i].source->renderCallback(peekEntries[i].source->source, skipFrames, NULL, peekEntries[i].source->callbackUserinfo);
+                        peekEntries[i].source->renderCallback(peekEntries[i].source->source, skipFrames, NULL, &peekEntries[i].timestamp, peekEntries[i].source->callbackUserinfo);
                     } else {
                         TPCircularBufferDequeueBufferListFrames(&peekEntries[i].source->buffer, &skipFrames, NULL, NULL, &sourceASBD);
                     }

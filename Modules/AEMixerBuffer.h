@@ -51,11 +51,13 @@ typedef void* AEMixerBufferSource;
  * @param source            The source. This can be anything you like, as long as it is not NULL, and is unique to each source.
  * @param frames            The number of frames required.
  * @param audio             The audio buffer list - audio should be copied into the provided buffers. May be NULL, in which case your render callback should simply discard the requested audio.
+ * @param inTimeStamp       The timestamp that is expected to correspond to the audio rendered.
  * @param userInfo          The opaque pointer passed to @link AEMixerBuffer::setRenderCallback:peekCallback:userInfo:forSource: setRenderCallback:peekCallback:userInfo:forSource: @endlink.
  */
 typedef void (*AEMixerBufferSourceRenderCallback) (AEMixerBufferSource       source,
                                                    UInt32                    frames,
                                                    AudioBufferList          *audio,
+                                                   const AudioTimeStamp     *inTimeStamp,
                                                    void                     *userInfo);
 
 /*!
