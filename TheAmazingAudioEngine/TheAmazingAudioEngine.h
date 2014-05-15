@@ -665,7 +665,11 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  - Send a channel group via Audiobus by assigning a new Output Port via
    @link AEAudioController::setAudiobusOutputPort:forChannelGroup: setAudiobusOutputPort:forChannelGroup: @endlink
 
-
+ <blockquote>
+ Audiobus provides an `ABAudiobusAudioUnitWrapper` class that makes working with audio units easier. <strong>The
+ Amazing Audio Engine does not require this class. In fact, it will cause problems if you use 
+ ABAudiobusAudioUnitWrapper with the methods listed above.</strong> You can use one or the other, but not both.
+ </blockquote>
  
  -------------
  
