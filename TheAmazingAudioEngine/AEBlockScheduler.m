@@ -214,7 +214,7 @@ static void timingReceiver(id                        receiver,
     
     for ( int i=THIS->_tail; i != THIS->_head; i=(i+1)%kMaximumSchedules ) {
         if ( THIS->_schedule[i].block && THIS->_schedule[i].context == context && THIS->_schedule[i].time && endTime >= THIS->_schedule[i].time ) {
-            UInt32 offset = THIS->_schedule[i].time > time->mHostTime ? AEConvertSecondsToFrames(audioController, (THIS->_schedule[i].time - time->mHostTime)*__hostTicksToSeconds) : 0;
+            UInt32 offset = THIS->_schedule[i].time > time->mHostTime ? (UInt32)AEConvertSecondsToFrames(audioController, (THIS->_schedule[i].time - time->mHostTime)*__hostTicksToSeconds) : 0;
             THIS->_schedule[i].block(time, offset);
             AEAudioControllerSendAsynchronousMessageToMainThread(audioController,
                                                                  timingReceiverFinishSchedule,
