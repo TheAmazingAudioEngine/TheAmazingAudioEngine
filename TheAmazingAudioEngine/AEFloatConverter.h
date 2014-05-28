@@ -117,6 +117,11 @@ BOOL AEFloatConverterFromFloatBufferList(AEFloatConverter* converter, AudioBuffe
  */
 @property (nonatomic, assign) AudioStreamBasicDescription sourceFormat;
 
+/*!
+ * The number of channels for the floating-point format
+ */
+@property (nonatomic, assign) int floatFormatChannelsPerFrame;
+
 @end
 
 #ifdef __cplusplus
