@@ -42,7 +42,7 @@ static void audioCallback(id THIS, AEAudioController *audioController, void *sou
     self.lineColor = [UIColor blackColor];
     
     // Disable animating view refreshes
-    self.actions = [NSDictionary dictionaryWithObject:[NSNull null] forKey:@"contents"];
+    self.actions = @{@"contents": [NSNull null]};
     
     return self;
 }
