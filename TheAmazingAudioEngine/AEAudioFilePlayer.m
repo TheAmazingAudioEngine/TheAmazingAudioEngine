@@ -107,7 +107,7 @@ static void notifyPlaybackStopped(AEAudioController *audioController, void *user
     THIS.channelIsPlaying = NO;
 
     if ( THIS->_removeUponFinish ) {
-        [audioController removeChannels:[NSArray arrayWithObject:THIS]];
+        [audioController removeChannels:@[THIS]];
     }
     
     if ( THIS.completionBlock ) THIS.completionBlock();

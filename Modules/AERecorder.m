@@ -97,11 +97,10 @@ static void reportError(AEAudioController *audioController, void *userInfo, int 
     struct reportError_t *arg = userInfo;
     NSError *error = [NSError errorWithDomain:NSOSStatusErrorDomain 
                                          code:arg->result
-                                     userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Error while saving audio: Code %d", @""), arg->result]
-                                                                          forKey:NSLocalizedDescriptionKey]];
+                                     userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Error while saving audio: Code %d", @""), arg->result]}];
     [[NSNotificationCenter defaultCenter] postNotificationName:AERecorderDidEncounterErrorNotification
                                                         object:arg->THIS
-                                                      userInfo:[NSDictionary dictionaryWithObject:error forKey:kAERecorderErrorKey]];
+                                                      userInfo:@{kAERecorderErrorKey: error}];
 }
 
 static void audioCallback(id                        receiver,
