@@ -1822,11 +1822,6 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
         [self addChannels:@[_audiobusMonitorChannel]];
     }
     
-    ABSenderPort *oldSenderPort = nil;
-    if ( channelElement->audiobusSenderPort ) {
-        oldSenderPort = (__bridge_transfer ABSenderPort*)channelElement->audiobusSenderPort;
-    }
-    
     if ( audiobusSenderPort == nil ) {
         [self performSynchronousMessageExchangeWithBlock:^{
             channelElement->audiobusSenderPort = nil;
