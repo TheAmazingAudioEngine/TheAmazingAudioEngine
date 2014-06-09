@@ -124,14 +124,9 @@ static const int kInputChannelsChangedContext;
 -(void)dealloc {
     [_audioController removeObserver:self forKeyPath:@"numberOfInputChannels"];
     
-    if ( _audioUnitFile ) {
-        AudioFileClose(_audioUnitFile);
-    }
-    
     if ( _levelsTimer ) [_levelsTimer invalidate];
 
     NSMutableArray *channelsToRemove = [NSMutableArray arrayWithObjects:_loop1, _loop2, nil];
-    
     
     if ( _player ) {
         [channelsToRemove addObject:_player];
@@ -160,7 +155,9 @@ static const int kInputChannelsChangedContext;
         [_audioController removeFilter:_reverb];
     }
     
-    
+    if ( _audioUnitFile ) {
+        AudioFileClose(_audioUnitFile);
+    }
 }
 
 -(void)viewDidLoad {
