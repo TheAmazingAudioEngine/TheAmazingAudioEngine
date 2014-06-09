@@ -21,8 +21,8 @@
     float       *_ringBuffer;
     int          _ringBufferHead;
 }
-@property (nonatomic, assign) AEAudioController *audioController;
-@property (nonatomic, retain) AEFloatConverter *floatConverter;
+@property (nonatomic, weak) AEAudioController *audioController;
+@property (nonatomic, strong) AEFloatConverter *floatConverter;
 @end
 
 static void audioCallback(id THIS, AEAudioController *audioController, void *source, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio);
@@ -34,7 +34,7 @@ static void audioCallback(id THIS, AEAudioController *audioController, void *sou
     if ( !(self = [super init]) ) return nil;
 
     self.audioController = audioController;
-    self.floatConverter = [[[AEFloatConverter alloc] initWithSourceFormat:audioController.audioDescription] autorelease];
+    self.floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:audioController.audioDescription];
     _conversionBuffer = AEAllocateAndInitAudioBufferList(_floatConverter.floatingPointAudioDescription, kMaxConversionSize);
     _ringBuffer = (float*)calloc(kRingBufferLength, sizeof(float));
     _scratchBuffer = (float*)malloc(kRingBufferLength * sizeof(float) * 2);
@@ -71,16 +71,13 @@ static void audioCallback(id THIS, AEAudioController *audioController, void *sou
 
 -(void)dealloc {
     [self stop];
-    self.lineColor = nil;
     if ( _ringBuffer ) {
         free(_ringBuffer);
     }
     if ( _conversionBuffer ) {
         AEFreeAudioBufferList(_conversionBuffer);
     }
-    self.floatConverter = nil;
     self.audioController = nil;
-    [super dealloc];
 }
 
 #pragma mark - Rendering
@@ -121,8 +118,12 @@ static void audioCallback(id THIS, AEAudioController *audioController, void *sou
 
 #pragma mark - Callback
 
-static void audioCallback(id THISptr, AEAudioController *audioController, void *source, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
-    TPOscilloscopeLayer *THIS = (TPOscilloscopeLayer*)THISptr;
+static void audioCallback(__unsafe_unretained TPOscilloscopeLayer *THIS,
+                          __unsafe_unretained AEAudioController *audioController,
+                          void *source,
+                          const AudioTimeStamp *time,
+                          UInt32 frames,
+                          AudioBufferList *audio) {
     
     // Convert audio
     AEFloatConverterToFloatBufferList(THIS->_floatConverter, audio, THIS->_conversionBuffer, frames);

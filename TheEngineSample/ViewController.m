@@ -35,27 +35,27 @@ static const int kInputChannelsChangedContext;
     AudioFileID _audioUnitFile;
     AEChannelGroupRef _group;
 }
-@property (nonatomic, retain) AEAudioController *audioController;
-@property (nonatomic, retain) AEAudioFilePlayer *loop1;
-@property (nonatomic, retain) AEAudioFilePlayer *loop2;
-@property (nonatomic, retain) AEBlockChannel *oscillator;
-@property (nonatomic, retain) AEAudioUnitChannel *audioUnitPlayer;
-@property (nonatomic, retain) AEAudioFilePlayer *oneshot;
-@property (nonatomic, retain) AEPlaythroughChannel *playthrough;
-@property (nonatomic, retain) AELimiterFilter *limiter;
-@property (nonatomic, retain) AEExpanderFilter *expander;
-@property (nonatomic, retain) AEAudioUnitFilter *reverb;
-@property (nonatomic, retain) TPOscilloscopeLayer *outputOscilloscope;
-@property (nonatomic, retain) TPOscilloscopeLayer *inputOscilloscope;
-@property (nonatomic, retain) CALayer *inputLevelLayer;
-@property (nonatomic, retain) CALayer *outputLevelLayer;
-@property (nonatomic, assign) NSTimer *levelsTimer;
-@property (nonatomic, retain) AERecorder *recorder;
-@property (nonatomic, retain) AEAudioFilePlayer *player;
-@property (nonatomic, retain) UIButton *recordButton;
-@property (nonatomic, retain) UIButton *playButton;
-@property (nonatomic, retain) UIButton *oneshotButton;
-@property (nonatomic, retain) UIButton *oneshotAudioUnitButton;
+@property (nonatomic, strong) AEAudioController *audioController;
+@property (nonatomic, strong) AEAudioFilePlayer *loop1;
+@property (nonatomic, strong) AEAudioFilePlayer *loop2;
+@property (nonatomic, strong) AEBlockChannel *oscillator;
+@property (nonatomic, strong) AEAudioUnitChannel *audioUnitPlayer;
+@property (nonatomic, strong) AEAudioFilePlayer *oneshot;
+@property (nonatomic, strong) AEPlaythroughChannel *playthrough;
+@property (nonatomic, strong) AELimiterFilter *limiter;
+@property (nonatomic, strong) AEExpanderFilter *expander;
+@property (nonatomic, strong) AEAudioUnitFilter *reverb;
+@property (nonatomic, strong) TPOscilloscopeLayer *outputOscilloscope;
+@property (nonatomic, strong) TPOscilloscopeLayer *inputOscilloscope;
+@property (nonatomic, strong) CALayer *inputLevelLayer;
+@property (nonatomic, strong) CALayer *outputLevelLayer;
+@property (nonatomic, weak) NSTimer *levelsTimer;
+@property (nonatomic, strong) AERecorder *recorder;
+@property (nonatomic, strong) AEAudioFilePlayer *player;
+@property (nonatomic, strong) UIButton *recordButton;
+@property (nonatomic, strong) UIButton *playButton;
+@property (nonatomic, strong) UIButton *oneshotButton;
+@property (nonatomic, strong) UIButton *oneshotAudioUnitButton;
 @end
 
 @implementation ViewController
@@ -105,9 +105,9 @@ static const int kInputChannelsChangedContext;
     _oscillator.channelIsMuted = YES;
     
     // Create an audio unit channel (a file player)
-    self.audioUnitPlayer = [[[AEAudioUnitChannel alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Generator, kAudioUnitSubType_AudioFilePlayer)
+    self.audioUnitPlayer = [[AEAudioUnitChannel alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Generator, kAudioUnitSubType_AudioFilePlayer)
                                                                      audioController:_audioController
-                                                                               error:NULL] autorelease];
+                                                                               error:NULL];
     
     // Create a group for loop1, loop2 and oscillator
     _group = [_audioController createChannelGroup];
@@ -132,69 +132,50 @@ static const int kInputChannelsChangedContext;
 
     NSMutableArray *channelsToRemove = [NSMutableArray arrayWithObjects:_loop1, _loop2, nil];
     
-    self.loop1 = nil;
-    self.loop2 = nil;
     
     if ( _player ) {
         [channelsToRemove addObject:_player];
-        self.player = nil;
     }
     
     if ( _oneshot ) {
         [channelsToRemove addObject:_oneshot];
-        self.oneshot = nil;
     }
     
     if ( _playthrough ) {
         [channelsToRemove addObject:_playthrough];
         [_audioController removeInputReceiver:_playthrough];
-        self.playthrough = nil;
     }
     
     [_audioController removeChannels:channelsToRemove];
     
     if ( _limiter ) {
         [_audioController removeFilter:_limiter];
-        self.limiter = nil;
     }
     
     if ( _expander ) {
         [_audioController removeFilter:_expander];
-        self.expander = nil;
     }
     
     if ( _reverb ) {
         [_audioController removeFilter:_reverb];
-        self.reverb = nil;
     }
     
-    self.recorder = nil;
-    self.recordButton = nil;
-    self.playButton = nil;
-    self.oneshotButton = nil;
-    self.oneshotAudioUnitButton = nil;
-    self.outputOscilloscope = nil;
-    self.inputOscilloscope = nil;
-    self.inputLevelLayer = nil;
-    self.outputLevelLayer = nil;
-    self.audioController = nil;
     
-    [super dealloc];
 }
 
 -(void)viewDidLoad {
     [super viewDidLoad];
     
-    UIView *headerView = [[[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 100)] autorelease];
+    UIView *headerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 100)];
     headerView.backgroundColor = [UIColor groupTableViewBackgroundColor];
     
-    self.outputOscilloscope = [[[TPOscilloscopeLayer alloc] initWithAudioController:_audioController] autorelease];
+    self.outputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioController:_audioController];
     _outputOscilloscope.frame = CGRectMake(0, 0, headerView.bounds.size.width, 80);
     [headerView.layer addSublayer:_outputOscilloscope];
     [_audioController addOutputReceiver:_outputOscilloscope];
     [_outputOscilloscope start];
     
-    self.inputOscilloscope = [[[TPOscilloscopeLayer alloc] initWithAudioController:_audioController] autorelease];
+    self.inputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioController:_audioController];
     _inputOscilloscope.frame = CGRectMake(0, 0, headerView.bounds.size.width, 80);
     _inputOscilloscope.lineColor = [UIColor colorWithWhite:0.0 alpha:0.3];
     [headerView.layer addSublayer:_inputOscilloscope];
@@ -213,7 +194,7 @@ static const int kInputChannelsChangedContext;
     
     self.tableView.tableHeaderView = headerView;
     
-    UIView *footerView = [[[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 80)] autorelease];
+    UIView *footerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 80)];
     self.recordButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
     [_recordButton setTitle:@"Record" forState:UIControlStateNormal];
     [_recordButton setTitle:@"Stop" forState:UIControlStateSelected];
@@ -281,7 +262,7 @@ static const int kInputChannelsChangedContext;
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellIdentifier];
     
     if ( !cell ) {
-        cell = [[[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:cellIdentifier] autorelease];
+        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:cellIdentifier];
     }
     
     cell.accessoryView = nil;
@@ -290,8 +271,8 @@ static const int kInputChannelsChangedContext;
     
     switch ( indexPath.section ) {
         case 0: {
-            cell.accessoryView = [[[UISwitch alloc] initWithFrame:CGRectZero] autorelease];
-            UISlider *slider = [[[UISlider alloc] initWithFrame:CGRectMake(cell.bounds.size.width - (isiPad ? 250 : 210), 0, 100, cell.bounds.size.height)] autorelease];
+            cell.accessoryView = [[UISwitch alloc] initWithFrame:CGRectZero];
+            UISlider *slider = [[UISlider alloc] initWithFrame:CGRectMake(cell.bounds.size.width - (isiPad ? 250 : 210), 0, 100, cell.bounds.size.height)];
             slider.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
             slider.tag = kAuxiliaryViewTag;
             slider.maximumValue = 1.0;
@@ -360,7 +341,7 @@ static const int kInputChannelsChangedContext;
             break;
         }
         case 2: {
-            cell.accessoryView = [[[UISwitch alloc] initWithFrame:CGRectZero] autorelease];
+            cell.accessoryView = [[UISwitch alloc] initWithFrame:CGRectZero];
             
             switch ( indexPath.row ) {
                 case 0: {
@@ -385,7 +366,7 @@ static const int kInputChannelsChangedContext;
             break;
         }
         case 3: {
-            cell.accessoryView = [[[UISwitch alloc] initWithFrame:CGRectZero] autorelease];
+            cell.accessoryView = [[UISwitch alloc] initWithFrame:CGRectZero];
             
             switch ( indexPath.row ) {
                 case 0: {
@@ -400,11 +381,11 @@ static const int kInputChannelsChangedContext;
                     int channelCount = _audioController.numberOfInputChannels;
                     CGSize buttonSize = CGSizeMake(30, 30);
 
-                    UIScrollView *channelStrip = [[[UIScrollView alloc] initWithFrame:CGRectMake(0,
+                    UIScrollView *channelStrip = [[UIScrollView alloc] initWithFrame:CGRectMake(0,
                                                                                                  0,
                                                                                                  MIN(channelCount * (buttonSize.width+5) + 5,
                                                                                                      isiPad ? 400 : 200),
-                                                                                                 cell.bounds.size.height)] autorelease];
+                                                                                                 cell.bounds.size.height)];
                     channelStrip.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth;
                     channelStrip.backgroundColor = [UIColor clearColor];
                     
@@ -475,9 +456,11 @@ static const int kInputChannelsChangedContext;
                                                  audioController:_audioController
                                                            error:NULL];
         _oneshot.removeUponFinish = YES;
+        __weak ViewController *weakSelf = self;
         _oneshot.completionBlock = ^{
-            self.oneshot = nil;
-            _oneshotButton.selected = NO;
+            ViewController *strongSelf = weakSelf;
+            strongSelf.oneshot = nil;
+            strongSelf->_oneshotButton.selected = NO;
         };
         [_audioController addChannels:[NSArray arrayWithObject:_oneshot]];
         _oneshotButton.selected = YES;
@@ -487,7 +470,7 @@ static const int kInputChannelsChangedContext;
 - (void)oneshotAudioUnitPlayButtonPressed:(UIButton*)sender {
     if ( !_audioUnitFile ) {
         NSURL *playerFile = [[NSBundle mainBundle] URLForResource:@"Organ Run" withExtension:@"m4a"];
-        checkResult(AudioFileOpenURL((CFURLRef)playerFile, kAudioFileReadPermission, 0, &_audioUnitFile), "AudioFileOpenURL");
+        checkResult(AudioFileOpenURL((__bridge CFURLRef)playerFile, kAudioFileReadPermission, 0, &_audioUnitFile), "AudioFileOpenURL");
     }
     
     // Set the file to play
@@ -536,7 +519,7 @@ static const int kInputChannelsChangedContext;
 
 - (void)playthroughSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
-        self.playthrough = [[[AEPlaythroughChannel alloc] initWithAudioController:_audioController] autorelease];
+        self.playthrough = [[AEPlaythroughChannel alloc] initWithAudioController:_audioController];
         [_audioController addInputReceiver:_playthrough];
         [_audioController addChannels:[NSArray arrayWithObject:_playthrough]];
     } else {
@@ -548,7 +531,7 @@ static const int kInputChannelsChangedContext;
 
 - (void)limiterSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
-        self.limiter = [[[AELimiterFilter alloc] initWithAudioController:_audioController] autorelease];
+        self.limiter = [[AELimiterFilter alloc] initWithAudioController:_audioController];
         _limiter.level = 0.1;
         [_audioController addFilter:_limiter];
     } else {
@@ -559,7 +542,7 @@ static const int kInputChannelsChangedContext;
 
 - (void)expanderSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
-        self.expander = [[[AEExpanderFilter alloc] initWithAudioController:_audioController] autorelease];
+        self.expander = [[AEExpanderFilter alloc] initWithAudioController:_audioController];
         [_audioController addFilter:_expander];
     } else {
         [_audioController removeFilter:_expander];
@@ -569,7 +552,7 @@ static const int kInputChannelsChangedContext;
 
 - (void)reverbSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
-        self.reverb = [[[AEAudioUnitFilter alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Effect, kAudioUnitSubType_Reverb2) audioController:_audioController error:NULL] autorelease];
+        self.reverb = [[AEAudioUnitFilter alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Effect, kAudioUnitSubType_Reverb2) audioController:_audioController error:NULL];
         
         AudioUnitSetParameter(_reverb.audioUnit, kReverb2Param_DryWetMix, kAudioUnitScope_Global, 0, 100.f, 0);
         
@@ -590,7 +573,6 @@ static const int kInputChannelsChangedContext;
         NSMutableArray *channels = [_audioController.inputChannelSelection mutableCopy];
         [channels removeObject:[NSNumber numberWithInt:sender.tag]];
         _audioController.inputChannelSelection = channels;
-        [channels release];
         sender.highlighted = NO;
     }
 }
@@ -607,16 +589,16 @@ static const int kInputChannelsChangedContext;
         self.recorder = nil;
         _recordButton.selected = NO;
     } else {
-        self.recorder = [[[AERecorder alloc] initWithAudioController:_audioController] autorelease];
+        self.recorder = [[AERecorder alloc] initWithAudioController:_audioController];
         NSArray *documentsFolders = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
         NSString *path = [[documentsFolders objectAtIndex:0] stringByAppendingPathComponent:@"Recording.aiff"];
         NSError *error = nil;
         if ( ![_recorder beginRecordingToFileAtPath:path fileType:kAudioFileAIFFType error:&error] ) {
-            [[[[UIAlertView alloc] initWithTitle:@"Error" 
+            [[[UIAlertView alloc] initWithTitle:@"Error" 
                                          message:[NSString stringWithFormat:@"Couldn't start recording: %@", [error localizedDescription]]
                                         delegate:nil
                                cancelButtonTitle:nil
-                               otherButtonTitles:@"OK", nil] autorelease] show];
+                               otherButtonTitles:@"OK", nil] show];
             self.recorder = nil;
             return;
         }
@@ -643,18 +625,20 @@ static const int kInputChannelsChangedContext;
         self.player = [AEAudioFilePlayer audioFilePlayerWithURL:[NSURL fileURLWithPath:path] audioController:_audioController error:&error];
         
         if ( !_player ) {
-            [[[[UIAlertView alloc] initWithTitle:@"Error" 
+            [[[UIAlertView alloc] initWithTitle:@"Error" 
                                          message:[NSString stringWithFormat:@"Couldn't start playback: %@", [error localizedDescription]]
                                         delegate:nil
                                cancelButtonTitle:nil
-                               otherButtonTitles:@"OK", nil] autorelease] show];
+                               otherButtonTitles:@"OK", nil] show];
             return;
         }
         
         _player.removeUponFinish = YES;
+        __weak ViewController *weakSelf = self;
         _player.completionBlock = ^{
-            _playButton.selected = NO;
-            self.player = nil;
+            ViewController *strongSelf = weakSelf;
+            strongSelf->_playButton.selected = NO;
+            weakSelf.player = nil;
         };
         [_audioController addChannels:[NSArray arrayWithObject:_player]];
         

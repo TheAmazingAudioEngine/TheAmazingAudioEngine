@@ -100,8 +100,8 @@ typedef enum {
  * @param audio             The audio buffer list - audio should be copied into the provided buffers
  * @return A status code
  */
-typedef OSStatus (*AEAudioControllerRenderCallback) (id                        channel,
-                                                     AEAudioController        *audioController,
+typedef OSStatus (*AEAudioControllerRenderCallback) (__unsafe_unretained id    channel,
+                                                     __unsafe_unretained AEAudioController *audioController,
                                                      const AudioTimeStamp     *time,
                                                      UInt32                    frames,
                                                      AudioBufferList          *audio);
@@ -207,8 +207,8 @@ typedef OSStatus (*AEAudioControllerRenderCallback) (id                        c
  * @param frames     The length of the audio, in frames
  * @param audio      The audio buffer list
  */
-typedef void (*AEAudioControllerAudioCallback) (id                        receiver,
-                                                AEAudioController        *audioController,
+typedef void (*AEAudioControllerAudioCallback) (__unsafe_unretained id    receiver,
+                                                __unsafe_unretained AEAudioController *audioController,
                                                 void                     *source,
                                                 const AudioTimeStamp     *time,
                                                 UInt32                    frames,
@@ -282,8 +282,8 @@ typedef OSStatus (*AEAudioControllerFilterProducer)(void            *producerTok
  * @param audio     The audio buffer list to write output audio to
  * @return A status code
  */
-typedef OSStatus (*AEAudioControllerFilterCallback)(id                        filter,
-                                                    AEAudioController        *audioController,
+typedef OSStatus (*AEAudioControllerFilterCallback)(__unsafe_unretained id    filter,
+                                                    __unsafe_unretained AEAudioController *audioController,
                                                     AEAudioControllerFilterProducer producer,
                                                     void                     *producerToken,
                                                     const AudioTimeStamp     *time,
@@ -356,8 +356,8 @@ typedef enum {
  * @param frames    The number of frames for the current block
  * @param context   The timing context - either input, or output
  */
-typedef void (*AEAudioControllerTimingCallback) (id                        receiver,
-                                                 AEAudioController        *audioController,
+typedef void (*AEAudioControllerTimingCallback) (__unsafe_unretained id    receiver,
+                                                 __unsafe_unretained AEAudioController *audioController,
                                                  const AudioTimeStamp     *time,
                                                  UInt32                    frames,
                                                  AEAudioTimingContext      context);
@@ -1183,7 +1183,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  *  By default, the first two inputs will be used, for devices with more than 1 input
  *  channel.
  */
-@property (nonatomic, retain) NSArray *inputChannelSelection;
+@property (nonatomic, strong) NSArray *inputChannelSelection;
 
 /*!
  * Preferred buffer duration (in seconds)
@@ -1252,14 +1252,14 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  *
  *  Note: This property is observable
  */
-@property (nonatomic, readonly) NSUInteger numberOfInputChannels;
+@property (nonatomic, readonly) int numberOfInputChannels;
 
 /*!
  * The name of the current audio route
  *
  *  Note: This property is observable
  */
-@property (nonatomic, retain, readonly) NSString *audioRoute;
+@property (nonatomic, strong, readonly) NSString *audioRoute;
 
 /*!
  * The audio description defining the input audio format

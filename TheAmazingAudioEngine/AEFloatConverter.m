@@ -70,7 +70,6 @@ static OSStatus complexInputDataProc(AudioConverterRef             inAudioConver
     if ( _toFloatConverter ) AudioConverterDispose(_toFloatConverter);
     if ( _fromFloatConverter ) AudioConverterDispose(_fromFloatConverter);
     if ( _scratchFloatBufferList ) free(_scratchFloatBufferList);
-    [super dealloc];
 }
 
 -(void)setSourceFormat:(AudioStreamBasicDescription)sourceFormat {

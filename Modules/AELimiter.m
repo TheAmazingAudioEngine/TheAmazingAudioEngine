@@ -88,7 +88,7 @@ static element_t findNextTriggerValueInRange(AELimiter *THIS, AudioBufferList *d
     return self;
 }
 
-BOOL AELimiterEnqueue(AELimiter *THIS, float** buffers, UInt32 length, const AudioTimeStamp *timestamp) {
+BOOL AELimiterEnqueue(__unsafe_unretained AELimiter *THIS, float** buffers, UInt32 length, const AudioTimeStamp *timestamp) {
     int numberOfBuffers = THIS->_audioDescription.mChannelsPerFrame;
     
     char audioBufferListBytes[sizeof(AudioBufferList)+(numberOfBuffers-1)*sizeof(AudioBuffer)];
@@ -103,16 +103,16 @@ BOOL AELimiterEnqueue(AELimiter *THIS, float** buffers, UInt32 length, const Aud
     return TPCircularBufferCopyAudioBufferList(&THIS->_buffer, bufferList, timestamp, kTPCircularBufferCopyAll, NULL);
 }
 
-void AELimiterDequeue(AELimiter *THIS, float** buffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
+void AELimiterDequeue(__unsafe_unretained AELimiter *THIS, float** buffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
     *ioLength = min(*ioLength, AELimiterFillCount(THIS, NULL, NULL));
     _AELimiterDequeue(THIS, buffers, ioLength, timestamp);
 }
 
-void AELimiterDrain(AELimiter *THIS, float** buffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
+void AELimiterDrain(__unsafe_unretained AELimiter *THIS, float** buffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
     _AELimiterDequeue(THIS, buffers, ioLength, timestamp);
 }
 
-static void _AELimiterDequeue(AELimiter *THIS, float** buffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
+static void _AELimiterDequeue(__unsafe_unretained AELimiter *THIS, float** buffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
     // Dequeue the audio
     int numberOfBuffers = THIS->_audioDescription.mChannelsPerFrame;
     char audioBufferListBytes[sizeof(AudioBufferList)+(numberOfBuffers-1)*sizeof(AudioBuffer)];
@@ -282,7 +282,7 @@ static void _AELimiterDequeue(AELimiter *THIS, float** buffers, UInt32 *ioLength
     }
 }
 
-UInt32 AELimiterFillCount(AELimiter *THIS, AudioTimeStamp *timestamp, UInt32 *trueFillCount) {
+UInt32 AELimiterFillCount(__unsafe_unretained AELimiter *THIS, AudioTimeStamp *timestamp, UInt32 *trueFillCount) {
     if ( timestamp ) memset(timestamp, 0, sizeof(AudioTimeStamp));
     int fillCount = 0;
     AudioBufferList *bufferList = TPCircularBufferNextBufferList(&THIS->_buffer, timestamp);
@@ -294,7 +294,7 @@ UInt32 AELimiterFillCount(AELimiter *THIS, AudioTimeStamp *timestamp, UInt32 *tr
     return MAX(0, fillCount - (int)THIS->_attack);
 }
 
-void AELimiterReset(AELimiter *THIS) {
+void AELimiterReset(__unsafe_unretained AELimiter *THIS) {
     THIS->_gain = 1.0;
     THIS->_state = kStateIdle;
     THIS->_framesSinceLastTrigger = kNoValue;
@@ -303,7 +303,7 @@ void AELimiterReset(AELimiter *THIS) {
     TPCircularBufferClear(&THIS->_buffer);
 }
 
-static inline void advanceTime(AELimiter *THIS, UInt32 frames) {
+static inline void advanceTime(__unsafe_unretained AELimiter *THIS, UInt32 frames) {
     if ( THIS->_framesSinceLastTrigger != kNoValue ) {
         THIS->_framesSinceLastTrigger += frames;
         if ( THIS->_framesSinceLastTrigger > THIS->_hold+THIS->_decay ) {
@@ -320,7 +320,7 @@ static inline void advanceTime(AELimiter *THIS, UInt32 frames) {
 }
 
 
-static element_t findNextTriggerValueInRange(AELimiter *THIS, AudioBufferList *dequeuedBufferList, int dequeuedBufferListOffset, NSRange range) {
+static element_t findNextTriggerValueInRange(__unsafe_unretained AELimiter *THIS, AudioBufferList *dequeuedBufferList, int dequeuedBufferListOffset, NSRange range) {
     int framesSeen = 0;
     AudioBufferList *buffer = dequeuedBufferList;
     while ( framesSeen < range.location+range.length && buffer ) {
@@ -354,7 +354,7 @@ static element_t findNextTriggerValueInRange(AELimiter *THIS, AudioBufferList *d
     return (element_t) {0, 0};
 }
 
-static element_t findMaxValueInRange(AELimiter *THIS, AudioBufferList *dequeuedBufferList, int dequeuedBufferListOffset, NSRange range) {
+static element_t findMaxValueInRange(__unsafe_unretained AELimiter *THIS, AudioBufferList *dequeuedBufferList, int dequeuedBufferListOffset, NSRange range) {
     vDSP_Length index = 0;
     float max = 0.0;
     int framesSeen = 0;

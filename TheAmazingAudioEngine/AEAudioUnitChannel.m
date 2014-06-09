@@ -67,7 +67,6 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     _audioGraph = _audioController.audioGraph;
     
     if ( ![self setup:block error:error] ) {
-        [self release];
         return nil;
     }
     
@@ -150,7 +149,6 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 
     checkResult(AUGraphUpdate(_audioGraph, NULL), "AUGraphUpdate");
     
-    [super dealloc];
 }
 
 -(AudioUnit)audioUnit {
@@ -161,12 +159,11 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     return _node;
 }
 
-static OSStatus renderCallback(id                        channel,
-                               AEAudioController        *audioController,
+static OSStatus renderCallback(__unsafe_unretained AEAudioUnitChannel *THIS,
+                               __unsafe_unretained AEAudioController *audioController,
                                const AudioTimeStamp     *time,
                                UInt32                    frames,
                                AudioBufferList          *audio) {
-    AEAudioUnitChannel *THIS = (AEAudioUnitChannel*)channel;
     AudioUnitRenderActionFlags flags = 0;
     checkResult(AudioUnitRender(THIS->_converterUnit ? THIS->_converterUnit : THIS->_audioUnit, &flags, time, 0, frames, audio), "AudioUnitRender");
     return noErr;

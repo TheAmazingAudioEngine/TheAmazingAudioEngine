@@ -231,8 +231,8 @@ extern "C" {
 
  ...
  
- static OSStatus renderCallback(AEAudioFilePlayer *THIS,
-                                AEAudioController *audioController,
+ static OSStatus renderCallback(__unsafe_unretained AEAudioFilePlayer *THIS,
+                                __unsafe_unretained AEAudioController *audioController,
                                 const AudioTimeStamp *time,
                                 UInt32 frames,
                                 AudioBufferList *audio) {
@@ -370,15 +370,13 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
 
  ...
  
- static OSStatus filterCallback(id                        filter,
-                                AEAudioController        *audioController,
+ static OSStatus filterCallback(__unsafe_unretained MyFilterClass *THIS,
+                                __unsafe_unretained AEAudioController *audioController,
                                 AEAudioControllerFilterProducer producer,
                                 void                     *producerToken,
                                 const AudioTimeStamp     *time,
                                 UInt32                    frames,
                                 AudioBufferList          *audio) {
- 
-     MyFilterClass *THIS = (MyFilterClass*)filter;
  
      // Pull audio
      OSStatus status = producer(producerToken, audio, &frames);
@@ -472,13 +470,12 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  @interface MyAudioReceiver : NSObject <AEAudioReceiver>
  @end
  @implementation MyAudioReceiver
- static void receiverCallback(id                        receiver,
-                              AEAudioController        *audioController,
+ static void receiverCallback(__unsafe_unretained MyAudioReceiver *THIS,
+                              __unsafe_unretained AEAudioController *audioController,
                               void                     *source,
                               const AudioTimeStamp     *time,
                               UInt32                    frames,
                               AudioBufferList          *audio) {
-     MyAudioReceiver *THIS = (MyAudioReceiver*)receiver;
      
      // Do something with 'audio'
  }

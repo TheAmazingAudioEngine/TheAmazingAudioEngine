@@ -108,7 +108,7 @@ extern "C" {
 /*!
  * The error, if one occurred
  */
-@property (nonatomic, retain, readonly) NSError *error;
+@property (nonatomic, strong, readonly) NSError *error;
 
 @end
 

@@ -109,7 +109,7 @@ void AERecorderStartRecording(AERecorder* recorder);
 /*!
  * The path
  */
-@property (nonatomic, retain, readonly) NSString *path;
+@property (nonatomic, strong, readonly) NSString *path;
 
 /*!
  * Current recorded time in seconds

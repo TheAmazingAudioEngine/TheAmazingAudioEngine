@@ -81,7 +81,6 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     _audioGraph = audioController.audioGraph;
 	
     if ( ![self setup:block error:error] ) {
-        [self release];
         return nil;
     }
 
@@ -194,7 +193,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     // Setup render callback struct
     AURenderCallbackStruct rcbs;
     rcbs.inputProc = &audioUnitRenderCallback;
-    rcbs.inputProcRefCon = self;
+    rcbs.inputProcRefCon = (__bridge void *)self;
     checkResult(AudioUnitSetProperty(_inConverterUnit ? _inConverterUnit : _audioUnit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &rcbs, sizeof(rcbs)),
                 "AudioUnitSetProperty(kAudioUnitProperty_SetRenderCallback)");
     
@@ -230,7 +229,6 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     
     checkResult(AUGraphUpdate(_audioGraph, NULL), "AUGraphUpdate");
     
-    [super dealloc];
 }
 
 -(AudioUnit)audioUnit {
@@ -241,14 +239,13 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     return _node;
 }
 
-static OSStatus filterCallback(id                        filter,
-                               AEAudioController        *audioController,
+static OSStatus filterCallback(__unsafe_unretained AEAudioUnitFilter *THIS,
+                               __unsafe_unretained AEAudioController *audioController,
                                AEAudioControllerFilterProducer producer,
                                void                     *producerToken,
                                const AudioTimeStamp     *time,
                                UInt32                    frames,
                                AudioBufferList          *audio) {
-    AEAudioUnitFilter *THIS = (AEAudioUnitFilter*)filter;
     
     THIS->_currentProducer = producer;
     THIS->_currentProducerToken = producerToken;
@@ -279,7 +276,7 @@ static OSStatus audioUnitRenderCallback(void                       *inRefCon,
                                         UInt32                      inBusNumber,
                                         UInt32                      inNumberFrames,
                                         AudioBufferList            *ioData) {
-    AEAudioUnitFilter *THIS = (AEAudioUnitFilter*)inRefCon;
+    __unsafe_unretained AEAudioUnitFilter *THIS = (__bridge AEAudioUnitFilter*)inRefCon;
     return THIS->_currentProducer(THIS->_currentProducerToken, ioData, &inNumberFrames);
 }
 

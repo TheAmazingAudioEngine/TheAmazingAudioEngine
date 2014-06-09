@@ -39,22 +39,17 @@
 }
 
 + (AEBlockFilter*)filterWithBlock:(AEBlockFilterBlock)block {
-    return [[[AEBlockFilter alloc] initWithBlock:block] autorelease];
+    return [[AEBlockFilter alloc] initWithBlock:block];
 }
 
--(void)dealloc {
-    self.block = nil;
-    [super dealloc];
-}
 
-static OSStatus filterCallback(id                        filter,
-                               AEAudioController        *audioController,
+static OSStatus filterCallback(__unsafe_unretained AEBlockFilter *THIS,
+                               __unsafe_unretained AEAudioController *audioController,
                                AEAudioControllerFilterProducer producer,
                                void                     *producerToken,
                                const AudioTimeStamp     *time,
                                UInt32                    frames,
                                AudioBufferList          *audio) {
-    AEBlockFilter *THIS = (AEBlockFilter*)filter;
     THIS->_block(producer, producerToken, time, frames, audio);
     return noErr;
 }

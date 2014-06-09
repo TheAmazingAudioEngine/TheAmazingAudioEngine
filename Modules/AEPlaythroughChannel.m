@@ -36,7 +36,7 @@ static const int kAudiobusReceiverPortConnectedToSelfChanged;
     TPCircularBuffer _buffer;
     BOOL _audiobusConnectedToSelf;
 }
-@property (nonatomic, retain) AEAudioController *audioController;
+@property (nonatomic, strong) AEAudioController *audioController;
 @end
 
 @implementation AEPlaythroughChannel
@@ -57,7 +57,6 @@ static const int kAudiobusReceiverPortConnectedToSelfChanged;
 - (void)dealloc {
     TPCircularBufferCleanup(&_buffer);
     self.audioController = nil;
-    [super dealloc];
 }
 
 -(void)setAudioController:(AEAudioController *)audioController {
@@ -65,28 +64,26 @@ static const int kAudiobusReceiverPortConnectedToSelfChanged;
         [_audioController removeObserver:self forKeyPath:@"audiobusReceiverPort.connectedToSelf"];
     }
     
-    [audioController retain];
-    [_audioController release];
     _audioController = audioController;
 
     if ( _audioController ) {
         [_audioController addObserver:self forKeyPath:@"audiobusReceiverPort.connectedToSelf" options:0 context:(void*)&kAudiobusReceiverPortConnectedToSelfChanged];
         
-        if ( _audioController.audiobusReceiverPort && [_audioController.audiobusReceiverPort respondsToSelector:@selector(connectedToSelf)] ) {
+        if ( _audioController.audiobusReceiverPort && [(id)_audioController.audiobusReceiverPort respondsToSelector:@selector(connectedToSelf)] ) {
             _audiobusConnectedToSelf = _audioController.audiobusReceiverPort
-                                    && [_audioController.audiobusReceiverPort respondsToSelector:@selector(connectedToSelf)]
-                                    && [_audioController.audiobusReceiverPort connectedToSelf];
+                                    && [(id)_audioController.audiobusReceiverPort respondsToSelector:@selector(connectedToSelf)]
+                                    && [(id)_audioController.audiobusReceiverPort connectedToSelf];
         }
     }
 }
 
-static void inputCallback(id                        receiver,
-                          AEAudioController        *audioController,
+static void inputCallback(__unsafe_unretained AEPlaythroughChannel *THIS,
+                          __unsafe_unretained AEAudioController *audioController,
                           void                     *source,
                           const AudioTimeStamp     *time,
                           UInt32                    frames,
                           AudioBufferList          *audio) {
-    AEPlaythroughChannel *THIS = receiver;
+
     if ( THIS->_audiobusConnectedToSelf ) return;
     TPCircularBufferCopyAudioBufferList(&THIS->_buffer, audio, time, kTPCircularBufferCopyAll, NULL);
 }
@@ -95,13 +92,11 @@ static void inputCallback(id                        receiver,
     return inputCallback;
 }
 
-static OSStatus renderCallback(id                        channel,
-                               AEAudioController        *audioController,
+static OSStatus renderCallback(__unsafe_unretained AEPlaythroughChannel *THIS,
+                               __unsafe_unretained AEAudioController *audioController,
                                const AudioTimeStamp     *time,
                                UInt32                    frames,
                                AudioBufferList          *audio) {
-    AEPlaythroughChannel *THIS = channel;
-    
     while ( 1 ) {
         // Discard any buffers with an incompatible format, in the event of a format change
         AudioBufferList *nextBuffer = TPCircularBufferNextBufferList(&THIS->_buffer, NULL);
@@ -140,8 +135,8 @@ static OSStatus renderCallback(id                        channel,
 -(void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
     if ( context == &kAudiobusReceiverPortConnectedToSelfChanged ) {
         _audiobusConnectedToSelf = _audioController.audiobusReceiverPort
-                                    && [_audioController.audiobusReceiverPort respondsToSelector:@selector(connectedToSelf)]
-                                    && [_audioController.audiobusReceiverPort connectedToSelf];
+                                    && [(id)_audioController.audiobusReceiverPort respondsToSelector:@selector(connectedToSelf)]
+                                    && [(id)_audioController.audiobusReceiverPort connectedToSelf];
     } else {
         [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
     }

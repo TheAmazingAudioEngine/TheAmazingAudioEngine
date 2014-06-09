@@ -44,7 +44,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     AudioStreamBasicDescription _audioDescription;
 }
 
-@property (nonatomic, retain, readwrite) NSString *path;
+@property (nonatomic, strong, readwrite) NSString *path;
 @end
 
 @implementation AEAudioFileWriter
@@ -101,8 +101,6 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     if ( _writing ) {
         [self finishWriting];
     }
-    self.path = nil;
-    [super dealloc];
 }
 
 - (BOOL)beginWritingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType error:(NSError**)error {
@@ -147,7 +145,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
         }
         
         // Create the file
-        status = ExtAudioFileCreateWithURL((CFURLRef)[NSURL fileURLWithPath:path], 
+        status = ExtAudioFileCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:path], 
                                            kAudioFileM4AType, 
                                            &destinationFormat, 
                                            NULL, 
@@ -187,7 +185,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
         audioDescription.mFramesPerPacket = 1;
         
         // Create the file
-        status = ExtAudioFileCreateWithURL((CFURLRef)[NSURL fileURLWithPath:path], 
+        status = ExtAudioFileCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:path], 
                                            fileType, 
                                            &audioDescription, 
                                            NULL, 
@@ -238,11 +236,11 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     }
 }
 
-OSStatus AEAudioFileWriterAddAudio(AEAudioFileWriter* THIS, AudioBufferList *bufferList, UInt32 lengthInFrames) {
+OSStatus AEAudioFileWriterAddAudio(__unsafe_unretained AEAudioFileWriter* THIS, AudioBufferList *bufferList, UInt32 lengthInFrames) {
     return ExtAudioFileWriteAsync(THIS->_audioFile, lengthInFrames, bufferList);
 }
 
-OSStatus AEAudioFileWriterAddAudioSynchronously(AEAudioFileWriter* THIS, AudioBufferList *bufferList, UInt32 lengthInFrames) {
+OSStatus AEAudioFileWriterAddAudioSynchronously(__unsafe_unretained AEAudioFileWriter* THIS, AudioBufferList *bufferList, UInt32 lengthInFrames) {
     return ExtAudioFileWrite(THIS->_audioFile, lengthInFrames, bufferList);
 }
 
