@@ -283,7 +283,7 @@ static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp
 static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferList *buffer, UInt32 numberFrames);
 static BOOL upstreamChannelsMutedByAudiobus(AEChannelRef channel);
 
-@property (nonatomic, assign, readwrite) float currentBufferDuration;
+@property (nonatomic, assign, readwrite) NSTimeInterval currentBufferDuration;
 @property (nonatomic, strong) NSError *lastError;
 @property (nonatomic, strong) NSTimer *housekeepingTimer;
 @property (nonatomic, strong) ABReceiverPort *audiobusReceiverPort;
@@ -1715,7 +1715,7 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
     }
 }
 
--(void)setPreferredBufferDuration:(float)preferredBufferDuration {
+-(void)setPreferredBufferDuration:(NSTimeInterval)preferredBufferDuration {
     if ( _preferredBufferDuration == preferredBufferDuration ) return;
     
     _preferredBufferDuration = preferredBufferDuration;
@@ -2378,7 +2378,7 @@ static void IsInterAppConnectedCallback(void *inRefCon, AudioUnit inUnit, AudioU
     
     BOOL inputAvailable          = audioSession.inputAvailable;
     BOOL hardwareInputAvailable  = inputAvailable;
-    UInt32 numberOfInputChannels = _audioDescription.mChannelsPerFrame;
+    int numberOfInputChannels = _audioDescription.mChannelsPerFrame;
     BOOL usingAudiobus           = NO;
     UInt32 usingIAA              = NO;
     
@@ -2420,9 +2420,9 @@ static void IsInterAppConnectedCallback(void *inRefCon, AudioUnit inUnit, AudioU
             }
             
             if ( hasChannelCount ) {
-                numberOfInputChannels = channels;
+                numberOfInputChannels = (int)channels;
             } else {
-                if ( !_lastError ) self.lastError = [NSError audioControllerErrorWithMessage:@"Audio system error while determining input channel count" OSStatus:channels];
+                if ( !_lastError ) self.lastError = [NSError audioControllerErrorWithMessage:@"Audio system error while determining input channel count" OSStatus:(OSStatus)channels];
                 success = NO;
             }
         }

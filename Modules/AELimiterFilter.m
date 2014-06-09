@@ -80,9 +80,6 @@ const int kScratchBufferLength = 8192;
     }
     
     AELimiter *limiter = [[AELimiter alloc] initWithNumberOfChannels:clientFormat.mChannelsPerFrame sampleRate:clientFormat.mSampleRate];
-    
-    AELimiter *oldLimiter = _limiter;
-    AEFloatConverter *oldFloatConverter = _floatConverter;
     float** oldScratchBuffer = _scratchBuffer;
     AudioStreamBasicDescription oldClientFormat = _clientFormat;
     

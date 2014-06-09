@@ -564,14 +564,14 @@ static const int kInputChannelsChangedContext;
 }
 
 - (void)channelButtonPressed:(UIButton*)sender {
-    BOOL selected = [_audioController.inputChannelSelection containsObject:[NSNumber numberWithInt:sender.tag]];
+    BOOL selected = [_audioController.inputChannelSelection containsObject:[NSNumber numberWithInteger:sender.tag]];
     selected = !selected;
     if ( selected ) {
-        _audioController.inputChannelSelection = [[_audioController.inputChannelSelection arrayByAddingObject:[NSNumber numberWithInt:sender.tag]] sortedArrayUsingSelector:@selector(compare:)];
+        _audioController.inputChannelSelection = [[_audioController.inputChannelSelection arrayByAddingObject:[NSNumber numberWithInteger:sender.tag]] sortedArrayUsingSelector:@selector(compare:)];
         [self performSelector:@selector(highlightButtonDelayed:) withObject:sender afterDelay:0.01];
     } else {
         NSMutableArray *channels = [_audioController.inputChannelSelection mutableCopy];
-        [channels removeObject:[NSNumber numberWithInt:sender.tag]];
+        [channels removeObject:[NSNumber numberWithInteger:sender.tag]];
         _audioController.inputChannelSelection = channels;
         sender.highlighted = NO;
     }

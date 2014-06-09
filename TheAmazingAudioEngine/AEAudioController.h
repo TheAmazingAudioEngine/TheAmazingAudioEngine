@@ -1213,7 +1213,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  *
  *  Default is 0.005.
  */
-@property (nonatomic, assign) float preferredBufferDuration;
+@property (nonatomic, assign) NSTimeInterval preferredBufferDuration;
 
 /*!
  * Current buffer duration (in seconds)
@@ -1224,7 +1224,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  *
  *  Observable.
  */
-@property (nonatomic, readonly) float currentBufferDuration;
+@property (nonatomic, readonly) NSTimeInterval currentBufferDuration;
 
 /*!
  * Input latency (in seconds)
