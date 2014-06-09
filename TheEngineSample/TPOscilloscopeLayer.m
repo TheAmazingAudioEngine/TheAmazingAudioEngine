@@ -60,7 +60,7 @@ static void VRAMPMUL(const SAMPLETYPE *__vDSP_I, vDSP_Stride __vDSP_IS, SAMPLETY
     self.lineColor = [UIColor blackColor];
     
     // Disable animating view refreshes
-    self.actions = [NSDictionary dictionaryWithObject:[NSNull null] forKey:@"contents"];
+    self.actions = @{@"contents": [NSNull null]};
     
     return self;
 }

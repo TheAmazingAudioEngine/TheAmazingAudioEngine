@@ -111,8 +111,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
         if ( ![AEAudioFileWriter AACEncodingAvailable] ) {
             if ( error ) *error = [NSError errorWithDomain:AEAudioFileWriterErrorDomain 
                                                       code:kAEAudioFileWriterFormatError 
-                                                  userInfo:[NSDictionary dictionaryWithObject:NSLocalizedString(@"AAC Encoding not available", @"")
-                                                                                       forKey:NSLocalizedDescriptionKey]];
+                                                  userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"AAC Encoding not available", @"")}];
             
             return NO;
         }
@@ -144,8 +143,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
             int fourCC = CFSwapInt32HostToBig(status);
             if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain 
                                                       code:status 
-                                                  userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't prepare the output format (error %d/%4.4s)", @""), status, (char*)&fourCC] 
-                                                                                       forKey:NSLocalizedDescriptionKey]];
+                                                  userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Couldn't prepare the output format (error %d/%4.4s)", @""), status, (char*)&fourCC]}];
             return NO;
         }
         
@@ -161,8 +159,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
             int fourCC = CFSwapInt32HostToBig(status);
             if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain 
                                                       code:status 
-                                                  userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't open the output file (error %d/%4.4s)", @""), status, (char*)&fourCC] 
-                                                                                       forKey:NSLocalizedDescriptionKey]];
+                                                  userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Couldn't open the output file (error %d/%4.4s)", @""), status, (char*)&fourCC]}];
             return NO;
         }
         
@@ -173,8 +170,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
             int fourCC = CFSwapInt32HostToBig(status);
             if (error) *error = [NSError errorWithDomain:NSOSStatusErrorDomain
                                                     code:status
-                                                userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't set audio codec (error %d/%4.4s)", @""), status, (char*)&fourCC]
-                                                                                     forKey:NSLocalizedDescriptionKey]];
+                                                userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Couldn't set audio codec (error %d/%4.4s)", @""), status, (char*)&fourCC]}];
             ExtAudioFileDispose(_audioFile);
             return NO;
         }
@@ -201,8 +197,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
             int fourCC = CFSwapInt32HostToBig(status);
             if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain 
                                                       code:status 
-                                                  userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't open the output file (error %d/%4.4s)", @""), status, (char*)&fourCC] 
-                                                                                       forKey:NSLocalizedDescriptionKey]];
+                                                  userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Couldn't open the output file (error %d/%4.4s)", @""), status, (char*)&fourCC]}];
             return NO;
         }
     }
@@ -213,8 +208,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
         int fourCC = CFSwapInt32HostToBig(status);
         if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain 
                                                   code:status 
-                                              userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't configure the converter (error %d/%4.4s)", @""), status, (char*)&fourCC] 
-                                                                                   forKey:NSLocalizedDescriptionKey]];
+                                              userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Couldn't configure the converter (error %d/%4.4s)", @""), status, (char*)&fourCC]}];
         ExtAudioFileDispose(_audioFile);
         return NO;
     }

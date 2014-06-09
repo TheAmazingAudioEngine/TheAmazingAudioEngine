@@ -169,13 +169,11 @@ struct _schedule_t {
     struct _schedule_t *schedule = [self scheduleWithIdentifier:identifier];
     if ( !schedule ) return nil;
     
-    return [NSDictionary dictionaryWithObjectsAndKeys:
-            (__bridge id)schedule->block, AEBlockSchedulerKeyBlock,
-            (__bridge id)schedule->identifier, AEBlockSchedulerKeyIdentifier,
-            schedule->responseBlock ? (__bridge id)schedule->responseBlock : [NSNull null], AEBlockSchedulerKeyResponseBlock,
-            [NSNumber numberWithLongLong:schedule->time], AEBlockSchedulerKeyTimestampInHostTicks,
-            [NSNumber numberWithInt:schedule->context], AEBlockSchedulerKeyTimingContext,
-            nil];
+    return @{AEBlockSchedulerKeyBlock: (__bridge id)schedule->block,
+            AEBlockSchedulerKeyIdentifier: (__bridge id)schedule->identifier,
+            AEBlockSchedulerKeyResponseBlock: schedule->responseBlock ? (__bridge id)schedule->responseBlock : [NSNull null],
+            AEBlockSchedulerKeyTimestampInHostTicks: @((long long)schedule->time),
+            AEBlockSchedulerKeyTimingContext: @((int)schedule->context)};
 }
 
 - (struct _schedule_t*)scheduleWithIdentifier:(id<NSCopying>)identifier {

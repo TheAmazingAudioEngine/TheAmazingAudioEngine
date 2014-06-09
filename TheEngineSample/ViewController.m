@@ -111,10 +111,10 @@ static const int kInputChannelsChangedContext;
     
     // Create a group for loop1, loop2 and oscillator
     _group = [_audioController createChannelGroup];
-    [_audioController addChannels:[NSArray arrayWithObjects:_loop1, _loop2, _oscillator, nil] toChannelGroup:_group];
+    [_audioController addChannels:@[_loop1, _loop2, _oscillator] toChannelGroup:_group];
     
     // Finally, add the audio unit player
-    [_audioController addChannels:[NSArray arrayWithObjects:_audioUnitPlayer, nil]];
+    [_audioController addChannels:@[_audioUnitPlayer]];
     
     [_audioController addObserver:self forKeyPath:@"numberOfInputChannels" options:0 context:(void*)&kInputChannelsChangedContext];
     
@@ -390,7 +390,7 @@ static const int kInputChannelsChangedContext;
                         UIButton *button = [UIButton buttonWithType:UIButtonTypeRoundedRect];
                         button.frame = CGRectMake(i*(buttonSize.width+5), round((channelStrip.bounds.size.height-buttonSize.height)/2), buttonSize.width, buttonSize.height);
                         [button setTitle:[NSString stringWithFormat:@"%d", i+1] forState:UIControlStateNormal];
-                        button.highlighted = [_audioController.inputChannelSelection containsObject:[NSNumber numberWithInt:i]];
+                        button.highlighted = [_audioController.inputChannelSelection containsObject:@(i)];
                         button.tag = i;
                         [button addTarget:self action:@selector(channelButtonPressed:) forControlEvents:UIControlEventTouchUpInside];
                         [channelStrip addSubview:button];
@@ -445,7 +445,7 @@ static const int kInputChannelsChangedContext;
 
 - (void)oneshotPlayButtonPressed:(UIButton*)sender {
     if ( _oneshot ) {
-        [_audioController removeChannels:[NSArray arrayWithObject:_oneshot]];
+        [_audioController removeChannels:@[_oneshot]];
         self.oneshot = nil;
         _oneshotButton.selected = NO;
     } else {
@@ -459,7 +459,7 @@ static const int kInputChannelsChangedContext;
             strongSelf.oneshot = nil;
             strongSelf->_oneshotButton.selected = NO;
         };
-        [_audioController addChannels:[NSArray arrayWithObject:_oneshot]];
+        [_audioController addChannels:@[_oneshot]];
         _oneshotButton.selected = YES;
     }
 }
@@ -518,9 +518,9 @@ static const int kInputChannelsChangedContext;
     if ( sender.isOn ) {
         self.playthrough = [[AEPlaythroughChannel alloc] initWithAudioController:_audioController];
         [_audioController addInputReceiver:_playthrough];
-        [_audioController addChannels:[NSArray arrayWithObject:_playthrough]];
+        [_audioController addChannels:@[_playthrough]];
     } else {
-        [_audioController removeChannels:[NSArray arrayWithObject:_playthrough]];
+        [_audioController removeChannels:@[_playthrough]];
         [_audioController removeInputReceiver:_playthrough];
         self.playthrough = nil;
     }
@@ -561,14 +561,14 @@ static const int kInputChannelsChangedContext;
 }
 
 - (void)channelButtonPressed:(UIButton*)sender {
-    BOOL selected = [_audioController.inputChannelSelection containsObject:[NSNumber numberWithInteger:sender.tag]];
+    BOOL selected = [_audioController.inputChannelSelection containsObject:@(sender.tag)];
     selected = !selected;
     if ( selected ) {
-        _audioController.inputChannelSelection = [[_audioController.inputChannelSelection arrayByAddingObject:[NSNumber numberWithInteger:sender.tag]] sortedArrayUsingSelector:@selector(compare:)];
+        _audioController.inputChannelSelection = [[_audioController.inputChannelSelection arrayByAddingObject:@(sender.tag)] sortedArrayUsingSelector:@selector(compare:)];
         [self performSelector:@selector(highlightButtonDelayed:) withObject:sender afterDelay:0.01];
     } else {
         NSMutableArray *channels = [_audioController.inputChannelSelection mutableCopy];
-        [channels removeObject:[NSNumber numberWithInteger:sender.tag]];
+        [channels removeObject:@(sender.tag)];
         _audioController.inputChannelSelection = channels;
         sender.highlighted = NO;
     }
@@ -588,7 +588,7 @@ static const int kInputChannelsChangedContext;
     } else {
         self.recorder = [[AERecorder alloc] initWithAudioController:_audioController];
         NSArray *documentsFolders = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-        NSString *path = [[documentsFolders objectAtIndex:0] stringByAppendingPathComponent:@"Recording.aiff"];
+        NSString *path = [documentsFolders[0] stringByAppendingPathComponent:@"Recording.aiff"];
         NSError *error = nil;
         if ( ![_recorder beginRecordingToFileAtPath:path fileType:kAudioFileAIFFType error:&error] ) {
             [[[UIAlertView alloc] initWithTitle:@"Error" 
@@ -609,12 +609,12 @@ static const int kInputChannelsChangedContext;
 
 - (void)play:(id)sender {
     if ( _player ) {
-        [_audioController removeChannels:[NSArray arrayWithObject:_player]];
+        [_audioController removeChannels:@[_player]];
         self.player = nil;
         _playButton.selected = NO;
     } else {
         NSArray *documentsFolders = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-        NSString *path = [[documentsFolders objectAtIndex:0] stringByAppendingPathComponent:@"Recording.aiff"];
+        NSString *path = [documentsFolders[0] stringByAppendingPathComponent:@"Recording.aiff"];
         
         if ( ![[NSFileManager defaultManager] fileExistsAtPath:path] ) return;
         
@@ -637,7 +637,7 @@ static const int kInputChannelsChangedContext;
             strongSelf->_playButton.selected = NO;
             weakSelf.player = nil;
         };
-        [_audioController addChannels:[NSArray arrayWithObject:_player]];
+        [_audioController addChannels:@[_player]];
         
         _playButton.selected = YES;
     }

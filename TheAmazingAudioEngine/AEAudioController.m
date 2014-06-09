@@ -112,8 +112,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     int fourCC = CFSwapInt32HostToBig(status);
     return [NSError errorWithDomain:NSOSStatusErrorDomain
                                code:status
-                           userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"%@ (error %d/%4.4s)", message, (int)status, (char*)&fourCC]
-                                                                forKey:NSLocalizedDescriptionKey]];
+                           userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"%@ (error %d/%4.4s)", message, (int)status, (char*)&fourCC]}];
 }
 @end
 
@@ -692,12 +691,12 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         sysctlbyname("hw.machine", NULL, &size, NULL, 0);
         char *machine = malloc(size);
         sysctlbyname("hw.machine", machine, &size, NULL, 0);
-        platform = [NSString stringWithCString:machine encoding:NSUTF8StringEncoding];
+        platform = @(machine);
         free(machine);
     }
     
     // These devices aren't fast enough to do voice processing effectively
-    NSArray *badDevices = [NSArray arrayWithObjects:@"iPhone1,1", @"iPhone1,2", @"iPhone2,1", @"iPod1,1", @"iPod2,1", @"iPod3,1", nil];
+    NSArray *badDevices = @[@"iPhone1,1", @"iPhone1,2", @"iPhone2,1", @"iPod1,1", @"iPod2,1", @"iPod3,1"];
     return ![badDevices containsObject:platform];
 }
 
@@ -894,7 +893,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         }
         
         
-        for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", @"channelIsPlaying", @"channelIsMuted", @"audioDescription", nil] ) {
+        for ( NSString *property in @[@"volume", @"pan", @"channelIsPlaying", @"channelIsMuted", @"audioDescription"] ) {
             [(NSObject*)channel addObserver:self forKeyPath:property options:0 context:NULL];
         }
         
@@ -962,8 +961,8 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     void** ptrMatchArray = malloc(count * sizeof(void*));
     void** objectMatchArray = malloc(count * sizeof(void*));
     for ( int i=0; i<count; i++ ) {
-        ptrMatchArray[i] = ((id<AEAudioPlayable>)[channels objectAtIndex:i]).renderCallback;
-        objectMatchArray[i] = (__bridge void *)([channels objectAtIndex:i]);
+        ptrMatchArray[i] = ((id<AEAudioPlayable>)channels[i]).renderCallback;
+        objectMatchArray[i] = (__bridge void *)(channels[i]);
     }
     AEChannelRef removedChannels[count];
     memset(removedChannels, 0, sizeof(removedChannels));
@@ -1699,7 +1698,7 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
     if ( _inputCallbacks[0].channelMap ) return (__bridge NSArray *)_inputCallbacks[0].channelMap;
     NSMutableArray *selection = [NSMutableArray array];
     for ( int i=0; i<MIN(_numberOfInputChannels, _inputCallbacks[0].audioDescription.mChannelsPerFrame); i++ ) {
-        [selection addObject:[NSNumber numberWithInt:i]];
+        [selection addObject:@(i)];
     }
     return selection;
 }
@@ -1869,7 +1868,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
 -(void) observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
 
     if ( object == (__bridge id)_topChannel->audiobusSenderPort ) {
-        if ( [change objectForKey:NSKeyValueChangeNotificationIsPriorKey] ) {
+        if ( change[NSKeyValueChangeNotificationIsPriorKey] ) {
             [self willChangeValueForKey:@"playingThroughDeviceSpeaker"];
         } else {
             [self didChangeValueForKey:@"playingThroughDeviceSpeaker"];
@@ -2470,8 +2469,8 @@ static void IsInterAppConnectedCallback(void *inRefCon, AudioUnit inUnit, AudioU
                                             || (entry->channelMap && [(__bridge NSArray*)entry->channelMap count] != entry->audioDescription.mChannelsPerFrame);
             if ( !converterRequired && entry->channelMap ) {
                 for ( int i=0; i<[(__bridge NSArray*)entry->channelMap count]; i++ ) {
-                    id channelEntry = [(__bridge NSArray*)entry->channelMap objectAtIndex:i];
-                    if ( ([channelEntry isKindOfClass:[NSArray class]] && ([channelEntry count] > 1 || [[channelEntry objectAtIndex:0] intValue] != i)) || ([channelEntry isKindOfClass:[NSNumber class]] && [channelEntry intValue] != i) ) {
+                    id channelEntry = ((__bridge NSArray*)entry->channelMap)[i];
+                    if ( ([channelEntry isKindOfClass:[NSArray class]] && ([channelEntry count] > 1 || [channelEntry[0] intValue] != i)) || ([channelEntry isKindOfClass:[NSNumber class]] && [channelEntry intValue] != i) ) {
                         converterRequired = YES;
                         break;
                     }
@@ -2512,7 +2511,7 @@ static void IsInterAppConnectedCallback(void *inRefCon, AudioUnit inUnit, AudioU
                     if ( [(__bridge NSArray*)entry->channelMap count] > 0 ) {
                         channelMap[i] = min(numberOfInputChannels-1,
                                                [(__bridge NSArray*)entry->channelMap count] > i
-                                               ? [[(__bridge NSArray*)entry->channelMap objectAtIndex:i] intValue]
+                                               ? [((__bridge NSArray*)entry->channelMap)[i] intValue]
                                                : [[(__bridge NSArray*)entry->channelMap lastObject] intValue]);
                     } else {
                         channelMap[i] = min(numberOfInputChannels-1, i);
@@ -3028,7 +3027,7 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
     if ( channel->type == kChannelTypeGroup ) {
         [self releaseResourcesForGroup:(AEChannelGroupRef)channel->ptr];
     } else if ( channel->type == kChannelTypeChannel ) {
-        for ( NSString *property in [NSArray arrayWithObjects:@"volume", @"pan", @"channelIsPlaying", @"channelIsMuted", @"audioDescription", nil] ) {
+        for ( NSString *property in @[@"volume", @"pan", @"channelIsPlaying", @"channelIsMuted", @"audioDescription"] ) {
             [(__bridge NSObject*)channel->object removeObserver:self forKeyPath:property];
         }
         CFBridgingRelease(channel->object);
@@ -3308,7 +3307,7 @@ static void removeCallbackFromTable(__unsafe_unretained AEAudioController *THIS,
 }
 
 - (NSArray*)associatedObjectsWithFlags:(uint8_t)flags forChannelGroup:(AEChannelGroupRef)group {
-    if ( !group->channel ) return [NSArray array];
+    if ( !group->channel ) return @[];
     return [self associatedObjectsFromTable:&group->channel->callbacks matchingFlag:flags];
 }
 
