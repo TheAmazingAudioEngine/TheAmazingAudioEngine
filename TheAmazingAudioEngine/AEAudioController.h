@@ -47,11 +47,30 @@ extern "C" {
  *  the audio graph. This can happen in response to some unexpected system 
  *  errors. Objects that use the graph directly (such as creating audio units)
  *  should re-initialise the audio units.
+ *
+ * @var AEAudioControllerErrorOccurredNotification
+ *  Some asynchronous error occurred, such as when the user denies your app
+ *  record access. The userInfo dictionary of the notification will contain
+ *  the AVAudioControllerErrorKey, an NSError.
  */
 extern NSString * const AEAudioControllerSessionInterruptionBeganNotification;
 extern NSString * const AEAudioControllerSessionInterruptionEndedNotification;
 extern NSString * const AEAudioControllerDidRecreateGraphNotification;
+extern NSString * const AEAudioControllerErrorOccurredNotification;
+    
+/*!
+ * Keys to be used with notifications
+ */
+extern NSString * const AEAudioControllerErrorKey;
 
+/*!
+ * Errors
+ */
+extern NSString * const AEAudioControllerErrorDomain;
+enum {
+    AEAudioControllerErrorInputAccessDenied
+};
+    
 /*!
  * @enum AEInputMode
  *  Input mode
@@ -1074,10 +1093,10 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  * Audio session category to use
  *
  *  See discussion in the [Audio Session Programming Guide](http://developer.apple.com/library/ios/#documentation/Audio/Conceptual/AudioSessionProgrammingGuide/AudioSessionCategories/AudioSessionCategories.html)
- *  The default value is kAudioSessionCategory_PlayAndRecord if audio input is enabled, or 
- *  kAudioSessionCategory_MediaPlayback otherwise, with mixing with other apps enabled.
+ *  The default value is AVAudioSessionCategoryPlayAndRecord if audio input is enabled, or
+ *  AVAudioSessionCategoryPlayback otherwise, with mixing with other apps enabled.
  */
-@property (nonatomic, assign) UInt32 audioSessionCategory;
+@property (nonatomic, assign) NSString * audioSessionCategory;
 
 /*!
  * Whether to allow mixing audio with other apps
@@ -1253,13 +1272,6 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  *  Note: This property is observable
  */
 @property (nonatomic, readonly) int numberOfInputChannels;
-
-/*!
- * The name of the current audio route
- *
- *  Note: This property is observable
- */
-@property (nonatomic, strong, readonly) NSString *audioRoute;
 
 /*!
  * The audio description defining the input audio format

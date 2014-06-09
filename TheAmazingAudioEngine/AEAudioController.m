@@ -26,6 +26,7 @@
 #import "AEAudioController.h"
 #import "AEUtilities.h"
 #import <UIKit/UIKit.h>
+#import <AVFoundation/AVFoundation.h>
 #import <libkern/OSAtomic.h>
 #import "TPCircularBuffer.h"
 #include <sys/types.h>
@@ -59,6 +60,11 @@ static Float32 __cachedOutputLatency = kNoValue;
 NSString * const AEAudioControllerSessionInterruptionBeganNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionBeganNotification";
 NSString * const AEAudioControllerSessionInterruptionEndedNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionEndedNotification";
 NSString * const AEAudioControllerDidRecreateGraphNotification = @"com.theamazingaudioengine.AEAudioControllerDidRecreateGraphNotification";
+NSString * const AEAudioControllerErrorOccurredNotification = @"com.theamazingaudioengine.AEAudioControllerErrorOccurredNotification";
+
+NSString * const AEAudioControllerErrorKey = @"error";
+
+NSString * const AEAudioControllerErrorDomain = @"com.theamazingaudioengine.errors";
 
 const NSString *kAEAudioControllerCallbackKey = @"callback";
 const NSString *kAEAudioControllerUserInfoKey = @"userinfo";
@@ -277,7 +283,6 @@ static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp
 static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferList *buffer, UInt32 numberFrames);
 static BOOL upstreamChannelsMutedByAudiobus(AEChannelRef channel);
 
-@property (nonatomic, strong, readwrite) NSString *audioRoute;
 @property (nonatomic, assign, readwrite) float currentBufferDuration;
 @property (nonatomic, strong) NSError *lastError;
 @property (nonatomic, strong) NSTimer *housekeepingTimer;
@@ -300,98 +305,9 @@ static BOOL upstreamChannelsMutedByAudiobus(AEChannelRef channel);
             audioUnit                   = _ioAudioUnit,
             audioGraph                  = _audioGraph,
             audioDescription            = _audioDescription,
-            audioRoute                  = _audioRoute,
             audiobusReceiverPort        = _audiobusReceiverPort;
 
 @dynamic    running, inputGainAvailable, inputGain, audiobusSenderPort, inputAudioDescription, inputChannelSelection;
-
-#pragma mark - Audio session callbacks
-
-static AEAudioController * __interruptionListenerSelf = nil;
-
-static void interruptionListener(void *inClientData, UInt32 inInterruption) {
-    if ( !__interruptionListenerSelf ) return;
-    
-    AEAudioController *THIS = __interruptionListenerSelf;
-    
-    if (inInterruption == kAudioSessionEndInterruption) {
-        NSLog(@"TAAE: Audio session interruption ended");
-        THIS->_interrupted = NO;
-        
-        if ( [[UIApplication sharedApplication] applicationState] != UIApplicationStateBackground || THIS->_runningPriorToInterruption ) {
-            // make sure we are again the active session
-            checkResult(AudioSessionSetActive(true), "AudioSessionSetActive");
-        }
-        
-        if ( THIS->_runningPriorToInterruption && ![THIS running] ) {
-            [THIS start:NULL];
-        }
-        
-        [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionEndedNotification object:THIS];
-    } else if (inInterruption == kAudioSessionBeginInterruption) {
-        NSLog(@"TAAE: Audio session interrupted");
-        THIS->_runningPriorToInterruption = THIS->_running;
-        
-        THIS->_interrupted = YES;
-        
-        if ( THIS->_runningPriorToInterruption ) {
-            [THIS stop];
-        }
-
-        [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionBeganNotification object:THIS];
-        
-        processPendingMessagesOnRealtimeThread(THIS);
-    }
-}
-
-static void audioSessionPropertyListener(void *inClientData, AudioSessionPropertyID inID, UInt32 inDataSize, const void *inData) {
-    AEAudioController *THIS = (__bridge AEAudioController *)inClientData;
-    
-    __cachedInputLatency = kNoValue;
-    __cachedOutputLatency = kNoValue;
-    
-    if (inID == kAudioSessionProperty_AudioRouteChange) {
-        int reason = [[(__bridge NSDictionary*)inData objectForKey:[NSString stringWithCString:kAudioSession_AudioRouteChangeKey_Reason encoding:NSUTF8StringEncoding]] intValue];
-        
-        CFStringRef route = NULL;
-        UInt32 size = sizeof(route);
-        if ( !checkResult(AudioSessionGetProperty(kAudioSessionProperty_AudioRoute, &size, &route), "AudioSessionGetProperty(kAudioSessionProperty_AudioRoute)") ) return;
-        
-        THIS.audioRoute = [NSString stringWithString:(__bridge NSString*)route];
-        
-        NSLog(@"TAAE: Changed audio route to %@", THIS.audioRoute);
-        
-        BOOL playingThroughSpeaker;
-        if ( [(__bridge NSString*)route isEqualToString:@"SpeakerAndMicrophone"] || [(__bridge NSString*)route isEqualToString:@"Speaker"] ) {
-            playingThroughSpeaker = YES;
-        } else {
-            playingThroughSpeaker = NO;
-        }
-        
-        CFRelease(route);
-        
-        BOOL updatedVP = NO;
-        if ( THIS->_playingThroughDeviceSpeaker != playingThroughSpeaker ) {
-            [THIS willChangeValueForKey:@"playingThroughDeviceSpeaker"];
-            THIS->_playingThroughDeviceSpeaker = playingThroughSpeaker;
-            [THIS didChangeValueForKey:@"playingThroughDeviceSpeaker"];
-            
-            if ( THIS->_voiceProcessingEnabled && THIS->_voiceProcessingOnlyForSpeakerAndMicrophone ) {
-                if ( [THIS mustUpdateVoiceProcessingSettings] ) {
-                    [THIS replaceIONode];
-                    updatedVP = YES;
-                }
-            }
-        }
-        
-        if ( !updatedVP && (reason == kAudioSessionRouteChangeReason_NewDeviceAvailable || reason == kAudioSessionRouteChangeReason_OldDeviceUnavailable) && THIS->_inputEnabled ) {
-            [THIS updateInputDeviceStatus];
-        }
-        
-    } else if ( inID == kAudioSessionProperty_AudioInputAvailable && THIS->_inputEnabled ) {
-        [THIS updateInputDeviceStatus];
-    }
-}
 
 #pragma mark -
 #pragma mark Input and render callbacks
@@ -798,9 +714,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     NSAssert(audioDescription.mFormatID == kAudioFormatLinearPCM, @"Only linear PCM supported");
 
-    __interruptionListenerSelf = self;
-    
-    _audioSessionCategory = enableInput ? kAudioSessionCategory_PlayAndRecord : kAudioSessionCategory_MediaPlayback;
+    _audioSessionCategory = enableInput ? AVAudioSessionCategoryPlayAndRecord : AVAudioSessionCategoryPlayback;
     _allowMixingWithOtherApps = YES;
     _audioDescription = audioDescription;
     _inputEnabled = enableInput;
@@ -830,8 +744,6 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 - (void)dealloc {
-    __interruptionListenerSelf = nil;
-    
     [_housekeepingTimer invalidate];
     self.housekeepingTimer = nil;
     
@@ -847,13 +759,6 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     }
     
     [self releaseResourcesForChannel:_topChannel];
-    
-    OSStatus result = AudioSessionRemovePropertyListenerWithUserData(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, (__bridge void *)self);
-    checkResult(result, "AudioSessionRemovePropertyListenerWithUserData");
-    
-    result = AudioSessionRemovePropertyListenerWithUserData(kAudioSessionProperty_AudioInputAvailable, audioSessionPropertyListener, (__bridge void *)self);
-    checkResult(result, "AudioSessionRemovePropertyListenerWithUserData");
-    
     
     TPCircularBufferCleanup(&_realtimeThreadMessageBuffer);
     TPCircularBufferCleanup(&_mainThreadMessageBuffer);
@@ -896,16 +801,17 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         return NO;
     }
     
-    if ( !checkResult(status=AudioSessionSetActive(true), "AudioSessionSetActive") ) {
-        if ( error ) *error = [NSError audioControllerErrorWithMessage:@"Couldn't activate audio session" OSStatus:status];
+    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+    
+    if ( ![audioSession setActive:YES error:error] ) {
         return NO;
     }
     
-    Float32 bufferDuration;
-    UInt32 bufferDurationSize = sizeof(bufferDuration);
-    OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration, &bufferDurationSize, &bufferDuration);
-    checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration)");
+    NSTimeInterval bufferDuration = audioSession.preferredIOBufferDuration;
     if ( _currentBufferDuration != bufferDuration ) self.currentBufferDuration = bufferDuration;
+    
+    __cachedInputLatency = audioSession.inputLatency;
+    __cachedOutputLatency = audioSession.outputLatency;
     
     BOOL hasError = NO;
     
@@ -952,7 +858,10 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         _running = NO;
         
         if ( !_interrupted ) {
-            AudioSessionSetActive(false);
+            NSError *error = nil;
+            if ( ![[AVAudioSession sharedInstance] setActive:NO error:&error] ) {
+                NSLog(@"Couldn't deactivate audio session: %@", error);
+            }
         }
         
         processPendingMessagesOnRealtimeThread(self);
@@ -1673,55 +1582,55 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
 
 #pragma mark - Setters, getters
 
--(void)setAudioSessionCategory:(UInt32)audioSessionCategory {
-    NSLog(@"TAAE: Setting audio session category to %@",
-          audioSessionCategory == kAudioSessionCategory_MediaPlayback ? @"MediaPlayback":
-          audioSessionCategory == kAudioSessionCategory_PlayAndRecord ? @"PlayAndRecord":
-          audioSessionCategory == kAudioSessionCategory_LiveAudio ? @"LiveAudio":
-          audioSessionCategory == kAudioSessionCategory_RecordAudio ? @"RecordAudio":
-          audioSessionCategory == kAudioSessionCategory_AmbientSound ? @"AmbientSound":
-          audioSessionCategory == kAudioSessionCategory_SoloAmbientSound ? @"SoloAmbientSound":
-          @"(other)");
+-(void)setAudioSessionCategory:(NSString *)audioSessionCategory {
+    NSLog(@"TAAE: Setting audio session category to %@", audioSessionCategory);
     
     _audioSessionCategory = audioSessionCategory;
-    UInt32 category = _audioSessionCategory;
     
-    if ( !_audioInputAvailable && (category == kAudioSessionCategory_PlayAndRecord || category == kAudioSessionCategory_RecordAudio) ) {
-        NSLog(@"TAAE: No input available. Using MediaPlayback category instead.");
-        category = kAudioSessionCategory_MediaPlayback;
+    if ( !_audioInputAvailable && ([_audioSessionCategory isEqualToString:AVAudioSessionCategoryPlayAndRecord] || [_audioSessionCategory isEqualToString:AVAudioSessionCategoryRecord]) ) {
+        NSLog(@"TAAE: No input available. Using AVAudioSessionCategoryPlayback category instead.");
+        _audioSessionCategory = AVAudioSessionCategoryPlayback;
     }
     
-    checkResult(AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof(category), &category),
-                "AudioSessionSetProperty(kAudioSessionProperty_AudioCategory)");
+    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     
-    if ( category == kAudioSessionCategory_PlayAndRecord ) {
-        UInt32 toSpeaker = YES;
-        checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryDefaultToSpeaker, sizeof (toSpeaker), &toSpeaker), "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryDefaultToSpeaker)");
+    int options = 0;
+    
+    if ( [_audioSessionCategory isEqualToString:AVAudioSessionCategoryPlayAndRecord] ) {
+        options |= AVAudioSessionCategoryOptionDefaultToSpeaker;
     }
     
-    UInt32 allowBluetoothInput = _enableBluetoothInput;
-    OSStatus result = AudioSessionSetProperty (kAudioSessionProperty_OverrideCategoryEnableBluetoothInput, sizeof (allowBluetoothInput), &allowBluetoothInput);
-    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryEnableBluetoothInput)");
+    options |= _enableBluetoothInput ? AVAudioSessionCategoryOptionAllowBluetooth : 0;
     
-    if ( category == kAudioSessionCategory_MediaPlayback || category == kAudioSessionCategory_PlayAndRecord ) {
-        UInt32 allowMixing = _allowMixingWithOtherApps;
-        checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing),
-                    "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
+    if ( [_audioSessionCategory isEqualToString:AVAudioSessionCategoryPlayAndRecord] || [_audioSessionCategory isEqualToString:AVAudioSessionCategoryPlayback] ) {
+        options |= _allowMixingWithOtherApps ? AVAudioSessionCategoryOptionMixWithOthers : 0;
+    }
+    
+    NSError *error = nil;
+    if ( ![audioSession setCategory:_audioSessionCategory withOptions:options error:&error] ) {
+        NSLog(@"Error setting audio session category: %@", error);
     }
 }
 
--(UInt32)audioSessionCategory {
-    return ( !_audioInputAvailable && (_audioSessionCategory == kAudioSessionCategory_PlayAndRecord || _audioSessionCategory == kAudioSessionCategory_RecordAudio) )
-                ? kAudioSessionCategory_MediaPlayback
+-(NSString *)audioSessionCategory {
+    return ( !_audioInputAvailable && ([_audioSessionCategory isEqualToString:AVAudioSessionCategoryPlayAndRecord] || [_audioSessionCategory isEqualToString:AVAudioSessionCategoryRecord]) )
+                ? AVAudioSessionCategoryPlayback
                 : _audioSessionCategory;
 }
 
 -(void)setAllowMixingWithOtherApps:(BOOL)allowMixingWithOtherApps {
     _allowMixingWithOtherApps = allowMixingWithOtherApps;
     
-    UInt32 allowMixing = _allowMixingWithOtherApps;
-    checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing),
-                "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
+    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+
+    NSError *error = nil;
+    if ( ![audioSession setCategory:audioSession.category
+                        withOptions:_allowMixingWithOtherApps
+                                        ? audioSession.categoryOptions | AVAudioSessionCategoryOptionMixWithOthers
+                                        : audioSession.categoryOptions & ~AVAudioSessionCategoryOptionMixWithOthers
+                              error:&error] ) {
+        NSLog(@"Couldn't set mixing with others flag: %@", error);
+    }
 }
 
 -(void)setMasterOutputVolume:(float)masterOutputVolume {
@@ -1744,22 +1653,14 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
     _enableBluetoothInput = enableBluetoothInput;
 
     // Enable/disable bluetooth
-    UInt32 allowBluetoothInput = _enableBluetoothInput;
-    OSStatus result = AudioSessionSetProperty (kAudioSessionProperty_OverrideCategoryEnableBluetoothInput, sizeof (allowBluetoothInput), &allowBluetoothInput);
-    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryEnableBluetoothInput)");
-    
-    if ( _audioSessionCategory == kAudioSessionCategory_MediaPlayback || _audioSessionCategory == kAudioSessionCategory_PlayAndRecord ) {
-        UInt32 allowMixing = _allowMixingWithOtherApps;
-        checkResult(AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers, sizeof (allowMixing), &allowMixing),
-                    "AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryMixWithOthers)");
-    }
-}
-
--(NSString*)audioRoute {
-    if ( _topChannel->audiobusSenderPort && ABSenderPortIsMuted((__bridge ABSenderPort *)_topChannel->audiobusSenderPort) ) {
-        return @"Audiobus";
-    } else {
-        return _audioRoute;
+    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+    NSError *error = nil;
+    if ( ![audioSession setCategory:audioSession.category
+                        withOptions:_enableBluetoothInput
+                                        ? audioSession.categoryOptions | AVAudioSessionCategoryOptionAllowBluetooth
+                                        : audioSession.categoryOptions & ~AVAudioSessionCategoryOptionAllowBluetooth
+                              error:&error] ) {
+        NSLog(@"Couldn't set bluetooth flag: %@", error);
     }
 }
 
@@ -1772,19 +1673,11 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
 }
 
 -(BOOL)inputGainAvailable {
-    UInt32 inputGainAvailable = NO;
-    UInt32 size = sizeof(inputGainAvailable);
-    OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_InputGainAvailable, &size, &inputGainAvailable);
-    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_InputGainAvailable)");
-    return inputGainAvailable;
+    return [[AVAudioSession sharedInstance] inputGainAvailable];
 }
 
 -(float)inputGain {
-    Float32 inputGain = NO;
-    UInt32 size = sizeof(inputGain);
-    OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_InputGainScalar, &size, &inputGain);
-    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_InputGainScalar)");
-    return inputGain;
+    return [[AVAudioSession sharedInstance] inputGain];
 }
 
 -(AudioStreamBasicDescription)inputAudioDescription {
@@ -1792,9 +1685,7 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
 }
 
 -(void)setInputGain:(float)inputGain {
-    Float32 inputGainScaler = inputGain;
-    OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_InputGainScalar, sizeof(inputGainScaler), &inputGainScaler);
-    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_InputGainScalar)");
+    [[AVAudioSession sharedInstance] setInputGain:inputGain];
 }
 
 -(void)setInputMode:(AEInputMode)inputMode {
@@ -1828,20 +1719,20 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
     if ( _preferredBufferDuration == preferredBufferDuration ) return;
     
     _preferredBufferDuration = preferredBufferDuration;
-
-    Float32 preferredBufferSize = [self usingVPIO] ? MAX(kMaxBufferDurationWithVPIO, _preferredBufferDuration) : _preferredBufferDuration;
-    OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
-    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
     
-    Float32 grantedBufferSize;
-    UInt32 grantedBufferSizeSize = sizeof(grantedBufferSize);
-    result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration, &grantedBufferSizeSize, &grantedBufferSize);
-    checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration)");
+    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+    NSError *error = nil;
+    if ( ![audioSession setPreferredIOBufferDuration:_preferredBufferDuration error:&error] ) {
+        NSLog(@"Couldn't set preferred IO buffer duration: %@", error);
+    }
+
+    NSTimeInterval grantedBufferSize = audioSession.IOBufferDuration;
+
     if ( _currentBufferDuration != grantedBufferSize ) self.currentBufferDuration = grantedBufferSize;
     
     NSLog(@"Buffer duration %0.2g, %d frames (requested %0.2gs, %d frames)",
           grantedBufferSize, (int)round(grantedBufferSize*_audioDescription.mSampleRate),
-          preferredBufferSize, (int)round(preferredBufferSize*_audioDescription.mSampleRate));
+          _preferredBufferDuration, (int)round(_preferredBufferDuration*_audioDescription.mSampleRate));
 }
 
 -(NSTimeInterval)inputLatency {
@@ -1850,11 +1741,7 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
 
 NSTimeInterval AEAudioControllerInputLatency(AEAudioController *controller) {
     if ( __cachedInputLatency == kNoValue ) {
-        UInt32 size = sizeof(__cachedInputLatency);
-        if ( !checkResult(AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputLatency, &size, &__cachedInputLatency),
-                          "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputLatency)") ) {
-            __cachedInputLatency = 0;
-        }
+        __cachedInputLatency = [[AVAudioSession sharedInstance] inputLatency];
     }
     return __cachedInputLatency;
 }
@@ -1865,11 +1752,7 @@ NSTimeInterval AEAudioControllerInputLatency(AEAudioController *controller) {
 
 NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     if ( __cachedOutputLatency == kNoValue ) {
-        UInt32 size = sizeof(__cachedOutputLatency);
-        if ( !checkResult(AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareOutputLatency, &size, &__cachedOutputLatency),
-                          "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareOutputLatency)") ) {
-            __cachedOutputLatency = 0;
-        }
+        __cachedOutputLatency = [[AVAudioSession sharedInstance] outputLatency];
     }
     return __cachedOutputLatency;
 }
@@ -1908,10 +1791,8 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
         [(__bridge id)_topChannel->audiobusSenderPort removeObserver:self forKeyPath:@"connectedPortAttributes"];
     }
     
-    [self willChangeValueForKey:@"audioRoute"];
     [self willChangeValueForKey:@"playingThroughDeviceSpeaker"];
     [self setAudiobusSenderPort:audiobusSenderPort forChannelElement:_topChannel];
-    [self didChangeValueForKey:@"audioRoute"];
     [self didChangeValueForKey:@"playingThroughDeviceSpeaker"];
     
     
@@ -1994,10 +1875,8 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
 
     if ( object == (__bridge id)_topChannel->audiobusSenderPort ) {
         if ( [change objectForKey:NSKeyValueChangeNotificationIsPriorKey] ) {
-            [self willChangeValueForKey:@"audioRoute"];
             [self willChangeValueForKey:@"playingThroughDeviceSpeaker"];
         } else {
-            [self didChangeValueForKey:@"audioRoute"];
             [self didChangeValueForKey:@"playingThroughDeviceSpeaker"];
         }
         return;
@@ -2069,8 +1948,10 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
 }
 
 - (void)applicationWillEnterForeground:(NSNotification*)notification {
-    OSStatus status = AudioSessionSetActive(true);
-    checkResult(status, "AudioSessionSetActive");
+    NSError *error = nil;
+    if ( ![[AVAudioSession sharedInstance] setActive:YES error:&error] ) {
+        NSLog(@"Couldn't activate audio session: %@", error);
+    }
     
     if ( _interrupted ) {
         _interrupted = NO;
@@ -2094,37 +1975,97 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     }
 }
 
+- (void)interruptionNotification:(NSNotification*)notification {
+    if ( [notification.userInfo[AVAudioSessionInterruptionTypeKey] intValue] == AVAudioSessionInterruptionTypeEnded ) {
+        NSLog(@"TAAE: Audio session interruption ended");
+        _interrupted = NO;
+        
+        if ( [[UIApplication sharedApplication] applicationState] != UIApplicationStateBackground || _runningPriorToInterruption ) {
+            // make sure we are again the active session
+            NSError *error = nil;
+            if ( ![[AVAudioSession sharedInstance] setActive:YES error:&error] ) {
+                NSLog(@"Coludn't activate audio session: %@", error);
+            }
+        }
+        
+        if ( _runningPriorToInterruption && !self.running ) {
+            [self start:NULL];
+        }
+        
+        [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionEndedNotification object:self];
+    } else if ( [notification.userInfo[AVAudioSessionInterruptionTypeKey] intValue] == AVAudioSessionInterruptionTypeBegan ) {
+        NSLog(@"TAAE: Audio session interrupted");
+        _runningPriorToInterruption = _running;
+        
+        _interrupted = YES;
+        
+        if ( _runningPriorToInterruption ) {
+            [self stop];
+        }
+        
+        [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionBeganNotification object:self];
+        
+        processPendingMessagesOnRealtimeThread(self);
+    }
+}
+
+- (void)audioRouteChangeNotification:(NSNotification*)notification {
+    __cachedInputLatency = kNoValue;
+    __cachedOutputLatency = kNoValue;
+    
+    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+    AVAudioSessionRouteDescription *currentRoute = audioSession.currentRoute;
+    
+    NSLog(@"TAAE: Changed audio route to %@", currentRoute);
+    
+    BOOL playingThroughSpeaker;
+    if ( [currentRoute.outputs filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"portType = %@", AVAudioSessionPortBuiltInSpeaker]].count > 0 ) {
+        playingThroughSpeaker = YES;
+    } else {
+        playingThroughSpeaker = NO;
+    }
+    
+    BOOL updatedVP = NO;
+    if ( _playingThroughDeviceSpeaker != playingThroughSpeaker ) {
+        [self willChangeValueForKey:@"playingThroughDeviceSpeaker"];
+        _playingThroughDeviceSpeaker = playingThroughSpeaker;
+        [self didChangeValueForKey:@"playingThroughDeviceSpeaker"];
+        
+        if ( _voiceProcessingEnabled && _voiceProcessingOnlyForSpeakerAndMicrophone ) {
+            if ( [self mustUpdateVoiceProcessingSettings] ) {
+                [self replaceIONode];
+                updatedVP = YES;
+            }
+        }
+    }
+    
+    int reason = [notification.userInfo[AVAudioSessionRouteChangeReasonKey] intValue];
+    if ( !updatedVP && (reason == AVAudioSessionRouteChangeReasonNewDeviceAvailable || reason == AVAudioSessionRouteChangeReasonOldDeviceUnavailable) && _inputEnabled ) {
+        [self updateInputDeviceStatus];
+    }
+}
+
 #pragma mark - Graph and audio session configuration
 
 - (BOOL)initAudioSession {
+    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     NSMutableString *extraInfo = [NSMutableString string];
     
-    // Initialise the audio session
-    OSStatus result = AudioSessionInitialize(NULL, NULL, interruptionListener, NULL);
-    if ( result != kAudioSessionAlreadyInitialized && !checkResult(result, "AudioSessionInitialize") ) {
-        self.lastError = [NSError audioControllerErrorWithMessage:@"Couldn't initialize audio session" OSStatus:result];
-        _hasSystemError = YES;
-        return NO;
-    }
-    
-    // Register property listeners
-    result = AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audioSessionPropertyListener, (__bridge void *)self);
-    checkResult(result, "AudioSessionAddPropertyListener");
-    
-    result = AudioSessionAddPropertyListener(kAudioSessionProperty_AudioInputAvailable, audioSessionPropertyListener, (__bridge void *)self);
-    checkResult(result, "AudioSessionAddPropertyListener");
+    // Register for notifications
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(interruptionNotification:) name:AVAudioSessionInterruptionNotification object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(audioRouteChangeNotification:) name:AVAudioSessionRouteChangeNotification object:nil];
     
     // Set sample rate
     Float64 sampleRate = _audioDescription.mSampleRate;
-    result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareSampleRate, sizeof(sampleRate), &sampleRate);
-    checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareSampleRate)");
+    NSError *error = nil;
+    if ( ![audioSession setPreferredSampleRate:sampleRate error:&error] ) {
+        NSLog(@"Couldn't set preferred sample rate: %@", error);
+    }
     
     UInt32 inputAvailable = NO;
     if ( _inputEnabled ) {
         // See if input's available
-        UInt32 size = sizeof(inputAvailable);
-        OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_AudioInputAvailable, &size, &inputAvailable);
-        checkResult(result, "AudioSessionGetProperty");
+        inputAvailable = audioSession.inputAvailable;
         if ( inputAvailable ) [extraInfo appendFormat:@", input available"];
     }
     _audioInputAvailable = _hardwareInputAvailable = inputAvailable;
@@ -2133,41 +2074,43 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     [self setAudioSessionCategory:_audioSessionCategory];
     
     // Start session
-    checkResult(AudioSessionSetActive(true), "AudioSessionSetActive");
+    if ( ![audioSession setActive:YES error:&error] ) {
+        NSLog(@"Couldn't activate audio session: %@", error);
+    }
     
     // Fetch sample rate, in case we didn't get quite what we requested
-    Float64 achievedSampleRate;
-    UInt32 size = sizeof(achievedSampleRate);
-    result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareSampleRate, &size, &achievedSampleRate);
-    checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareSampleRate)");
+    Float64 achievedSampleRate = audioSession.sampleRate;
     if ( achievedSampleRate != sampleRate ) {
         NSLog(@"Hardware sample rate is %f", achievedSampleRate);
     }
 
     // Determine audio route
-    CFStringRef route;
-    size = sizeof(route);
-    if ( checkResult(AudioSessionGetProperty(kAudioSessionProperty_AudioRoute, &size, &route),
-                     "AudioSessionGetProperty(kAudioSessionProperty_AudioRoute)") ) {
-        
-        self.audioRoute = [(__bridge NSString*)route copy];
-        [extraInfo appendFormat:@", audio route '%@'", _audioRoute];
-        
-        if ( [(__bridge NSString*)route isEqualToString:@"SpeakerAndMicrophone"] || [(__bridge NSString*)route isEqualToString:@"Speaker"] ) {
-            _playingThroughDeviceSpeaker = YES;
-        } else {
-            _playingThroughDeviceSpeaker = NO;
-        }
+    AVAudioSessionRouteDescription *currentRoute = audioSession.currentRoute;
+    [extraInfo appendFormat:@", audio route '%@'", currentRoute];
+    
+    if ( [currentRoute.outputs filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"portType = %@", AVAudioSessionPortBuiltInSpeaker]].count > 0 ) {
+        _playingThroughDeviceSpeaker = YES;
+    } else {
+        _playingThroughDeviceSpeaker = NO;
     }
     
-    CFRelease(route);
-    
     // Determine IO buffer duration
-    Float32 bufferDuration;
-    UInt32 bufferDurationSize = sizeof(bufferDuration);
-    result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration, &bufferDurationSize, &bufferDuration);
-    checkResult(result, "AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration)");
+    Float32 bufferDuration = audioSession.IOBufferDuration;
     if ( _currentBufferDuration != bufferDuration ) self.currentBufferDuration = bufferDuration;
+    
+    if ( _inputEnabled ) {
+        [audioSession requestRecordPermission:^(BOOL granted) {
+            if ( granted ) {
+                [self updateInputDeviceStatus];
+            } else {
+                [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerErrorOccurredNotification
+                                                                    object:self
+                                                                  userInfo:@{ AEAudioControllerErrorKey: [NSError errorWithDomain:AEAudioControllerErrorDomain
+                                                                                                                             code:AEAudioControllerErrorInputAccessDenied
+                                                                                                                         userInfo:nil]}];
+            }
+        }];
+    }
     
     NSLog(@"TAAE: Audio session initialized (%@)", [extraInfo stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@", "]]);
     return YES;
@@ -2304,6 +2247,8 @@ static void IsInterAppConnectedCallback(void *inRefCon, AudioUnit inUnit, AudioU
 }
 
 - (void)configureAudioUnit {
+    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+    
     if ( _inputEnabled ) {
         // Enable input
         UInt32 enableInputFlag = 1;
@@ -2332,15 +2277,18 @@ static void IsInterAppConnectedCallback(void *inRefCon, AudioUnit inUnit, AudioU
         if ( _preferredBufferDuration ) {
             // If we're using voice processing, clamp the buffer duration
             Float32 preferredBufferSize = MAX(kMaxBufferDurationWithVPIO, _preferredBufferDuration);
-            result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
-            checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
+            NSError *error = nil;
+            if ( ![audioSession setPreferredIOBufferDuration:preferredBufferSize error:&error] ) {
+                NSLog(@"Couldn't set preferred IO buffer duration: %@", error);
+            }
         }
     } else {
         if ( _preferredBufferDuration ) {
             // Set the buffer duration
-            Float32 preferredBufferSize = _preferredBufferDuration;
-            OSStatus result = AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration, sizeof(preferredBufferSize), &preferredBufferSize);
-            checkResult(result, "AudioSessionSetProperty(kAudioSessionProperty_PreferredHardwareIOBufferDuration)");
+            NSError *error = nil;
+            if ( ![audioSession setPreferredIOBufferDuration:_preferredBufferDuration error:&error] ) {
+                NSLog(@"Couldn't set preferred IO buffer duration: %@", error);
+            }
         }
     }
     
@@ -2426,19 +2374,15 @@ static void IsInterAppConnectedCallback(void *inRefCon, AudioUnit inUnit, AudioU
     NSAssert(_inputEnabled, @"Input must be enabled");
     
     BOOL success = YES;
+    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     
-    UInt32 inputAvailable        = 0;
-    BOOL hardwareInputAvailable  = NO;
+    BOOL inputAvailable          = audioSession.inputAvailable;
+    BOOL hardwareInputAvailable  = inputAvailable;
     UInt32 numberOfInputChannels = _audioDescription.mChannelsPerFrame;
     BOOL usingAudiobus           = NO;
+    UInt32 usingIAA              = NO;
     
-    UInt32 size = sizeof(inputAvailable);
-    OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_AudioInputAvailable, &size, &inputAvailable);
-    checkResult(result, "AudioSessionGetProperty");
-    hardwareInputAvailable = inputAvailable;
-    
-    UInt32 usingIAA = 0;
-    size = sizeof(usingIAA);
+    UInt32 size = sizeof(usingIAA);
     AudioUnitGetProperty(_ioAudioUnit, kAudioUnitProperty_IsInterAppConnected, kAudioUnitScope_Global, 0, &usingIAA, &size);
 
     // Determine if audio input is available, and the number of input channels available
@@ -2446,38 +2390,39 @@ static void IsInterAppConnectedCallback(void *inRefCon, AudioUnit inUnit, AudioU
         inputAvailable          = YES;
         numberOfInputChannels   = 2;
         usingAudiobus           = YES;
-    } else if(usingIAA) {
+    } else if ( usingIAA ) {
         inputAvailable          = YES;
         numberOfInputChannels   = 2;
     } else {
-        size = sizeof(numberOfInputChannels);
+        numberOfInputChannels = 0;
         if ( inputAvailable ) {
             // Check channels on input
-            UInt32 channels;
-            OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &channels);
-            if ( result == kAudioSessionIncompatibleCategory ) {
+            BOOL hasChannelCount = NO;
+            NSInteger channels = audioSession.inputNumberOfChannels;
+            hasChannelCount = channels < 128 && channels >= 0;
+            if ( channels == AVAudioSessionErrorCodeIncompatibleCategory ) {
                 // Attempt to force category, and try again
-                UInt32 originalCategory = _audioSessionCategory;
-                self.audioSessionCategory = kAudioSessionCategory_PlayAndRecord;
-                result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &channels);
-                if ( result == noErr ) {
-                    numberOfInputChannels = channels;
-                } else {
+                NSString * originalCategory = _audioSessionCategory;
+                self.audioSessionCategory = AVAudioSessionCategoryPlayAndRecord;
+                channels = audioSession.inputNumberOfChannels;
+                hasChannelCount = channels < 128 && channels >= 0;
+                if ( !hasChannelCount ) {
                     NSLog(@"TAAE: Audio session error (rdar://13022588). Power-cycling audio session.");
-                    AudioSessionSetActive(false);
-                    AudioSessionSetActive(true);
-                    result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareInputNumberChannels, &size, &channels);
+                    [audioSession setActive:NO error:NULL];
+                    [audioSession setActive:YES error:NULL];
+                    channels = audioSession.inputNumberOfChannels;
+                    hasChannelCount = channels < 128 && channels >= 0;
                 }
                 
-                if ( originalCategory != kAudioSessionCategory_PlayAndRecord ) {
+                if ( ![originalCategory isEqualToString:AVAudioSessionCategoryPlayAndRecord] ) {
                     self.audioSessionCategory = originalCategory;
                 }
             }
             
-            if ( result == noErr ) {
+            if ( hasChannelCount ) {
                 numberOfInputChannels = channels;
             } else {
-                if ( !_lastError ) self.lastError = [NSError audioControllerErrorWithMessage:@"Audio system error while determining input channel count" OSStatus:result];
+                if ( !_lastError ) self.lastError = [NSError audioControllerErrorWithMessage:@"Audio system error while determining input channel count" OSStatus:channels];
                 success = NO;
             }
         }
@@ -2624,7 +2569,7 @@ static void IsInterAppConnectedCallback(void *inRefCon, AudioUnit inUnit, AudioU
         }
         
     } else if ( !inputAvailable ) {
-        if ( _audioSessionCategory == kAudioSessionCategory_PlayAndRecord || _audioSessionCategory == kAudioSessionCategory_RecordAudio ) {
+        if ( [_audioSessionCategory isEqualToString:AVAudioSessionCategoryPlayAndRecord] || [_audioSessionCategory isEqualToString:AVAudioSessionCategoryRecord] ) {
             // Update audio session as appropriate (will select a non-recording category for us)
             self.audioSessionCategory = _audioSessionCategory;
         }
@@ -3158,7 +3103,10 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
         
         [NSThread sleepForTimeInterval:0.5];
         
-        checkResult(AudioSessionSetActive(true), "AudioSessionSetActive");
+        NSError *e = nil;
+        if ( ![[AVAudioSession sharedInstance] setActive:YES error:&e] ) {
+            NSLog(@"Couldn't activate audio session: %@", e);
+        }
         
         if ( [self setup] && [self start:error recoveringFromErrors:NO] ) {
             [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerDidRecreateGraphNotification object:self];
@@ -3419,10 +3367,8 @@ static BOOL upstreamChannelsMutedByAudiobus(AEChannelRef channel) {
 }
 
 - (void)housekeeping {
-    Float32 bufferDuration;
-    UInt32 bufferDurationSize = sizeof(bufferDuration);
-    OSStatus result = AudioSessionGetProperty(kAudioSessionProperty_CurrentHardwareIOBufferDuration, &bufferDurationSize, &bufferDuration);
-    if ( result == noErr && _currentBufferDuration != bufferDuration ) self.currentBufferDuration = bufferDuration;
+    Float32 bufferDuration = [[AVAudioSession sharedInstance] IOBufferDuration];
+    if ( _currentBufferDuration != bufferDuration ) self.currentBufferDuration = bufferDuration;
 }
 
 @end
