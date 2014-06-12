@@ -68,12 +68,7 @@ static const int kAudiobusReceiverPortConnectedToSelfChanged;
 
     if ( _audioController ) {
         [_audioController addObserver:self forKeyPath:@"audiobusReceiverPort.connectedToSelf" options:0 context:(void*)&kAudiobusReceiverPortConnectedToSelfChanged];
-        
-        if ( _audioController.audiobusReceiverPort && [(id)_audioController.audiobusReceiverPort respondsToSelector:@selector(connectedToSelf)] ) {
-            _audiobusConnectedToSelf = _audioController.audiobusReceiverPort
-                                    && [(id)_audioController.audiobusReceiverPort respondsToSelector:@selector(connectedToSelf)]
-                                    && [(id)_audioController.audiobusReceiverPort connectedToSelf];
-        }
+        [self updateAudiobusConnectedToSelf];
     }
 }
 
@@ -134,11 +129,19 @@ static OSStatus renderCallback(__unsafe_unretained AEPlaythroughChannel *THIS,
 
 -(void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
     if ( context == &kAudiobusReceiverPortConnectedToSelfChanged ) {
-        _audiobusConnectedToSelf = _audioController.audiobusReceiverPort
-                                    && [(id)_audioController.audiobusReceiverPort respondsToSelector:@selector(connectedToSelf)]
-                                    && [(id)_audioController.audiobusReceiverPort connectedToSelf];
+        [self updateAudiobusConnectedToSelf];
     } else {
         [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
+    }
+}
+
+-(void)updateAudiobusConnectedToSelf {
+    if ( _audioController.audiobusReceiverPort
+            && [(id)_audioController.audiobusReceiverPort respondsToSelector:@selector(connectedToSelf)]
+            && [(id)_audioController.audiobusReceiverPort respondsToSelector:@selector(setAutomaticMonitoring:)] ) {
+        // Handle loopback connections: Pass monitoring responsibilities over to Audiobus SDK, and prepare to mute our own input
+        _audiobusConnectedToSelf = [(id)_audioController.audiobusReceiverPort connectedToSelf];
+        [(id)_audioController.audiobusReceiverPort setAutomaticMonitoring:_audiobusConnectedToSelf];
     }
 }
 

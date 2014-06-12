@@ -754,7 +754,6 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     if ( _topChannel->audiobusSenderPort ) {
         [(__bridge id)_topChannel->audiobusSenderPort removeObserver:self forKeyPath:@"destinations"];
-        [(__bridge id)_topChannel->audiobusSenderPort removeObserver:self forKeyPath:@"connectedPortAttributes"];
     }
     
     [self releaseResourcesForChannel:_topChannel];
@@ -1787,7 +1786,6 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     
     if ( _topChannel->audiobusSenderPort ) {
         [(__bridge id)_topChannel->audiobusSenderPort removeObserver:self forKeyPath:@"destinations"];
-        [(__bridge id)_topChannel->audiobusSenderPort removeObserver:self forKeyPath:@"connectedPortAttributes"];
     }
     
     [self willChangeValueForKey:@"playingThroughDeviceSpeaker"];
@@ -1797,7 +1795,6 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     
     if ( _topChannel->audiobusSenderPort ) {
         [(__bridge id)_topChannel->audiobusSenderPort addObserver:self forKeyPath:@"destinations" options:NSKeyValueObservingOptionPrior context:NULL];
-        [(__bridge id)_topChannel->audiobusSenderPort addObserver:self forKeyPath:@"connectedPortAttributes" options:NSKeyValueObservingOptionPrior context:NULL];
     }
 }
 
