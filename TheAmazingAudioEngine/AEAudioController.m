@@ -838,10 +838,26 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
             _running = YES;
         } else {
             if ( !recoverFromErrors || ![self attemptRecoveryFromSystemError:error] ) {
-                if ( error && !*error ) *error = [NSError audioControllerErrorWithMessage:@"Couldn't start audio engine" OSStatus:status];
+                NSError *startError = [NSError audioControllerErrorWithMessage:@"Couldn't start audio engine" OSStatus:status];
+                if ( error && !*error ) *error = startError;
+                [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerErrorOccurredNotification object:self userInfo:@{ AEAudioControllerErrorKey: startError}];
                 return NO;
             }
         }
+    }
+    
+    if ( _inputEnabled ) {
+        [audioSession requestRecordPermission:^(BOOL granted) {
+            if ( granted ) {
+                [self updateInputDeviceStatus];
+            } else {
+                [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerErrorOccurredNotification
+                                                                    object:self
+                                                                  userInfo:@{ AEAudioControllerErrorKey: [NSError errorWithDomain:AEAudioControllerErrorDomain
+                                                                                                                             code:AEAudioControllerErrorInputAccessDenied
+                                                                                                                         userInfo:nil]}];
+            }
+        }];
     }
     
     return !hasError;
@@ -2089,20 +2105,6 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     Float32 bufferDuration = audioSession.IOBufferDuration;
     if ( _currentBufferDuration != bufferDuration ) self.currentBufferDuration = bufferDuration;
     
-    if ( _inputEnabled ) {
-        [audioSession requestRecordPermission:^(BOOL granted) {
-            if ( granted ) {
-                [self updateInputDeviceStatus];
-            } else {
-                [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerErrorOccurredNotification
-                                                                    object:self
-                                                                  userInfo:@{ AEAudioControllerErrorKey: [NSError errorWithDomain:AEAudioControllerErrorDomain
-                                                                                                                             code:AEAudioControllerErrorInputAccessDenied
-                                                                                                                         userInfo:nil]}];
-            }
-        }];
-    }
-    
     NSLog(@"TAAE: Audio session initialized (%@)", [extraInfo stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@", "]]);
     return YES;
 }
@@ -2174,6 +2176,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     result = AUGraphInitialize(_audioGraph);
     if ( !checkResult(result, "AUGraphInitialize") ) {
         self.lastError = [NSError audioControllerErrorWithMessage:@"Couldn't create audio graph" OSStatus:result];
+        [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerErrorOccurredNotification object:self userInfo:@{ AEAudioControllerErrorKey: _lastError}];
         _hasSystemError = YES;
         return NO;
     }
@@ -2413,7 +2416,10 @@ static void IsInterAppConnectedCallback(void *inRefCon, AudioUnit inUnit, AudioU
             if ( hasChannelCount ) {
                 numberOfInputChannels = (int)channels;
             } else {
-                if ( !_lastError ) self.lastError = [NSError audioControllerErrorWithMessage:@"Audio system error while determining input channel count" OSStatus:(OSStatus)channels];
+                if ( !_lastError ) {
+                    self.lastError = [NSError audioControllerErrorWithMessage:@"Audio system error while determining input channel count" OSStatus:(OSStatus)channels];
+                    [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerErrorOccurredNotification object:self userInfo:@{ AEAudioControllerErrorKey: _lastError}];
+                }
                 success = NO;
             }
         }
