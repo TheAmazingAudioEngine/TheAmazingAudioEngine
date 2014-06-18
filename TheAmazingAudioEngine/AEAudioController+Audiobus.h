@@ -71,6 +71,21 @@ extern "C" {
  *
  *  Set this property to an Audiobus sender port to send system
  *  output out this port.
+ *
+ *  Generally speaking, it's more efficient to not use this property, and
+ *  instead use ABSenderPort's audio unit initializer (using 
+ *  AEAudioController's [audioUnit](@ref AEAudioController::audioUnit) property.
+ *
+ *  However, there are certain circumstances where it's preferable to
+ *  use the audiobusSenderPort property instead: Namely, where you are
+ *  using multiple ABSenderPorts, or where you intend to provide an
+ *  ABReceiverPort with the ability to connect to your own ABSenderPort
+ *  (ABAudiobusController's 'allowsConnectionsToSelf') for feeding your
+ *  input with your own output. These tricky cases require special 
+ *  handling, which TAAE can do for you.
+ *
+ *  Note that you cannot initialise ABSenderPort with TAAE's audio unit,
+ *  then use the sender port with this property.
  */
 @property (nonatomic, retain) ABSenderPort *audiobusSenderPort;
 
