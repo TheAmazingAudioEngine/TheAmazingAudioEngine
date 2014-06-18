@@ -1802,8 +1802,8 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     
     if ( [(id)audiobusSenderPort audioUnit] == _ioAudioUnit ) {
         printf("You should not use ABSenderPort's audio unit initialiser with TAAE.\n"
-               "Either use ABSenderPort's audio unit initialiser, and don't use the audiobusSenderPort property,"
-               "or do use the non-audio unit initialiser but don't use the audiobusSenderProperty, but not both.\n");
+               "Either (a) use ABSenderPort's audio unit initialiser, and don't use the audiobusSenderPort property or "
+               "(b) use the audio unit initialiser but don't use the audiobusSenderProperty, but not both.\n");
         abort();
     }
     
