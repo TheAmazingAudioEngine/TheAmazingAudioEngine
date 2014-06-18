@@ -46,6 +46,7 @@ typedef void (^ABReceiverPortAudioInputBlock)(ABReceiverPort *receiverPort, UInt
 - (void)setConnectedPortAttributes:(NSInteger)connectedPortAttributes;
 - (BOOL)connectedToSelf;
 - (void)setAutomaticMonitoring:(BOOL)automaticMonitoring;
+- (AudioUnit)audioUnit;
 @end
 
 enum {
