@@ -277,10 +277,6 @@ typedef struct {
 - (BOOL)mustUpdateVoiceProcessingSettings;
 - (void)replaceIONode;
 - (BOOL)updateInputDeviceStatus;
-static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS);
-static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp *inTimeStamp, UInt32 inNumberFrames, AudioBufferList *ioData);
-static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferList *buffer, UInt32 numberFrames);
-static BOOL upstreamChannelsMutedByAudiobus(AEChannelRef channel);
 
 @property (nonatomic, assign, readwrite) NSTimeInterval currentBufferDuration;
 @property (nonatomic, strong) NSError *lastError;
@@ -435,8 +431,11 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
         // Send via Audiobus
         ABSenderPortSend((__bridge id)channel->audiobusSenderPort, channel->audiobusScratchBuffer, inNumberFrames, &timestamp);
         
-        if ( !ABSenderPortIsMuted((__bridge id)channel->audiobusSenderPort) && upstreamChannelsMutedByAudiobus(channel) && ((__bridge AEAudioController*)channel->audioController)->_audiobusMonitorBuffer ) {
-            // Mix with monitoring buffer
+        if ( !ABSenderPortIsMuted((__bridge id)channel->audiobusSenderPort)
+                && upstreamChannelsMutedByAudiobus(channel)
+                && ((__bridge AEAudioController*)channel->audioController)->_audiobusMonitorBuffer ) {
+            
+            // Mix with monitoring buffer, as we need to monitor this channel but an upstream channel is muted by Audiobus
             AudioBufferList *monitorBuffer = ((__bridge AEAudioController*)channel->audioController)->_audiobusMonitorBuffer;
             for ( int i=0; i<MIN(monitorBuffer->mNumberBuffers, channel->audiobusScratchBuffer->mNumberBuffers); i++ ) {
                 vDSP_vadd((float*)monitorBuffer->mBuffers[i].mData, 1, (float*)channel->audiobusScratchBuffer->mBuffers[i].mData, 1, (float*)monitorBuffer->mBuffers[i].mData, 1, MIN(inNumberFrames, kMaxFramesPerSlice));
@@ -444,7 +443,7 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
         }
     }
     
-    if ( channel->audiobusSenderPort && ABSenderPortIsMuted((__bridge id)channel->audiobusSenderPort) ) {
+    if ( channel->audiobusSenderPort && ABSenderPortIsMuted((__bridge id)channel->audiobusSenderPort) && !upstreamChannelsConnectedToAudiobus(channel) ) {
         // Silence output
         for ( int i=0; i<ioData->mNumberBuffers; i++ ) memset(ioData->mBuffers[i].mData, 0, ioData->mBuffers[i].mDataByteSize);
     }
@@ -1828,7 +1827,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
 -(void)setAudiobusSenderPort:(ABSenderPort *)audiobusSenderPort forChannelElement:(AEChannelRef)channelElement {
     if ( channelElement->audiobusSenderPort == (__bridge void*)audiobusSenderPort ) return;
     
-    if ( !_audiobusMonitorChannel ) {
+    if ( [self hasAudiobusSenderForUpstreamChannels:channelElement] && !_audiobusMonitorChannel ) {
         _audiobusMonitorBuffer = AEAllocateAndInitAudioBufferList([AEAudioController nonInterleavedFloatStereoAudioDescription], kMaxFramesPerSlice);
         AudioBufferList *monitorBuffer = _audiobusMonitorBuffer;
         _audiobusMonitorChannel = [AEBlockChannel channelWithBlock:^(const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
@@ -3359,15 +3358,37 @@ static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferLi
     }
 }
 
+- (BOOL)hasAudiobusSenderForUpstreamChannels:(AEChannelRef)channel {
+    if ( !channel->parentGroup ) return NO;
+    
+    AEChannelRef parentGroupChannel = channel->parentGroup->channel;
+    if ( parentGroupChannel->audiobusSenderPort ) {
+        return YES;
+    }
+    
+    return [self hasAudiobusSenderForUpstreamChannels:parentGroupChannel];
+}
+
 static BOOL upstreamChannelsMutedByAudiobus(AEChannelRef channel) {
     if ( !channel->parentGroup ) return NO;
     
     AEChannelRef parentGroupChannel = channel->parentGroup->channel;
-    if ( parentGroupChannel->audiobusSenderPort && ABSenderPortIsMuted((__bridge id)channel->audiobusSenderPort) ) {
+    if ( parentGroupChannel->audiobusSenderPort && ABSenderPortIsMuted((__bridge id)parentGroupChannel->audiobusSenderPort) ) {
         return YES;
     }
     
     return upstreamChannelsMutedByAudiobus(parentGroupChannel);
+}
+
+static BOOL upstreamChannelsConnectedToAudiobus(AEChannelRef channel) {
+    if ( !channel->parentGroup ) return NO;
+    
+    AEChannelRef parentGroupChannel = channel->parentGroup->channel;
+    if ( parentGroupChannel->audiobusSenderPort && ABSenderPortIsConnected((__bridge id)parentGroupChannel->audiobusSenderPort) ) {
+        return YES;
+    }
+    
+    return upstreamChannelsConnectedToAudiobus(parentGroupChannel);
 }
 
 - (void)housekeeping {
