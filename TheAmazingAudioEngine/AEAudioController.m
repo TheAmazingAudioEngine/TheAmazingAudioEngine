@@ -277,6 +277,7 @@ static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferLi
 @property (nonatomic, assign) NSTimer *housekeepingTimer;
 @property (nonatomic, retain) ABInputPort *audiobusInputPort;
 @property (nonatomic, retain) ABOutputPort *audiobusOutputPort;
+@property (nonatomic, retain) NSThread *thread;
 @end
 
 @implementation AEAudioController
@@ -435,9 +436,9 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
         AEAudioControllerRenderCallback callback = (AEAudioControllerRenderCallback) channel->ptr;
         id<AEAudioPlayable> channelObj = (id<AEAudioPlayable>) channel->object;
         
-        for ( int i=0; i<audio->mNumberBuffers; i++ ) {
-            memset(audio->mBuffers[i].mData, 0, audio->mBuffers[i].mDataByteSize);
-        }
+//        for ( int i=0; i<audio->mNumberBuffers; i++ ) {
+//            memset(audio->mBuffers[i].mData, 0, audio->mBuffers[i].mDataByteSize);
+//        }
         
         status = callback(channelObj, channel->audioController, &channel->timeStamp, *frames, audio);
         channel->timeStamp.mSampleTime += *frames;
@@ -791,6 +792,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     _voiceProcessingOnlyForSpeakerAndMicrophone = YES;
     _inputCallbacks = (input_callback_table_t*)calloc(sizeof(input_callback_table_t), 1);
     _inputCallbackCount = 1;
+    _thread = [NSThread currentThread];
     
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationWillEnterForeground:) name:UIApplicationWillEnterForegroundNotification object:nil];
     
@@ -1206,6 +1208,18 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     return group->channel->muted;
 }
 
+BOOL AEAudioControllerRenderMainOutput(AEAudioController *audioController, AudioTimeStamp inTimeStamp, UInt32 inNumberFrames, AudioBufferList *ioData) {
+    channel_producer_arg_t arg = {
+        .channel = audioController->_topChannel,
+        .inTimeStamp = inTimeStamp,
+        .ioActionFlags = 0,
+        .nextFilterIndex = 0
+    };
+    OSStatus result = channelAudioProducer((void*)&arg, ioData, &inNumberFrames);
+    handleCallbacksForChannel(arg.channel, &inTimeStamp, inNumberFrames, ioData);
+    return result;
+}
+
 #pragma mark - Filters
 
 - (void)addFilter:(id<AEAudioFilter>)filter {
@@ -1516,7 +1530,7 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
         TPCircularBufferProduce(&_realtimeThreadMessageBuffer, sizeof(message_t));
         
         if ( !self.running ) {
-            if ( [NSThread isMainThread] ) {
+            if ( [[NSThread currentThread] isEqual:self.thread] ) {
                 processPendingMessagesOnRealtimeThread(self);
                 [self pollForMessageResponses];
             } else {
@@ -1542,7 +1556,7 @@ static void processPendingMessagesOnRealtimeThread(AEAudioController *THIS) {
     // Wait for response
     uint64_t giveUpTime = mach_absolute_time() + (1.0 * __secondsToHostTicks);
     while ( !finished && mach_absolute_time() < giveUpTime ) {
-        if ( [NSThread isMainThread] ) {
+        if ( [[NSThread currentThread] isEqual:self.thread] ) {
             [self pollForMessageResponses];
         } else {
             dispatch_async(dispatch_get_main_queue(), ^{
@@ -1594,7 +1608,7 @@ static BOOL AEAudioControllerHasPendingMainThreadMessages(AEAudioController *THI
 
 - (void)averagePowerLevel:(Float32*)averagePower peakHoldLevel:(Float32*)peakLevel forGroup:(AEChannelGroupRef)group {
     if ( !group->level_monitor_data.monitoringEnabled ) {
-        if ( ![NSThread isMainThread] ) {
+        if ( ![[NSThread currentThread] isEqual:self.thread] ) {
             dispatch_async(dispatch_get_main_queue(), ^{ [self averagePowerLevel:NULL peakHoldLevel:NULL forGroup:group]; });
         } else {
             group->level_monitor_data.channels = group->channel->audioDescription.mChannelsPerFrame;
