@@ -1677,14 +1677,6 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
     }
 }
 
--(BOOL)playingThroughDeviceSpeaker {
-    if ( _topChannel->audiobusSenderPort && ABSenderPortIsMuted((__bridge ABSenderPort *)_topChannel->audiobusSenderPort) ) {
-        return NO;
-    } else {
-        return _playingThroughDeviceSpeaker;
-    }
-}
-
 -(BOOL)inputGainAvailable {
     return [[AVAudioSession sharedInstance] inputGainAvailable];
 }
