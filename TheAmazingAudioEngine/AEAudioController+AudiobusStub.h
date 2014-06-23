@@ -31,7 +31,6 @@
 
 extern NSString * ABConnectionsChangedNotification;
 
-typedef NSUInteger ABReceiverPortAttributes;
 void ABReceiverPortReceive(ABReceiverPort *receiverPort, ABPort *sourcePortOrNil, AudioBufferList *bufferList, UInt32 lengthInFrames, AudioTimeStamp *outTimestamp);
 BOOL ABReceiverPortIsConnected(ABReceiverPort *receiverPort);
 BOOL ABSenderPortSend(ABSenderPort* senderPort, const AudioBufferList *audio, UInt32 lengthInFrames, const AudioTimeStamp *timestamp);
@@ -43,14 +42,7 @@ typedef void (^ABReceiverPortAudioInputBlock)(ABReceiverPort *receiverPort, UInt
 @interface NSObject ()
 - (AudioStreamBasicDescription)clientFormat;
 - (void)setClientFormat:(AudioStreamBasicDescription)clientFormat;
-- (void)setConnectedPortAttributes:(NSInteger)connectedPortAttributes;
 - (BOOL)connectedToSelf;
 - (void)setAutomaticMonitoring:(BOOL)automaticMonitoring;
 - (AudioUnit)audioUnit;
 @end
-
-enum {
-    ABReceiverPortAttributeNone            = 0x0,//!< No attributes
-    ABReceiverPortAttributePlaysLiveAudio  = 0x1  //!< The receiver will play the received audio out loud, live.
-                                               //!< Connected senders should mute their output.
-};
