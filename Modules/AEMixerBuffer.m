@@ -60,7 +60,7 @@ typedef struct {
     BOOL                                    synced;
     UInt32                                  consumedFramesInCurrentTimeSlice;
     AudioStreamBasicDescription             audioDescription;
-    AEFloatConverter                       *floatConverter;
+    void                                   *floatConverter;
     float                                   volume;
     float                                   pan;
     BOOL                                    started;
@@ -115,7 +115,7 @@ static void prepareNewSource(AEMixerBuffer *THIS, AEMixerBufferSource sourceID);
 static void prepareSkipFadeBufferForSource(AEMixerBuffer *THIS, source_t* source);
 - (void)refreshMixingGraph;
 
-@property (nonatomic, retain) AEFloatConverter *floatConverter;
+@property (nonatomic, strong) AEFloatConverter *floatConverter;
 @end
 
 @interface AEMixerBufferPollProxy : NSObject {
@@ -145,7 +145,7 @@ static void prepareSkipFadeBufferForSource(AEMixerBuffer *THIS, source_t* source
     _sourceIdleThreshold = kSourceTimestampIdleThreshold;
     TPCircularBufferInit(&_mainThreadActionBuffer, kActionBufferSize);
     _mainThreadActionPollTimer = [NSTimer scheduledTimerWithTimeInterval:kActionMainThreadPollDuration
-                                                                  target:[[[AEMixerBufferPollProxy alloc] initWithMixerBuffer:self] autorelease]
+                                                                  target:[[AEMixerBufferPollProxy alloc] initWithMixerBuffer:self]
                                                                 selector:@selector(pollActionBuffer) 
                                                                 userInfo:nil
                                                                  repeats:YES];
@@ -168,7 +168,6 @@ static void prepareSkipFadeBufferForSource(AEMixerBuffer *THIS, source_t* source
         TPCircularBufferCleanup(&_audioConverterBuffer);
     }
     
-    self.floatConverter = nil;
     
     for ( int i=0; i<kMaxSources; i++ ) {
         if ( _table[i].source ) {
@@ -182,7 +181,7 @@ static void prepareSkipFadeBufferForSource(AEMixerBuffer *THIS, source_t* source
                 free(_table[i].skipFadeBuffer);
             }
             if ( _table[i].floatConverter ) {
-                [_table[i].floatConverter release];
+                CFBridgingRelease(_table[i].floatConverter);
             }
         }
     }
@@ -194,15 +193,16 @@ static void prepareSkipFadeBufferForSource(AEMixerBuffer *THIS, source_t* source
     }
     free(_microfadeBuffer);
     
-    [super dealloc];
 }
 
 -(void)setClientFormat:(AudioStreamBasicDescription)clientFormat {
+    if ( memcmp(&_clientFormat, &clientFormat, sizeof(AudioStreamBasicDescription)) == 0 ) return;
+    
     _clientFormat = clientFormat;
     
     [self respondToChannelCountChange];
     
-    self.floatConverter = [[[AEFloatConverter alloc] initWithSourceFormat:_clientFormat] autorelease];
+    self.floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:_clientFormat];
     
     for ( int i=0; i<kMaxSources; i++ ) {
         source_t *source = &_table[i];
@@ -258,7 +258,7 @@ static void prepareSkipFadeBufferForSource(AEMixerBuffer *THIS, source_t* source
     [self refreshMixingGraph];
 }
 
-void AEMixerBufferEnqueue(AEMixerBuffer *THIS, AEMixerBufferSource sourceID, AudioBufferList *audio, UInt32 lengthInFrames, const AudioTimeStamp *timestamp) {
+void AEMixerBufferEnqueue(__unsafe_unretained AEMixerBuffer *THIS, AEMixerBufferSource sourceID, AudioBufferList *audio, UInt32 lengthInFrames, const AudioTimeStamp *timestamp) {
     dprintf(THIS, 1, "Enqueue %u frames at time %0.5lfs for source %p", (unsigned int)lengthInFrames, timestamp ? timestamp->mHostTime*__hostTicksToSeconds : 0, sourceID);
     source_t *source = sourceWithID(THIS, sourceID, NULL);
     if ( !source ) {
@@ -321,7 +321,7 @@ static OSStatus fillComplexBufferInputProc(AudioConverterRef             inAudio
     return noErr;
 }
 
-void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, AudioTimeStamp *outTimestamp) {
+void AEMixerBufferDequeue(__unsafe_unretained AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, AudioTimeStamp *outTimestamp) {
     dprintf(THIS, 1, "Dequeue %u frames", (unsigned int)*ioLengthInFrames);
     
     unregisterSources(THIS);
@@ -426,10 +426,7 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
     
         if ( THIS->_audioConverter ) {
             // Initialise output buffer (to receive audio in mixer format)
-            intermediateBufferList = TPCircularBufferPrepareEmptyAudioBufferList(&THIS->_audioConverterBuffer, 
-                                                                                 THIS->_mixerOutputFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? THIS->_mixerOutputFormat.mChannelsPerFrame : 1, 
-                                                                                 frames * THIS->_mixerOutputFormat.mBytesPerFrame,
-                                                                                 NULL);
+            intermediateBufferList = TPCircularBufferPrepareEmptyAudioBufferListWithAudioFormat(&THIS->_audioConverterBuffer, &THIS->_mixerOutputFormat, frames, NULL);
             assert(intermediateBufferList != NULL);
             
             for ( int i=0; i<intermediateBufferList->mNumberBuffers; i++ ) {
@@ -491,7 +488,7 @@ void AEMixerBufferDequeue(AEMixerBuffer *THIS, AudioBufferList *bufferList, UInt
 }
 
 
-void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource sourceID, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, AudioTimeStamp *outTimestamp) {
+void AEMixerBufferDequeueSingleSource(__unsafe_unretained AEMixerBuffer *THIS, AEMixerBufferSource sourceID, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, AudioTimeStamp *outTimestamp) {
     source_t *source = sourceWithID(THIS, sourceID, NULL);
     
     dprintf(THIS, 1, "Dequeue %u frames from source %p", (unsigned int)*ioLengthInFrames, sourceID);
@@ -624,7 +621,7 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
             }
             
             // Convert the audio to float
-            if ( !AEFloatConverterToFloat(source->floatConverter ? source->floatConverter : THIS->_floatConverter,
+            if ( !AEFloatConverterToFloat(source->floatConverter ? (__bridge AEFloatConverter*)source->floatConverter : THIS->_floatConverter,
                                           source->skipFadeBuffer,
                                           THIS->_microfadeBuffer,
                                           microfadeFrames) ) {
@@ -676,7 +673,7 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
             
             if ( bufferList ) {
                 // Convert the audio to float
-                if ( !AEFloatConverterToFloat(source->floatConverter ? source->floatConverter : THIS->_floatConverter,
+                if ( !AEFloatConverterToFloat(source->floatConverter ? (__bridge AEFloatConverter*)source->floatConverter : THIS->_floatConverter,
                                               bufferList,
                                               THIS->_microfadeBuffer + audioDescription.mChannelsPerFrame,
                                               microfadeFrames) ) {
@@ -701,7 +698,7 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
                 }
                 
                 // Store in output
-                if ( !AEFloatConverterFromFloat(source->floatConverter ? source->floatConverter : THIS->_floatConverter,
+                if ( !AEFloatConverterFromFloat(source->floatConverter ? (__bridge AEFloatConverter*)source->floatConverter : THIS->_floatConverter,
                                                 THIS->_microfadeBuffer,
                                                 bufferList,
                                                 microfadeFrames) ) {
@@ -759,12 +756,12 @@ void AEMixerBufferDequeueSingleSource(AEMixerBuffer *THIS, AEMixerBufferSource s
     }
 }
 
-UInt32 AEMixerBufferPeek(AEMixerBuffer *THIS, AudioTimeStamp *outNextTimestamp) {
+UInt32 AEMixerBufferPeek(__unsafe_unretained AEMixerBuffer *THIS, AudioTimeStamp *outNextTimestamp) {
     unregisterSources(THIS);
     return _AEMixerBufferPeek(THIS, outNextTimestamp, NO);
 }
 
-static UInt32 _AEMixerBufferPeek(AEMixerBuffer *THIS, AudioTimeStamp *outNextTimestamp, BOOL respectInfiniteSourceFlag) {
+static UInt32 _AEMixerBufferPeek(__unsafe_unretained AEMixerBuffer *THIS, AudioTimeStamp *outNextTimestamp, BOOL respectInfiniteSourceFlag) {
     dprintf(THIS, 3, "Peeking");
     
     // Make sure we have at least one source
@@ -953,7 +950,7 @@ static UInt32 _AEMixerBufferPeek(AEMixerBuffer *THIS, AudioTimeStamp *outNextTim
 }
 
 
-void AEMixerBufferEndTimeInterval(AEMixerBuffer *THIS) {
+void AEMixerBufferEndTimeInterval(__unsafe_unretained AEMixerBuffer *THIS) {
     if ( THIS->_currentSliceFrameCount == 0 ) return;
     
     dprintf(THIS, 3, "End of time interval marked");
@@ -990,7 +987,7 @@ void AEMixerBufferEndTimeInterval(AEMixerBuffer *THIS) {
     }
 }
 
-void AEMixerBufferMarkSourceIdle(AEMixerBuffer *THIS, AEMixerBufferSource sourceID) {
+void AEMixerBufferMarkSourceIdle(__unsafe_unretained AEMixerBuffer *THIS, AEMixerBufferSource sourceID) {
     source_t *source = sourceWithID(THIS, sourceID, NULL);
     if ( source ) {
         dprintf(THIS, 3, "Marking source %p idle", sourceID);
@@ -1011,8 +1008,8 @@ void AEMixerBufferMarkSourceIdle(AEMixerBuffer *THIS, AEMixerBufferSource source
     source->audioDescription = audioDescription;
     
     if ( source->floatConverter ) {
-        [source->floatConverter release];
-        source->floatConverter = nil;
+        CFBridgingRelease(source->floatConverter);
+        source->floatConverter = NULL;
     }
     
     if ( source->skipFadeBuffer ) {
@@ -1023,7 +1020,7 @@ void AEMixerBufferMarkSourceIdle(AEMixerBuffer *THIS, AEMixerBufferSource source
     }
     
     if ( source->audioDescription.mSampleRate && memcmp(&source->audioDescription, &self->_clientFormat, sizeof(AudioStreamBasicDescription)) != 0 ) {
-        source->floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:source->audioDescription];
+        source->floatConverter = (__bridge_retained void*)[[AEFloatConverter alloc] initWithSourceFormat:source->audioDescription];
     }
     
     prepareSkipFadeBufferForSource(self, source);
@@ -1128,7 +1125,7 @@ void AEMixerBufferMarkSourceIdle(AEMixerBuffer *THIS, AEMixerBufferSource source
 }
 
 static OSStatus sourceInputCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
-    AEMixerBuffer *THIS = (AEMixerBuffer*)inRefCon;
+    __unsafe_unretained AEMixerBuffer *THIS = (__bridge AEMixerBuffer*)inRefCon;
     
     for ( int i=0; i<ioData->mNumberBuffers; i++ ) {
         memset(ioData->mBuffers[i].mData, 0, ioData->mBuffers[i].mDataByteSize);
@@ -1180,7 +1177,7 @@ static OSStatus sourceInputCallback(void *inRefCon, AudioUnitRenderActionFlags *
         // Set the render callback
         AURenderCallbackStruct rcbs;
         rcbs.inputProc = &sourceInputCallback;
-        rcbs.inputProcRefCon = self;
+        rcbs.inputProcRefCon = (__bridge void *)self;
         OSStatus result = AUGraphSetNodeInputCallback(_graph, _mixerNode, busNumber, &rcbs);
         if ( result != kAUGraphErr_InvalidConnection /* Ignore this error */ )
             checkResult(result, "AUGraphSetNodeInputCallback");
@@ -1312,7 +1309,7 @@ static OSStatus sourceInputCallback(void *inRefCon, AudioUnitRenderActionFlags *
     }
 }
 
-static inline source_t *sourceWithID(AEMixerBuffer *THIS, AEMixerBufferSource sourceID, int *index) {
+static inline source_t *sourceWithID(__unsafe_unretained AEMixerBuffer *THIS, AEMixerBufferSource sourceID, int *index) {
     for ( int i=0; i<kMaxSources; i++ ) {
         if ( THIS->_table[i].source == sourceID ) {
             if ( index ) *index = i;
@@ -1322,7 +1319,7 @@ static inline source_t *sourceWithID(AEMixerBuffer *THIS, AEMixerBufferSource so
     return NULL;
 }
 
-static inline void unregisterSources(AEMixerBuffer *THIS) {
+static inline void unregisterSources(__unsafe_unretained AEMixerBuffer *THIS) {
     for ( int i=0; i<kMaxSources; i++ ) {
         if ( THIS->_table[i].unregistering ) {
             THIS->_table[i].source = NULL;
@@ -1330,7 +1327,7 @@ static inline void unregisterSources(AEMixerBuffer *THIS) {
     }
 }
 
-static void prepareNewSource(AEMixerBuffer *THIS, AEMixerBufferSource sourceID) {
+static void prepareNewSource(__unsafe_unretained AEMixerBuffer *THIS, AEMixerBufferSource sourceID) {
     if ( sourceWithID(THIS, sourceID, NULL) ) return;
     
     source_t *source = sourceWithID(THIS, NULL, NULL);
@@ -1350,7 +1347,7 @@ static void prepareNewSource(AEMixerBuffer *THIS, AEMixerBufferSource sourceID) 
     [THIS refreshMixingGraph];
 }
 
-static void prepareSkipFadeBufferForSource(AEMixerBuffer *THIS, source_t* source) {
+static void prepareSkipFadeBufferForSource(__unsafe_unretained AEMixerBuffer *THIS, source_t* source) {
     AudioStreamBasicDescription audioDescription = source->audioDescription.mSampleRate ? source->audioDescription : THIS->_clientFormat;
     source->skipFadeBuffer = malloc(sizeof(AudioBufferList)+((audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? audioDescription.mChannelsPerFrame-1 : 0)*sizeof(AudioBuffer)));
     source->skipFadeBuffer->mNumberBuffers = audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? audioDescription.mChannelsPerFrame : 1;

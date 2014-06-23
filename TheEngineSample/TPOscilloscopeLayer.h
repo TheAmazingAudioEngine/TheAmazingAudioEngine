@@ -33,7 +33,7 @@
 - (void)stop;
 
 /*! The line color to render with */
-@property (nonatomic, retain) UIColor *lineColor;
+@property (nonatomic, strong) UIColor *lineColor;
 
 - (AEAudioControllerAudioCallback)receiverCallback;
 

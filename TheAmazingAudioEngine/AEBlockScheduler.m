@@ -22,11 +22,11 @@ NSString const * AEBlockSchedulerKeyIdentifier = @"identifier";
 NSString const * AEBlockSchedulerKeyTimingContext = @"context";
 
 struct _schedule_t {
-    AEBlockSchedulerBlock block;
-    void (^responseBlock)();
+    void *block;
+    void *responseBlock;
     uint64_t time;
     AEAudioTimingContext context;
-    id identifier;
+    void *identifier;
 };
 
 @interface AEBlockScheduler () {
@@ -34,8 +34,8 @@ struct _schedule_t {
     int _head;
     int _tail;
 }
-@property (nonatomic, retain) NSMutableArray *scheduledIdentifiers;
-@property (nonatomic, assign) AEAudioController *audioController;
+@property (nonatomic, strong) NSMutableArray *scheduledIdentifiers;
+@property (nonatomic, weak) AEAudioController *audioController;
 @end
 
 @implementation AEBlockScheduler
@@ -85,16 +85,14 @@ struct _schedule_t {
 -(void)dealloc {
     for ( int i=0; i<kMaximumSchedules; i++ ) {
         if ( _schedule[i].block ) {
-            [_schedule[i].block release];
+            CFBridgingRelease(_schedule[i].block);
             if ( _schedule[i].responseBlock ) {
-                [_schedule[i].responseBlock release];
+                CFBridgingRelease(_schedule[i].responseBlock);
             }
-            [_schedule[i].identifier release];
+            CFBridgingRelease(_schedule[i].identifier);
         }
     }
-    self.scheduledIdentifiers = nil;
     self.audioController = nil;
-    [super dealloc];
 }
 
 -(void)scheduleBlock:(AEBlockSchedulerBlock)block atTime:(uint64_t)time timingContext:(AEAudioTimingContext)context identifier:(id<NSCopying>)identifier {
@@ -111,9 +109,9 @@ struct _schedule_t {
     
     struct _schedule_t *schedule = &_schedule[_head];
     
-    schedule->identifier = [(NSObject*)identifier copy];
-    schedule->block = [block copy];
-    schedule->responseBlock = response ? [response copy] : nil;
+    schedule->identifier = (__bridge_retained void*)[(NSObject*)identifier copy];
+    schedule->block = (__bridge_retained void*)[block copy];
+    schedule->responseBlock = response ? (__bridge_retained void*)[response copy] : NULL;
     schedule->time = time;
     schedule->context = context;
     
@@ -135,7 +133,7 @@ struct _schedule_t {
     int scheduleCount = 0;
     
     for ( int i=_tail; i != _head; i=(i+1)%kMaximumSchedules ) {
-        if ( _schedule[i].identifier && [_schedule[i].identifier isEqual:identifier] ) {
+        if ( _schedule[i].identifier && [((__bridge id)_schedule[i].identifier) isEqual:identifier] ) {
             pointers[scheduleCount] = &_schedule[i];
             values[scheduleCount] = _schedule[i];
             scheduleCount++;
@@ -159,11 +157,11 @@ struct _schedule_t {
     [_scheduledIdentifiers removeObject:identifier];
     
     for ( int i=0; i<scheduleCount; i++ ) {
-        [values[i].block release];
+        CFBridgingRelease(values[i].block);
         if ( values[i].responseBlock ) {
-            [values[i].responseBlock release];
+            CFBridgingRelease(values[i].responseBlock);
         }
-        [values[i].identifier release];
+        CFBridgingRelease(values[i].identifier);
     }
 }
 
@@ -171,52 +169,51 @@ struct _schedule_t {
     struct _schedule_t *schedule = [self scheduleWithIdentifier:identifier];
     if ( !schedule ) return nil;
     
-    return @{AEBlockSchedulerKeyBlock: schedule->block,
-            AEBlockSchedulerKeyIdentifier: schedule->identifier,
-            AEBlockSchedulerKeyResponseBlock: schedule->responseBlock ? (id)schedule->responseBlock : [NSNull null],
-            AEBlockSchedulerKeyTimestampInHostTicks: [NSNumber numberWithLongLong:schedule->time],
-            AEBlockSchedulerKeyTimingContext: [NSNumber numberWithInt:schedule->context]};
+    return @{AEBlockSchedulerKeyBlock: (__bridge id)schedule->block,
+            AEBlockSchedulerKeyIdentifier: (__bridge id)schedule->identifier,
+            AEBlockSchedulerKeyResponseBlock: schedule->responseBlock ? (__bridge id)schedule->responseBlock : [NSNull null],
+            AEBlockSchedulerKeyTimestampInHostTicks: @((long long)schedule->time),
+            AEBlockSchedulerKeyTimingContext: @((int)schedule->context)};
 }
 
 - (struct _schedule_t*)scheduleWithIdentifier:(id<NSCopying>)identifier {
     for ( int i=_tail; i != _head; i=(i+1)%kMaximumSchedules ) {
-        if ( (identifier && _schedule[i].identifier && [_schedule[i].identifier isEqual:identifier]) ) {
+        if ( (identifier && _schedule[i].identifier && [((__bridge id)_schedule[i].identifier) isEqual:identifier]) ) {
             return &_schedule[i];
         }
     }
     return NULL;
 }
 
-struct _timingReceiverFinishSchedule_t { struct _schedule_t schedule; AEBlockScheduler *THIS; };
+struct _timingReceiverFinishSchedule_t { struct _schedule_t schedule; void *THIS; };
 static void timingReceiverFinishSchedule(AEAudioController *audioController, void *userInfo, int len) {
     struct _timingReceiverFinishSchedule_t *arg = (struct _timingReceiverFinishSchedule_t*)userInfo;
+    __unsafe_unretained AEBlockScheduler *THIS = (__bridge AEBlockScheduler*)arg->THIS;
     
     if ( arg->schedule.responseBlock ) {
-        arg->schedule.responseBlock();
-        [arg->schedule.responseBlock release];
+        ((__bridge_transfer void(^)())arg->schedule.responseBlock)();
     }
-    [arg->schedule.block release];
+    CFBridgingRelease(arg->schedule.block);
     
-    [arg->THIS->_scheduledIdentifiers removeObject:arg->schedule.identifier];
+    [THIS->_scheduledIdentifiers removeObject:(__bridge id)arg->schedule.identifier];
     
-    [arg->schedule.identifier release];
+    CFBridgingRelease(arg->schedule.identifier);
 }
 
-static void timingReceiver(id                        receiver,
-                           AEAudioController        *audioController,
+static void timingReceiver(__unsafe_unretained AEBlockScheduler *THIS,
+                           __unsafe_unretained AEAudioController *audioController,
                            const AudioTimeStamp     *time,
                            UInt32 const              frames,
                            AEAudioTimingContext      context) {
-    AEBlockScheduler *THIS = receiver;
     uint64_t endTime = time->mHostTime + AEConvertFramesToSeconds(audioController, frames)*__secondsToHostTicks;
     
     for ( int i=THIS->_tail; i != THIS->_head; i=(i+1)%kMaximumSchedules ) {
         if ( THIS->_schedule[i].block && THIS->_schedule[i].context == context && THIS->_schedule[i].time && endTime >= THIS->_schedule[i].time ) {
             UInt32 offset = THIS->_schedule[i].time > time->mHostTime ? (UInt32)AEConvertSecondsToFrames(audioController, (THIS->_schedule[i].time - time->mHostTime)*__hostTicksToSeconds) : 0;
-            THIS->_schedule[i].block(time, offset);
+            ((__bridge AEBlockSchedulerBlock)THIS->_schedule[i].block)(time, offset);
             AEAudioControllerSendAsynchronousMessageToMainThread(audioController,
                                                                  timingReceiverFinishSchedule,
-                                                                 &(struct _timingReceiverFinishSchedule_t) { .schedule = THIS->_schedule[i], .THIS = THIS },
+                                                                 &(struct _timingReceiverFinishSchedule_t) { .schedule = THIS->_schedule[i], .THIS = (__bridge void *)THIS },
                                                                  sizeof(struct _timingReceiverFinishSchedule_t));
             memset(&THIS->_schedule[i], 0, sizeof(struct _schedule_t));
             if ( i == THIS->_tail ) {

@@ -39,11 +39,11 @@ static const int kIncrementalLoadBufferSize = 4096;
 static const int kMaxAudioFileReadSize = 16384;
 
 @interface AEAudioFileLoaderOperation ()
-@property (nonatomic, retain) NSURL *url;
+@property (nonatomic, strong) NSURL *url;
 @property (nonatomic, assign) AudioStreamBasicDescription targetAudioDescription;
 @property (nonatomic, readwrite) AudioBufferList *bufferList;
 @property (nonatomic, readwrite) UInt32 lengthInFrames;
-@property (nonatomic, retain, readwrite) NSError *error;
+@property (nonatomic, strong, readwrite) NSError *error;
 @end
 
 @implementation AEAudioFileLoaderOperation
@@ -56,7 +56,7 @@ static const int kMaxAudioFileReadSize = 16384;
     OSStatus status;
     
     // Open file
-    status = ExtAudioFileOpenURL((CFURLRef)url, &audioFile);
+    status = ExtAudioFileOpenURL((__bridge CFURLRef)url, &audioFile);
     if ( !checkResult(status, "ExtAudioFileOpenURL") ) {
         if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
                                               userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't open the audio file", @"")}];
@@ -102,19 +102,13 @@ static const int kMaxAudioFileReadSize = 16384;
     return self;
 }
 
--(void)dealloc {
-    self.audioReceiverBlock = nil;
-    self.url = nil;
-    self.error = nil;
-    [super dealloc];
-}
 
 -(void)main {
     ExtAudioFileRef audioFile;
     OSStatus status;
     
     // Open file
-    status = ExtAudioFileOpenURL((CFURLRef)_url, &audioFile);
+    status = ExtAudioFileOpenURL((__bridge CFURLRef)_url, &audioFile);
     if ( !checkResult(status, "ExtAudioFileOpenURL") ) {
         self.error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
                                      userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't open the audio file", @"")}];

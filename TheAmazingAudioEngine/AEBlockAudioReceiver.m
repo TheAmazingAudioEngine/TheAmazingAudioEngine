@@ -39,21 +39,16 @@
 }
 
 + (AEBlockAudioReceiver*)audioReceiverWithBlock:(AEBlockAudioReceiverBlock)block {
-    return [[[AEBlockAudioReceiver alloc] initWithBlock:block] autorelease];
+    return [[AEBlockAudioReceiver alloc] initWithBlock:block];
 }
 
--(void)dealloc {
-    self.block = nil;
-    [super dealloc];
-}
 
-static void receiverCallback(id                        receiver,
-                             AEAudioController        *audioController,
+static void receiverCallback(__unsafe_unretained AEBlockAudioReceiver *THIS,
+                             __unsafe_unretained AEAudioController *audioController,
                              void                     *source,
                              const AudioTimeStamp     *time,
                              UInt32                    frames,
                              AudioBufferList          *audio) {
-    AEBlockAudioReceiver *THIS = (AEBlockAudioReceiver*)receiver;
     THIS->_block(source, time, frames, audio);
 }
 

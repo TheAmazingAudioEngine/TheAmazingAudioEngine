@@ -36,8 +36,8 @@ NSString * kAERecorderErrorKey = @"error";
     BOOL _recording;
     AudioBufferList *_buffer;
 }
-@property (nonatomic, retain) AEMixerBuffer *mixer;
-@property (nonatomic, retain) AEAudioFileWriter *writer;
+@property (nonatomic, strong) AEMixerBuffer *mixer;
+@property (nonatomic, strong) AEAudioFileWriter *writer;
 @end
 
 @implementation AERecorder
@@ -50,8 +50,8 @@ NSString * kAERecorderErrorKey = @"error";
 
 - (id)initWithAudioController:(AEAudioController*)audioController {
     if ( !(self = [super init]) ) return nil;
-    self.mixer = [[[AEMixerBuffer alloc] initWithClientFormat:audioController.audioDescription] autorelease];
-    self.writer = [[[AEAudioFileWriter alloc] initWithAudioDescription:audioController.audioDescription] autorelease];
+    self.mixer = [[AEMixerBuffer alloc] initWithClientFormat:audioController.audioDescription];
+    self.writer = [[AEAudioFileWriter alloc] initWithAudioDescription:audioController.audioDescription];
     if ( audioController.audioInputAvailable && audioController.inputAudioDescription.mChannelsPerFrame != audioController.audioDescription.mChannelsPerFrame ) {
         [_mixer setAudioDescription:*AEAudioControllerInputAudioDescription(audioController) forSource:AEAudioSourceInput];
     }
@@ -62,9 +62,6 @@ NSString * kAERecorderErrorKey = @"error";
 
 -(void)dealloc {
     free(_buffer);
-    self.mixer = nil;
-    self.writer = nil;
-    [super dealloc];
 }
 
 -(BOOL)beginRecordingToFileAtPath:(NSString *)path fileType:(AudioFileTypeID)fileType error:(NSError **)error {
@@ -79,7 +76,7 @@ NSString * kAERecorderErrorKey = @"error";
     return result;
 }
 
-void AERecorderStartRecording(AERecorder* THIS) {
+void AERecorderStartRecording(__unsafe_unretained AERecorder* THIS) {
     THIS->_recording = YES;
 }
 
@@ -92,24 +89,23 @@ void AERecorderStartRecording(AERecorder* THIS) {
     return _writer.path;
 }
 
-struct reportError_t { AERecorder *THIS; OSStatus result; };
+struct reportError_t { void *THIS; OSStatus result; };
 static void reportError(AEAudioController *audioController, void *userInfo, int length) {
     struct reportError_t *arg = userInfo;
     NSError *error = [NSError errorWithDomain:NSOSStatusErrorDomain 
                                          code:arg->result
                                      userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Error while saving audio: Code %d", @""), arg->result]}];
     [[NSNotificationCenter defaultCenter] postNotificationName:AERecorderDidEncounterErrorNotification
-                                                        object:arg->THIS
+                                                        object:(__bridge id)arg->THIS
                                                       userInfo:@{kAERecorderErrorKey: error}];
 }
 
-static void audioCallback(id                        receiver,
-                          AEAudioController        *audioController,
+static void audioCallback(__unsafe_unretained AERecorder *THIS,
+                          __unsafe_unretained AEAudioController *audioController,
                           void                     *source,
                           const AudioTimeStamp     *time,
                           UInt32                    frames,
                           AudioBufferList          *audio) {
-    AERecorder *THIS = receiver;
     if ( !THIS->_recording ) return;
     
     AEMixerBufferEnqueue(THIS->_mixer, source, audio, frames, time);
@@ -130,7 +126,7 @@ static void audioCallback(id                        receiver,
         if ( status != noErr ) {
             AEAudioControllerSendAsynchronousMessageToMainThread(audioController, 
                                                                  reportError, 
-                                                                 &(struct reportError_t) { .THIS = THIS, .result = status }, 
+                                                                 &(struct reportError_t) { .THIS = (__bridge void*)THIS, .result = status },
                                                                  sizeof(struct reportError_t));
         }
     }

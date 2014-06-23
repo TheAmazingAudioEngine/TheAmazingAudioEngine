@@ -31,48 +31,63 @@ extern "C" {
 #import "AEAudioController.h"
 #import <AudioToolbox/AudioToolbox.h>
 
-@class ABInputPort;
-@class ABOutputPort;
+@class ABReceiverPort;
+@class ABSenderPort;
 
 @interface AEAudioController (AudiobusAdditions)
 
 /*!
- * Set an Audiobus output port to send audio from a particular channel
+ * Set an Audiobus sender port to send audio from a particular channel
  *
  *  When assigned to a channel and connected via Audiobus, audio for the given channel
- *  will be sent out the Audiobus output port.
+ *  will be sent out the Audiobus sender port.
  *
- * @param outputPort The Audiobus output port, or nil to remove the port
- * @param channel    Channel for the output port
+ * @param senderPort The Audiobus sender port, or nil to remove the port
+ * @param channel    Channel for the sender port
  */
-- (void)setAudiobusOutputPort:(ABOutputPort*)outputPort forChannel:(id<AEAudioPlayable>)channel;
+- (void)setAudiobusSenderPort:(ABSenderPort*)senderPort forChannel:(id<AEAudioPlayable>)channel;
 
 /*!
- * Set an Audiobus output port to send audio from a particular channel group
+ * Set an Audiobus sender port to send audio from a particular channel group
  *
  *  When assigned to a channel and connected via Audiobus, audio for the given group
- *  will be sent out the Audiobus output port.
+ *  will be sent out the Audiobus sender port.
  *
- * @param outputPort The Audiobus output port, or nil to remove the port
- * @param channelGroup Channel group for the output port
+ * @param senderPort The Audiobus sender port, or nil to remove the port
+ * @param channelGroup Channel group for the sender port
  */
-- (void)setAudiobusOutputPort:(ABOutputPort*)outputPort forChannelGroup:(AEChannelGroupRef)channelGroup;
+- (void)setAudiobusSenderPort:(ABSenderPort*)senderPort forChannelGroup:(AEChannelGroupRef)channelGroup;
 
 /*!
- * Audiobus input port
+ * Audiobus receiver port
  *
- *  Set this property to an Audiobus input port to receive audio
+ *  Set this property to an Audiobus receiver port to receive audio
  *  from this port instead of the system audio input.
  */
-@property (nonatomic, retain) ABInputPort *audiobusInputPort;
+@property (nonatomic, retain) ABReceiverPort *audiobusReceiverPort;
 
 /*!
- * Audiobus output port
+ * Audiobus sender port
  *
- *  Set this property to an Audiobus output port to send system
+ *  Set this property to an Audiobus sender port to send system
  *  output out this port.
+ *
+ *  Generally speaking, it's more efficient to not use this property, and
+ *  instead use ABSenderPort's audio unit initializer (using 
+ *  AEAudioController's [audioUnit](@ref AEAudioController::audioUnit) property.
+ *
+ *  However, there are certain circumstances where it's preferable to
+ *  use the audiobusSenderPort property instead: Namely, where you are
+ *  using multiple ABSenderPorts, or where you intend to provide an
+ *  ABReceiverPort with the ability to connect to your own ABSenderPort
+ *  (ABAudiobusController's 'allowsConnectionsToSelf') for feeding your
+ *  input with your own output. These tricky cases require special 
+ *  handling, which TAAE can do for you.
+ *
+ *  Note that you cannot initialise ABSenderPort with TAAE's audio unit,
+ *  then use the sender port with this property.
  */
-@property (nonatomic, retain) ABOutputPort *audiobusOutputPort;
+@property (nonatomic, retain) ABSenderPort *audiobusSenderPort;
 
 @end
 

@@ -47,11 +47,30 @@ extern "C" {
  *  the audio graph. This can happen in response to some unexpected system 
  *  errors. Objects that use the graph directly (such as creating audio units)
  *  should re-initialise the audio units.
+ *
+ * @var AEAudioControllerErrorOccurredNotification
+ *  Some asynchronous error occurred, such as when the user denies your app
+ *  record access. The userInfo dictionary of the notification will contain
+ *  the AVAudioControllerErrorKey, an NSError.
  */
 extern NSString * const AEAudioControllerSessionInterruptionBeganNotification;
 extern NSString * const AEAudioControllerSessionInterruptionEndedNotification;
 extern NSString * const AEAudioControllerDidRecreateGraphNotification;
+extern NSString * const AEAudioControllerErrorOccurredNotification;
+    
+/*!
+ * Keys to be used with notifications
+ */
+extern NSString * const AEAudioControllerErrorKey;
 
+/*!
+ * Errors
+ */
+extern NSString * const AEAudioControllerErrorDomain;
+enum {
+    AEAudioControllerErrorInputAccessDenied
+};
+    
 /*!
  * @enum AEInputMode
  *  Input mode
@@ -100,8 +119,8 @@ typedef enum {
  * @param audio             The audio buffer list - audio should be copied into the provided buffers
  * @return A status code
  */
-typedef OSStatus (*AEAudioControllerRenderCallback) (id                        channel,
-                                                     AEAudioController        *audioController,
+typedef OSStatus (*AEAudioControllerRenderCallback) (__unsafe_unretained id    channel,
+                                                     __unsafe_unretained AEAudioController *audioController,
                                                      const AudioTimeStamp     *time,
                                                      UInt32                    frames,
                                                      AudioBufferList          *audio);
@@ -207,8 +226,8 @@ typedef OSStatus (*AEAudioControllerRenderCallback) (id                        c
  * @param frames     The length of the audio, in frames
  * @param audio      The audio buffer list
  */
-typedef void (*AEAudioControllerAudioCallback) (id                        receiver,
-                                                AEAudioController        *audioController,
+typedef void (*AEAudioControllerAudioCallback) (__unsafe_unretained id    receiver,
+                                                __unsafe_unretained AEAudioController *audioController,
                                                 void                     *source,
                                                 const AudioTimeStamp     *time,
                                                 UInt32                    frames,
@@ -282,8 +301,8 @@ typedef OSStatus (*AEAudioControllerFilterProducer)(void            *producerTok
  * @param audio     The audio buffer list to write output audio to
  * @return A status code
  */
-typedef OSStatus (*AEAudioControllerFilterCallback)(id                        filter,
-                                                    AEAudioController        *audioController,
+typedef OSStatus (*AEAudioControllerFilterCallback)(__unsafe_unretained id    filter,
+                                                    __unsafe_unretained AEAudioController *audioController,
                                                     AEAudioControllerFilterProducer producer,
                                                     void                     *producerToken,
                                                     const AudioTimeStamp     *time,
@@ -356,8 +375,8 @@ typedef enum {
  * @param frames    The number of frames for the current block
  * @param context   The timing context - either input, or output
  */
-typedef void (*AEAudioControllerTimingCallback) (id                        receiver,
-                                                 AEAudioController        *audioController,
+typedef void (*AEAudioControllerTimingCallback) (__unsafe_unretained id    receiver,
+                                                 __unsafe_unretained AEAudioController *audioController,
                                                  const AudioTimeStamp     *time,
                                                  UInt32                    frames,
                                                  AEAudioTimingContext      context);
@@ -1074,10 +1093,10 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  * Audio session category to use
  *
  *  See discussion in the [Audio Session Programming Guide](http://developer.apple.com/library/ios/#documentation/Audio/Conceptual/AudioSessionProgrammingGuide/AudioSessionCategories/AudioSessionCategories.html)
- *  The default value is kAudioSessionCategory_PlayAndRecord if audio input is enabled, or 
- *  kAudioSessionCategory_MediaPlayback otherwise, with mixing with other apps enabled.
+ *  The default value is AVAudioSessionCategoryPlayAndRecord if audio input is enabled, or
+ *  AVAudioSessionCategoryPlayback otherwise, with mixing with other apps enabled.
  */
-@property (nonatomic, assign) UInt32 audioSessionCategory;
+@property (nonatomic, assign) NSString * audioSessionCategory;
 
 /*!
  * Whether to allow mixing audio with other apps
@@ -1183,7 +1202,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  *  By default, the first two inputs will be used, for devices with more than 1 input
  *  channel.
  */
-@property (nonatomic, retain) NSArray *inputChannelSelection;
+@property (nonatomic, strong) NSArray *inputChannelSelection;
 
 /*!
  * Preferred buffer duration (in seconds)
@@ -1194,7 +1213,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  *
  *  Default is 0.005.
  */
-@property (nonatomic, assign) float preferredBufferDuration;
+@property (nonatomic, assign) NSTimeInterval preferredBufferDuration;
 
 /*!
  * Current buffer duration (in seconds)
@@ -1205,7 +1224,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  *
  *  Observable.
  */
-@property (nonatomic, readonly) float currentBufferDuration;
+@property (nonatomic, readonly) NSTimeInterval currentBufferDuration;
 
 /*!
  * Input latency (in seconds)
@@ -1252,14 +1271,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  *
  *  Note: This property is observable
  */
-@property (nonatomic, readonly) NSUInteger numberOfInputChannels;
-
-/*!
- * The name of the current audio route
- *
- *  Note: This property is observable
- */
-@property (nonatomic, retain, readonly) NSString *audioRoute;
+@property (nonatomic, readonly) int numberOfInputChannels;
 
 /*!
  * The audio description defining the input audio format

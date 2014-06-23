@@ -43,20 +43,15 @@
 }
 
 + (AEBlockChannel*)channelWithBlock:(AEBlockChannelBlock)block {
-    return [[[AEBlockChannel alloc] initWithBlock:block] autorelease];
+    return [[AEBlockChannel alloc] initWithBlock:block];
 }
 
--(void)dealloc {
-    self.block = nil;
-    [super dealloc];
-}
 
-static OSStatus renderCallback(id                        channel,
-                               AEAudioController        *audioController,
+static OSStatus renderCallback(__unsafe_unretained AEBlockChannel *THIS,
+                               __unsafe_unretained AEAudioController *audioController,
                                const AudioTimeStamp     *time,
                                UInt32                    frames,
                                AudioBufferList          *audio) {
-    AEBlockChannel *THIS = (AEBlockChannel*)channel;
     THIS->_block(time, frames, audio);
     return noErr;
 }

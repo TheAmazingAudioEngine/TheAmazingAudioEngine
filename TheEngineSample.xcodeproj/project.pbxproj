@@ -28,6 +28,7 @@
 		4C0C24BA159A00CB00D23E13 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C0C24B9159A00CB00D23E13 /* AudioToolbox.framework */; };
 		4C0C24BC159A00D500D23E13 /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C0C24BB159A00D500D23E13 /* Accelerate.framework */; };
 		4C0C24CC159A246500D23E13 /* TPOscilloscopeLayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C0C24CB159A246500D23E13 /* TPOscilloscopeLayer.m */; };
+		4C58F8981945573C0039FB0A /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C58F8971945573C0039FB0A /* AVFoundation.framework */; };
 		4C7C67F416F1606600721E60 /* libTheAmazingAudioEngine.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C7C67F116F1605A00721E60 /* libTheAmazingAudioEngine.a */; };
 		4C7C680916F1609800721E60 /* AEExpanderFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C7C67F816F1609800721E60 /* AEExpanderFilter.m */; };
 		4C7C680A16F1609800721E60 /* AELimiter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C7C67FA16F1609800721E60 /* AELimiter.m */; };
@@ -85,6 +86,7 @@
 		4C0C24BB159A00D500D23E13 /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
 		4C0C24CA159A246500D23E13 /* TPOscilloscopeLayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TPOscilloscopeLayer.h; sourceTree = "<group>"; };
 		4C0C24CB159A246500D23E13 /* TPOscilloscopeLayer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TPOscilloscopeLayer.m; sourceTree = "<group>"; };
+		4C58F8971945573C0039FB0A /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		4C7C67EC16F1605A00721E60 /* TheAmazingAudioEngine.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = TheAmazingAudioEngine.xcodeproj; sourceTree = "<group>"; };
 		4C7C67F716F1609800721E60 /* AEExpanderFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEExpanderFilter.h; sourceTree = "<group>"; };
 		4C7C67F816F1609800721E60 /* AEExpanderFilter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEExpanderFilter.m; sourceTree = "<group>"; };
@@ -110,6 +112,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4C58F8981945573C0039FB0A /* AVFoundation.framework in Frameworks */,
 				4C7C67F416F1606600721E60 /* libTheAmazingAudioEngine.a in Frameworks */,
 				4C0C24BC159A00D500D23E13 /* Accelerate.framework in Frameworks */,
 				4C0C24BA159A00CB00D23E13 /* AudioToolbox.framework in Frameworks */,
@@ -144,6 +147,7 @@
 		4C0C24881599FADD00D23E13 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				4C58F8971945573C0039FB0A /* AVFoundation.framework */,
 				4C0C24BB159A00D500D23E13 /* Accelerate.framework */,
 				4C0C24B9159A00CB00D23E13 /* AudioToolbox.framework */,
 				4C0C24B7159A000B00D23E13 /* QuartzCore.framework */,
@@ -392,7 +396,6 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 5.1;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -419,7 +422,6 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 5.1;
 				OTHER_CFLAGS = "-DNS_BLOCK_ASSERTIONS=1";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -430,11 +432,12 @@
 		4C0C24A71599FADD00D23E13 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_ARC = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "TheEngineSample/TheEngineSample-Prefix.pch";
 				HEADER_SEARCH_PATHS = TheAmazingAudioEngine;
 				INFOPLIST_FILE = "TheEngineSample/TheEngineSample-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 4.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				WRAPPER_EXTENSION = app;
 			};
@@ -443,11 +446,12 @@
 		4C0C24A81599FADD00D23E13 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_ARC = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "TheEngineSample/TheEngineSample-Prefix.pch";
 				HEADER_SEARCH_PATHS = TheAmazingAudioEngine;
 				INFOPLIST_FILE = "TheEngineSample/TheEngineSample-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 4.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				WRAPPER_EXTENSION = app;
 			};

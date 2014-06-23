@@ -38,7 +38,7 @@
     AudioStreamBasicDescription   _audioDescription;
     volatile int32_t              _playhead;
 }
-@property (nonatomic, retain, readwrite) NSURL *url;
+@property (nonatomic, strong, readwrite) NSURL *url;
 @end
 
 @implementation AEAudioFilePlayer
@@ -47,7 +47,7 @@
 
 + (id)audioFilePlayerWithURL:(NSURL*)url audioController:(AEAudioController *)audioController error:(NSError **)error {
     
-    AEAudioFilePlayer *player = [[[self alloc] init] autorelease];
+    AEAudioFilePlayer *player = [[self alloc] init];
     player->_volume = 1.0;
     player->_channelIsPlaying = YES;
     player->_audioDescription = audioController.audioDescription;
@@ -58,30 +58,25 @@
     
     if ( operation.error ) {
         if ( error ) {
-            *error = [[operation.error retain] autorelease];
+            *error = operation.error;
         }
-        [operation release];
         return nil;
     }
     
     player->_audio = operation.bufferList;
     player->_lengthInFrames = operation.lengthInFrames;
     
-    [operation release];
     
     return player;
 }
 
 - (void)dealloc {
-    self.url = nil;
-    self.completionBlock = nil;
     if ( _audio ) {
         for ( int i=0; i<_audio->mNumberBuffers; i++ ) {
             free(_audio->mBuffers[i].mData);
         }
         free(_audio);
     }
-    [super dealloc];
 }
 
 -(NSTimeInterval)duration {
@@ -97,13 +92,13 @@
 }
 
 static void notifyLoopRestart(AEAudioController *audioController, void *userInfo, int length) {
-    AEAudioFilePlayer *THIS = *(AEAudioFilePlayer**)userInfo;
+    __unsafe_unretained AEAudioFilePlayer *THIS = (__bridge AEAudioFilePlayer*)*(void**)userInfo;
     
     if ( THIS.startLoopBlock ) THIS.startLoopBlock();
 }
 
 static void notifyPlaybackStopped(AEAudioController *audioController, void *userInfo, int length) {
-    AEAudioFilePlayer *THIS = *(AEAudioFilePlayer**)userInfo;
+    __unsafe_unretained AEAudioFilePlayer *THIS = (__bridge AEAudioFilePlayer*)*(void**)userInfo;
     THIS.channelIsPlaying = NO;
 
     if ( THIS->_removeUponFinish ) {
@@ -115,7 +110,7 @@ static void notifyPlaybackStopped(AEAudioController *audioController, void *user
     THIS->_playhead = 0;
 }
 
-static OSStatus renderCallback(AEAudioFilePlayer *THIS, AEAudioController *audioController, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
+static OSStatus renderCallback(__unsafe_unretained AEAudioFilePlayer *THIS, __unsafe_unretained AEAudioController *audioController, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
     int32_t playhead = THIS->_playhead;
     int32_t originalPlayhead = playhead;
     
