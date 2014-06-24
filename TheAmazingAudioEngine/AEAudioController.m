@@ -2020,6 +2020,18 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
         }
     }
     
+    BOOL recordingThroughMic;
+    if ( [currentRoute.inputs filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"portType = %@", AVAudioSessionPortBuiltInMic]].count > 0 ) {
+        recordingThroughMic = YES;
+    } else {
+        recordingThroughMic = NO;
+    }
+    if ( _recordingThroughDeviceMicrophone != recordingThroughMic ) {
+        [self willChangeValueForKey:@"recordingThroughDeviceMicrophone"];
+        _recordingThroughDeviceMicrophone = recordingThroughMic;
+        [self didChangeValueForKey:@"recordingThroughDeviceMicrophone"];
+    }
+    
     int reason = [notification.userInfo[AVAudioSessionRouteChangeReasonKey] intValue];
     if ( !updatedVP && (reason == AVAudioSessionRouteChangeReasonNewDeviceAvailable || reason == AVAudioSessionRouteChangeReasonOldDeviceUnavailable) && _inputEnabled ) {
         [self updateInputDeviceStatus];
@@ -2073,6 +2085,12 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
         _playingThroughDeviceSpeaker = YES;
     } else {
         _playingThroughDeviceSpeaker = NO;
+    }
+
+    if ( [currentRoute.inputs filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"portType = %@", AVAudioSessionPortBuiltInMic]].count > 0 ) {
+        _recordingThroughDeviceMicrophone = YES;
+    } else {
+        _recordingThroughDeviceMicrophone = NO;
     }
     
     // Determine IO buffer duration

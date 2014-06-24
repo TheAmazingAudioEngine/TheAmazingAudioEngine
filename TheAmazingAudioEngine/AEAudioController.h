@@ -1262,6 +1262,13 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
 @property (nonatomic, readonly) BOOL playingThroughDeviceSpeaker;
 
 /*!
+ * Determine whether audio is currently being recorded through the device's mic
+ *
+ *  This property is observable
+ */
+@property (nonatomic, readonly) BOOL recordingThroughDeviceMicrophone;
+
+/*!
  * Whether audio input is currently available
  *
  *  Note: This property is observable
