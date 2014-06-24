@@ -86,7 +86,19 @@ extern "C" {
  
  First, you need to set up your project with The Amazing Audio Engine.
  
- Here's the recommended way to do this:
+ The easiest way to do so is using [CocoaPods](http://cocoapods.org):
+ 
+ 1. Add `pod 'TheAmazingAudioEngine'` to your Podfile, or, if you don't have one: at the top level of your project 
+    folder, create a file called "Podfile" with the following content:
+    @code
+    pod 'TheAmazingAudioEngine'
+    @endcode
+ 2. Then, in the terminal and in the same folder, type:
+    @code
+    pod install
+    @endcode
+ 
+ Alternatively, if you aren't using CocoaPods, or want to use the very latest code:
  
  1. Clone The Amazing Audio Engine's [git repository](https://github.com/TheAmazingAudioEngine/TheAmazingAudioEngine)
     (or just download it) into a folder within your project, such as `Library/The Amazing Audio Engine`.  
@@ -112,11 +124,8 @@ extern "C" {
  
  Take a look at "TheEngineSample.xcodeproj" for an example configuration.
  
- **If you're including source files directly within your ARC-enabled project, please note**: The Amazing Audio Engine does not
- use ARC. Why? Because its origins are pre-ARC, and because much of The Engine is written in C for performance
- reasons so there isn't a great benefit from porting to ARC.  
- This means if you include the source files of The Amazing Audio Engine directly into your ARC-enabled project, you'll
- need to add the `-fno-objc-arc` flag to the build parameters for each source file, which you can do by opening the
+ Note that TAAE now uses ARC, so if you're including source files directly within your non-ARC project, you'll
+ need to add the `-fobjc-arc` flag to the build parameters for each source file, which you can do by opening the
  "Build Phases" tab of your app target, opening the "Compile Sources" section, and double-clicking in the
  "Compiler Flags" column of the relevant source files.
  
