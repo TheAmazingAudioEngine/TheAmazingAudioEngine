@@ -872,7 +872,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         
         if ( !_interrupted ) {
             NSError *error = nil;
-            if ( ![[AVAudioSession sharedInstance] setActive:NO error:&error] ) {
+            if ( ![((AVAudioSession*)[AVAudioSession sharedInstance]) setActive:NO error:&error] ) {
                 NSLog(@"Couldn't deactivate audio session: %@", error);
             }
         }
@@ -1678,11 +1678,11 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
 }
 
 -(BOOL)inputGainAvailable {
-    return [[AVAudioSession sharedInstance] isInputGainSettable];
+    return [((AVAudioSession*)[AVAudioSession sharedInstance]) isInputGainSettable];
 }
 
 -(float)inputGain {
-    return [[AVAudioSession sharedInstance] inputGain];
+    return [((AVAudioSession*)[AVAudioSession sharedInstance]) inputGain];
 }
 
 -(AudioStreamBasicDescription)inputAudioDescription {
@@ -1690,7 +1690,10 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
 }
 
 -(void)setInputGain:(float)inputGain {
-    [[AVAudioSession sharedInstance] setInputGain:inputGain];
+    NSError *error = NULL;
+    if ( ![((AVAudioSession*)[AVAudioSession sharedInstance]) setInputGain:inputGain error:&error] ) {
+        NSLog(@"Couldn't set input gain: %@", error);
+    }
 }
 
 -(void)setInputMode:(AEInputMode)inputMode {
@@ -1746,7 +1749,7 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
 
 NSTimeInterval AEAudioControllerInputLatency(AEAudioController *controller) {
     if ( __cachedInputLatency == kNoValue ) {
-        __cachedInputLatency = [[AVAudioSession sharedInstance] inputLatency];
+        __cachedInputLatency = [((AVAudioSession*)[AVAudioSession sharedInstance]) inputLatency];
     }
     return __cachedInputLatency;
 }
@@ -1757,7 +1760,7 @@ NSTimeInterval AEAudioControllerInputLatency(AEAudioController *controller) {
 
 NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     if ( __cachedOutputLatency == kNoValue ) {
-        __cachedOutputLatency = [[AVAudioSession sharedInstance] outputLatency];
+        __cachedOutputLatency = [((AVAudioSession*)[AVAudioSession sharedInstance]) outputLatency];
     }
     return __cachedOutputLatency;
 }
@@ -1954,7 +1957,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
 
 - (void)applicationWillEnterForeground:(NSNotification*)notification {
     NSError *error = nil;
-    if ( ![[AVAudioSession sharedInstance] setActive:YES error:&error] ) {
+    if ( ![((AVAudioSession*)[AVAudioSession sharedInstance]) setActive:YES error:&error] ) {
         NSLog(@"Couldn't activate audio session: %@", error);
     }
     
@@ -1988,7 +1991,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
         if ( [[UIApplication sharedApplication] applicationState] != UIApplicationStateBackground || _runningPriorToInterruption ) {
             // make sure we are again the active session
             NSError *error = nil;
-            if ( ![[AVAudioSession sharedInstance] setActive:YES error:&error] ) {
+            if ( ![((AVAudioSession*)[AVAudioSession sharedInstance]) setActive:YES error:&error] ) {
                 NSLog(@"Coludn't activate audio session: %@", error);
             }
         }
@@ -3099,7 +3102,7 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
         [NSThread sleepForTimeInterval:0.5];
         
         NSError *e = nil;
-        if ( ![[AVAudioSession sharedInstance] setActive:YES error:&e] ) {
+        if ( ![((AVAudioSession*)[AVAudioSession sharedInstance]) setActive:YES error:&e] ) {
             NSLog(@"Couldn't activate audio session: %@", e);
         }
         
@@ -3384,7 +3387,7 @@ static BOOL upstreamChannelsConnectedToAudiobus(AEChannelRef channel) {
 }
 
 - (void)housekeeping {
-    Float32 bufferDuration = [[AVAudioSession sharedInstance] IOBufferDuration];
+    Float32 bufferDuration = [((AVAudioSession*)[AVAudioSession sharedInstance]) IOBufferDuration];
     if ( _currentBufferDuration != bufferDuration ) self.currentBufferDuration = bufferDuration;
 }
 
