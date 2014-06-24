@@ -2040,6 +2040,9 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     if ( !updatedVP && (reason == AVAudioSessionRouteChangeReasonNewDeviceAvailable || reason == AVAudioSessionRouteChangeReasonOldDeviceUnavailable) && _inputEnabled ) {
         [self updateInputDeviceStatus];
     }
+    
+    [self willChangeValueForKey:@"inputGainAvailable"];
+    [self didChangeValueForKey:@"inputGainAvailable"];
 }
 
 #pragma mark - Graph and audio session configuration
