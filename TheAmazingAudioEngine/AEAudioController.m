@@ -751,10 +751,6 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     [self stop];
     [self teardown];
     
-    if ( _topChannel->audiobusSenderPort ) {
-        [(__bridge id)_topChannel->audiobusSenderPort removeObserver:self forKeyPath:@"destinations"];
-    }
-    
     [self releaseResourcesForChannel:_topChannel];
     
     TPCircularBufferCleanup(&_realtimeThreadMessageBuffer);
@@ -1812,18 +1808,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
         abort();
     }
     
-    if ( _topChannel->audiobusSenderPort ) {
-        [(__bridge id)_topChannel->audiobusSenderPort removeObserver:self forKeyPath:@"destinations"];
-    }
-    
-    [self willChangeValueForKey:@"playingThroughDeviceSpeaker"];
     [self setAudiobusSenderPort:audiobusSenderPort forChannelElement:_topChannel];
-    [self didChangeValueForKey:@"playingThroughDeviceSpeaker"];
-    
-    
-    if ( _topChannel->audiobusSenderPort ) {
-        [(__bridge id)_topChannel->audiobusSenderPort addObserver:self forKeyPath:@"destinations" options:NSKeyValueObservingOptionPrior context:NULL];
-    }
 }
 
 - (ABSenderPort*)audiobusSenderPort {
@@ -1892,15 +1877,6 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
 
 -(void) observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
 
-    if ( object == (__bridge id)_topChannel->audiobusSenderPort ) {
-        if ( change[NSKeyValueChangeNotificationIsPriorKey] ) {
-            [self willChangeValueForKey:@"playingThroughDeviceSpeaker"];
-        } else {
-            [self didChangeValueForKey:@"playingThroughDeviceSpeaker"];
-        }
-        return;
-    }
-    
     id<AEAudioPlayable> channel = (id<AEAudioPlayable>)object;
     
     int index;
