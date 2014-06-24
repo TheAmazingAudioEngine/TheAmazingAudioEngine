@@ -228,6 +228,7 @@ typedef struct {
     void                           *userInfoByReference;
     int                             userInfoLength;
     pthread_t                       sourceThread;
+    BOOL                            responseBlockServiced;
 } message_t;
 
 
@@ -1373,15 +1374,40 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
         @synchronized ( self ) {
             int32_t availableBytes;
             message_t *buffer = TPCircularBufferTail(&_mainThreadMessageBuffer, &availableBytes);
-            if ( !buffer ) break;
+            if ( !buffer ) {
+                break;
+            }
             
-            if ( buffer->sourceThread && buffer->sourceThread != thread ) break;
+            message_t *bufferEnd = (message_t*)(((char*)buffer)+availableBytes);
             
-            int messageLength = sizeof(message_t) + (buffer->userInfoLength && !buffer->userInfoByReference ? buffer->userInfoLength : 0);
-            message = malloc(messageLength);
-            memcpy(message, buffer, messageLength);
+            BOOL hasPendingBuffers = NO;
+            BOOL hasBuffer = NO;
+            while ( buffer < bufferEnd && !hasBuffer ) {
+                int messageLength = sizeof(message_t) + (buffer->userInfoLength && !buffer->userInfoByReference ? buffer->userInfoLength : 0);
+                
+                if ( !buffer->responseBlockServiced ) {
+                    if ( buffer->sourceThread && buffer->sourceThread != thread ) {
+                        hasPendingBuffers = YES;
+                        buffer++;
+                        continue;
+                    }
+                    
+                    if ( !buffer->responseBlockServiced ) {
+                        message = (message_t*)malloc(messageLength);
+                        memcpy(message, buffer, messageLength);
+                        buffer->responseBlockServiced = YES;
+                        hasBuffer = YES;
+                    }
+                }
+                
+                if ( !hasPendingBuffers ) {
+                    TPCircularBufferConsume(&_mainThreadMessageBuffer, messageLength);
+                }
+            }
             
-            TPCircularBufferConsume(&_mainThreadMessageBuffer, messageLength);
+            if ( !hasBuffer ) {
+                break;
+            }
             
             _pendingResponses--;
             
@@ -1415,6 +1441,7 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
         if ( block ) {
             block = [block copy];
         }
+        
         if ( responseBlock ) {
             responseBlock = [responseBlock copy];
             _pendingResponses++;
@@ -1462,13 +1489,7 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
     // Wait for response
     uint64_t giveUpTime = mach_absolute_time() + (1.0 * __secondsToHostTicks);
     while ( !finished && mach_absolute_time() < giveUpTime ) {
-        if ( [NSThread isMainThread] ) {
-            [self pollForMessageResponses];
-        } else {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [self pollForMessageResponses];
-            });
-        }
+        [self pollForMessageResponses];
         if ( finished ) break;
         [NSThread sleepForTimeInterval:_preferredBufferDuration ? _preferredBufferDuration : 0.01];
     }
