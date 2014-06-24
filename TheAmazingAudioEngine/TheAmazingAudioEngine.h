@@ -633,7 +633,7 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  
 @page Audiobus Audiobus
  
- [Audiobus](http://audiob.us) is an exciting new technology that lets users combine iOS apps into an integrated,
+ [Audiobus](http://audiob.us) is a widely-used iOS library that lets users combine iOS apps into an integrated,
  modular virtual studio - a bit like virtual audio cables.
  
  Compatible apps build in support for the Audiobus SDK, which allows them to create 'ports' which can either send,
@@ -661,12 +661,9 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
    @link AEAudioController::setAudiobusSenderPort:forChannel: setAudiobusSenderPort:forChannel: @endlink
  - Send a channel group via Audiobus by assigning a new Sender port via
    @link AEAudioController::setAudiobusSenderPort:forChannelGroup: setAudiobusSenderPort:forChannelGroup: @endlink
-
- <blockquote>
- Audiobus provides an `ABAudiobusAudioUnitWrapper` class that makes working with audio units easier. <strong>The
- Amazing Audio Engine does not require this class. In fact, it will cause problems if you use 
- ABAudiobusAudioUnitWrapper with the methods listed above.</strong> You can use one or the other, but not both.
- </blockquote>
+ 
+ Take a look at the header documentation for the @link AEAudioController(AudiobusAdditions) Audiobus functions @endlink
+ for details.
  
  -------------
  
