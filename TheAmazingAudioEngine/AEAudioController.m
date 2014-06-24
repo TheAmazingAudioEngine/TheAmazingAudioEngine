@@ -1678,7 +1678,7 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
 }
 
 -(BOOL)inputGainAvailable {
-    return [[AVAudioSession sharedInstance] inputGainAvailable];
+    return [[AVAudioSession sharedInstance] isInputGainSettable];
 }
 
 -(float)inputGain {
