@@ -1349,7 +1349,7 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
 #ifdef DEBUG
             uint64_t end = mach_absolute_time();
             if ( (end-start)*__hostTicksToSeconds >= (THIS->_preferredBufferDuration ? THIS->_preferredBufferDuration : 0.01) ) {
-                printf("Warning: Block perform on realtime thread took too long (%0.4lfs)\n", (end-start)*__hostTicksToSeconds);
+                NSLog(@"Warning: Block perform on realtime thread took too long (%0.4lfs)\n", (end-start)*__hostTicksToSeconds);
             }
 #endif
         }
@@ -1789,7 +1789,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
     if ( _topChannel->audiobusSenderPort == (__bridge void *)audiobusSenderPort ) return;
     
     if ( [(id)audiobusSenderPort audioUnit] == _ioAudioUnit ) {
-        printf("You should not use ABSenderPort's audio unit initialiser with TAAE.\n"
+        NSLog(@"You should not use ABSenderPort's audio unit initialiser with TAAE.\n"
                "Either (a) use ABSenderPort's audio unit initialiser, and don't use the audiobusSenderPort property or "
                "(b) use the audio unit initialiser but don't use the audiobusSenderProperty, but not both.\n");
         abort();
