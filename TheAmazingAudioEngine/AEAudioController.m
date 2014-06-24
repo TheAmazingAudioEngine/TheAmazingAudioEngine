@@ -1969,7 +1969,7 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
             // make sure we are again the active session
             NSError *error = nil;
             if ( ![((AVAudioSession*)[AVAudioSession sharedInstance]) setActive:YES error:&error] ) {
-                NSLog(@"Coludn't activate audio session: %@", error);
+                NSLog(@"Couldn't activate audio session: %@", error);
             }
         }
         
