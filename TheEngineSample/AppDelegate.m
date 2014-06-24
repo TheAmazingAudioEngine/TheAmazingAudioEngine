@@ -24,6 +24,7 @@
     // Create an instance of the audio controller, set it up and start it running
     self.audioController = [[AEAudioController alloc] initWithAudioDescription:[AEAudioController nonInterleaved16BitStereoAudioDescription] inputEnabled:YES];
     _audioController.preferredBufferDuration = 0.005;
+    _audioController.useMeasurementMode = YES;
     [_audioController start:NULL];
     
     // Create and display view controller

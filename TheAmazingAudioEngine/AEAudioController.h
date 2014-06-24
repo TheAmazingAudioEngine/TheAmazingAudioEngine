@@ -1111,6 +1111,13 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  */
 @property (nonatomic, assign) BOOL allowMixingWithOtherApps;
 
+/*!
+ * Whether to use the "Measurement" Audio Session Mode for improved audio quality and bass response.
+ *
+ * Default: NO
+ */
+@property (nonatomic, assign) BOOL useMeasurementMode;
+
 /*! 
  * Mute output
  *

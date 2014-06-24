@@ -245,7 +245,7 @@ static const int kInputChannelsChangedContext;
             return 3;
             
         case 3:
-            return 1 + (_audioController.numberOfInputChannels > 1 ? 1 : 0);
+            return 2 + (_audioController.numberOfInputChannels > 1 ? 1 : 0);
             
         default:
             return 0;
@@ -373,6 +373,16 @@ static const int kInputChannelsChangedContext;
                     break;
                 }
                 case 1: {
+                    cell.textLabel.text = @"Input Gain";
+                    UISlider *inputGainSlider = [[UISlider alloc] initWithFrame:CGRectMake(0, 0, 100, 40)];
+                    inputGainSlider.minimumValue = 0.0;
+                    inputGainSlider.maximumValue = 1.0;
+                    inputGainSlider.value = _audioController.inputGain;
+                    [inputGainSlider addTarget:self action:@selector(inputGainSliderChanged:) forControlEvents:UIControlEventValueChanged];
+                    cell.accessoryView = inputGainSlider;
+                    break;
+                }
+                case 2: {
                     cell.textLabel.text = @"Channels";
                     
                     int channelCount = _audioController.numberOfInputChannels;
@@ -524,6 +534,10 @@ static const int kInputChannelsChangedContext;
         [_audioController removeInputReceiver:_playthrough];
         self.playthrough = nil;
     }
+}
+
+-(void)inputGainSliderChanged:(UISlider*)slider {
+    _audioController.inputGain = slider.value;
 }
 
 - (void)limiterSwitchChanged:(UISwitch*)sender {

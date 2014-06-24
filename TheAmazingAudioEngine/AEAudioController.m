@@ -1646,6 +1646,17 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
     }
 }
 
+-(void)setUseMeasurementMode:(BOOL)useMeasurementMode {
+    _useMeasurementMode = useMeasurementMode;
+    
+    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+    
+    NSError *error = nil;
+    if ( ![audioSession setMode:_useMeasurementMode ? AVAudioSessionModeMeasurement : AVAudioSessionModeDefault error:&error] ) {
+        NSLog(@"Couldn't set audio session mode: %@", error);
+    }
+}
+
 -(void)setMasterOutputVolume:(float)masterOutputVolume {
     _masterOutputVolume = masterOutputVolume;
     
