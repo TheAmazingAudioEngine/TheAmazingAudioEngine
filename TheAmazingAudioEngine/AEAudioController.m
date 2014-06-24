@@ -54,6 +54,8 @@ static const NSTimeInterval kMaxBufferDurationWithVPIO = 0.01;
 static const Float32 kNoValue                          = -1.0;
 #define kNoAudioErr                            -2222
 
+static void * kChannelPropertyChanged = &kChannelPropertyChanged;
+
 static Float32 __cachedInputLatency = kNoValue;
 static Float32 __cachedOutputLatency = kNoValue;
 
@@ -888,9 +890,8 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
             break;
         }
         
-        
         for ( NSString *property in @[@"volume", @"pan", @"channelIsPlaying", @"channelIsMuted", @"audioDescription"] ) {
-            [(NSObject*)channel addObserver:self forKeyPath:property options:0 context:NULL];
+            [(NSObject*)channel addObserver:self forKeyPath:property options:0 context:kChannelPropertyChanged];
         }
         
         AEChannelRef channelElement = (AEChannelRef)calloc(1, sizeof(channel_t));
@@ -1862,69 +1863,72 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
 #pragma mark - Events
 
 -(void) observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
+    if ( context == kChannelPropertyChanged ) {
+        id<AEAudioPlayable> channel = (id<AEAudioPlayable>)object;
+        
+        int index;
+        AEChannelGroupRef group = [self searchForGroupContainingChannelMatchingPtr:channel.renderCallback userInfo:(__bridge void*)channel index:&index];
+        if ( !group ) return;
+        
+        AEChannelRef channelElement = group->channels[index];
+        
+        if ( [keyPath isEqualToString:@"volume"] ) {
+            channelElement->volume = channel.volume;
+            
+            if ( group->mixerAudioUnit ) {
+                AudioUnitParameterValue value = channelElement->volume;
+                OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, index, value, 0);
+                checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
+            }
+            
+        } else if ( [keyPath isEqualToString:@"pan"] ) {
+            channelElement->pan = channel.pan;
+            
+            if ( group->mixerAudioUnit ) {
+                AudioUnitParameterValue value = channelElement->pan;
+                if ( value == -1.0 ) value = -0.999; // Workaround for pan limits bug
+                if ( value == 1.0 ) value = 0.999;
+                OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, index, value, 0);
+                checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)");
+            }
 
-    id<AEAudioPlayable> channel = (id<AEAudioPlayable>)object;
-    
-    int index;
-    AEChannelGroupRef group = [self searchForGroupContainingChannelMatchingPtr:channel.renderCallback userInfo:(__bridge void*)channel index:&index];
-    if ( !group ) return;
-    
-    AEChannelRef channelElement = group->channels[index];
-    
-    if ( [keyPath isEqualToString:@"volume"] ) {
-        channelElement->volume = channel.volume;
-        
-        if ( group->mixerAudioUnit ) {
-            AudioUnitParameterValue value = channelElement->volume;
-            OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, index, value, 0);
-            checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
+        } else if ( [keyPath isEqualToString:@"channelIsPlaying"] ) {
+            channelElement->playing = channel.channelIsPlaying;
+            AudioUnitParameterValue value = channel.channelIsPlaying && (![channel respondsToSelector:@selector(channelIsMuted)] || !channel.channelIsMuted);
+            
+            if ( group->mixerAudioUnit ) {
+                OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
+                checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
+            }
+            
+            group->channels[index]->playing = value;
+            
+        }  else if ( [keyPath isEqualToString:@"channelIsMuted"] ) {
+            channelElement->muted = channel.channelIsMuted;
+            
+            if ( group->mixerAudioUnit ) {
+                AudioUnitParameterValue value = ([channel respondsToSelector:@selector(channelIsPlaying)] ? channel.channelIsPlaying : YES) && !channel.channelIsMuted;
+                OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
+                checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
+            }
+            
+        } else if ( [keyPath isEqualToString:@"audioDescription"] ) {
+            channelElement->audioDescription = channel.audioDescription;
+            
+            if ( group->mixerAudioUnit ) {
+                OSStatus result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, index, &channelElement->audioDescription, sizeof(AudioStreamBasicDescription));
+                checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
+            }
+            
+            if ( channelElement->audiobusFloatConverter ) {
+                void *newFloatConverter = (__bridge_retained void*)[[AEFloatConverter alloc] initWithSourceFormat:channel.audioDescription];
+                void *oldFloatConverter = channelElement->audiobusFloatConverter;
+                [self performSynchronousMessageExchangeWithBlock:^{ channelElement->audiobusFloatConverter = newFloatConverter; }];
+                CFBridgingRelease(oldFloatConverter);
+            }
         }
-        
-    } else if ( [keyPath isEqualToString:@"pan"] ) {
-        channelElement->pan = channel.pan;
-        
-        if ( group->mixerAudioUnit ) {
-            AudioUnitParameterValue value = channelElement->pan;
-            if ( value == -1.0 ) value = -0.999; // Workaround for pan limits bug
-            if ( value == 1.0 ) value = 0.999;
-            OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, index, value, 0);
-            checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)");
-        }
-
-    } else if ( [keyPath isEqualToString:@"channelIsPlaying"] ) {
-        channelElement->playing = channel.channelIsPlaying;
-        AudioUnitParameterValue value = channel.channelIsPlaying && (![channel respondsToSelector:@selector(channelIsMuted)] || !channel.channelIsMuted);
-        
-        if ( group->mixerAudioUnit ) {
-            OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
-            checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
-        }
-        
-        group->channels[index]->playing = value;
-        
-    }  else if ( [keyPath isEqualToString:@"channelIsMuted"] ) {
-        channelElement->muted = channel.channelIsMuted;
-        
-        if ( group->mixerAudioUnit ) {
-            AudioUnitParameterValue value = ([channel respondsToSelector:@selector(channelIsPlaying)] ? channel.channelIsPlaying : YES) && !channel.channelIsMuted;
-            OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
-            checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
-        }
-        
-    } else if ( [keyPath isEqualToString:@"audioDescription"] ) {
-        channelElement->audioDescription = channel.audioDescription;
-        
-        if ( group->mixerAudioUnit ) {
-            OSStatus result = AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, index, &channelElement->audioDescription, sizeof(AudioStreamBasicDescription));
-            checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
-        }
-        
-        if ( channelElement->audiobusFloatConverter ) {
-            void *newFloatConverter = (__bridge_retained void*)[[AEFloatConverter alloc] initWithSourceFormat:channel.audioDescription];
-            void *oldFloatConverter = channelElement->audiobusFloatConverter;
-            [self performSynchronousMessageExchangeWithBlock:^{ channelElement->audiobusFloatConverter = newFloatConverter; }];
-            CFBridgingRelease(oldFloatConverter);
-        }
+    } else {
+        [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
     }
 }
 
