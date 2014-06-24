@@ -1138,6 +1138,8 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
 /*!
  * Enable audio input from Bluetooth devices
  *
+ *  Note that setting this property to YES may have implications for input latency.
+ *
  *  Default is NO.
  */
 @property (nonatomic, assign) BOOL enableBluetoothInput;
