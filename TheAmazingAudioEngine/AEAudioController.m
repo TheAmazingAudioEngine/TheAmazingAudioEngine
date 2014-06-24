@@ -287,22 +287,8 @@ typedef struct {
 @end
 
 @implementation AEAudioController
-@synthesize audioSessionCategory        = _audioSessionCategory,
-            audioInputAvailable         = _audioInputAvailable,
-            numberOfInputChannels       = _numberOfInputChannels, 
-            muteOutput                  = _muteOutput,
-            enableBluetoothInput        = _enableBluetoothInput,
-            voiceProcessingEnabled      = _voiceProcessingEnabled,
-            voiceProcessingOnlyForSpeakerAndMicrophone = _voiceProcessingOnlyForSpeakerAndMicrophone,
-            playingThroughDeviceSpeaker = _playingThroughDeviceSpeaker,
-            preferredBufferDuration     = _preferredBufferDuration, 
-            inputMode                   = _inputMode, 
-            audioUnit                   = _ioAudioUnit,
-            audioGraph                  = _audioGraph,
-            audioDescription            = _audioDescription,
-            audiobusReceiverPort        = _audiobusReceiverPort;
-
-@dynamic    running, inputGainAvailable, inputGain, audiobusSenderPort, inputAudioDescription, inputChannelSelection;
+@synthesize audioSessionCategory = _audioSessionCategory;
+@dynamic running, inputGainAvailable, inputGain, audiobusSenderPort, inputAudioDescription, inputChannelSelection;
 
 #pragma mark -
 #pragma mark Input and render callbacks
