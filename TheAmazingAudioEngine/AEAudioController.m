@@ -1658,6 +1658,10 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
     NSError *error = nil;
     if ( ![audioSession setMode:_useMeasurementMode ? AVAudioSessionModeMeasurement : AVAudioSessionModeDefault error:&error] ) {
         NSLog(@"Couldn't set audio session mode: %@", error);
+    } else {
+        if ( ![audioSession setPreferredIOBufferDuration:_preferredBufferDuration error:&error] ) {
+            NSLog(@"Couldn't set preferred IO buffer duration: %@", error);
+        }
     }
 }
 
