@@ -240,7 +240,7 @@ extern "C" {
 
  ...
  
- static OSStatus renderCallback(__unsafe_unretained AEAudioFilePlayer *THIS,
+ static OSStatus renderCallback(__unsafe_unretained MyChannelClass *THIS,
                                 __unsafe_unretained AEAudioController *audioController,
                                 const AudioTimeStamp *time,
                                 UInt32 frames,
