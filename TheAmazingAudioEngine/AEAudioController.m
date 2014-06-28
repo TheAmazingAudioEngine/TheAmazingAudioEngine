@@ -290,7 +290,7 @@ typedef struct {
 @end
 
 @implementation AEAudioController
-@synthesize audioSessionCategory = _audioSessionCategory;
+@synthesize audioSessionCategory = _audioSessionCategory, audioUnit = _ioAudioUnit;
 @dynamic running, inputGainAvailable, inputGain, audiobusSenderPort, inputAudioDescription, inputChannelSelection;
 
 #pragma mark -
