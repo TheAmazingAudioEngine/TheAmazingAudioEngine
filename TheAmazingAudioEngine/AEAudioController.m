@@ -234,10 +234,9 @@ typedef struct {
 
 #pragma mark -
 
-@interface AEAudioControllerProxy : NSProxy {
-    AEAudioController *_audioController;
-}
+@interface AEAudioControllerProxy : NSProxy
 - (id)initWithAudioController:(AEAudioController*)audioController;
+@property (nonatomic, weak) AEAudioController *audioController;
 @end
 
 @interface AEAudioControllerMessagePollThread : NSThread
