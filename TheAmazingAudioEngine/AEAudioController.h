@@ -1118,6 +1118,17 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  */
 @property (nonatomic, assign) BOOL useMeasurementMode;
 
+/*!
+ * Whether to avoid using Measurement Mode with the built-in mic
+ *
+ *  When used with the built-in microphone, Measurement Mode results in quite low audio
+ *  input levels. Setting this property to YES causes TAAE to avoid using Measurement Mode
+ *  with the built-in mic, avoiding this problem.
+ *
+ *  Default is YES.
+ */
+@property (nonatomic, assign) BOOL avoidMeasurementModeForBuiltInMic;
+
 /*! 
  * Mute output
  *

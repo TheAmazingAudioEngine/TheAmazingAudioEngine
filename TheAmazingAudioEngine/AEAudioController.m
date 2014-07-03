@@ -708,6 +708,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     _voiceProcessingEnabled = useVoiceProcessing;
     _inputMode = AEInputModeFixedAudioFormat;
     _voiceProcessingOnlyForSpeakerAndMicrophone = YES;
+    _avoidMeasurementModeForBuiltInMic = YES;
     _inputCallbacks = (input_callback_table_t*)calloc(sizeof(input_callback_table_t), 1);
     _inputCallbackCount = 1;
     
@@ -1655,7 +1656,9 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     
     NSError *error = nil;
-    if ( ![audioSession setMode:_useMeasurementMode ? AVAudioSessionModeMeasurement : AVAudioSessionModeDefault error:&error] ) {
+    if ( ![audioSession setMode:_useMeasurementMode && (!_avoidMeasurementModeForBuiltInMic || !_recordingThroughDeviceMicrophone)
+                                    ? AVAudioSessionModeMeasurement : AVAudioSessionModeDefault
+                          error:&error] ) {
         NSLog(@"Couldn't set audio session mode: %@", error);
     } else {
         if ( ![audioSession setPreferredIOBufferDuration:_preferredBufferDuration error:&error] ) {
@@ -2058,6 +2061,18 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
         [self willChangeValueForKey:@"recordingThroughDeviceMicrophone"];
         _recordingThroughDeviceMicrophone = recordingThroughMic;
         [self didChangeValueForKey:@"recordingThroughDeviceMicrophone"];
+        
+        if ( _useMeasurementMode && _avoidMeasurementModeForBuiltInMic ) {
+            NSError *error = nil;
+            if ( ![audioSession setMode:_useMeasurementMode && !_recordingThroughDeviceMicrophone ? AVAudioSessionModeMeasurement : AVAudioSessionModeDefault
+                                  error:&error] ) {
+                NSLog(@"Couldn't set audio session mode: %@", error);
+            } else {
+                if ( ![audioSession setPreferredIOBufferDuration:_preferredBufferDuration error:&error] ) {
+                    NSLog(@"Couldn't set preferred IO buffer duration: %@", error);
+                }
+            }
+        }
     }
     
     int reason = [notification.userInfo[AVAudioSessionRouteChangeReasonKey] intValue];
