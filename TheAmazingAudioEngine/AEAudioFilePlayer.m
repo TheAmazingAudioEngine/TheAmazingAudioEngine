@@ -92,13 +92,13 @@
 }
 
 static void notifyLoopRestart(AEAudioController *audioController, void *userInfo, int length) {
-    __unsafe_unretained AEAudioFilePlayer *THIS = (__bridge AEAudioFilePlayer*)*(void**)userInfo;
+    AEAudioFilePlayer *THIS = (__bridge AEAudioFilePlayer*)*(void**)userInfo;
     
     if ( THIS.startLoopBlock ) THIS.startLoopBlock();
 }
 
 static void notifyPlaybackStopped(AEAudioController *audioController, void *userInfo, int length) {
-    __unsafe_unretained AEAudioFilePlayer *THIS = (__bridge AEAudioFilePlayer*)*(void**)userInfo;
+    AEAudioFilePlayer *THIS = (__bridge AEAudioFilePlayer*)*(void**)userInfo;
     THIS.channelIsPlaying = NO;
 
     if ( THIS->_removeUponFinish ) {
