@@ -75,7 +75,7 @@ typedef struct {
     void *userInfo;
 } action_t;
 
-static const int kMaxSources                                = 30;
+#define kMaxSources 30
 static const NSTimeInterval kResyncTimestampThreshold       = 0.002;
 static const NSTimeInterval kSourceTimestampIdleThreshold   = 1.0;
 static const UInt32 kConversionBufferLength                 = 16384;
