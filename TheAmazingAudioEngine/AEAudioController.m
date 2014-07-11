@@ -792,7 +792,9 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     NSTimeInterval bufferDuration = audioSession.preferredIOBufferDuration;
     if ( _currentBufferDuration != bufferDuration ) self.currentBufferDuration = bufferDuration;
     
-    __cachedInputLatency = audioSession.inputLatency;
+    if ( _inputEnabled ) {
+        __cachedInputLatency = audioSession.inputLatency;
+    }
     __cachedOutputLatency = audioSession.outputLatency;
     
     BOOL hasError = NO;
@@ -1768,7 +1770,9 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
     return AEAudioControllerInputLatency(self);
 }
 
-NSTimeInterval AEAudioControllerInputLatency(AEAudioController *controller) {
+NSTimeInterval AEAudioControllerInputLatency(__unsafe_unretained AEAudioController *THIS) {
+    if ( !THIS->_inputEnabled ) return 0.0;
+    
     if ( __cachedInputLatency == kNoValue ) {
         __cachedInputLatency = [((AVAudioSession*)[AVAudioSession sharedInstance]) inputLatency];
     }
@@ -1779,7 +1783,7 @@ NSTimeInterval AEAudioControllerInputLatency(AEAudioController *controller) {
     return AEAudioControllerOutputLatency(self);
 }
 
-NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
+NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioController *THIS) {
     if ( __cachedOutputLatency == kNoValue ) {
         __cachedOutputLatency = [((AVAudioSession*)[AVAudioSession sharedInstance]) outputLatency];
     }
@@ -2022,9 +2026,6 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
 }
 
 - (void)audioRouteChangeNotification:(NSNotification*)notification {
-    __cachedInputLatency = kNoValue;
-    __cachedOutputLatency = kNoValue;
-    
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     AVAudioSessionRouteDescription *currentRoute = audioSession.currentRoute;
     
@@ -2074,6 +2075,11 @@ NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller) {
             }
         }
     }
+    
+    if ( _inputEnabled ) {
+        __cachedInputLatency = audioSession.inputLatency;
+    }
+    __cachedOutputLatency = audioSession.outputLatency;
     
     int reason = [notification.userInfo[AVAudioSessionRouteChangeReasonKey] intValue];
     if ( !updatedVP && (reason == AVAudioSessionRouteChangeReasonNewDeviceAvailable || reason == AVAudioSessionRouteChangeReasonOldDeviceUnavailable) && _inputEnabled ) {
