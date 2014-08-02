@@ -789,7 +789,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         return NO;
     }
     
-    NSTimeInterval bufferDuration = audioSession.preferredIOBufferDuration;
+    NSTimeInterval bufferDuration = audioSession.IOBufferDuration;
     if ( _currentBufferDuration != bufferDuration ) self.currentBufferDuration = bufferDuration;
     
     if ( _inputEnabled ) {
