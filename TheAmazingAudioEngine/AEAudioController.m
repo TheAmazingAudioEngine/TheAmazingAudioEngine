@@ -2556,8 +2556,8 @@ static void IsInterAppConnectedCallback(void *inRefCon, AudioUnit inUnit, AudioU
                     if ( [(__bridge NSArray*)entry->channelMap count] > 0 ) {
                         channelMap[i] = min(numberOfInputChannels-1,
                                                [(__bridge NSArray*)entry->channelMap count] > i
-                                               ? [((__bridge NSArray*)entry->channelMap)[i] intValue]
-                                               : [[(__bridge NSArray*)entry->channelMap lastObject] intValue]);
+                                               ? i
+                                               : (int)[(__bridge NSArray*)entry->channelMap count]);
                     } else {
                         channelMap[i] = min(numberOfInputChannels-1, i);
                     }
