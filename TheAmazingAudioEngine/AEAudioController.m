@@ -832,7 +832,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         }
     }
     
-    if ( _inputEnabled ) {
+    if ( _inputEnabled && [[[UIDevice currentDevice] systemVersion] floatValue] >= 7.0 ) {
         [audioSession requestRecordPermission:^(BOOL granted) {
             if ( granted ) {
                 [self updateInputDeviceStatus];
