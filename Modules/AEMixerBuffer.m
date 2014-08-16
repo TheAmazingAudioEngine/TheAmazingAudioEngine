@@ -119,7 +119,7 @@ static void prepareSkipFadeBufferForSource(AEMixerBuffer *THIS, source_t* source
 @end
 
 @interface AEMixerBufferPollProxy : NSObject {
-    AEMixerBuffer *_mixerBuffer;
+    __weak AEMixerBuffer *_mixerBuffer;
 }
 - (id)initWithMixerBuffer:(AEMixerBuffer*)mixerBuffer;
 @end
