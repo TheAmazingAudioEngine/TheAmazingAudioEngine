@@ -2262,9 +2262,11 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
 }
 
 static void IsInterAppConnectedCallback(void *inRefCon, AudioUnit inUnit, AudioUnitPropertyID inID, AudioUnitScope inScope, AudioUnitElement inElement) {
-    AEAudioController *THIS = (__bridge AEAudioController*)inRefCon;
-    if ( THIS->_inputEnabled ) {
-        [THIS updateInputDeviceStatus];
+    @autoreleasepool {
+        AEAudioController *THIS = (__bridge AEAudioController*)inRefCon;
+        if ( THIS->_inputEnabled ) {
+            [THIS updateInputDeviceStatus];
+        }
     }
 }
 
