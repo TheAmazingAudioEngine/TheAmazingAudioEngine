@@ -2010,68 +2010,70 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
 }
 
 - (void)audioRouteChangeNotification:(NSNotification*)notification {
-    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
-    AVAudioSessionRouteDescription *currentRoute = audioSession.currentRoute;
-    
-    NSLog(@"TAAE: Changed audio route to %@", currentRoute);
-    
-    BOOL playingThroughSpeaker;
-    if ( [currentRoute.outputs filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"portType = %@", AVAudioSessionPortBuiltInSpeaker]].count > 0 ) {
-        playingThroughSpeaker = YES;
-    } else {
-        playingThroughSpeaker = NO;
-    }
-    
-    BOOL updatedVP = NO;
-    if ( _playingThroughDeviceSpeaker != playingThroughSpeaker ) {
-        [self willChangeValueForKey:@"playingThroughDeviceSpeaker"];
-        _playingThroughDeviceSpeaker = playingThroughSpeaker;
-        [self didChangeValueForKey:@"playingThroughDeviceSpeaker"];
+    @autoreleasepool {
+        AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+        AVAudioSessionRouteDescription *currentRoute = audioSession.currentRoute;
         
-        if ( _voiceProcessingEnabled && _voiceProcessingOnlyForSpeakerAndMicrophone ) {
-            if ( [self mustUpdateVoiceProcessingSettings] ) {
-                [self replaceIONode];
-                updatedVP = YES;
-            }
+        NSLog(@"TAAE: Changed audio route to %@", currentRoute);
+        
+        BOOL playingThroughSpeaker;
+        if ( [currentRoute.outputs filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"portType = %@", AVAudioSessionPortBuiltInSpeaker]].count > 0 ) {
+            playingThroughSpeaker = YES;
+        } else {
+            playingThroughSpeaker = NO;
         }
-    }
-    
-    BOOL recordingThroughMic;
-    if ( [currentRoute.inputs filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"portType = %@", AVAudioSessionPortBuiltInMic]].count > 0 ) {
-        recordingThroughMic = YES;
-    } else {
-        recordingThroughMic = NO;
-    }
-    if ( _recordingThroughDeviceMicrophone != recordingThroughMic ) {
-        [self willChangeValueForKey:@"recordingThroughDeviceMicrophone"];
-        _recordingThroughDeviceMicrophone = recordingThroughMic;
-        [self didChangeValueForKey:@"recordingThroughDeviceMicrophone"];
         
-        if ( _useMeasurementMode && _avoidMeasurementModeForBuiltInMic ) {
-            NSError *error = nil;
-            if ( ![audioSession setMode:_useMeasurementMode && !_recordingThroughDeviceMicrophone ? AVAudioSessionModeMeasurement : AVAudioSessionModeDefault
-                                  error:&error] ) {
-                NSLog(@"Couldn't set audio session mode: %@", error);
-            } else {
-                if ( ![audioSession setPreferredIOBufferDuration:_preferredBufferDuration error:&error] ) {
-                    NSLog(@"Couldn't set preferred IO buffer duration: %@", error);
+        BOOL updatedVP = NO;
+        if ( _playingThroughDeviceSpeaker != playingThroughSpeaker ) {
+            [self willChangeValueForKey:@"playingThroughDeviceSpeaker"];
+            _playingThroughDeviceSpeaker = playingThroughSpeaker;
+            [self didChangeValueForKey:@"playingThroughDeviceSpeaker"];
+            
+            if ( _voiceProcessingEnabled && _voiceProcessingOnlyForSpeakerAndMicrophone ) {
+                if ( [self mustUpdateVoiceProcessingSettings] ) {
+                    [self replaceIONode];
+                    updatedVP = YES;
                 }
             }
         }
+        
+        BOOL recordingThroughMic;
+        if ( [currentRoute.inputs filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"portType = %@", AVAudioSessionPortBuiltInMic]].count > 0 ) {
+            recordingThroughMic = YES;
+        } else {
+            recordingThroughMic = NO;
+        }
+        if ( _recordingThroughDeviceMicrophone != recordingThroughMic ) {
+            [self willChangeValueForKey:@"recordingThroughDeviceMicrophone"];
+            _recordingThroughDeviceMicrophone = recordingThroughMic;
+            [self didChangeValueForKey:@"recordingThroughDeviceMicrophone"];
+            
+            if ( _useMeasurementMode && _avoidMeasurementModeForBuiltInMic ) {
+                NSError *error = nil;
+                if ( ![audioSession setMode:_useMeasurementMode && !_recordingThroughDeviceMicrophone ? AVAudioSessionModeMeasurement : AVAudioSessionModeDefault
+                                      error:&error] ) {
+                    NSLog(@"Couldn't set audio session mode: %@", error);
+                } else {
+                    if ( ![audioSession setPreferredIOBufferDuration:_preferredBufferDuration error:&error] ) {
+                        NSLog(@"Couldn't set preferred IO buffer duration: %@", error);
+                    }
+                }
+            }
+        }
+        
+        if ( _inputEnabled ) {
+            __cachedInputLatency = audioSession.inputLatency;
+        }
+        __cachedOutputLatency = audioSession.outputLatency;
+        
+        int reason = [notification.userInfo[AVAudioSessionRouteChangeReasonKey] intValue];
+        if ( !updatedVP && (reason == AVAudioSessionRouteChangeReasonNewDeviceAvailable || reason == AVAudioSessionRouteChangeReasonOldDeviceUnavailable) && _inputEnabled ) {
+            [self updateInputDeviceStatus];
+        }
+        
+        [self willChangeValueForKey:@"inputGainAvailable"];
+        [self didChangeValueForKey:@"inputGainAvailable"];
     }
-    
-    if ( _inputEnabled ) {
-        __cachedInputLatency = audioSession.inputLatency;
-    }
-    __cachedOutputLatency = audioSession.outputLatency;
-    
-    int reason = [notification.userInfo[AVAudioSessionRouteChangeReasonKey] intValue];
-    if ( !updatedVP && (reason == AVAudioSessionRouteChangeReasonNewDeviceAvailable || reason == AVAudioSessionRouteChangeReasonOldDeviceUnavailable) && _inputEnabled ) {
-        [self updateInputDeviceStatus];
-    }
-    
-    [self willChangeValueForKey:@"inputGainAvailable"];
-    [self didChangeValueForKey:@"inputGainAvailable"];
 }
 
 #pragma mark - Graph and audio session configuration
