@@ -789,7 +789,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         return NO;
     }
     
-    NSTimeInterval bufferDuration = audioSession.preferredIOBufferDuration;
+    NSTimeInterval bufferDuration = audioSession.IOBufferDuration;
     if ( _currentBufferDuration != bufferDuration ) self.currentBufferDuration = bufferDuration;
     
     if ( _inputEnabled ) {
@@ -1602,7 +1602,11 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
 #pragma mark - Setters, getters
 
 -(void)setAudioSessionCategory:(NSString *)audioSessionCategory {
-    NSLog(@"TAAE: Setting audio session category to %@", audioSessionCategory);
+    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+    
+    if ( ![audioSession.category isEqualToString:audioSessionCategory] ) {
+        NSLog(@"TAAE: Setting audio session category to %@", audioSessionCategory);
+    }
     
     _audioSessionCategory = audioSessionCategory;
     
@@ -1610,8 +1614,6 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
         NSLog(@"TAAE: No input available. Using AVAudioSessionCategoryPlayback category instead.");
         _audioSessionCategory = AVAudioSessionCategoryPlayback;
     }
-    
-    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     
     int options = 0;
     
@@ -1640,16 +1642,7 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
 -(void)setAllowMixingWithOtherApps:(BOOL)allowMixingWithOtherApps {
     _allowMixingWithOtherApps = allowMixingWithOtherApps;
     
-    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
-
-    NSError *error = nil;
-    if ( ![audioSession setCategory:audioSession.category
-                        withOptions:_allowMixingWithOtherApps
-                                        ? audioSession.categoryOptions | AVAudioSessionCategoryOptionMixWithOthers
-                                        : audioSession.categoryOptions & ~AVAudioSessionCategoryOptionMixWithOthers
-                              error:&error] ) {
-        NSLog(@"Couldn't set mixing with others flag: %@", error);
-    }
+    [self setAudioSessionCategory:_audioSessionCategory];
 }
 
 -(void)setUseMeasurementMode:(BOOL)useMeasurementMode {
@@ -1688,16 +1681,7 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
 -(void)setEnableBluetoothInput:(BOOL)enableBluetoothInput {
     _enableBluetoothInput = enableBluetoothInput;
 
-    // Enable/disable bluetooth
-    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
-    NSError *error = nil;
-    if ( ![audioSession setCategory:audioSession.category
-                        withOptions:_enableBluetoothInput
-                                        ? audioSession.categoryOptions | AVAudioSessionCategoryOptionAllowBluetooth
-                                        : audioSession.categoryOptions & ~AVAudioSessionCategoryOptionAllowBluetooth
-                              error:&error] ) {
-        NSLog(@"Couldn't set bluetooth flag: %@", error);
-    }
+    [self setAudioSessionCategory:_audioSessionCategory];
 }
 
 -(BOOL)inputGainAvailable {
@@ -2278,7 +2262,7 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
 }
 
 static void IsInterAppConnectedCallback(void *inRefCon, AudioUnit inUnit, AudioUnitPropertyID inID, AudioUnitScope inScope, AudioUnitElement inElement) {
-    __unsafe_unretained AEAudioController *THIS = (__bridge AEAudioController*)inRefCon;
+    AEAudioController *THIS = (__bridge AEAudioController*)inRefCon;
     if ( THIS->_inputEnabled ) {
         [THIS updateInputDeviceStatus];
     }
