@@ -354,6 +354,7 @@
 					"-DTPCircularBufferDequeueBufferListFrames=AECBDequeueBLFrames",
 					"-DTPCircularBufferPeek=AECBPeek",
 					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
+					"-DCA_PREFER_FIXED_POINT=NO",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PUBLIC_HEADERS_FOLDER_PATH = "$(TARGET_NAME)";
@@ -390,6 +391,7 @@
 					"-DTPCircularBufferDequeueBufferListFrames=AECBDequeueBLFrames",
 					"-DTPCircularBufferPeek=AECBPeek",
 					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
+					"-DCA_PREFER_FIXED_POINT=NO",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PUBLIC_HEADERS_FOLDER_PATH = "$(TARGET_NAME)";
