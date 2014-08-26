@@ -1970,7 +1970,7 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
     if ( _inputEnabled ) {
         [self updateInputDeviceStatus];
     }
-    if ( !self.running ) {
+    if ( [notification.object connected] ) {
         [self start:NULL];
     }
 }
