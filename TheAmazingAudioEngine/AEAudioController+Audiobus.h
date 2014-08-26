@@ -33,6 +33,7 @@ extern "C" {
 
 @class ABReceiverPort;
 @class ABSenderPort;
+@class ABFilterPort;
 
 @interface AEAudioController (AudiobusAdditions)
 
@@ -65,6 +66,14 @@ extern "C" {
  *  from this port instead of the system audio input.
  */
 @property (nonatomic, retain) ABReceiverPort *audiobusReceiverPort;
+
+/*!
+ * Audiobus filter port
+ *
+ *  Set this property to an Audiobus filter port to let TAAE correctly update the
+ *  number of input channels when connected.
+ */
+@property (nonatomic, retain) ABFilterPort *audiobusFilterPort;
 
 /*!
  * Audiobus sender port
