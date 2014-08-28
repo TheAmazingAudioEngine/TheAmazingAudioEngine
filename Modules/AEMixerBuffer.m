@@ -1078,8 +1078,6 @@ void AEMixerBufferMarkSourceIdle(__unsafe_unretained AEMixerBuffer *THIS, AEMixe
     
     // Set pan
     AudioUnitParameterValue value = source->pan;
-    if ( value == -1.0 ) value = -0.999; // Workaround for pan limits bug
-    if ( value == 1.0 ) value = 0.999;
     checkResult(AudioUnitSetParameter(_mixerUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, index, value, 0),
                 "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)");
 }
@@ -1169,8 +1167,6 @@ static OSStatus sourceInputCallback(void *inRefCon, AudioUnitRenderActionFlags *
         
         // Set pan
         value = source->pan;
-        if ( value == -1.0 ) value = -0.999; // Workaround for pan limits bug
-        if ( value == 1.0 ) value = 0.999;
         checkResult(AudioUnitSetParameter(_mixerUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, busNumber, value, 0),
                     "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)");
         

@@ -1107,8 +1107,6 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     NSAssert(parentGroup != NULL, @"Channel not found");
     
     AudioUnitParameterValue value = group->channel->pan = pan;
-    if ( value == -1.0 ) value = -0.999; // Workaround for pan limits bug
-    if ( value == 1.0 ) value = 0.999;
     OSStatus result = AudioUnitSetParameter(parentGroup->mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, index, value, 0);
     checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)");
 }
@@ -1910,8 +1908,6 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
             
             if ( group->mixerAudioUnit ) {
                 AudioUnitParameterValue value = channelElement->pan;
-                if ( value == -1.0 ) value = -0.999; // Workaround for pan limits bug
-                if ( value == 1.0 ) value = 0.999;
                 OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, index, value, 0);
                 checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)");
             }
@@ -2957,8 +2953,6 @@ static void IsInterAppConnectedCallback(void *inRefCon, AudioUnit inUnit, AudioU
             
             // Set pan
             AudioUnitParameterValue panValue = channel->pan;
-            if ( panValue == -1.0 ) panValue = -0.999; // Workaround for pan limits bug
-            if ( panValue == 1.0 ) panValue = 0.999;
             checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Pan, kAudioUnitScope_Input, i, panValue, 0),
                         "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)");
             
