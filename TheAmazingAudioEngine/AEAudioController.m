@@ -798,18 +798,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     }
     __cachedOutputLatency = audioSession.outputLatency;
     
-    BOOL hasError = NO;
-    
     _interrupted = NO;
-    
-    if ( _inputEnabled ) {
-        // Determine if audio input is available, and the number of input channels available
-        if ( ![self updateInputDeviceStatus] ) {
-            if ( error ) *error = self.lastError;
-            self.lastError = nil;
-            hasError = YES;
-        }
-    }
     
     if ( !_pollThread ) {
         // Start messaging poll thread
@@ -836,7 +825,10 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     if ( _inputEnabled ) {
         [audioSession requestRecordPermission:^(BOOL granted) {
             if ( granted ) {
-                [self updateInputDeviceStatus];
+                if ( ![self updateInputDeviceStatus] ) {
+                    if ( error ) *error = self.lastError;
+                    self.lastError = nil;
+                }
             } else {
                 [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerErrorOccurredNotification
                                                                     object:self
@@ -847,7 +839,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         }];
     }
     
-    return !hasError;
+    return YES;
 }
 
 - (void)stop {
