@@ -1991,6 +1991,8 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
         
         [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionEndedNotification object:self];
     } else if ( [notification.userInfo[AVAudioSessionInterruptionTypeKey] intValue] == AVAudioSessionInterruptionTypeBegan ) {
+        if ( _interrupted ) return;
+        
         NSLog(@"TAAE: Audio session interrupted");
         _runningPriorToInterruption = _running;
         
