@@ -2007,6 +2007,8 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
 }
 
 - (void)audioRouteChangeNotification:(NSNotification*)notification {
+    if ( _interrupted ) return;
+    
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     AVAudioSessionRouteDescription *currentRoute = audioSession.currentRoute;
     
