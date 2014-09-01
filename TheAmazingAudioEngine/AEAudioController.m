@@ -823,20 +823,21 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     }
     
     if ( _inputEnabled ) {
-        [audioSession requestRecordPermission:^(BOOL granted) {
-            if ( granted ) {
-                if ( ![self updateInputDeviceStatus] ) {
-                    if ( error ) *error = self.lastError;
-                    self.lastError = nil;
+        if ( [audioSession respondsToSelector:@selector(requestRecordPermission:)] ) {
+            [audioSession requestRecordPermission:^(BOOL granted) {
+                if ( granted ) {
+                    [self updateInputDeviceStatus];
+                } else {
+                    [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerErrorOccurredNotification
+                                                                        object:self
+                                                                      userInfo:@{ AEAudioControllerErrorKey: [NSError errorWithDomain:AEAudioControllerErrorDomain
+                                                                                                                                 code:AEAudioControllerErrorInputAccessDenied
+                                                                                                                             userInfo:nil]}];
                 }
-            } else {
-                [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerErrorOccurredNotification
-                                                                    object:self
-                                                                  userInfo:@{ AEAudioControllerErrorKey: [NSError errorWithDomain:AEAudioControllerErrorDomain
-                                                                                                                             code:AEAudioControllerErrorInputAccessDenied
-                                                                                                                         userInfo:nil]}];
-            }
-        }];
+            }];
+        } else {
+            [self updateInputDeviceStatus];
+        }
     }
     
     return YES;
