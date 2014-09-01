@@ -1328,12 +1328,14 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioController *THIS) {
     // Only call this from the Core Audio thread, or the main thread if audio system is not yet running
     int32_t availableBytes;
-    message_t *messagePtr = TPCircularBufferTail(&THIS->_realtimeThreadMessageBuffer, &availableBytes);
-    void *end = (char*)messagePtr + availableBytes;
-    
+    message_t *buffer = TPCircularBufferTail(&THIS->_realtimeThreadMessageBuffer, &availableBytes);
+    message_t *end = (message_t*)((char*)buffer + availableBytes);
     message_t message;
-    while ( (void*)messagePtr < (void*)end ) {
-        memcpy(&message, messagePtr, sizeof(message));
+    
+    while ( buffer < end ) {
+        assert(buffer->userInfoLength == 0);
+        
+        memcpy(&message, buffer, sizeof(message));
         TPCircularBufferConsume(&THIS->_realtimeThreadMessageBuffer, sizeof(message_t));
         
         if ( message.block ) {
@@ -1357,7 +1359,7 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
             TPCircularBufferProduce(&THIS->_mainThreadMessageBuffer, sizeof(message_t));
         }
         
-        messagePtr++;
+        buffer++;
     }
 }
 
@@ -1366,6 +1368,7 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
     while ( 1 ) {
         message_t *message = NULL;
         @synchronized ( self ) {
+            // Look for pending messages
             int32_t availableBytes;
             message_t *buffer = TPCircularBufferTail(&_mainThreadMessageBuffer, &availableBytes);
             if ( !buffer ) {
@@ -1373,33 +1376,36 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
             }
             
             message_t *bufferEnd = (message_t*)(((char*)buffer)+availableBytes);
+            BOOL hasUnservicedMessages = NO;
             
-            BOOL hasPendingBuffers = NO;
-            BOOL hasBuffer = NO;
-            while ( buffer < bufferEnd && !hasBuffer ) {
+            // Look through pending messages
+            while ( buffer < bufferEnd && !message ) {
                 int messageLength = sizeof(message_t) + (buffer->userInfoLength && !buffer->userInfoByReference ? buffer->userInfoLength : 0);
                 
                 if ( !buffer->responseBlockServiced ) {
-                    if ( buffer->sourceThread && buffer->sourceThread != thread ) {
-                        hasPendingBuffers = YES;
-                        buffer++;
-                        continue;
-                    }
+                    // This is a message that hasn't yet been serviced
                     
-                    if ( !buffer->responseBlockServiced ) {
+                    if ( buffer->sourceThread && buffer->sourceThread != thread ) {
+                        // Skip this message, it's for a different thread
+                        hasUnservicedMessages = YES;
+                    } else {
+                        // Service this message
                         message = (message_t*)malloc(messageLength);
                         memcpy(message, buffer, messageLength);
                         buffer->responseBlockServiced = YES;
-                        hasBuffer = YES;
                     }
                 }
                 
-                if ( !hasPendingBuffers ) {
+                // Advance to next message
+                buffer = (message_t*)(((char*)buffer)+messageLength);
+                
+                if ( !hasUnservicedMessages ) {
+                    // If we're done with all message records so far, free up the buffer
                     TPCircularBufferConsume(&_mainThreadMessageBuffer, messageLength);
                 }
             }
             
-            if ( !hasBuffer ) {
+            if ( !message ) {
                 break;
             }
             
