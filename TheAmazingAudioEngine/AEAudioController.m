@@ -825,15 +825,17 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     if ( _inputEnabled ) {
         if ( [audioSession respondsToSelector:@selector(requestRecordPermission:)] ) {
             [audioSession requestRecordPermission:^(BOOL granted) {
-                if ( granted ) {
-                    [self updateInputDeviceStatus];
-                } else {
-                    [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerErrorOccurredNotification
-                                                                        object:self
-                                                                      userInfo:@{ AEAudioControllerErrorKey: [NSError errorWithDomain:AEAudioControllerErrorDomain
-                                                                                                                                 code:AEAudioControllerErrorInputAccessDenied
-                                                                                                                             userInfo:nil]}];
-                }
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if ( granted ) {
+                        [self updateInputDeviceStatus];
+                    } else {
+                        [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerErrorOccurredNotification
+                                                                            object:self
+                                                                          userInfo:@{ AEAudioControllerErrorKey: [NSError errorWithDomain:AEAudioControllerErrorDomain
+                                                                                                                                     code:AEAudioControllerErrorInputAccessDenied
+                                                                                                                                 userInfo:nil]}];
+                    }
+                });
             }];
         } else {
             [self updateInputDeviceStatus];
@@ -1980,106 +1982,110 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
 }
 
 - (void)interruptionNotification:(NSNotification*)notification {
-    if ( [notification.userInfo[AVAudioSessionInterruptionTypeKey] intValue] == AVAudioSessionInterruptionTypeEnded ) {
-        NSLog(@"TAAE: Audio session interruption ended");
-        _interrupted = NO;
-        
-        if ( [[UIApplication sharedApplication] applicationState] != UIApplicationStateBackground || _runningPriorToInterruption ) {
-            // make sure we are again the active session
-            NSError *error = nil;
-            if ( ![((AVAudioSession*)[AVAudioSession sharedInstance]) setActive:YES error:&error] ) {
-                NSLog(@"Couldn't activate audio session: %@", error);
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if ( [notification.userInfo[AVAudioSessionInterruptionTypeKey] intValue] == AVAudioSessionInterruptionTypeEnded ) {
+            NSLog(@"TAAE: Audio session interruption ended");
+            _interrupted = NO;
+            
+            if ( [[UIApplication sharedApplication] applicationState] != UIApplicationStateBackground || _runningPriorToInterruption ) {
+                // make sure we are again the active session
+                NSError *error = nil;
+                if ( ![((AVAudioSession*)[AVAudioSession sharedInstance]) setActive:YES error:&error] ) {
+                    NSLog(@"Couldn't activate audio session: %@", error);
+                }
             }
+            
+            if ( _runningPriorToInterruption && !self.running ) {
+                [self start:NULL];
+            }
+            
+            [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionEndedNotification object:self];
+        } else if ( [notification.userInfo[AVAudioSessionInterruptionTypeKey] intValue] == AVAudioSessionInterruptionTypeBegan ) {
+            if ( _interrupted ) return;
+            
+            NSLog(@"TAAE: Audio session interrupted");
+            _runningPriorToInterruption = _running;
+            
+            _interrupted = YES;
+            
+            if ( _runningPriorToInterruption ) {
+                [self stop];
+            }
+            
+            [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionBeganNotification object:self];
+            
+            processPendingMessagesOnRealtimeThread(self);
         }
-        
-        if ( _runningPriorToInterruption && !self.running ) {
-            [self start:NULL];
-        }
-        
-        [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionEndedNotification object:self];
-    } else if ( [notification.userInfo[AVAudioSessionInterruptionTypeKey] intValue] == AVAudioSessionInterruptionTypeBegan ) {
-        if ( _interrupted ) return;
-        
-        NSLog(@"TAAE: Audio session interrupted");
-        _runningPriorToInterruption = _running;
-        
-        _interrupted = YES;
-        
-        if ( _runningPriorToInterruption ) {
-            [self stop];
-        }
-        
-        [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionBeganNotification object:self];
-        
-        processPendingMessagesOnRealtimeThread(self);
-    }
+    });
 }
 
 - (void)audioRouteChangeNotification:(NSNotification*)notification {
-    if ( _interrupted ) return;
-    
-    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
-    AVAudioSessionRouteDescription *currentRoute = audioSession.currentRoute;
-    
-    NSLog(@"TAAE: Changed audio route to %@", currentRoute);
-    
-    BOOL playingThroughSpeaker;
-    if ( [currentRoute.outputs filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"portType = %@", AVAudioSessionPortBuiltInSpeaker]].count > 0 ) {
-        playingThroughSpeaker = YES;
-    } else {
-        playingThroughSpeaker = NO;
-    }
-    
-    BOOL updatedVP = NO;
-    if ( _playingThroughDeviceSpeaker != playingThroughSpeaker ) {
-        [self willChangeValueForKey:@"playingThroughDeviceSpeaker"];
-        _playingThroughDeviceSpeaker = playingThroughSpeaker;
-        [self didChangeValueForKey:@"playingThroughDeviceSpeaker"];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if ( _interrupted ) return;
         
-        if ( _voiceProcessingEnabled && _voiceProcessingOnlyForSpeakerAndMicrophone ) {
-            if ( [self mustUpdateVoiceProcessingSettings] ) {
-                [self replaceIONode];
-                updatedVP = YES;
-            }
+        AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+        AVAudioSessionRouteDescription *currentRoute = audioSession.currentRoute;
+        
+        NSLog(@"TAAE: Changed audio route to %@", currentRoute);
+        
+        BOOL playingThroughSpeaker;
+        if ( [currentRoute.outputs filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"portType = %@", AVAudioSessionPortBuiltInSpeaker]].count > 0 ) {
+            playingThroughSpeaker = YES;
+        } else {
+            playingThroughSpeaker = NO;
         }
-    }
-    
-    BOOL recordingThroughMic;
-    if ( [currentRoute.inputs filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"portType = %@", AVAudioSessionPortBuiltInMic]].count > 0 ) {
-        recordingThroughMic = YES;
-    } else {
-        recordingThroughMic = NO;
-    }
-    if ( _recordingThroughDeviceMicrophone != recordingThroughMic ) {
-        [self willChangeValueForKey:@"recordingThroughDeviceMicrophone"];
-        _recordingThroughDeviceMicrophone = recordingThroughMic;
-        [self didChangeValueForKey:@"recordingThroughDeviceMicrophone"];
         
-        if ( _useMeasurementMode && _avoidMeasurementModeForBuiltInMic ) {
-            NSError *error = nil;
-            if ( ![audioSession setMode:_useMeasurementMode && !_recordingThroughDeviceMicrophone ? AVAudioSessionModeMeasurement : AVAudioSessionModeDefault
-                                  error:&error] ) {
-                NSLog(@"Couldn't set audio session mode: %@", error);
-            } else {
-                if ( ![audioSession setPreferredIOBufferDuration:_preferredBufferDuration error:&error] ) {
-                    NSLog(@"Couldn't set preferred IO buffer duration: %@", error);
+        BOOL updatedVP = NO;
+        if ( _playingThroughDeviceSpeaker != playingThroughSpeaker ) {
+            [self willChangeValueForKey:@"playingThroughDeviceSpeaker"];
+            _playingThroughDeviceSpeaker = playingThroughSpeaker;
+            [self didChangeValueForKey:@"playingThroughDeviceSpeaker"];
+            
+            if ( _voiceProcessingEnabled && _voiceProcessingOnlyForSpeakerAndMicrophone ) {
+                if ( [self mustUpdateVoiceProcessingSettings] ) {
+                    [self replaceIONode];
+                    updatedVP = YES;
                 }
             }
         }
-    }
-    
-    if ( _inputEnabled ) {
-        __cachedInputLatency = audioSession.inputLatency;
-    }
-    __cachedOutputLatency = audioSession.outputLatency;
-    
-    int reason = [notification.userInfo[AVAudioSessionRouteChangeReasonKey] intValue];
-    if ( !updatedVP && (reason == AVAudioSessionRouteChangeReasonNewDeviceAvailable || reason == AVAudioSessionRouteChangeReasonOldDeviceUnavailable) && _inputEnabled ) {
-        [self updateInputDeviceStatus];
-    }
-    
-    [self willChangeValueForKey:@"inputGainAvailable"];
-    [self didChangeValueForKey:@"inputGainAvailable"];
+        
+        BOOL recordingThroughMic;
+        if ( [currentRoute.inputs filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"portType = %@", AVAudioSessionPortBuiltInMic]].count > 0 ) {
+            recordingThroughMic = YES;
+        } else {
+            recordingThroughMic = NO;
+        }
+        if ( _recordingThroughDeviceMicrophone != recordingThroughMic ) {
+            [self willChangeValueForKey:@"recordingThroughDeviceMicrophone"];
+            _recordingThroughDeviceMicrophone = recordingThroughMic;
+            [self didChangeValueForKey:@"recordingThroughDeviceMicrophone"];
+            
+            if ( _useMeasurementMode && _avoidMeasurementModeForBuiltInMic ) {
+                NSError *error = nil;
+                if ( ![audioSession setMode:_useMeasurementMode && !_recordingThroughDeviceMicrophone ? AVAudioSessionModeMeasurement : AVAudioSessionModeDefault
+                                      error:&error] ) {
+                    NSLog(@"Couldn't set audio session mode: %@", error);
+                } else {
+                    if ( ![audioSession setPreferredIOBufferDuration:_preferredBufferDuration error:&error] ) {
+                        NSLog(@"Couldn't set preferred IO buffer duration: %@", error);
+                    }
+                }
+            }
+        }
+        
+        if ( _inputEnabled ) {
+            __cachedInputLatency = audioSession.inputLatency;
+        }
+        __cachedOutputLatency = audioSession.outputLatency;
+        
+        int reason = [notification.userInfo[AVAudioSessionRouteChangeReasonKey] intValue];
+        if ( !updatedVP && (reason == AVAudioSessionRouteChangeReasonNewDeviceAvailable || reason == AVAudioSessionRouteChangeReasonOldDeviceUnavailable) && _inputEnabled ) {
+            [self updateInputDeviceStatus];
+        }
+        
+        [self willChangeValueForKey:@"inputGainAvailable"];
+        [self didChangeValueForKey:@"inputGainAvailable"];
+    });
 }
 
 #pragma mark - Graph and audio session configuration
