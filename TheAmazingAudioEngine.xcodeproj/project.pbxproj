@@ -332,6 +332,7 @@
 				DSTROOT = /tmp/TheAmazingAudioEngine.dst;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "TheAmazingAudioEngine/TheAmazingAudioEngine-Prefix.pch";
+				GCC_UNROLL_LOOPS = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
 				OTHER_CFLAGS = (
 					"-DTPCircularBuffer=AECB",
@@ -369,6 +370,7 @@
 				DSTROOT = /tmp/TheAmazingAudioEngine.dst;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "TheAmazingAudioEngine/TheAmazingAudioEngine-Prefix.pch";
+				GCC_UNROLL_LOOPS = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
 				OTHER_CFLAGS = (
 					"-DTPCircularBuffer=AECB",
