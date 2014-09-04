@@ -27,12 +27,14 @@
 
 @class ABReceiverPort;
 @class ABSenderPort;
+@class ABFilterPort;
 @class ABPort;
 
 extern NSString * ABConnectionsChangedNotification;
 
 void ABReceiverPortReceive(ABReceiverPort *receiverPort, ABPort *sourcePortOrNil, AudioBufferList *bufferList, UInt32 lengthInFrames, AudioTimeStamp *outTimestamp);
 BOOL ABReceiverPortIsConnected(ABReceiverPort *receiverPort);
+BOOL ABFilterPortIsConnected(ABFilterPort *filterPort);
 BOOL ABSenderPortSend(ABSenderPort* senderPort, const AudioBufferList *audio, UInt32 lengthInFrames, const AudioTimeStamp *timestamp);
 BOOL ABSenderPortIsConnected(ABSenderPort *senderPort);
 BOOL ABSenderPortIsMuted(ABSenderPort *senderPort);
@@ -45,4 +47,5 @@ typedef void (^ABReceiverPortAudioInputBlock)(ABReceiverPort *receiverPort, UInt
 - (BOOL)connectedToSelf;
 - (void)setAutomaticMonitoring:(BOOL)automaticMonitoring;
 - (AudioUnit)audioUnit;
+- (BOOL)connected;
 @end
