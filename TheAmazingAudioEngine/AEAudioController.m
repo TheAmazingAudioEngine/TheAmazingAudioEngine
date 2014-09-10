@@ -452,6 +452,10 @@ static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt3
     input_producer_arg_t *arg = (input_producer_arg_t*)userInfo;
     __unsafe_unretained AEAudioController *THIS = (__bridge AEAudioController*)arg->THIS;
     
+    if ( !THIS->_inputAudioBufferList ) {
+        return noErr;
+    }
+    
     // See if there's another filter
     for ( int i=arg->table->callbacks.count-1, filterIndex=0; i>=0; i-- ) {
         callback_t *callback = &arg->table->callbacks.callbacks[i];
@@ -464,6 +468,10 @@ static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt3
             }
             filterIndex++;
         }
+    }
+    
+    if ( !THIS->_inputAudioBufferList ) {
+        return noErr;
     }
     
     if ( arg->table->audioConverter ) {
@@ -479,7 +487,7 @@ static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt3
                                                           NULL);
         checkResult(result, "AudioConverterConvertComplexBuffer");
     } else {
-        for ( int i=0; i<audio->mNumberBuffers; i++ ) {
+        for ( int i=0; i<audio->mNumberBuffers && i<THIS->_inputAudioBufferList->mNumberBuffers; i++ ) {
             audio->mBuffers[i].mDataByteSize = MIN(audio->mBuffers[i].mDataByteSize, THIS->_inputAudioBufferList->mBuffers[i].mDataByteSize);
             memcpy(audio->mBuffers[i].mData, THIS->_inputAudioBufferList->mBuffers[i].mData, audio->mBuffers[i].mDataByteSize);
         }
