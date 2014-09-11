@@ -2093,11 +2093,11 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
         
         [self willChangeValueForKey:@"inputGainAvailable"];
         [self didChangeValueForKey:@"inputGainAvailable"];
+        
+        [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionRouteChangeNotification
+                                                            object:self
+                                                          userInfo:notification.userInfo];
     });
-    
-    [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionRouteChangeNotification
-                                                        object:self
-                                                      userInfo:notification.userInfo];
 }
 
 #pragma mark - Graph and audio session configuration
