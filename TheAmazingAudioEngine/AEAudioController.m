@@ -61,6 +61,7 @@ static Float32 __cachedOutputLatency = kNoValue;
 
 NSString * const AEAudioControllerSessionInterruptionBeganNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionBeganNotification";
 NSString * const AEAudioControllerSessionInterruptionEndedNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionEndedNotification";
+NSString * const AEAudioControllerSessionRouteChangeNotification = @"com.theamazingaudioengine.AEAudioControllerRouteChangeNotification";
 NSString * const AEAudioControllerDidRecreateGraphNotification = @"com.theamazingaudioengine.AEAudioControllerDidRecreateGraphNotification";
 NSString * const AEAudioControllerErrorOccurredNotification = @"com.theamazingaudioengine.AEAudioControllerErrorOccurredNotification";
 
@@ -452,6 +453,10 @@ static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt3
     input_producer_arg_t *arg = (input_producer_arg_t*)userInfo;
     __unsafe_unretained AEAudioController *THIS = (__bridge AEAudioController*)arg->THIS;
     
+    if ( !THIS->_inputAudioBufferList ) {
+        return noErr;
+    }
+    
     // See if there's another filter
     for ( int i=arg->table->callbacks.count-1, filterIndex=0; i>=0; i-- ) {
         callback_t *callback = &arg->table->callbacks.callbacks[i];
@@ -464,6 +469,10 @@ static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt3
             }
             filterIndex++;
         }
+    }
+    
+    if ( !THIS->_inputAudioBufferList ) {
+        return noErr;
     }
     
     if ( arg->table->audioConverter ) {
@@ -479,7 +488,7 @@ static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt3
                                                           NULL);
         checkResult(result, "AudioConverterConvertComplexBuffer");
     } else {
-        for ( int i=0; i<audio->mNumberBuffers; i++ ) {
+        for ( int i=0; i<audio->mNumberBuffers && i<THIS->_inputAudioBufferList->mNumberBuffers; i++ ) {
             audio->mBuffers[i].mDataByteSize = MIN(audio->mBuffers[i].mDataByteSize, THIS->_inputAudioBufferList->mBuffers[i].mDataByteSize);
             memcpy(audio->mBuffers[i].mData, THIS->_inputAudioBufferList->mBuffers[i].mData, audio->mBuffers[i].mDataByteSize);
         }
@@ -2021,12 +2030,11 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
 
 - (void)audioRouteChangeNotification:(NSNotification*)notification {
     dispatch_async(dispatch_get_main_queue(), ^{
-        if ( _interrupted ) return;
+        if ( _interrupted || !_running ) return;
         
         AVAudioSession *audioSession = [AVAudioSession sharedInstance];
         AVAudioSessionRouteDescription *currentRoute = audioSession.currentRoute;
-        
-        NSLog(@"TAAE: Changed audio route to %@", currentRoute);
+        NSLog(@"TAAE: Changed audio route to %@", [self stringFromRouteDescription:currentRoute]);
         
         BOOL playingThroughSpeaker;
         if ( [currentRoute.outputs filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"portType = %@", AVAudioSessionPortBuiltInSpeaker]].count > 0 ) {
@@ -2085,6 +2093,10 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
         
         [self willChangeValueForKey:@"inputGainAvailable"];
         [self didChangeValueForKey:@"inputGainAvailable"];
+        
+        [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionRouteChangeNotification
+                                                            object:self
+                                                          userInfo:notification.userInfo];
     });
 }
 
@@ -2129,7 +2141,7 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
 
     // Determine audio route
     AVAudioSessionRouteDescription *currentRoute = audioSession.currentRoute;
-    [extraInfo appendFormat:@", audio route '%@'", currentRoute];
+    [extraInfo appendFormat:@", audio route '%@'", [self stringFromRouteDescription:currentRoute]];
     
     if ( [currentRoute.outputs filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"portType = %@", AVAudioSessionPortBuiltInSpeaker]].count > 0 ) {
         _playingThroughDeviceSpeaker = YES;
@@ -2276,9 +2288,11 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
 }
 
 static void IsInterAppConnectedCallback(void *inRefCon, AudioUnit inUnit, AudioUnitPropertyID inID, AudioUnitScope inScope, AudioUnitElement inElement) {
-    AEAudioController *THIS = (__bridge AEAudioController*)inRefCon;
-    if ( THIS->_inputEnabled ) {
-        [THIS updateInputDeviceStatus];
+    @autoreleasepool {
+        AEAudioController *THIS = (__bridge AEAudioController*)inRefCon;
+        if ( THIS->_inputEnabled ) {
+            [THIS updateInputDeviceStatus];
+        }
     }
 }
 
@@ -3430,6 +3444,20 @@ static BOOL upstreamChannelsConnectedToAudiobus(AEChannelRef channel) {
     if ( _currentBufferDuration != bufferDuration ) self.currentBufferDuration = bufferDuration;
 }
 
+- (NSString*)stringFromRouteDescription:(AVAudioSessionRouteDescription*)routeDescription {
+    
+    NSMutableString *inputsString = [NSMutableString string];
+    for ( AVAudioSessionPortDescription *port in routeDescription.inputs ) {
+        [inputsString appendFormat:@"%@%@", inputsString.length > 0 ? @", " : @"", port.portName];
+    }
+    NSMutableString *outputsString = [NSMutableString string];
+    for ( AVAudioSessionPortDescription *port in routeDescription.outputs ) {
+        [outputsString appendFormat:@"%@%@", outputsString.length > 0 ? @", " : @"", port.portName];
+    }
+    
+    return [NSString stringWithFormat:@"%@%@%@", inputsString, inputsString.length > 0 && outputsString.length > 0 ? @" and " : @"", outputsString];
+}
+
 @end
 
 #pragma mark -
@@ -3460,12 +3488,16 @@ static BOOL upstreamChannelsConnectedToAudiobus(AEChannelRef channel) {
     return self;
 }
 -(void)main {
-    pthread_setname_np("com.theamazingaudioengine.AEAudioControllerMessagePollThread");
-    while ( ![self isCancelled] ) {
-        if ( AEAudioControllerHasPendingMainThreadMessages(_audioController) ) {
-            [_audioController performSelectorOnMainThread:@selector(pollForMessageResponses) withObject:nil waitUntilDone:NO];
+    @autoreleasepool {
+        pthread_setname_np("com.theamazingaudioengine.AEAudioControllerMessagePollThread");
+        while ( ![self isCancelled] ) {
+            @autoreleasepool {
+                if ( AEAudioControllerHasPendingMainThreadMessages(_audioController) ) {
+                    [_audioController performSelectorOnMainThread:@selector(pollForMessageResponses) withObject:nil waitUntilDone:NO];
+                }
+                usleep(_pollInterval*1.0e6);
+            }
         }
-        usleep(_pollInterval*1.0e6);
     }
 }
 @end

@@ -355,7 +355,7 @@ static const int kInputChannelsChangedContext;
                 }
                 case 2: {
                     cell.textLabel.text = @"Reverb";
-                    ((UISwitch*)cell.accessoryView).on = _expander != nil;
+                    ((UISwitch*)cell.accessoryView).on = _reverb != nil;
                     [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(reverbSwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
                 }
