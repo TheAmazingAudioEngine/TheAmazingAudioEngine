@@ -2288,9 +2288,11 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
 }
 
 static void IsInterAppConnectedCallback(void *inRefCon, AudioUnit inUnit, AudioUnitPropertyID inID, AudioUnitScope inScope, AudioUnitElement inElement) {
-    AEAudioController *THIS = (__bridge AEAudioController*)inRefCon;
-    if ( THIS->_inputEnabled ) {
-        [THIS updateInputDeviceStatus];
+    @autoreleasepool {
+        AEAudioController *THIS = (__bridge AEAudioController*)inRefCon;
+        if ( THIS->_inputEnabled ) {
+            [THIS updateInputDeviceStatus];
+        }
     }
 }
 
@@ -3486,12 +3488,16 @@ static BOOL upstreamChannelsConnectedToAudiobus(AEChannelRef channel) {
     return self;
 }
 -(void)main {
-    pthread_setname_np("com.theamazingaudioengine.AEAudioControllerMessagePollThread");
-    while ( ![self isCancelled] ) {
-        if ( AEAudioControllerHasPendingMainThreadMessages(_audioController) ) {
-            [_audioController performSelectorOnMainThread:@selector(pollForMessageResponses) withObject:nil waitUntilDone:NO];
+    @autoreleasepool {
+        pthread_setname_np("com.theamazingaudioengine.AEAudioControllerMessagePollThread");
+        while ( ![self isCancelled] ) {
+            @autoreleasepool {
+                if ( AEAudioControllerHasPendingMainThreadMessages(_audioController) ) {
+                    [_audioController performSelectorOnMainThread:@selector(pollForMessageResponses) withObject:nil waitUntilDone:NO];
+                }
+                usleep(_pollInterval*1.0e6);
+            }
         }
-        usleep(_pollInterval*1.0e6);
     }
 }
 @end
