@@ -61,6 +61,7 @@ static Float32 __cachedOutputLatency = kNoValue;
 
 NSString * const AEAudioControllerSessionInterruptionBeganNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionBeganNotification";
 NSString * const AEAudioControllerSessionInterruptionEndedNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionEndedNotification";
+NSString * const AEAudioControllerSessionRouteChangeNotification = @"com.theamazingaudioengine.AEAudioControllerRouteChangeNotification";
 NSString * const AEAudioControllerDidRecreateGraphNotification = @"com.theamazingaudioengine.AEAudioControllerDidRecreateGraphNotification";
 NSString * const AEAudioControllerErrorOccurredNotification = @"com.theamazingaudioengine.AEAudioControllerErrorOccurredNotification";
 
@@ -2093,6 +2094,10 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
         [self willChangeValueForKey:@"inputGainAvailable"];
         [self didChangeValueForKey:@"inputGainAvailable"];
     });
+    
+    [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionRouteChangeNotification
+                                                        object:self
+                                                      userInfo:notification.userInfo];
 }
 
 #pragma mark - Graph and audio session configuration
