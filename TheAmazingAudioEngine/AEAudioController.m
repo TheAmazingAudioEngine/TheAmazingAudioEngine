@@ -2033,8 +2033,7 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
         
         AVAudioSession *audioSession = [AVAudioSession sharedInstance];
         AVAudioSessionRouteDescription *currentRoute = audioSession.currentRoute;
-        
-        NSLog(@"TAAE: Changed audio route to %@", currentRoute);
+        NSLog(@"TAAE: Changed audio route to %@", [self stringFromRouteDescription:currentRoute]);
         
         BOOL playingThroughSpeaker;
         if ( [currentRoute.outputs filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"portType = %@", AVAudioSessionPortBuiltInSpeaker]].count > 0 ) {
@@ -2137,7 +2136,7 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
 
     // Determine audio route
     AVAudioSessionRouteDescription *currentRoute = audioSession.currentRoute;
-    [extraInfo appendFormat:@", audio route '%@'", currentRoute];
+    [extraInfo appendFormat:@", audio route '%@'", [self stringFromRouteDescription:currentRoute]];
     
     if ( [currentRoute.outputs filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"portType = %@", AVAudioSessionPortBuiltInSpeaker]].count > 0 ) {
         _playingThroughDeviceSpeaker = YES;
@@ -3436,6 +3435,20 @@ static BOOL upstreamChannelsConnectedToAudiobus(AEChannelRef channel) {
 - (void)housekeeping {
     Float32 bufferDuration = [((AVAudioSession*)[AVAudioSession sharedInstance]) IOBufferDuration];
     if ( _currentBufferDuration != bufferDuration ) self.currentBufferDuration = bufferDuration;
+}
+
+- (NSString*)stringFromRouteDescription:(AVAudioSessionRouteDescription*)routeDescription {
+    
+    NSMutableString *inputsString = [NSMutableString string];
+    for ( AVAudioSessionPortDescription *port in routeDescription.inputs ) {
+        [inputsString appendFormat:@"%@%@", inputsString.length > 0 ? @", " : @"", port.portName];
+    }
+    NSMutableString *outputsString = [NSMutableString string];
+    for ( AVAudioSessionPortDescription *port in routeDescription.outputs ) {
+        [outputsString appendFormat:@"%@%@", outputsString.length > 0 ? @", " : @"", port.portName];
+    }
+    
+    return [NSString stringWithFormat:@"%@%@%@", inputsString, inputsString.length > 0 && outputsString.length > 0 ? @" and " : @"", outputsString];
 }
 
 @end
