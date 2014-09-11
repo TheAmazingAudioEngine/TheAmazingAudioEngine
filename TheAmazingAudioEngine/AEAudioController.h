@@ -42,6 +42,9 @@ extern "C" {
  *  Notification that the audio session interrupted has ended, and control
  *  has been passed back to the application.
  *
+ * @var AEAudioControllerSessionRouteChangeNotification
+ *  Notification that the system's audio route has changed.
+ *
  * @var AEAudioControllerDidRecreateGraphNotification
  *  Notification that AEAudioController has shut down and re-initialized
  *  the audio graph. This can happen in response to some unexpected system 
@@ -55,6 +58,7 @@ extern "C" {
  */
 extern NSString * const AEAudioControllerSessionInterruptionBeganNotification;
 extern NSString * const AEAudioControllerSessionInterruptionEndedNotification;
+extern NSString * const AEAudioControllerSessionRouteChangeNotification;
 extern NSString * const AEAudioControllerDidRecreateGraphNotification;
 extern NSString * const AEAudioControllerErrorOccurredNotification;
     
