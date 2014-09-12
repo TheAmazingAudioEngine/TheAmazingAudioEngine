@@ -2100,6 +2100,15 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
     });
 }
 
+static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, AudioUnitPropertyID inID, AudioUnitScope inScope, AudioUnitElement inElement) {
+    @autoreleasepool {
+        AEAudioController *THIS = (__bridge AEAudioController*)inRefCon;
+        if ( THIS->_inputEnabled ) {
+            [THIS updateInputDeviceStatus];
+        }
+    }
+}
+
 #pragma mark - Graph and audio session configuration
 
 - (BOOL)initAudioSession {
@@ -2287,15 +2296,6 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
     }
 }
 
-static void IsInterAppConnectedCallback(void *inRefCon, AudioUnit inUnit, AudioUnitPropertyID inID, AudioUnitScope inScope, AudioUnitElement inElement) {
-    @autoreleasepool {
-        AEAudioController *THIS = (__bridge AEAudioController*)inRefCon;
-        if ( THIS->_inputEnabled ) {
-            [THIS updateInputDeviceStatus];
-        }
-    }
-}
-
 - (void)configureAudioUnit {
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     
@@ -2346,7 +2346,7 @@ static void IsInterAppConnectedCallback(void *inRefCon, AudioUnit inUnit, AudioU
     checkResult(AudioUnitSetProperty(_ioAudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &kMaxFramesPerSlice, sizeof(kMaxFramesPerSlice)),
                 "AudioUnitSetProperty(kAudioUnitProperty_MaximumFramesPerSlice)");
 
-    checkResult(AudioUnitAddPropertyListener(_ioAudioUnit, kAudioUnitProperty_IsInterAppConnected, IsInterAppConnectedCallback, (__bridge void*)self),
+    checkResult(AudioUnitAddPropertyListener(_ioAudioUnit, kAudioUnitProperty_IsInterAppConnected, interAppConnectedChangeCallback, (__bridge void*)self),
                 "AudioUnitAddPropertyListener(kAudioUnitProperty_IsInterAppConnected)");
 }
 
