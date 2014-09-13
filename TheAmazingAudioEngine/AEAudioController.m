@@ -249,11 +249,10 @@ typedef struct {
     AUGraph             _audioGraph;
     AUNode              _ioNode;
     AudioUnit           _ioAudioUnit;
+    BOOL                _started;
     BOOL                _interrupted;
     BOOL                _inputEnabled;
     BOOL                _hardwareInputAvailable;
-    BOOL                _running;
-    BOOL                _runningPriorToInterruption;
     BOOL                _hasSystemError;
     
     AEChannelGroupRef   _topGroup;
@@ -817,17 +816,13 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         [_pollThread start];
     }
     
-    if ( !self.running ) {
-        // Start things up
-        if ( checkResult(status=AUGraphStart(_audioGraph), "AUGraphStart") ) {
-            _running = YES;
-        } else {
-            if ( !recoverFromErrors || ![self attemptRecoveryFromSystemError:error] ) {
-                NSError *startError = [NSError audioControllerErrorWithMessage:@"Couldn't start audio engine" OSStatus:status];
-                if ( error && !*error ) *error = startError;
-                [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerErrorOccurredNotification object:self userInfo:@{ AEAudioControllerErrorKey: startError}];
-                return NO;
-            }
+    // Start things up
+    if ( !checkResult(status=AUGraphStart(_audioGraph), "AUGraphStart") ) {
+        if ( !recoverFromErrors || ![self attemptRecoveryFromSystemError:error] ) {
+            NSError *startError = [NSError audioControllerErrorWithMessage:@"Couldn't start audio engine" OSStatus:status];
+            if ( error && !*error ) *error = startError;
+            [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerErrorOccurredNotification object:self userInfo:@{ AEAudioControllerErrorKey: startError}];
+            return NO;
         }
     }
     
@@ -851,26 +846,28 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         }
     }
     
+    _started = YES;
+    
     return YES;
 }
 
 - (void)stop {
+    [self stopInternal];
+    _started = NO;
+}
+
+- (void)stopInternal {
     NSLog(@"TAAE: Stopping Engine");
     
-    if ( _running ) {
-        checkResult(AUGraphStop(_audioGraph), "AUGraphStop");
-        
-        _running = NO;
-        
-        if ( !_interrupted ) {
-            NSError *error = nil;
-            if ( ![((AVAudioSession*)[AVAudioSession sharedInstance]) setActive:NO error:&error] ) {
-                NSLog(@"Couldn't deactivate audio session: %@", error);
-            }
+    checkResult(AUGraphStop(_audioGraph), "AUGraphStop");
+    if ( !_interrupted ) {
+        NSError *error = nil;
+        if ( ![((AVAudioSession*)[AVAudioSession sharedInstance]) setActive:NO error:&error] ) {
+            NSLog(@"Couldn't deactivate audio session: %@", error);
         }
-        
-        processPendingMessagesOnRealtimeThread(self);
     }
+    
+    processPendingMessagesOnRealtimeThread(self);
     
     if ( _pollThread ) {
         [_pollThread cancel];
@@ -1680,11 +1677,13 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
 }
 
 - (BOOL)running {
-    if ( !_audioGraph ) return NO;
-    
-    if ( _interrupted ) return NO;
-    
-    return _running;
+    Boolean topAudioUnitIsRunning;
+    UInt32 size = sizeof(topAudioUnitIsRunning);
+    if ( checkResult(AudioUnitGetProperty(_ioAudioUnit, kAudioOutputUnitProperty_IsRunning, kAudioUnitScope_Global, 0, &topAudioUnitIsRunning, &size), "kAudioOutputUnitProperty_IsRunning") ) {
+        return topAudioUnitIsRunning;
+    } else {
+        return NO;
+    }
 }
 
 -(void)setEnableBluetoothInput:(BOOL)enableBluetoothInput {
@@ -1971,7 +1970,7 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
     if ( _interrupted ) {
         _interrupted = NO;
         
-        if ( _runningPriorToInterruption && ![self running] ) {
+        if ( _started && !self.running ) {
             [self start:NULL];
         }
         
@@ -1985,7 +1984,7 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
     if ( _inputEnabled ) {
         [self updateInputDeviceStatus];
     }
-    if ( [notification.object connected] ) {
+    if ( [notification.object connected] && !self.running ) {
         [self start:NULL];
     }
 }
@@ -1996,7 +1995,7 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
             NSLog(@"TAAE: Audio session interruption ended");
             _interrupted = NO;
             
-            if ( [[UIApplication sharedApplication] applicationState] != UIApplicationStateBackground || _runningPriorToInterruption ) {
+            if ( [[UIApplication sharedApplication] applicationState] != UIApplicationStateBackground || _started ) {
                 // make sure we are again the active session
                 NSError *error = nil;
                 if ( ![((AVAudioSession*)[AVAudioSession sharedInstance]) setActive:YES error:&error] ) {
@@ -2004,7 +2003,7 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
                 }
             }
             
-            if ( _runningPriorToInterruption && !self.running ) {
+            if ( _started && !self.running ) {
                 [self start:NULL];
             }
             
@@ -2013,13 +2012,9 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
             if ( _interrupted ) return;
             
             NSLog(@"TAAE: Audio session interrupted");
-            _runningPriorToInterruption = _running;
-            
             _interrupted = YES;
             
-            if ( _runningPriorToInterruption ) {
-                [self stop];
-            }
+            [self stopInternal];
             
             [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionBeganNotification object:self];
             
@@ -2030,7 +2025,7 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
 
 - (void)audioRouteChangeNotification:(NSNotification*)notification {
     dispatch_async(dispatch_get_main_queue(), ^{
-        if ( _interrupted || !_running ) return;
+        if ( _interrupted || !self.running ) return;
         
         AVAudioSession *audioSession = [AVAudioSession sharedInstance];
         AVAudioSessionRouteDescription *currentRoute = audioSession.currentRoute;
@@ -2261,8 +2256,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         .componentFlagsMask = 0
     };
     
-    BOOL wasRunning = _running;
-    _running = NO;
+    BOOL wasRunning = self.running;
     
     if ( !checkResult(AUGraphStop(_audioGraph), "AUGraphStop") // Stop graph
             || !checkResult(AUGraphRemoveNode(_audioGraph, _ioNode), "AUGraphRemoveNode") // Remove the old IO node
@@ -2290,9 +2284,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     checkResult([self updateGraph], "Update graph");
     
     if ( wasRunning ) {
-        if ( checkResult(AUGraphStart(_audioGraph), "AUGraphStart") ) {
-            _running = YES;
-        }
+        checkResult(AUGraphStart(_audioGraph), "AUGraphStart");
     }
 }
 
@@ -2375,7 +2367,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 
 - (OSStatus)updateGraph {
     // Only update if graph is running
-    if ( _running ) {
+    if ( self.running ) {
         // Retry a few times (as sometimes the graph will be in the wrong state to update)
         OSStatus err;
         for ( int retry=0; retry<6; retry++ ) {
@@ -3149,7 +3141,7 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
         NSLog(@"TAAE: Trying to recover from system error (%d retries remain)", retries);
         retries--;
         
-        [self stop];
+        [self stopInternal];
         [self teardown];
         
         [NSThread sleepForTimeInterval:0.5];
