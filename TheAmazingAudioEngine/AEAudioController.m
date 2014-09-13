@@ -2108,7 +2108,11 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         UInt32 size = sizeof(iaaConnected);
         AudioUnitGetProperty(THIS->_ioAudioUnit, kAudioUnitProperty_IsInterAppConnected, kAudioUnitScope_Global, 0, &iaaConnected, &size);
         if ( !iaaConnected ) {
-            THIS->_interrupted = YES;
+            if ( [[UIApplication sharedApplication] applicationState] == UIApplicationStateBackground ) {
+                THIS->_interrupted = YES;
+            } else {
+                [THIS start:NULL];
+            }
         }
         
         if ( THIS->_inputEnabled ) {
