@@ -826,6 +826,11 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         }
     }
     
+    if ( !self.running ) {
+        // Ensure top IO unit is running (AUGraphStart may fail to start it)
+        checkResult(AudioOutputUnitStart(_ioAudioUnit), "AudioOutputUnitStart");
+    }
+    
     if ( _inputEnabled ) {
         if ( [audioSession respondsToSelector:@selector(requestRecordPermission:)] ) {
             [audioSession requestRecordPermission:^(BOOL granted) {
@@ -2098,6 +2103,14 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
 static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, AudioUnitPropertyID inID, AudioUnitScope inScope, AudioUnitElement inElement) {
     @autoreleasepool {
         AEAudioController *THIS = (__bridge AEAudioController*)inRefCon;
+        
+        UInt32 iaaConnected;
+        UInt32 size = sizeof(iaaConnected);
+        AudioUnitGetProperty(THIS->_ioAudioUnit, kAudioUnitProperty_IsInterAppConnected, kAudioUnitScope_Global, 0, &iaaConnected, &size);
+        if ( !iaaConnected ) {
+            THIS->_interrupted = YES;
+        }
+        
         if ( THIS->_inputEnabled ) {
             [THIS updateInputDeviceStatus];
         }
