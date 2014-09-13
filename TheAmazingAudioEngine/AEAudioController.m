@@ -865,6 +865,12 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     NSLog(@"TAAE: Stopping Engine");
     
     checkResult(AUGraphStop(_audioGraph), "AUGraphStop");
+    
+    if ( self.running ) {
+        // Ensure top IO unit is stopped (AUGraphStop may fail to stop it)
+        checkResult(AudioOutputUnitStop(_ioAudioUnit), "AudioOutputUnitStop");
+    }
+    
     if ( !_interrupted ) {
         NSError *error = nil;
         if ( ![((AVAudioSession*)[AVAudioSession sharedInstance]) setActive:NO error:&error] ) {
