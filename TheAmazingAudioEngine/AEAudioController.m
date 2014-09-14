@@ -1513,14 +1513,16 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
     
     // Wait for response
     uint64_t giveUpTime = mach_absolute_time() + (1.0 * __secondsToHostTicks);
-    while ( !finished && mach_absolute_time() < giveUpTime ) {
+    while ( !finished && mach_absolute_time() < giveUpTime && self.running ) {
         [self pollForMessageResponses];
         if ( finished ) break;
         [NSThread sleepForTimeInterval:_preferredBufferDuration ? _preferredBufferDuration : 0.01];
     }
     
     if ( !finished ) {
-        NSLog(@"TAAE: Timed out while performing message exchange");
+        if ( self.running ) {
+            NSLog(@"TAAE: Timed out while performing message exchange");
+        }
         @synchronized ( self ) {
             processPendingMessagesOnRealtimeThread(self);
             [self pollForMessageResponses];
