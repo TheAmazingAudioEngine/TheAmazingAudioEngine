@@ -122,7 +122,7 @@ struct _schedule_t {
 }
 
 -(NSArray *)schedules {
-    return _scheduledIdentifiers;
+	return [NSArray arrayWithArray:_scheduledIdentifiers];
 }
 
 -(void)cancelScheduleWithIdentifier:(id<NSCopying>)identifier {
