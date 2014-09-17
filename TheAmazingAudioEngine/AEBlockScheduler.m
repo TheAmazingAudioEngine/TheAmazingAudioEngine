@@ -154,15 +154,16 @@ struct _schedule_t {
         }
     }];
 
-    [_scheduledIdentifiers removeObject:identifier];
-    
-    for ( int i=0; i<scheduleCount; i++ ) {
-        CFBridgingRelease(values[i].block);
-        if ( values[i].responseBlock ) {
-            CFBridgingRelease(values[i].responseBlock);
-        }
-        CFBridgingRelease(values[i].identifier);
-    }
+	if ( [_scheduledIdentifiers containsObject:identifier] ) {
+		[_scheduledIdentifiers removeObject:identifier];
+		for ( int i=0; i<scheduleCount; i++ ) {
+			CFBridgingRelease(values[i].block);
+			if ( values[i].responseBlock ) {
+				CFBridgingRelease(values[i].responseBlock);
+			}
+			CFBridgingRelease(values[i].identifier);
+		}
+	}
 }
 
 - (NSDictionary*)infoForScheduleWithIdentifier:(id<NSCopying>)identifier {
