@@ -446,17 +446,6 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(AEAudioController *aud
 ///@{
 
 /*!
- * Canonical Audio Unit audio description
- *
- *  This is the non-interleaved audio description associated with the kAudioFormatFlagsAudioUnitCanonical flag,
- *  at 44.1kHz that can be used with @link initWithAudioDescription: @endlink.
- *
- *  This is the 8.24 fixed-point audio format recommended by Apple, although it is relatively 
- *  inconvenient to work with individual samples without converting.
- */
-+ (AudioStreamBasicDescription)audioUnitCanonicalAudioDescription;
-
-/*!
  * 16-bit stereo audio description, interleaved
  *
  *  This is a 16-bit signed PCM, stereo, interleaved format at 44.1kHz that can be used
