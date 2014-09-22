@@ -2020,6 +2020,15 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
             _interrupted = YES;
             
             [self stopInternal];
+
+            UInt32 iaaConnected;
+            UInt32 size = sizeof(iaaConnected);
+            AudioUnitGetProperty(_ioAudioUnit, kAudioUnitProperty_IsInterAppConnected, kAudioUnitScope_Global, 0, &iaaConnected, &size);
+            if ( iaaConnected ) {
+                NSLog(@"TAAE: Audio session interrupted while connected to IAA, restarting");
+                [self start:NULL];
+                return;
+            }
             
             [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionBeganNotification object:self];
             
