@@ -213,9 +213,10 @@ extern "C" {
  }];
  @endcode
  
- The block will be called with a timestamp that corresponds to the time the audio will reach the device
- audio output (automatically compensated for device latency), the number of audio frames you are expected
- to produce, and an AudioBufferList in which to store the generated audio.
+ The block will be called with a timestamp which, when adjusted by the value returned from
+ @link AEAudioControllerOutputLatency AEAudioController::AEAudioControllerOutputLatency @endlink,
+ corresponds to the time the audio will reach the device audio output; the number of audio frames 
+ you are expected to produce, and an AudioBufferList in which to store the generated audio.
  
  @section Object-Channels Objective-C Object Channels
  

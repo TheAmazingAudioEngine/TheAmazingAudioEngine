@@ -272,8 +272,10 @@ typedef struct {
     
     audio_level_monitor_t _inputLevelMonitorData;
     BOOL                _usingAudiobusInput;
+    AEChannelRef        _channelBeingRendered;
     
     AudioBufferList    *_audiobusMonitorBuffer;
+    pthread_t           _renderThread;
 }
 
 - (BOOL)mustUpdateVoiceProcessingSettings;
@@ -370,20 +372,14 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
 static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
     AEChannelRef channel = (AEChannelRef)inRefCon;
     
+    __unsafe_unretained AEAudioController * THIS = (__bridge AEAudioController*)channel->audioController;
+    
     if ( channel == NULL || channel->ptr == NULL || !channel->playing ) {
         *ioActionFlags |= kAudioUnitRenderAction_OutputIsSilence;
         return noErr;
     }
     
     AudioTimeStamp timestamp = *inTimeStamp;
-    
-    if ( channel->audiobusSenderPort && ABSenderPortIsMuted((__bridge id)channel->audiobusSenderPort) ) {
-        // We're sending via the sender port, and the receiver plays live - offset the timestamp by the reported latency
-        timestamp.mHostTime += ABSenderPortGetAverageLatency((__bridge id)channel->audiobusSenderPort)*__secondsToHostTicks;
-    } else {
-        // Adjust timestamp to factor in hardware output latency
-        timestamp.mHostTime += AEAudioControllerOutputLatency((__bridge id)channel->audioController)*__secondsToHostTicks;
-    }
     
     if ( channel->timeStamp.mFlags == 0 ) {
         channel->timeStamp = timestamp;
@@ -398,9 +394,13 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
         .nextFilterIndex = 0
     };
     
+    THIS->_channelBeingRendered = channel;
+    
     OSStatus result = channelAudioProducer((void*)&arg, ioData, &inNumberFrames);
     
     handleCallbacksForChannel(channel, &timestamp, inNumberFrames, ioData);
+    
+    THIS->_channelBeingRendered = NULL;
     
     if ( channel->audiobusSenderPort && ABSenderPortIsConnected((__bridge id)channel->audiobusSenderPort) && channel->audiobusFloatConverter ) {
         // Convert the audio to float, and apply volume/pan if necessary
@@ -422,10 +422,10 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
         
         if ( !ABSenderPortIsMuted((__bridge id)channel->audiobusSenderPort)
                 && upstreamChannelsMutedByAudiobus(channel)
-                && ((__bridge AEAudioController*)channel->audioController)->_audiobusMonitorBuffer ) {
+                && THIS->_audiobusMonitorBuffer ) {
             
             // Mix with monitoring buffer, as we need to monitor this channel but an upstream channel is muted by Audiobus
-            AudioBufferList *monitorBuffer = ((__bridge AEAudioController*)channel->audioController)->_audiobusMonitorBuffer;
+            AudioBufferList *monitorBuffer = THIS->_audiobusMonitorBuffer;
             for ( int i=0; i<MIN(monitorBuffer->mNumberBuffers, channel->audiobusScratchBuffer->mNumberBuffers); i++ ) {
                 vDSP_vadd((float*)monitorBuffer->mBuffers[i].mData, 1, (float*)channel->audiobusScratchBuffer->mBuffers[i].mData, 1, (float*)monitorBuffer->mBuffers[i].mData, 1, MIN(inNumberFrames, kMaxFramesPerSlice));
             }
@@ -498,6 +498,10 @@ static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt3
 
 static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
     __unsafe_unretained AEAudioController *THIS = (__bridge AEAudioController *)inRefCon;
+    
+    if ( !THIS->_renderThread ) {
+        THIS->_renderThread = pthread_self();
+    }
     
     if ( !THIS->_inputAudioBufferList ) return noErr;
     
@@ -576,10 +580,15 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
 static OSStatus groupRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
     AEChannelRef channel = (AEChannelRef)inRefCon;
     AEChannelGroupRef group = (AEChannelGroupRef)channel->ptr;
+    __unsafe_unretained AEAudioController * THIS = (__bridge AEAudioController*)channel->audioController;
     
     if ( !(*ioActionFlags & kAudioUnitRenderAction_PreRender) ) {
         // After render
+        THIS->_channelBeingRendered = channel;
+        
         handleCallbacksForChannel(channel, inTimeStamp, inNumberFrames, ioData);
+        
+        THIS->_channelBeingRendered = NULL;
         
         if ( group->level_monitor_data.monitoringEnabled ) {
             performLevelMonitoring(&group->level_monitor_data, ioData, inNumberFrames);
@@ -593,6 +602,10 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     __unsafe_unretained AEAudioController *THIS = (__bridge AEAudioController *)inRefCon;
 
+    if ( !THIS->_renderThread ) {
+        THIS->_renderThread = pthread_self();
+    }
+    
     if ( *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
         // Before render: Perform timing callbacks
         for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
@@ -801,6 +814,8 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         OSMemoryBarrier();
         [_pollThread start];
     }
+    
+    _renderThread = NULL;
     
     @synchronized ( self ) {
         status = AUGraphStart(_audioGraph);
@@ -1781,6 +1796,17 @@ NSTimeInterval AEAudioControllerInputLatency(__unsafe_unretained AEAudioControll
 }
 
 NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioController *THIS) {
+    if ( THIS->_renderThread == pthread_self() ) {
+        AEChannelRef channelBeingRendered = THIS->_channelBeingRendered;
+        if ( !channelBeingRendered ) channelBeingRendered = THIS->_topChannel;
+        
+        __unsafe_unretained ABSenderPort * upstreamSenderPort = firstUpstreamAudiobusSenderPort(channelBeingRendered);
+        if ( upstreamSenderPort && ABSenderPortIsMuted(upstreamSenderPort) ) {
+            // We're sending via the sender port, and the receiver plays live - offset the timestamp by the reported latency
+            return ABSenderPortGetAverageLatency(upstreamSenderPort)*__secondsToHostTicks;
+        }
+    }
+    
     if ( __cachedOutputLatency == kNoValue ) {
         __cachedOutputLatency = [((AVAudioSession*)[AVAudioSession sharedInstance]) outputLatency];
     }
@@ -2308,6 +2334,8 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     [self configureChannelsInRange:NSMakeRange(0, 1) forGroup:NULL];
     
     checkResult([self updateGraph], "Update graph");
+    
+    _renderThread = NULL;
     
     if ( wasRunning ) {
         @synchronized ( self ) {
@@ -3454,6 +3482,16 @@ static BOOL upstreamChannelsConnectedToAudiobus(AEChannelRef channel) {
     }
     
     return upstreamChannelsConnectedToAudiobus(parentGroupChannel);
+}
+
+static __unsafe_unretained ABSenderPort * firstUpstreamAudiobusSenderPort(AEChannelRef channel) {
+    if ( channel->audiobusSenderPort ) {
+        return (__bridge ABSenderPort*)channel->audiobusSenderPort;
+    }
+    
+    if ( !channel->parentGroup ) return nil;
+    
+    return firstUpstreamAudiobusSenderPort(channel->parentGroup->channel);
 }
 
 - (void)housekeeping {
