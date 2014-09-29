@@ -41,7 +41,7 @@ BOOL ABSenderPortIsMuted(ABSenderPort *senderPort);
 NSTimeInterval ABSenderPortGetAverageLatency(ABSenderPort *senderPort);
 typedef void (^ABReceiverPortAudioInputBlock)(ABReceiverPort *receiverPort, UInt32 lengthInFrames, AudioTimeStamp nextTimestamp, ABPort *sourcePortOrNil);
 
-@interface NSObject ()
+@protocol AEAudiobusForwardDeclarationsProtocol <NSObject>
 - (AudioStreamBasicDescription)clientFormat;
 - (void)setClientFormat:(AudioStreamBasicDescription)clientFormat;
 - (BOOL)connectedToSelf;

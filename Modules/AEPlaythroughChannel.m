@@ -140,8 +140,8 @@ static OSStatus renderCallback(__unsafe_unretained AEPlaythroughChannel *THIS,
             && [(id)_audioController.audiobusReceiverPort respondsToSelector:@selector(connectedToSelf)]
             && [(id)_audioController.audiobusReceiverPort respondsToSelector:@selector(setAutomaticMonitoring:)] ) {
         // Handle loopback connections: Pass monitoring responsibilities over to Audiobus SDK, and prepare to mute our own input
-        _audiobusConnectedToSelf = [(id)_audioController.audiobusReceiverPort connectedToSelf];
-        [(id)_audioController.audiobusReceiverPort setAutomaticMonitoring:_audiobusConnectedToSelf];
+        _audiobusConnectedToSelf = [(id<AEAudiobusForwardDeclarationsProtocol>)_audioController.audiobusReceiverPort connectedToSelf];
+        [(id<AEAudiobusForwardDeclarationsProtocol>)_audioController.audiobusReceiverPort setAutomaticMonitoring:_audiobusConnectedToSelf];
     }
 }
 
