@@ -3484,7 +3484,7 @@ static BOOL upstreamChannelsConnectedToAudiobus(AEChannelRef channel) {
     return upstreamChannelsConnectedToAudiobus(parentGroupChannel);
 }
 
-static __unsafe_unretained ABSenderPort * firstUpstreamAudiobusSenderPort(AEChannelRef channel) {
+static ABSenderPort * firstUpstreamAudiobusSenderPort(AEChannelRef channel) {
     if ( channel->audiobusSenderPort ) {
         return (__bridge ABSenderPort*)channel->audiobusSenderPort;
     }
