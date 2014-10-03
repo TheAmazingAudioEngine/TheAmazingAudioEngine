@@ -885,7 +885,7 @@ static UInt32 _AEMixerBufferPeek(__unsafe_unretained AEMixerBuffer *THIS, AudioT
             if ( latestStartFrames >= sourceEndFrames ) {
                 
                 #ifdef DEBUG
-                dprintf(THIS, 1, "Mixer buffer %p skipping %u frames of source %p (ends %0.4lfs/%d frames before earliest source starts)",
+                dprintf(THIS, 1, "Mixer buffer %p skipping %u frames of source %p (ends %0.4lfs/%d frames before latest source starts)",
                        THIS,
                        (unsigned int)peekEntries[i].frameCount,
                        peekEntries[i].source->source,
