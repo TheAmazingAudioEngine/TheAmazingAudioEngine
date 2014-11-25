@@ -106,7 +106,7 @@ OSStatus AEAudioFileWriterAddAudioSynchronously(AEAudioFileWriter* writer, Audio
 /*!
  * The path to the file being written
  */
-@property (nonatomic, retain, readonly) NSString *path;
+@property (nonatomic, strong, readonly) NSString *path;
 
 @end
 

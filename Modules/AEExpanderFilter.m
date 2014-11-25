@@ -67,8 +67,8 @@ typedef void (^AECalibrateCompletionBlock)(void);
 }
 
 @property (nonatomic, copy) AECalibrateCompletionBlock calibrateCompletionBlock;
-@property (nonatomic, retain) AEFloatConverter *floatConverter;
-@property (nonatomic, assign) AEAudioController *audioController;
+@property (nonatomic, strong) AEFloatConverter *floatConverter;
+@property (nonatomic, weak) AEAudioController *audioController;
 @end
 
 @implementation AEExpanderFilter
@@ -88,7 +88,7 @@ typedef void (^AECalibrateCompletionBlock)(void);
     self.audioController = audioController;
     _clientFormat = audioController.audioDescription;
     
-    self.floatConverter = [[[AEFloatConverter alloc] initWithSourceFormat:_clientFormat] autorelease];
+    self.floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:_clientFormat];
     
     _scratchBuffer = (float**)malloc(sizeof(float*) * _clientFormat.mChannelsPerFrame);
     assert(_scratchBuffer);
@@ -112,13 +112,11 @@ typedef void (^AECalibrateCompletionBlock)(void);
         free(_scratchBuffer[i]);
     }
     free(_scratchBuffer);
-    self.floatConverter = nil;
-    [super dealloc];
 }
 
 -(void)setClientFormat:(AudioStreamBasicDescription)clientFormat {
     
-    AEFloatConverter *floatConverter = [[[AEFloatConverter alloc] initWithSourceFormat:clientFormat] autorelease];
+    AEFloatConverter *floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:clientFormat];
     
     float **scratchBuffer = (float**)malloc(sizeof(float*) * clientFormat.mChannelsPerFrame);
     assert(scratchBuffer);
@@ -127,7 +125,6 @@ typedef void (^AECalibrateCompletionBlock)(void);
         assert(scratchBuffer[i]);
     }
     
-    AEFloatConverter *oldFloatConverter = _floatConverter;
     float** oldScratchBuffer = _scratchBuffer;
     AudioStreamBasicDescription oldClientFormat = _clientFormat;
     
@@ -137,7 +134,6 @@ typedef void (^AECalibrateCompletionBlock)(void);
         _clientFormat = clientFormat;
     }];
     
-    [oldFloatConverter release];
     for ( int i=0; i<oldClientFormat.mChannelsPerFrame; i++ ) {
         free(oldScratchBuffer[i]);
     }
@@ -225,26 +221,23 @@ typedef void (^AECalibrateCompletionBlock)(void);
 }
 
 static void completeCalibration(AEAudioController *audioController, void *userInfo, int len) {
-    AEExpanderFilter *THIS = *(AEExpanderFilter**)userInfo;
+    __unsafe_unretained AEExpanderFilter *THIS = (__bridge AEExpanderFilter*)*(void**)userInfo;
     THIS->_threshold = min((THIS->_calibrationMaxValue + kCalibrationThresholdOffset),
                            ratio_from_db(kMaxAutoThreshold) * INT16_MAX) * THIS->_thresholdOffset;
     double threshold_db = db_from_value(THIS->_threshold);
     THIS->_offThreshold = ratio_from_db(threshold_db - THIS->_hysteresis_db) * INT16_MAX;
     
     THIS->_calibrateCompletionBlock();
-    [THIS->_calibrateCompletionBlock release];
     THIS->_calibrateCompletionBlock = nil;
 }
 
-static OSStatus filterCallback(id                        filter,
-                               AEAudioController        *audioController,
+static OSStatus filterCallback(__unsafe_unretained AEExpanderFilter *THIS,
+                               __unsafe_unretained AEAudioController *audioController,
                                AEAudioControllerFilterProducer producer,
                                void                     *producerToken,
                                const AudioTimeStamp     *time,
                                UInt32                    frames,
                                AudioBufferList          *audio) {
-    
-    AEExpanderFilter *THIS = (AEExpanderFilter*)filter;
     
     OSStatus status = producer(producerToken, audio, &frames);
     if ( status != noErr ) return status;
@@ -300,7 +293,7 @@ static OSStatus filterCallback(id                        filter,
             
         case kStateClosing: {
             // Apply a ramp to the first part of the buffer
-            UInt32 decayFrames = AEConvertSecondsToFrames(audioController, THIS->_decay);
+            long decayFrames = AEConvertSecondsToFrames(audioController, THIS->_decay);
             int rampDuration = min(THIS->_multiplier * decayFrames, frames);
             float multiplierStart = (THIS->_multiplier * (1.0-THIS->_ratio)) + THIS->_ratio;
             float multiplierStep = -(1.0 / decayFrames) * (1.0-THIS->_ratio);
@@ -330,7 +323,7 @@ static OSStatus filterCallback(id                        filter,
             
         case kStateOpening: {
             // Apply a ramp to the first part of the buffer
-            UInt32 attackFrames = AEConvertSecondsToFrames(audioController, THIS->_attack);
+            long attackFrames = AEConvertSecondsToFrames(audioController, THIS->_attack);
             int rampDuration = min((1.0-THIS->_multiplier) * attackFrames, frames);
             float multiplierStart = (THIS->_multiplier * (1.0-THIS->_ratio)) + THIS->_ratio;
             float multiplierStep = (1.0 / attackFrames) * (1.0-THIS->_ratio);

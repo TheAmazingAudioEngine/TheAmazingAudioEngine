@@ -25,35 +25,27 @@
 
 #import <Foundation/Foundation.h>
 
-@class ABInputPort;
-@class ABOutputPort;
+@class ABReceiverPort;
+@class ABSenderPort;
+@class ABFilterPort;
 @class ABPort;
 
 extern NSString * ABConnectionsChangedNotification;
 
-#define ABMetadataBlockList void*
-typedef NSUInteger ABInputPortAttributes;
-void ABInputPortReceive(ABInputPort *inputPort, ABPort *sourcePortOrNil, AudioBufferList *bufferList, UInt32 *ioLengthInFrames, AudioTimeStamp *outTimestamp, ABMetadataBlockList *ioMetadataBlockList);
-void ABInputPortReceiveLive(ABInputPort *inputPort, AudioBufferList *bufferList, UInt32 lengthInFrames, AudioTimeStamp *outTimestamp);
-UInt32 ABInputPortPeek(ABInputPort *inputPort, AudioTimeStamp *outNextTimestamp);
-BOOL ABInputPortIsConnected(ABInputPort *inputPort);
-BOOL ABOutputPortSendAudio(ABOutputPort* outputPort, const AudioBufferList *audio, UInt32 lengthInFrames, const AudioTimeStamp *timestamp, ABMetadataBlockList *metadata);
-BOOL ABOutputPortIsConnected(ABOutputPort *outputPort);
-ABInputPortAttributes ABOutputPortGetConnectedPortAttributes(ABOutputPort *outputPort);
-NSTimeInterval ABOutputPortGetAverageLatency(ABOutputPort *outputPort);
-typedef void (^ABInputPortAudioInputBlock)(ABInputPort *inputPort, UInt32 lengthInFrames, AudioTimeStamp nextTimestamp, ABPort *sourcePortOrNil);
+void ABReceiverPortReceive(ABReceiverPort *receiverPort, ABPort *sourcePortOrNil, AudioBufferList *bufferList, UInt32 lengthInFrames, AudioTimeStamp *outTimestamp);
+BOOL ABReceiverPortIsConnected(ABReceiverPort *receiverPort);
+BOOL ABFilterPortIsConnected(ABFilterPort *filterPort);
+BOOL ABSenderPortSend(ABSenderPort* senderPort, const AudioBufferList *audio, UInt32 lengthInFrames, const AudioTimeStamp *timestamp);
+BOOL ABSenderPortIsConnected(ABSenderPort *senderPort);
+BOOL ABSenderPortIsMuted(ABSenderPort *senderPort);
+NSTimeInterval ABSenderPortGetAverageLatency(ABSenderPort *senderPort);
+typedef void (^ABReceiverPortAudioInputBlock)(ABReceiverPort *receiverPort, UInt32 lengthInFrames, AudioTimeStamp nextTimestamp, ABPort *sourcePortOrNil);
 
-@interface NSObject ()
+@protocol AEAudiobusForwardDeclarationsProtocol <NSObject>
 - (AudioStreamBasicDescription)clientFormat;
 - (void)setClientFormat:(AudioStreamBasicDescription)clientFormat;
-- (void)setAudioInputBlock:(ABInputPortAudioInputBlock)audioInputBlock;
-- (void)setConnectedPortAttributes:(NSInteger)connectedPortAttributes;
-- (void)setMuteLiveAudioInputWhenConnectedToSelf:(BOOL)self;
 - (BOOL)connectedToSelf;
+- (void)setAutomaticMonitoring:(BOOL)automaticMonitoring;
+- (AudioUnit)audioUnit;
+- (BOOL)connected;
 @end
-
-enum {
-    ABInputPortAttributeNone            = 0x0,//!< No attributes
-    ABInputPortAttributePlaysLiveAudio  = 0x1  //!< The receiver will play the received audio out loud, live.
-                                               //!< Connected senders should mute their output.
-};

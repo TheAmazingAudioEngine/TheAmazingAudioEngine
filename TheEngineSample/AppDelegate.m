@@ -16,24 +16,19 @@
 @synthesize viewController = _viewController;
 @synthesize audioController = _audioController;
 
-- (void)dealloc
-{
-    [_window release];
-    [_viewController release];
-    [super dealloc];
-}
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
-    self.window = [[[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]] autorelease];
+    self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
     
     // Create an instance of the audio controller, set it up and start it running
-    self.audioController = [[[AEAudioController alloc] initWithAudioDescription:[AEAudioController nonInterleaved16BitStereoAudioDescription] inputEnabled:YES] autorelease];
+    self.audioController = [[AEAudioController alloc] initWithAudioDescription:[AEAudioController nonInterleaved16BitStereoAudioDescription] inputEnabled:YES];
     _audioController.preferredBufferDuration = 0.005;
+    _audioController.useMeasurementMode = YES;
     [_audioController start:NULL];
     
     // Create and display view controller
-    self.viewController = [[[ViewController alloc] initWithAudioController:_audioController] autorelease];
+    self.viewController = [[ViewController alloc] initWithAudioController:_audioController];
     self.window.rootViewController = self.viewController;
     [self.window makeKeyAndVisible];
     

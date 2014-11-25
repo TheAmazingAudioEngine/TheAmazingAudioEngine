@@ -55,7 +55,7 @@ extern "C" {
  * @param numberOfChannels Number of channels to use
  * @param sampleRate Sample rate to use
  */
-- (id)initWithNumberOfChannels:(NSInteger)numberOfChannels sampleRate:(Float32)sampleRate;
+- (id)initWithNumberOfChannels:(int)numberOfChannels sampleRate:(Float32)sampleRate;
 
 /*!
  * Enqueue audio

@@ -39,11 +39,11 @@ static const int kIncrementalLoadBufferSize = 4096;
 static const int kMaxAudioFileReadSize = 16384;
 
 @interface AEAudioFileLoaderOperation ()
-@property (nonatomic, retain) NSURL *url;
+@property (nonatomic, strong) NSURL *url;
 @property (nonatomic, assign) AudioStreamBasicDescription targetAudioDescription;
 @property (nonatomic, readwrite) AudioBufferList *bufferList;
 @property (nonatomic, readwrite) UInt32 lengthInFrames;
-@property (nonatomic, retain, readwrite) NSError *error;
+@property (nonatomic, strong, readwrite) NSError *error;
 @end
 
 @implementation AEAudioFileLoaderOperation
@@ -56,11 +56,10 @@ static const int kMaxAudioFileReadSize = 16384;
     OSStatus status;
     
     // Open file
-    status = ExtAudioFileOpenURL((CFURLRef)url, &audioFile);
+    status = ExtAudioFileOpenURL((__bridge CFURLRef)url, &audioFile);
     if ( !checkResult(status, "ExtAudioFileOpenURL") ) {
         if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
-                                              userInfo:[NSDictionary dictionaryWithObject:NSLocalizedString(@"Couldn't open the audio file", @"") 
-                                                                                   forKey:NSLocalizedDescriptionKey]];
+                                              userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't open the audio file", @"")}];
         return NO;
     }
         
@@ -70,8 +69,7 @@ static const int kMaxAudioFileReadSize = 16384;
         status = ExtAudioFileGetProperty(audioFile, kExtAudioFileProperty_FileDataFormat, &size, audioDescription);
         if ( !checkResult(status, "ExtAudioFileGetProperty") ) {
             if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
-                                                  userInfo:[NSDictionary dictionaryWithObject:NSLocalizedString(@"Couldn't read the audio file", @"") 
-                                                                                       forKey:NSLocalizedDescriptionKey]];
+                                                  userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't read the audio file", @"")}];
             return NO;
         }
     }    
@@ -84,8 +82,7 @@ static const int kMaxAudioFileReadSize = 16384;
         if ( !checkResult(status, "ExtAudioFileGetProperty(kExtAudioFileProperty_FileLengthFrames)") ) {
             ExtAudioFileDispose(audioFile);
             if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
-                                                  userInfo:[NSDictionary dictionaryWithObject:NSLocalizedString(@"Couldn't read the audio file", @"") 
-                                                                                       forKey:NSLocalizedDescriptionKey]];
+                                                  userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't read the audio file", @"")}];
             return NO;
         }
         *lengthInFrames = (UInt32)fileLengthInFrames;
@@ -105,23 +102,16 @@ static const int kMaxAudioFileReadSize = 16384;
     return self;
 }
 
--(void)dealloc {
-    self.audioReceiverBlock = nil;
-    self.url = nil;
-    self.error = nil;
-    [super dealloc];
-}
 
 -(void)main {
     ExtAudioFileRef audioFile;
     OSStatus status;
     
     // Open file
-    status = ExtAudioFileOpenURL((CFURLRef)_url, &audioFile);
+    status = ExtAudioFileOpenURL((__bridge CFURLRef)_url, &audioFile);
     if ( !checkResult(status, "ExtAudioFileOpenURL") ) {
         self.error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
-                                     userInfo:[NSDictionary dictionaryWithObject:NSLocalizedString(@"Couldn't open the audio file", @"") 
-                                                                          forKey:NSLocalizedDescriptionKey]];
+                                     userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't open the audio file", @"")}];
         return;
     }
     
@@ -132,8 +122,7 @@ static const int kMaxAudioFileReadSize = 16384;
     if ( !checkResult(status, "ExtAudioFileGetProperty(kExtAudioFileProperty_FileDataFormat)") ) {
         ExtAudioFileDispose(audioFile);
         self.error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
-                                     userInfo:[NSDictionary dictionaryWithObject:NSLocalizedString(@"Couldn't read the audio file", @"") 
-                                                                          forKey:NSLocalizedDescriptionKey]];
+                                     userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't read the audio file", @"")}];
         return;
     }
     
@@ -143,8 +132,7 @@ static const int kMaxAudioFileReadSize = 16384;
         ExtAudioFileDispose(audioFile);
         int fourCC = CFSwapInt32HostToBig(status);
         self.error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
-                                     userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't convert the audio file (error %d/%4.4s)", @""), status, (char*)&fourCC]
-                                                                          forKey:NSLocalizedDescriptionKey]];
+                                     userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Couldn't convert the audio file (error %d/%4.4s)", @""), status, (char*)&fourCC]}];
         return;
     }
     
@@ -172,8 +160,7 @@ static const int kMaxAudioFileReadSize = 16384;
     if ( !checkResult(status, "ExtAudioFileGetProperty(kExtAudioFileProperty_FileLengthFrames)") ) {
         ExtAudioFileDispose(audioFile);
         self.error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
-                                     userInfo:[NSDictionary dictionaryWithObject:NSLocalizedString(@"Couldn't read the audio file", @"") 
-                                                                          forKey:NSLocalizedDescriptionKey]];
+                                     userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't read the audio file", @"")}];
         return;
     }
     
@@ -187,8 +174,7 @@ static const int kMaxAudioFileReadSize = 16384;
     if ( !bufferList ) {
         ExtAudioFileDispose(audioFile);
         self.error = [NSError errorWithDomain:NSPOSIXErrorDomain code:ENOMEM 
-                                     userInfo:[NSDictionary dictionaryWithObject:NSLocalizedString(@"Not enough memory to open file", @"")
-                                                                          forKey:NSLocalizedDescriptionKey]];
+                                     userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Not enough memory to open file", @"")}];
         return;
     }
     
@@ -219,8 +205,7 @@ static const int kMaxAudioFileReadSize = 16384;
             ExtAudioFileDispose(audioFile);
             int fourCC = CFSwapInt32HostToBig(status);
             self.error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
-                                         userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:NSLocalizedString(@"Couldn't read the audio file (error %d/%4.4s)", @""), status, (char*)&fourCC]
-                                                                              forKey:NSLocalizedDescriptionKey]];
+                                         userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Couldn't read the audio file (error %d/%4.4s)", @""), status, (char*)&fourCC]}];
             return;
         }
         

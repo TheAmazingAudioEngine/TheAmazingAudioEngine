@@ -49,7 +49,14 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 @implementation AEAudioUnitChannel
 
 - (id)initWithComponentDescription:(AudioComponentDescription)audioComponentDescription
+                       audioController:(AEAudioController*)audioController
+                                 error:(NSError**)error {
+    return [self initWithComponentDescription:audioComponentDescription audioController:audioController  preInitializeBlock:nil error:error];
+}
+
+- (id)initWithComponentDescription:(AudioComponentDescription)audioComponentDescription
                    audioController:(AEAudioController*)audioController
+                preInitializeBlock:(void(^)(AudioUnit audioUnit))block
                              error:(NSError**)error {
     
     if ( !(self = [super init]) ) return nil;
@@ -59,8 +66,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     _componentDescription = audioComponentDescription;
     _audioGraph = _audioController.audioGraph;
     
-    if ( ![self setup:error] ) {
-        [self release];
+    if ( ![self setup:block error:error] ) {
         return nil;
     }
     
@@ -74,11 +80,11 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     return self;
 }
 
-- (BOOL)setup:(NSError**)error {
+- (BOOL)setup:(void(^)(AudioUnit audioUnit))block error:(NSError**)error {
 	OSStatus result;
     if ( !checkResult(result=AUGraphAddNode(_audioGraph, &_componentDescription, &_node), "AUGraphAddNode") ||
          !checkResult(result=AUGraphNodeInfo(_audioGraph, _node, NULL, &_audioUnit), "AUGraphNodeInfo") ) {
-        if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:result userInfo:[NSDictionary dictionaryWithObject:@"Couldn't initialise audio unit" forKey:NSLocalizedDescriptionKey]];
+        if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:result userInfo:@{NSLocalizedDescriptionKey: @"Couldn't initialise audio unit"}];
         return NO;
     }
     
@@ -96,7 +102,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
         defaultAudioDescription.mSampleRate = audioDescription.mSampleRate;
         AEAudioStreamBasicDescriptionSetChannelsPerFrame(&defaultAudioDescription, audioDescription.mChannelsPerFrame);
         if ( !checkResult(result=AudioUnitSetProperty(_audioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &defaultAudioDescription, size), "AudioUnitSetProperty") ) {
-            if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:result userInfo:[NSDictionary dictionaryWithObject:@"Incompatible audio format" forKey:NSLocalizedDescriptionKey]];
+            if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:result userInfo:@{NSLocalizedDescriptionKey: @"Incompatible audio format"}];
             return NO;
         }
         
@@ -108,19 +114,26 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
              !checkResult(result=AudioUnitSetProperty(_converterUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFPS, sizeof(maxFPS)), "kAudioUnitProperty_MaximumFramesPerSlice") ||
              !checkResult(result=AUGraphConnectNodeInput(_audioGraph, _node, 0, _converterNode, 0), "AUGraphConnectNodeInput") ) {
             
-            if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:result userInfo:[NSDictionary dictionaryWithObject:@"Couldn't setup converter audio unit" forKey:NSLocalizedDescriptionKey]];
+            if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:result userInfo:@{NSLocalizedDescriptionKey: @"Couldn't setup converter audio unit"}];
             return NO;
         }
+        
+        // Set the audio unit to handle up to 4096 frames per slice to keep rendering during screen lock
+        UInt32 maxFPS = 4096;
+        checkResult(AudioUnitSetProperty(_converterUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFPS, sizeof(maxFPS)),
+                    "AudioUnitSetProperty(kAudioUnitProperty_MaximumFramesPerSlice)");
     }
     
     checkResult(AUGraphUpdate(_audioGraph, NULL), "AUGraphUpdate");
-    
+
+    if(block) block(_audioUnit);
+
     checkResult(AudioUnitInitialize(_audioUnit), "AudioUnitInitialize");
     
     if ( _converterUnit ) {
         checkResult(AudioUnitInitialize(_converterUnit), "AudioUnitInitialize");
     }
-    
+
     return YES;
 }
 
@@ -136,7 +149,6 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 
     checkResult(AUGraphUpdate(_audioGraph, NULL), "AUGraphUpdate");
     
-    [super dealloc];
 }
 
 -(AudioUnit)audioUnit {
@@ -147,12 +159,11 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     return _node;
 }
 
-static OSStatus renderCallback(id                        channel,
-                               AEAudioController        *audioController,
+static OSStatus renderCallback(__unsafe_unretained AEAudioUnitChannel *THIS,
+                               __unsafe_unretained AEAudioController *audioController,
                                const AudioTimeStamp     *time,
                                UInt32                    frames,
                                AudioBufferList          *audio) {
-    AEAudioUnitChannel *THIS = (AEAudioUnitChannel*)channel;
     AudioUnitRenderActionFlags flags = 0;
     checkResult(AudioUnitRender(THIS->_converterUnit ? THIS->_converterUnit : THIS->_audioUnit, &flags, time, 0, frames, audio), "AudioUnitRender");
     return noErr;
@@ -168,7 +179,7 @@ static OSStatus renderCallback(id                        channel,
     _converterNode = 0;
     _converterUnit = NULL;
     _audioGraph = _audioController.audioGraph;
-    [self setup:NULL];
+    [self setup:nil error:NULL];
 }
 
 @end

@@ -70,6 +70,27 @@ extern "C" {
                              error:(NSError**)error;
 
 /*!
+ * Create a new Audio Unit filter, with a block to run before initialization of the unit 
+ *
+ * @param audioComponentDescription The structure that identifies the audio unit
+ * @param audioController The audio controller
+ * @param useDefaultInputFormat Whether to always use the audio unit's default input audio format.
+ *              This can be used as a workaround for audio units that misidentify the TAAE system
+ *              audio description as being compatible. Audio will automatically be converted from
+ *              the source audio format to this format.
+ * @param preInitializeBlock A block to run before the audio unit is initialized.
+ *              This can be used to set some properties that needs to be set before the unit is initialized.
+ * @param error On output, if not NULL, will point to an error if a problem occurred
+ * @return The initialised filter, or nil if an error occurred
+ */
+- (id)initWithComponentDescription:(AudioComponentDescription)audioComponentDescription
+                   audioController:(AEAudioController*)audioController
+             useDefaultInputFormat:(BOOL)useDefaultInputFormat
+                preInitializeBlock:(void(^)(AudioUnit audioUnit))block
+                             error:(NSError**)error;
+
+    
+/*!
  * The audio unit
  */
 @property (nonatomic, readonly) AudioUnit audioUnit;
@@ -78,6 +99,13 @@ extern "C" {
  * The audio graph node
  */
 @property (nonatomic, readonly) AUNode audioGraphNode;
+
+/*!
+ * Audio Unit effect bypass. Default is false.
+ * Toggle this state at any time and it will begin taking effect 
+ * on the next render cycle.
+ */
+@property (nonatomic, assign) bool bypassed;
 
 @end
 
