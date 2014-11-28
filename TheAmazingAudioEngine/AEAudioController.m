@@ -1148,6 +1148,10 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     return group->channel->muted;
 }
 
+Boolean AEChannelGroupIsMuted(AEChannelGroupRef group) {
+    return group->channel->muted;
+}
+
 #pragma mark - Filters
 
 - (void)addFilter:(id<AEAudioFilter>)filter {
