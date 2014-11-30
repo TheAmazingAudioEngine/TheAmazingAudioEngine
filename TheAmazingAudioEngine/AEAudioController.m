@@ -339,14 +339,14 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
             filterIndex++;
         }
     }
+
+    for ( int i=0; i<audio->mNumberBuffers; i++ ) {
+        memset(audio->mBuffers[i].mData, 0, audio->mBuffers[i].mDataByteSize);
+    }
     
     if ( channel->type == kChannelTypeChannel ) {
         AEAudioControllerRenderCallback callback = (AEAudioControllerRenderCallback) channel->ptr;
         __unsafe_unretained id<AEAudioPlayable> channelObj = (__bridge id<AEAudioPlayable>) channel->object;
-        
-        for ( int i=0; i<audio->mNumberBuffers; i++ ) {
-            memset(audio->mBuffers[i].mData, 0, audio->mBuffers[i].mDataByteSize);
-        }
         
         status = callback(channelObj, (__bridge AEAudioController*)channel->audioController, &channel->timeStamp, *frames, audio);
         channel->timeStamp.mSampleTime += *frames;
@@ -376,6 +376,7 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     
     if ( channel == NULL || channel->ptr == NULL || !channel->playing ) {
         *ioActionFlags |= kAudioUnitRenderAction_OutputIsSilence;
+        for ( int i=0; i<ioData->mNumberBuffers; i++ ) memset(ioData->mBuffers[i].mData, 0, ioData->mBuffers[i].mDataByteSize);
         return noErr;
     }
     
@@ -434,6 +435,7 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     
     if ( channel->audiobusSenderPort && ABSenderPortIsMuted((__bridge id)channel->audiobusSenderPort) && !upstreamChannelsConnectedToAudiobus(channel) ) {
         // Silence output
+        *ioActionFlags |= kAudioUnitRenderAction_OutputIsSilence;
         for ( int i=0; i<ioData->mNumberBuffers; i++ ) memset(ioData->mBuffers[i].mData, 0, ioData->mBuffers[i].mDataByteSize);
     }
     
