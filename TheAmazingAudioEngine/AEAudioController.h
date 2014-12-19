@@ -1224,7 +1224,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  *  values for greater latency with lower processing overhead.  This parameter affects
  *  the length of the audio buffers received by the various callbacks.
  *
- *  Default is 0.005.
+ *  System default is ~23ms, or 1024 frames.
  */
 @property (nonatomic, assign) NSTimeInterval preferredBufferDuration;
 
