@@ -229,7 +229,7 @@ typedef struct {
     void                           *userInfoByReference;
     int                             userInfoLength;
     pthread_t                       sourceThread;
-    BOOL                            responseBlockServiced;
+    BOOL                            replyServiced;
 } message_t;
 
 
@@ -1372,13 +1372,11 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
 #endif
         }
 
-        if ( message.responseBlock ) {
-            int32_t availableBytes;
-            message_t *reply = TPCircularBufferHead(&THIS->_mainThreadMessageBuffer, &availableBytes);
-            assert(availableBytes >= sizeof(message_t));
-            memcpy(reply, &message, sizeof(message_t));
-            TPCircularBufferProduce(&THIS->_mainThreadMessageBuffer, sizeof(message_t));
-        }
+        int32_t availableBytes;
+        message_t *reply = TPCircularBufferHead(&THIS->_mainThreadMessageBuffer, &availableBytes);
+        assert(availableBytes >= sizeof(message_t));
+        memcpy(reply, &message, sizeof(message_t));
+        TPCircularBufferProduce(&THIS->_mainThreadMessageBuffer, sizeof(message_t));
         
         buffer++;
     }
@@ -1403,7 +1401,7 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
             while ( buffer < bufferEnd && !message ) {
                 int messageLength = sizeof(message_t) + (buffer->userInfoLength && !buffer->userInfoByReference ? buffer->userInfoLength : 0);
                 
-                if ( !buffer->responseBlockServiced ) {
+                if ( !buffer->replyServiced ) {
                     // This is a message that hasn't yet been serviced
                     
                     if ( buffer->sourceThread && buffer->sourceThread != thread ) {
@@ -1413,7 +1411,7 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
                         // Service this message
                         message = (message_t*)malloc(messageLength);
                         memcpy(message, buffer, messageLength);
-                        buffer->responseBlockServiced = YES;
+                        buffer->replyServiced = YES;
                     }
                 }
                 
@@ -1438,7 +1436,8 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
         }
         
         if ( message->responseBlock ) {
-            ((__bridge_transfer void(^)())message->responseBlock)();
+            ((__bridge void(^)())message->responseBlock)();
+            CFBridgingRelease(message->responseBlock);
         } else if ( message->handler ) {
             message->handler(self, 
                              message->userInfoLength > 0
@@ -1459,12 +1458,8 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
                                       responseBlock:(void (^)())responseBlock
                                        sourceThread:(pthread_t)sourceThread {
     @synchronized ( self ) {
-        if ( block ) {
-            block = [block copy];
-        }
-        
+
         if ( responseBlock ) {
-            responseBlock = [responseBlock copy];
             _pendingResponses++;
             
             if ( self.running && _pollThread.pollInterval == kIdleMessagingPollDuration ) {
@@ -1477,8 +1472,8 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
         message_t *message = TPCircularBufferHead(&_realtimeThreadMessageBuffer, &availableBytes);
         assert(availableBytes >= sizeof(message_t));
         memset(message, 0, sizeof(message_t));
-        message->block         = (__bridge_retained void*)block;
-        message->responseBlock = (__bridge_retained void*)responseBlock;
+        message->block         = block ? (__bridge_retained void*)[block copy] : NULL;
+        message->responseBlock = responseBlock ? (__bridge_retained void*)[responseBlock copy] : NULL;
         message->sourceThread  = sourceThread;
         
         TPCircularBufferProduce(&_realtimeThreadMessageBuffer, sizeof(message_t));
