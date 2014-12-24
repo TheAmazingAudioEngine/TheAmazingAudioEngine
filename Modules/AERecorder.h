@@ -72,6 +72,7 @@ extern NSString * kAERecorderErrorKey;
  * @return YES on success, NO on failure.
  */
 - (BOOL)beginRecordingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType error:(NSError**)error;
+- (BOOL)beginRecordingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType bitDepth:(UInt32)bits error:(NSError**)error;
 
 /*!
  * Prepare to record
@@ -88,6 +89,7 @@ extern NSString * kAERecorderErrorKey;
  * @return YES on success, NO on failure.
  */
 - (BOOL)prepareRecordingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType error:(NSError**)error;
+- (BOOL)prepareRecordingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType bitDepth:(UInt32)bits error:(NSError**)error;
 
 /*!
  * Start recording

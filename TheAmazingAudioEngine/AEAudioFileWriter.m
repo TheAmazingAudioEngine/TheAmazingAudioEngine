@@ -105,6 +105,11 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 }
 
 - (BOOL)beginWritingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType error:(NSError**)error {
+    return [self beginWritingToFileAtPath:path fileType:fileType bitDepth:16 error:error];
+}
+
+- (BOOL)beginWritingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType bitDepth:(UInt32)bits error:(NSError**)error {
+
     OSStatus status;
     
     if ( fileType == kAudioFileM4AType ) {
@@ -180,7 +185,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
         AudioStreamBasicDescription audioDescription = _audioDescription;
         audioDescription.mFormatFlags = (fileType == kAudioFileAIFFType ? kLinearPCMFormatFlagIsBigEndian : 0) | kLinearPCMFormatFlagIsSignedInteger | kLinearPCMFormatFlagIsPacked;
         audioDescription.mFormatID = kAudioFormatLinearPCM;
-        audioDescription.mBitsPerChannel = 16;
+        audioDescription.mBitsPerChannel = bits;
         audioDescription.mBytesPerPacket =
             audioDescription.mBytesPerFrame = audioDescription.mChannelsPerFrame * (audioDescription.mBitsPerChannel/8);
         audioDescription.mFramesPerPacket = 1;
