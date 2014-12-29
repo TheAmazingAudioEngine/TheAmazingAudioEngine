@@ -81,27 +81,33 @@ static inline void AEAudioControllerError(OSStatus result, const char *operation
     }
 }
 
+static inline BOOL AEAudioControllerRateLimit() {
+    static uint64_t lastMessage = 0;
+    static int messageCount=0;
+    uint64_t now = mach_absolute_time();
+    if ( (now-lastMessage)*__hostTicksToSeconds > 2 ) {
+        messageCount = 0;
+    }
+    lastMessage = now;
+    if ( ++messageCount >= 10 ) {
+        if ( messageCount == 10 ) {
+            @autoreleasepool {
+                NSLog(@"TAAE: Suppressing some messages");
+            }
+        }
+        if ( messageCount%500 != 0 ) {
+            return NO;
+        }
+    }
+    return YES;
+}
+
 #define checkResult(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/')+1,__LINE__))
 static inline BOOL _checkResult(OSStatus result, const char *operation, const char* file, int line) {
     if ( result != noErr ) {
-        static uint64_t lastMessage = 0;
-        static int messageCount=0;
-        uint64_t now = mach_absolute_time();
-        if ( (now-lastMessage)*__hostTicksToSeconds > 2 ) {
-            messageCount = 0;
+        if ( AEAudioControllerRateLimit() ) {
+            AEAudioControllerError(result, operation, file, line);
         }
-        lastMessage = now;
-        if ( ++messageCount >= 10 ) {
-            if ( messageCount == 10 ) {
-                @autoreleasepool {
-                    NSLog(@"TAAE: Suppressing some messages");
-                }
-            }
-            if ( messageCount%500 != 0 ) {
-                return NO;
-            }
-        }
-        AEAudioControllerError(result, operation, file, line);
         return NO;
     }
     return YES;
@@ -276,6 +282,7 @@ typedef struct {
     
     AudioBufferList    *_audiobusMonitorBuffer;
     pthread_t           _renderThread;
+    uint64_t            _renderStartTime;
 }
 
 - (BOOL)mustUpdateVoiceProcessingSettings;
@@ -610,6 +617,10 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     if ( *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
         // Before render: Perform timing callbacks
+#ifdef DEBUG
+        THIS->_renderStartTime = mach_absolute_time();
+#endif
+        
         for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
             callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
             ((AEAudioControllerTimingCallback)callback->callback)((__bridge id)callback->userInfo, THIS, inTimeStamp, inNumberFrames, AEAudioTimingContextOutput);
@@ -623,6 +634,18 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         }
         
         processPendingMessagesOnRealtimeThread(THIS);
+      
+#ifdef DEBUG
+        // Warn if render takes longer than 50% of buffer duration (gives us a bit of headroom)
+        uint64_t renderEndTime = mach_absolute_time();
+        uint64_t duration = renderEndTime - THIS->_renderStartTime;
+        NSTimeInterval threshold = THIS->_currentBufferDuration * 0.5;
+        if ( duration >= threshold * __secondsToHostTicks && AEAudioControllerRateLimit() ) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSLog(@"TAAE: Warning: render took too long (%0.4lfs, should be less than %0.4lfs). Expect glitches.", duration*__hostTicksToSeconds, threshold);
+            });
+        }
+#endif
     }
     
     return noErr;
@@ -1370,8 +1393,11 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
             ((__bridge void(^)())message.block)();
 #ifdef DEBUG
             uint64_t end = mach_absolute_time();
-            if ( (end-start)*__hostTicksToSeconds >= (THIS->_preferredBufferDuration ? THIS->_preferredBufferDuration : 0.01) ) {
-                NSLog(@"TAAE: Warning: Block perform on realtime thread took too long (%0.4lfs)\n", (end-start)*__hostTicksToSeconds);
+            uint64_t duration = end - start;
+            if ( duration >= (THIS->_currentBufferDuration * 0.5) * __secondsToHostTicks ) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    NSLog(@"TAAE: Warning: Block perform on realtime thread took too long (%0.4lfs)", duration*__hostTicksToSeconds);
+                });
             }
 #endif
         }
