@@ -54,17 +54,9 @@
 }
 
 + (id)audioBufferListPlayerWithAudioBufferList:(AudioBufferList*)audio audioController:(AEAudioController *)audioController error:(NSError **)error {
-    AEAudioBufferListPlayer *player = [[self alloc] init];
-    player->_volume = 1.0;
-    player->_channelIsPlaying = YES;
-    player->_audioDescription = audioController.audioDescription;
-    player->_audio = audio;
+    AEAudioBufferListPlayer *player = [[self alloc] audioBufferListPlayerWithAudioController:audioController error:error];
 
-    int *channels = malloc(sizeof(int));;
-    player->_lengthInFrames = AEGetNumberOfFramesInAudioBufferList(audio, player->_audioDescription, channels);
-    player->_lengthInFrames *= *channels;
-    player->_duration = (double) player->_lengthInFrames / (double)player->_audioDescription.mSampleRate;
-    free(channels);
+    [player setAudio:audio];
 
     return player;
 }
