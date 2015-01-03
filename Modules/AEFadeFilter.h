@@ -28,17 +28,14 @@
 extern "C" {
 #endif
 
-
 #import <Foundation/Foundation.h>
 #import "AEAudioController.h"
 #import "AEBlockFilter.h"
 
 @protocol AEFadeFilterDelegate;
 
-@interface AEFadeFilter : AEBlockFilter <AEAudioFilter>
-
 /*!
- * Create a new fade filter instance
+ * Audio fade filter class
  *
  * This class allows you to fade audio in or out over a specified duration.
  * It is a subclass of AEBlockFilter. To use it, create an instance of the
@@ -46,15 +43,36 @@ extern "C" {
  * , @link AEAudioController::addFilter:toChannel: @endlink or
  * @link AEAudioController::addFilter:toChannel: @endlink.
  *
- * To start a fade in (or out), send the filter a @link startFadeOut:milliseconds @endlink
- * or @link startFadeIn:milliseconds * @endlink message.
+ */
+@interface AEFadeFilter : AEBlockFilter <AEAudioFilter>
+
+/*!
+ * Create a new fade filter instance
  *
  * @param audioController     The AEAudioController instance
  * @return The fade filter instance
  */
 + (AEBlockFilter*)initWithAudioController:(AEAudioController*)audioController;
-- (void)startFadeOut:(int)milliseconds;
+
+
+/*!
+ * Begin fade in
+ *
+ *  Start fading audio from the instance's current adjustment level to full
+ *  volume.
+ *
+ * @param milliseconds    The duration of the fade
+ */
 - (void)startFadeIn:(int)milliseconds;
+
+/*!
+ * Begin fade in
+ *
+ *  Start fading audio from the instance's current adjustment level to silience.
+ *
+ * @param milliseconds    The duration of the fade
+ */
+- (void)startFadeOut:(int)milliseconds;
 
 /*!
  * Delegate object
@@ -63,7 +81,6 @@ extern "C" {
  */
 @property (nonatomic, weak) id<AEFadeFilterDelegate> delegate;
 
-
 /*!
  * The AEAudioController instance
  */
@@ -71,10 +88,33 @@ extern "C" {
 
 @end
 
+/*!
+ * Fade filter delegate protocol
+ *
+ * Implements methods to receive notifications when an AEFadeFilter has
+ * completed fading audio in or out.
+ *
+ */
 @protocol AEFadeFilterDelegate <NSObject>
 
 @optional
+
+/*!
+ * Fade in completion handler
+ *
+ * If specified, this selector will be performed on the delegate when a fade in
+ * has completed.
+ *
+ */
 -(void)onFadeInComplete;
+
+/*!
+ * Fade out completion handler
+ *
+ * If specified, this selector will be performed on the delegate when a fade out
+ * has completed.
+ *
+ */
 -(void)onFadeOutComplete;
 
 @end

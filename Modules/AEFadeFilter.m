@@ -165,19 +165,20 @@ static float const maxReduction = 60.0;
     return;
 }
 
-- (void)startFadeOut:(int)milliseconds {
-    _isFading = NO;
-    [self prepareDbGainTable:milliseconds toRatio: 0.0];
-    _sampleGainStep = 0;
-    _fadeDirection = kAEFadeFilterFadeOut;
-    _isFading = YES;
-}
-
 - (void)startFadeIn:(int)milliseconds {
     _isFading = NO;
     [self prepareDbGainTable:milliseconds toRatio: 1.0];
     _sampleGainStep = 0;
     _fadeDirection = kAEFadeFilterFadeIn;
+    _isFading = YES;
+}
+
+
+- (void)startFadeOut:(int)milliseconds {
+    _isFading = NO;
+    [self prepareDbGainTable:milliseconds toRatio: 0.0];
+    _sampleGainStep = 0;
+    _fadeDirection = kAEFadeFilterFadeOut;
     _isFading = YES;
 }
 
@@ -203,6 +204,5 @@ static float floatToDecibel(float value) {
         return maxReduction * -1.0;
     }
 }
-
 
 @end
