@@ -31,10 +31,9 @@ extern "C" {
 #import "AEAudioController.h"
 
 /*!
- * Audio file player
+ * AudioBufferList player
  *
- *  This class allows you to play audio files, either as one-off samples, or looped.
- *  It will play any audio file format supported by iOS.
+ *  This class allows you to play audio buffer lists, either as one-off samples, or looped.
  *
  *  To use, create an instance, then add it to the audio controller.
  */
@@ -52,7 +51,7 @@ extern "C" {
 /*!
  * Create a new player instance with an audio buffer list
  *
- * @param audio AudioBufferList to be played
+ * @param audio             The AudioBufferList to be played
  * @param audioController   The audio controller
  * @param error             If not NULL, the error on output
  * @return The audio player, ready to be @link AEAudioController::addChannels: added @endlink to the audio controller.
