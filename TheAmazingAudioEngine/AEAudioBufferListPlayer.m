@@ -64,11 +64,13 @@
 -(void)setAudio:(AudioBufferList *)audio {
     _channelIsPlaying = NO;
     _audio = audio;
+
     int *channels = malloc(sizeof(int));;
     _lengthInFrames = AEGetNumberOfFramesInAudioBufferList(audio, _audioDescription, channels);
     _lengthInFrames *= *channels;
-    _duration = (double) _lengthInFrames / (double)_audioDescription.mSampleRate;
     free(channels);
+
+    _duration = (double) _lengthInFrames / (double)_audioDescription.mSampleRate;
 }
 
 -(NSTimeInterval)currentTime {
