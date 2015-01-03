@@ -71,15 +71,6 @@
     free(channels);
 }
 
-- (void)dealloc {
-    if ( _audio ) {
-        for ( int i=0; i<_audio->mNumberBuffers; i++ ) {
-            free(_audio->mBuffers[i].mData);
-        }
-        free(_audio);
-    }
-}
-
 -(NSTimeInterval)currentTime {
     return ((double)_playhead / (double)_lengthInFrames) * _duration;
 }
