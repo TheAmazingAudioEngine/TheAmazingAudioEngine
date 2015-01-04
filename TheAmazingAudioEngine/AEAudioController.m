@@ -81,27 +81,33 @@ static inline void AEAudioControllerError(OSStatus result, const char *operation
     }
 }
 
+static inline BOOL AEAudioControllerRateLimit() {
+    static uint64_t lastMessage = 0;
+    static int messageCount=0;
+    uint64_t now = mach_absolute_time();
+    if ( (now-lastMessage)*__hostTicksToSeconds > 2 ) {
+        messageCount = 0;
+    }
+    lastMessage = now;
+    if ( ++messageCount >= 10 ) {
+        if ( messageCount == 10 ) {
+            @autoreleasepool {
+                NSLog(@"TAAE: Suppressing some messages");
+            }
+        }
+        if ( messageCount%500 != 0 ) {
+            return NO;
+        }
+    }
+    return YES;
+}
+
 #define checkResult(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/')+1,__LINE__))
 static inline BOOL _checkResult(OSStatus result, const char *operation, const char* file, int line) {
     if ( result != noErr ) {
-        static uint64_t lastMessage = 0;
-        static int messageCount=0;
-        uint64_t now = mach_absolute_time();
-        if ( (now-lastMessage)*__hostTicksToSeconds > 2 ) {
-            messageCount = 0;
+        if ( AEAudioControllerRateLimit() ) {
+            AEAudioControllerError(result, operation, file, line);
         }
-        lastMessage = now;
-        if ( ++messageCount >= 10 ) {
-            if ( messageCount == 10 ) {
-                @autoreleasepool {
-                    NSLog(@"TAAE: Suppressing some messages");
-                }
-            }
-            if ( messageCount%500 != 0 ) {
-                return NO;
-            }
-        }
-        AEAudioControllerError(result, operation, file, line);
         return NO;
     }
     return YES;
@@ -229,7 +235,7 @@ typedef struct {
     void                           *userInfoByReference;
     int                             userInfoLength;
     pthread_t                       sourceThread;
-    BOOL                            responseBlockServiced;
+    BOOL                            replyServiced;
 } message_t;
 
 
@@ -276,6 +282,7 @@ typedef struct {
     
     AudioBufferList    *_audiobusMonitorBuffer;
     pthread_t           _renderThread;
+    uint64_t            _renderStartTime;
 }
 
 - (BOOL)mustUpdateVoiceProcessingSettings;
@@ -610,6 +617,10 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     if ( *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
         // Before render: Perform timing callbacks
+#ifdef DEBUG
+        THIS->_renderStartTime = mach_absolute_time();
+#endif
+        
         for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
             callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
             ((AEAudioControllerTimingCallback)callback->callback)((__bridge id)callback->userInfo, THIS, inTimeStamp, inNumberFrames, AEAudioTimingContextOutput);
@@ -623,6 +634,18 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         }
         
         processPendingMessagesOnRealtimeThread(THIS);
+      
+#ifdef DEBUG
+        // Warn if render takes longer than 50% of buffer duration (gives us a bit of headroom)
+        uint64_t renderEndTime = mach_absolute_time();
+        uint64_t duration = renderEndTime - THIS->_renderStartTime;
+        NSTimeInterval threshold = THIS->_currentBufferDuration * 0.5;
+        if ( duration >= threshold * __secondsToHostTicks && AEAudioControllerRateLimit() ) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSLog(@"TAAE: Warning: render took too long (%0.4lfs, should be less than %0.4lfs). Expect glitches.", duration*__hostTicksToSeconds, threshold);
+            });
+        }
+#endif
     }
     
     return noErr;
@@ -1370,19 +1393,20 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
             ((__bridge void(^)())message.block)();
 #ifdef DEBUG
             uint64_t end = mach_absolute_time();
-            if ( (end-start)*__hostTicksToSeconds >= (THIS->_preferredBufferDuration ? THIS->_preferredBufferDuration : 0.01) ) {
-                NSLog(@"TAAE: Warning: Block perform on realtime thread took too long (%0.4lfs)\n", (end-start)*__hostTicksToSeconds);
+            uint64_t duration = end - start;
+            if ( duration >= (THIS->_currentBufferDuration * 0.5) * __secondsToHostTicks ) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    NSLog(@"TAAE: Warning: Block perform on realtime thread took too long (%0.4lfs)", duration*__hostTicksToSeconds);
+                });
             }
 #endif
         }
 
-        if ( message.responseBlock ) {
-            int32_t availableBytes;
-            message_t *reply = TPCircularBufferHead(&THIS->_mainThreadMessageBuffer, &availableBytes);
-            assert(availableBytes >= sizeof(message_t));
-            memcpy(reply, &message, sizeof(message_t));
-            TPCircularBufferProduce(&THIS->_mainThreadMessageBuffer, sizeof(message_t));
-        }
+        int32_t availableBytes;
+        message_t *reply = TPCircularBufferHead(&THIS->_mainThreadMessageBuffer, &availableBytes);
+        assert(availableBytes >= sizeof(message_t));
+        memcpy(reply, &message, sizeof(message_t));
+        TPCircularBufferProduce(&THIS->_mainThreadMessageBuffer, sizeof(message_t));
         
         buffer++;
     }
@@ -1407,7 +1431,7 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
             while ( buffer < bufferEnd && !message ) {
                 int messageLength = sizeof(message_t) + (buffer->userInfoLength && !buffer->userInfoByReference ? buffer->userInfoLength : 0);
                 
-                if ( !buffer->responseBlockServiced ) {
+                if ( !buffer->replyServiced ) {
                     // This is a message that hasn't yet been serviced
                     
                     if ( buffer->sourceThread && buffer->sourceThread != thread ) {
@@ -1417,7 +1441,7 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
                         // Service this message
                         message = (message_t*)malloc(messageLength);
                         memcpy(message, buffer, messageLength);
-                        buffer->responseBlockServiced = YES;
+                        buffer->replyServiced = YES;
                     }
                 }
                 
@@ -1442,7 +1466,8 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
         }
         
         if ( message->responseBlock ) {
-            ((__bridge_transfer void(^)())message->responseBlock)();
+            ((__bridge void(^)())message->responseBlock)();
+            CFBridgingRelease(message->responseBlock);
         } else if ( message->handler ) {
             message->handler(self, 
                              message->userInfoLength > 0
@@ -1463,12 +1488,8 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
                                       responseBlock:(void (^)())responseBlock
                                        sourceThread:(pthread_t)sourceThread {
     @synchronized ( self ) {
-        if ( block ) {
-            block = [block copy];
-        }
-        
+
         if ( responseBlock ) {
-            responseBlock = [responseBlock copy];
             _pendingResponses++;
             
             if ( self.running && _pollThread.pollInterval == kIdleMessagingPollDuration ) {
@@ -1481,8 +1502,8 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
         message_t *message = TPCircularBufferHead(&_realtimeThreadMessageBuffer, &availableBytes);
         assert(availableBytes >= sizeof(message_t));
         memset(message, 0, sizeof(message_t));
-        message->block         = (__bridge_retained void*)block;
-        message->responseBlock = (__bridge_retained void*)responseBlock;
+        message->block         = block ? (__bridge_retained void*)[block copy] : NULL;
+        message->responseBlock = responseBlock ? (__bridge_retained void*)[responseBlock copy] : NULL;
         message->sourceThread  = sourceThread;
         
         TPCircularBufferProduce(&_realtimeThreadMessageBuffer, sizeof(message_t));
