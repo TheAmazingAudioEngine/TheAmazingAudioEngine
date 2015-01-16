@@ -1244,16 +1244,32 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
 /*!
  * Input latency (in seconds)
  *
- *  The currently-reported hardware input latency
+ *  The currently-reported hardware input latency.
+ *  See AEAudioControllerInputLatency.
  */
 @property (nonatomic, readonly) NSTimeInterval inputLatency;
 
 /*!
  * Output latency (in seconds)
  *
- *  The currently-reported hardware output latency
+ *  The currently-reported hardware output latency.
+ *  See AEAudioControllerOutputLatency
  */
 @property (nonatomic, readonly) NSTimeInterval outputLatency;
+
+/*!
+ * Whether to automatically account for input/output latency
+ *
+ *  If you set this property to YES, the timestamps you see in the various callbacks
+ *  will automatically account for input and output latency. If this is NO
+ *  (the default), and you wish to account for latency, you will need to use
+ *  the @link inputLatency @endlink and @link outputLatency @endlink properties, 
+ *  or their corresponding C functions @link AEAudioControllerInputLatency @endlink
+ *  and @link AEAudioControllerOutputLatency @endlink yourself.
+ *
+ *  Default is NO.
+ */
+@property (nonatomic, assign) BOOL automaticLatencyManagement;
 
 /*!
  * Determine whether the audio engine is running
@@ -1328,9 +1344,9 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  *
  *  For example:
  *
- *      timestamp.mHostTime += AEAudioControllerInputLatency(audioController)*__secondsToHostTicks;
+ *      timestamp.mHostTime -= AEAudioControllerInputLatency(audioController)*__secondsToHostTicks;
  *
- *  Note that you should not use this value when connected to Audiobus, as it does not apply in this case.
+ *  Note that when connected to Audiobus input, this function returns 0.
  *
  * @param controller The audio controller
  * @returns The currently-reported hardware input latency
