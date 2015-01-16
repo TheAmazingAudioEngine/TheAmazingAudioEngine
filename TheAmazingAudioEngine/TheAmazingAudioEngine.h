@@ -217,9 +217,9 @@ extern "C" {
  
  - A timestamp that corresponds to the time the audio will reach the device audio output. If latency compensation
    is important, this should be offset by the value returned from 
-   @link AEAudioControllerOutputLatency AEAudioController::AEAudioControllerOutputLatency @endlink. This can also
+   @link  AEAudioController::AEAudioControllerOutputLatency AEAudioControllerOutputLatency @endlink. This can also
    can be performed automatically if you use AEAudioController's
-   @link automaticLatencyManagement AEAudioController::automaticLatencyManagement @endlink feature);
+   @link AEAudioController::automaticLatencyManagement automaticLatencyManagement @endlink feature);
  - the number of audio frames you are expected to produce, and 
  - an AudioBufferList in which to store the generated audio.
  
@@ -272,9 +272,9 @@ extern "C" {
  - A reference to the AEAudioController instance,
  - A timestamp that corresponds to the time the audio will reach the device audio output. If latency compensation
    is important, this should be offset by the value returned from
-   @link AEAudioControllerOutputLatency AEAudioController::AEAudioControllerOutputLatency @endlink. This can also
+   @link AEAudioController::AEAudioControllerOutputLatency AEAudioControllerOutputLatency @endlink. This can also
    can be performed automatically if you use AEAudioController's
-   @link automaticLatencyManagement AEAudioController::automaticLatencyManagement @endlink feature);
+   @link AEAudioController::automaticLatencyManagement automaticLatencyManagement @endlink feature);
  - the number of audio frames you are expected to produce, and
  - an AudioBufferList in which to store the generated audio.
  
@@ -534,9 +534,9 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  - An opaque identifier indicating the audio source,
  - A timestamp that corresponds to the time the audio hit the device audio input. If latency compensation
    is important, this should be offset by the value returned from
-   @link AEAudioControllerInputLatency AEAudioController::AEAudioControllerInputLatency @endlink. This can also
+   @link AEAudioController::AEAudioControllerInputLatency AEAudioControllerInputLatency @endlink. This can also
    can be performed automatically if you use AEAudioController's
-   @link automaticLatencyManagement AEAudioController::automaticLatencyManagement @endlink feature);
+   @link AEAudioController::automaticLatencyManagement automaticLatencyManagement @endlink feature);
  - the number of audio frames available, and
  - an AudioBufferList containing the audio.
  
