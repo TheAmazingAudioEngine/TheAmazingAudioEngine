@@ -213,10 +213,15 @@ extern "C" {
  }];
  @endcode
  
- The block will be called with a timestamp which, when adjusted by the value returned from
- @link AEAudioControllerOutputLatency AEAudioController::AEAudioControllerOutputLatency @endlink,
- corresponds to the time the audio will reach the device audio output; the number of audio frames 
- you are expected to produce, and an AudioBufferList in which to store the generated audio.
+ The block will be called with three parameters: 
+ 
+ - A timestamp that corresponds to the time the audio will reach the device audio output. If latency compensation
+   is important, this should be offset by the value returned from 
+   @link AEAudioControllerOutputLatency AEAudioController::AEAudioControllerOutputLatency @endlink. This can also
+   can be performed automatically if you use AEAudioController's
+   @link automaticLatencyManagement AEAudioController::automaticLatencyManagement @endlink feature);
+ - the number of audio frames you are expected to produce, and 
+ - an AudioBufferList in which to store the generated audio.
  
  @section Object-Channels Objective-C Object Channels
  
@@ -260,6 +265,18 @@ extern "C" {
  
  self.channel = [[MyChannelClass alloc] init];
  @endcode
+ 
+ The render callback will be called with five parameters:
+ 
+ - A reference to your class,
+ - A reference to the AEAudioController instance,
+ - A timestamp that corresponds to the time the audio will reach the device audio output. If latency compensation
+   is important, this should be offset by the value returned from
+   @link AEAudioControllerOutputLatency AEAudioController::AEAudioControllerOutputLatency @endlink. This can also
+   can be performed automatically if you use AEAudioController's
+   @link automaticLatencyManagement AEAudioController::automaticLatencyManagement @endlink feature);
+ - the number of audio frames you are expected to produce, and
+ - an AudioBufferList in which to store the generated audio.
  
  @section Audio-Unit-Channels Audio Unit Channels
  
@@ -511,6 +528,17 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
     // Do something with 'audio'
  }];
  @endcode
+ 
+ In both cases, your callback or block will be passed:
+ 
+ - An opaque identifier indicating the audio source,
+ - A timestamp that corresponds to the time the audio hit the device audio input. If latency compensation
+   is important, this should be offset by the value returned from
+   @link AEAudioControllerInputLatency AEAudioController::AEAudioControllerInputLatency @endlink. This can also
+   can be performed automatically if you use AEAudioController's
+   @link automaticLatencyManagement AEAudioController::automaticLatencyManagement @endlink feature);
+ - the number of audio frames available, and
+ - an AudioBufferList containing the audio.
  
  Then, add the receiver to the source of your choice:
  
