@@ -282,7 +282,10 @@ typedef struct {
     
     AudioBufferList    *_audiobusMonitorBuffer;
     pthread_t           _renderThread;
+    
+#ifdef DEBUG
     uint64_t            _renderStartTime;
+#endif
 }
 
 - (BOOL)mustUpdateVoiceProcessingSettings;
@@ -627,10 +630,6 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     if ( *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
         // Before render: Perform timing callbacks
-#ifdef DEBUG
-        THIS->_renderStartTime = mach_absolute_time();
-#endif
-        
         for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
             callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
             ((AEAudioControllerTimingCallback)callback->callback)((__bridge id)callback->userInfo, THIS, inTimeStamp, inNumberFrames, AEAudioTimingContextOutput);
@@ -644,15 +643,40 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         }
         
         processPendingMessagesOnRealtimeThread(THIS);
-      
+    }
+    
+    return noErr;
+}
+
 #ifdef DEBUG
-        // Warn if render takes longer than 50% of buffer duration (gives us a bit of headroom)
+
+// Performance monitoring in debug mode
+static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
+    
+    __unsafe_unretained AEAudioController * THIS = (__bridge AEAudioController*)inRefCon;
+    
+    if ( ((THIS->_inputEnabled && inBusNumber == 1) || (!THIS->_inputEnabled && inBusNumber == 0)) && *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
+        // Remember the time we started rendering
+        THIS->_renderStartTime = mach_absolute_time();
+        
+    } else if ( inBusNumber == 0 && *ioActionFlags & kAudioUnitRenderAction_PostRender ) {
+        // Output bus renders last. Warn if total render takes longer than 50% of buffer duration (gives us a bit of headroom)
         uint64_t renderEndTime = mach_absolute_time();
         uint64_t duration = renderEndTime - THIS->_renderStartTime;
         NSTimeInterval threshold = THIS->_currentBufferDuration * 0.5;
         if ( duration >= threshold * __secondsToHostTicks && AEAudioControllerRateLimit() ) {
             dispatch_async(dispatch_get_main_queue(), ^{
-                NSLog(@"TAAE: Warning: render took too long (%0.4lfs, should be less than %0.4lfs). Expect glitches.", duration*__hostTicksToSeconds, threshold);
+                NSLog(@"TAAE: Warning: render took too long (%lfs, should be less than %lfs). Expect glitches.", duration*__hostTicksToSeconds, threshold);
+            });
+        }
+        
+#ifdef TAAE_REPORT_RENDER_TIME
+        // Define the above symbol to report peak render time
+        static uint64_t max = 0;
+        if ( duration > max ) {
+            max = duration;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSLog(@"TAAE: Render time peak %lfs", max*__hostTicksToSeconds);
             });
         }
 #endif
@@ -660,6 +684,8 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     return noErr;
 }
+
+#endif
 
 #pragma mark - Setup and start/stop
 
@@ -2287,6 +2313,11 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     result = AUGraphNodeInfo(_audioGraph, _ioNode, NULL, &_ioAudioUnit);
     if ( !checkResult(result, "AUGraphNodeInfo") ) return NO;
 
+#ifdef DEBUG
+    // Add a render notify to the top audio unit, for the purposes of performance profiling
+    checkResult(AudioUnitAddRenderNotify(_ioAudioUnit, &ioUnitRenderNotifyCallback, (__bridge void*)self), "AudioUnitAddRenderNotify");
+#endif
+    
     [self configureAudioUnit];
     
     if ( _inputEnabled ) {
