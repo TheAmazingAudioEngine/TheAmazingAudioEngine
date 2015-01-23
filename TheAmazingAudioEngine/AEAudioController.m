@@ -1835,7 +1835,7 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
         AEChannelRef channelBeingRendered = THIS->_channelBeingRendered;
         if ( !channelBeingRendered ) channelBeingRendered = THIS->_topChannel;
         
-        __unsafe_unretained ABSenderPort * upstreamSenderPort = firstUpstreamAudiobusSenderPort(channelBeingRendered);
+        __unsafe_unretained ABSenderPort * upstreamSenderPort = (__bridge ABSenderPort*)firstUpstreamAudiobusSenderPort(channelBeingRendered);
         if ( upstreamSenderPort && ABSenderPortIsMuted(upstreamSenderPort) ) {
             // We're sending via the sender port, and the receiver plays live - offset the timestamp by the reported latency
             return ABSenderPortGetAverageLatency(upstreamSenderPort)*__secondsToHostTicks;
@@ -3527,9 +3527,9 @@ static BOOL upstreamChannelsConnectedToAudiobus(AEChannelRef channel) {
     return upstreamChannelsConnectedToAudiobus(parentGroupChannel);
 }
 
-static ABSenderPort * firstUpstreamAudiobusSenderPort(AEChannelRef channel) {
+static void * firstUpstreamAudiobusSenderPort(AEChannelRef channel) {
     if ( channel->audiobusSenderPort ) {
-        return (__bridge ABSenderPort*)channel->audiobusSenderPort;
+        return channel->audiobusSenderPort;
     }
     
     if ( !channel->parentGroup ) return nil;
