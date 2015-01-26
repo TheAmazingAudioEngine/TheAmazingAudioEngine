@@ -969,6 +969,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     
     // Add to group's channel array
     for ( id<AEAudioPlayable> channel in channels ) {
+        NSParameterAssert([channel respondsToSelector:@selector(renderCallback)]);
         if ( group->channelCount == kMaximumChannelsPerGroup ) {
             NSLog(@"TAAE: Warning: Channel limit reached");
             break;
@@ -1209,28 +1210,33 @@ Boolean AEChannelGroupIsMuted(AEChannelGroupRef group) {
 #pragma mark - Filters
 
 - (void)addFilter:(id<AEAudioFilter>)filter {
+    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     if ( [self addCallback:filter.filterCallback userInfo:(__bridge void *)filter flags:kFilterFlag forChannelGroup:_topGroup] ) {
         CFBridgingRetain(filter);
     }
 }
 
 - (void)addFilter:(id<AEAudioFilter>)filter toChannel:(id<AEAudioPlayable>)channel {
+    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     if ( [self addCallback:filter.filterCallback userInfo:(__bridge void *)filter flags:kFilterFlag forChannel:channel] ) {
         CFBridgingRetain(filter);
     }
 }
 
 - (void)addFilter:(id<AEAudioFilter>)filter toChannelGroup:(AEChannelGroupRef)group {
+    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     if ( [self addCallback:filter.filterCallback userInfo:(__bridge void *)filter flags:kFilterFlag forChannelGroup:group] ) {
         CFBridgingRetain(filter);
     }
 }
 
 - (void)addInputFilter:(id<AEAudioFilter>)filter {
+    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     [self addInputFilter:filter forChannels:nil];
 }
 
 - (void)addInputFilter:(id<AEAudioFilter>)filter forChannels:(NSArray *)channels {
+    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     void *callback = filter.filterCallback;
     if ( [self addCallback:callback userInfo:(__bridge void *)filter flags:kFilterFlag forInputChannels:channels] ) {
         CFBridgingRetain(filter);
@@ -1238,24 +1244,28 @@ Boolean AEChannelGroupIsMuted(AEChannelGroupRef group) {
 }
 
 - (void)removeFilter:(id<AEAudioFilter>)filter {
+    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     if ( [self removeCallback:filter.filterCallback userInfo:(__bridge void *)filter fromChannelGroup:_topGroup] ) {
         CFBridgingRelease((__bridge CFTypeRef)filter);
     }
 }
 
 - (void)removeFilter:(id<AEAudioFilter>)filter fromChannel:(id<AEAudioPlayable>)channel {
+    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     if ( [self removeCallback:filter.filterCallback userInfo:(__bridge void *)filter fromChannel:channel] ) {
         CFBridgingRelease((__bridge CFTypeRef)filter);
     }
 }
 
 - (void)removeFilter:(id<AEAudioFilter>)filter fromChannelGroup:(AEChannelGroupRef)group {
+    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     if ( [self removeCallback:filter.filterCallback userInfo:(__bridge void *)filter fromChannelGroup:group] ) {
         CFBridgingRelease((__bridge CFTypeRef)filter);
     }
 }
 
 - (void)removeInputFilter:(id<AEAudioFilter>)filter {
+    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     void *callback = filter.filterCallback;
     __block BOOL found = NO;
     [self performSynchronousMessageExchangeWithBlock:^{
@@ -1292,36 +1302,42 @@ Boolean AEChannelGroupIsMuted(AEChannelGroupRef group) {
 #pragma mark - Output receivers
 
 - (void)addOutputReceiver:(id<AEAudioReceiver>)receiver {
+    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     if ( [self addCallback:receiver.receiverCallback userInfo:(__bridge void *)receiver flags:kReceiverFlag forChannelGroup:_topGroup] ) {
         CFBridgingRetain(receiver);
     }
 }
 
 - (void)addOutputReceiver:(id<AEAudioReceiver>)receiver forChannel:(id<AEAudioPlayable>)channel {
+    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     if ( [self addCallback:receiver.receiverCallback userInfo:(__bridge void *)receiver flags:kReceiverFlag forChannel:channel] ) {
         CFBridgingRetain(receiver);
     }
 }
 
 - (void)addOutputReceiver:(id<AEAudioReceiver>)receiver forChannelGroup:(AEChannelGroupRef)group {
+    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     if ( [self addCallback:receiver.receiverCallback userInfo:(__bridge void *)receiver flags:kReceiverFlag forChannelGroup:group] ) {
         CFBridgingRetain(receiver);
     }
 }
 
 - (void)removeOutputReceiver:(id<AEAudioReceiver>)receiver {
+    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     if ( [self removeCallback:receiver.receiverCallback userInfo:(__bridge void *)receiver fromChannelGroup:_topGroup] ) {
         CFBridgingRelease((__bridge CFTypeRef)receiver);
     }
 }
 
 - (void)removeOutputReceiver:(id<AEAudioReceiver>)receiver fromChannel:(id<AEAudioPlayable>)channel {
+    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     if ( [self removeCallback:receiver.receiverCallback userInfo:(__bridge void *)receiver fromChannel:channel] ) {
         CFBridgingRelease((__bridge CFTypeRef)receiver);
     }
 }
 
 - (void)removeOutputReceiver:(id<AEAudioReceiver>)receiver fromChannelGroup:(AEChannelGroupRef)group {
+    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     if ( [self removeCallback:receiver.receiverCallback userInfo:(__bridge void *)receiver fromChannelGroup:group] ) {
         CFBridgingRelease((__bridge CFTypeRef)receiver);
     }
@@ -1342,18 +1358,20 @@ Boolean AEChannelGroupIsMuted(AEChannelGroupRef group) {
 #pragma mark - Input receivers
 
 - (void)addInputReceiver:(id<AEAudioReceiver>)receiver {
+    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     [self addInputReceiver:receiver forChannels:nil];
 }
 
 - (void)addInputReceiver:(id<AEAudioReceiver>)receiver forChannels:(NSArray *)channels {
+    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     void *callback = receiver.receiverCallback;
-    
     if ( [self addCallback:callback userInfo:(__bridge void *)receiver flags:kReceiverFlag forInputChannels:channels] ) {
         CFBridgingRetain(receiver);
     }
 }
 
 - (void)removeInputReceiver:(id<AEAudioReceiver>)receiver {
+    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     void *callback = receiver.receiverCallback;
     __block BOOL found = NO;
     [self performSynchronousMessageExchangeWithBlock:^{
