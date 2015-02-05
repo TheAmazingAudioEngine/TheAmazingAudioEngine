@@ -671,13 +671,19 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
         }
         
 #ifdef TAAE_REPORT_RENDER_TIME
-        // Define the above symbol to report peak render time
+        // Define the above symbol to report ongoing (max) render time every second
         static uint64_t max = 0;
+        static uint64_t lastReport = 0;
         if ( duration > max ) {
             max = duration;
+        }
+        if ( renderEndTime > lastReport + (1.0 * __secondsToHostTicks) ) {
+            uint64_t value = max;
             dispatch_async(dispatch_get_main_queue(), ^{
-                NSLog(@"TAAE: Render time peak %lfs", max*__hostTicksToSeconds);
+                NSLog(@"TAAE: Render time %lfs", value*__hostTicksToSeconds);
             });
+            lastReport = renderEndTime;
+            max = 0;
         }
 #endif
     }
