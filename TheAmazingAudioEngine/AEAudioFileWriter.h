@@ -69,6 +69,8 @@ enum {
 
 - (BOOL)beginWritingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType bitDepth:(UInt32)bits error:(NSError**)error;
 
+- (BOOL)beginWritingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType bitDepth:(UInt32)bits channels:(UInt32)channels error:(NSError**)error;
+
 
 /*!
  * Complete writing operation
