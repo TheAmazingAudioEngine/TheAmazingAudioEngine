@@ -47,7 +47,7 @@ static const int kMaxAudioFileReadSize = 16384;
 @end
 
 @implementation AEAudioFileLoaderOperation
-@synthesize url = _url, targetAudioDescription = _targetAudioDescription, audioReceiverBlock = _audioReceiverBlock, bufferList = _bufferList, lengthInFrames = _lengthInFrames, error = _error;
+@synthesize url = _url, targetAudioDescription = _targetAudioDescription, audioReceiverBlock = _audioReceiverBlock, completedBlock=_completedBlock, bufferList = _bufferList, lengthInFrames = _lengthInFrames, error = _error;
 
 + (BOOL)infoForFileAtURL:(NSURL*)url audioDescription:(AudioStreamBasicDescription*)audioDescription lengthInFrames:(UInt32*)lengthInFrames error:(NSError**)error {
     if ( audioDescription ) memset(audioDescription, 0, sizeof(AudioStreamBasicDescription));
@@ -242,6 +242,10 @@ static const int kMaxAudioFileReadSize = 16384;
     } else {
         _bufferList = bufferList;
         _lengthInFrames = (UInt32)fileLengthInFrames;
+    }
+
+    if ( _completedBlock ) {
+        _completedBlock();
     }
 }
 
