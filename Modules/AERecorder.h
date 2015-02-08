@@ -72,6 +72,8 @@ extern NSString * kAERecorderErrorKey;
  * @return YES on success, NO on failure.
  */
 - (BOOL)beginRecordingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType error:(NSError**)error;
+- (BOOL)beginRecordingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType bitDepth:(UInt32)bits error:(NSError**)error;
+- (BOOL)beginRecordingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType bitDepth:(UInt32)bits channels:(UInt32)channels error:(NSError**)error;
 
 /*!
  * Prepare to record
@@ -88,6 +90,8 @@ extern NSString * kAERecorderErrorKey;
  * @return YES on success, NO on failure.
  */
 - (BOOL)prepareRecordingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType error:(NSError**)error;
+- (BOOL)prepareRecordingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType bitDepth:(UInt32)bits error:(NSError**)error;
+- (BOOL)prepareRecordingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType bitDepth:(UInt32)bits channels:(UInt32)channels error:(NSError**)error;
 
 /*!
  * Start recording
@@ -100,6 +104,20 @@ extern NSString * kAERecorderErrorKey;
  * @param recorder The recorder
  */
 void AERecorderStartRecording(AERecorder* recorder);
+
+/*!
+ * Stop recording
+ *
+ * Will stop from recording more data to file.  This does not close or flush the file, it only stops
+ * any incoming audio from being written.  You can later call finishRecording, or call AERecorderStartRecording to
+ * continue recording.
+ *
+ *  This is thread-safe and can be used from the audio thread.
+ *
+ * @param recorder The recorder
+ */
+void AERecorderStopRecording(AERecorder* recorder);
+
 
 /*!
  * Finish recording and close file

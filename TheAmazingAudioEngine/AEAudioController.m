@@ -50,6 +50,7 @@ static const UInt32 kMaxFramesPerSlice                 = 4096;
 static const int kScratchBufferFrames                  = kMaxFramesPerSlice;
 static const int kInputAudioBufferFrames               = kMaxFramesPerSlice;
 static const int kLevelMonitorScratchBufferSize        = kMaxFramesPerSlice;
+static const int kMaximumMonitoringChannels            = 16;
 static const NSTimeInterval kMaxBufferDurationWithVPIO = 0.01;
 static const Float32 kNoValue                          = -1.0;
 #define kNoAudioErr                            -2222
@@ -168,7 +169,11 @@ typedef struct __input_callback_table_t {
 typedef struct __audio_level_monitor_t {
     BOOL                monitoringEnabled;
     double              meanAccumulator;
+    double              chanMeanAccumulator[kMaximumMonitoringChannels];
     int                 meanBlockCount;
+    int                 chanMeanBlockCount;
+    float               chanPeak[kMaximumMonitoringChannels];
+    float               chanAverage[kMaximumMonitoringChannels];
     float               peak;
     float               average;
     void                *floatConverter;
@@ -258,6 +263,7 @@ typedef struct {
     BOOL                _started;
     BOOL                _interrupted;
     BOOL                _inputEnabled;
+    BOOL                _outputEnabled;
     BOOL                _hardwareInputAvailable;
     BOOL                _hasSystemError;
     
@@ -383,7 +389,7 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     AEChannelRef channel = (AEChannelRef)inRefCon;
     
     __unsafe_unretained AEAudioController * THIS = (__bridge AEAudioController*)channel->audioController;
-    
+
     if ( channel == NULL || channel->ptr == NULL || !channel->playing ) {
         *ioActionFlags |= kAudioUnitRenderAction_OutputIsSilence;
         for ( int i=0; i<ioData->mNumberBuffers; i++ ) memset(ioData->mBuffers[i].mData, 0, ioData->mBuffers[i].mDataByteSize);
@@ -519,7 +525,7 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
     if ( !THIS->_renderThread ) {
         THIS->_renderThread = pthread_self();
     }
-    
+
     if ( !THIS->_inputAudioBufferList ) return noErr;
     
     AudioTimeStamp timestamp = *inTimeStamp;
@@ -595,7 +601,13 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
     if ( THIS->_inputLevelMonitorData.monitoringEnabled ) {
         performLevelMonitoring(&THIS->_inputLevelMonitorData, THIS->_inputAudioBufferList, inNumberFrames);
     }
-    
+
+    // only do the pending messages here if our output isn't enabled
+    if ( !THIS->_outputEnabled ) {
+        processPendingMessagesOnRealtimeThread(THIS);
+    }
+
+
     return result;
 }
 
@@ -771,14 +783,20 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 }
 
 - (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing {
+    return [self initWithAudioDescription:audioDescription inputEnabled:enableInput useVoiceProcessing:NO outputEnabled:YES];
+}
+
+- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing outputEnabled:(BOOL)enableOutput {
+
     if ( !(self = [super init]) ) return nil;
     
     NSAssert(audioDescription.mFormatID == kAudioFormatLinearPCM, @"Only linear PCM supported");
 
-    _audioSessionCategory = enableInput ? AVAudioSessionCategoryPlayAndRecord : AVAudioSessionCategoryPlayback;
-    _allowMixingWithOtherApps = YES;
+    _audioSessionCategory = enableInput ? (enableOutput ? AVAudioSessionCategoryPlayAndRecord : AVAudioSessionCategoryRecord) : AVAudioSessionCategoryPlayback;
+    _allowMixingWithOtherApps = enableOutput ? YES : NO;
     _audioDescription = audioDescription;
     _inputEnabled = enableInput;
+    _outputEnabled = enableOutput;
     _masterOutputVolume = 1.0;
     _voiceProcessingEnabled = useVoiceProcessing;
     _inputMode = AEInputModeFixedAudioFormat;
@@ -795,7 +813,12 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     
     TPCircularBufferInit(&_realtimeThreadMessageBuffer, kMessageBufferLength);
     TPCircularBufferInit(&_mainThreadMessageBuffer, kMessageBufferLength);
-    
+
+    // Register for notifications
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(interruptionNotification:) name:AVAudioSessionInterruptionNotification object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(audioRouteChangeNotification:) name:AVAudioSessionRouteChangeNotification object:nil];
+
+
     if ( ![self initAudioSession] || ![self setup] ) {
         _audioGraph = NULL;
     }
@@ -804,6 +827,48 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     
     return self;
 }
+
+
+- (BOOL)updateWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing outputEnabled:(BOOL)enableOutput {
+
+    BOOL wasStarted = _started;
+    if ( _started ) {
+        [self stopInternal];
+    }
+    [self teardown];
+
+    [NSThread sleepForTimeInterval:0.5];
+
+    _audioSessionCategory = enableInput ? (enableOutput ? AVAudioSessionCategoryPlayAndRecord : AVAudioSessionCategoryRecord) : AVAudioSessionCategoryPlayback;
+    _allowMixingWithOtherApps = enableOutput ? YES : NO;
+    _audioDescription = audioDescription;
+    _inputEnabled = enableInput;
+    _outputEnabled = enableOutput;
+    _masterOutputVolume = 1.0;
+    _voiceProcessingEnabled = useVoiceProcessing;
+    _inputMode = AEInputModeFixedAudioFormat;
+    _voiceProcessingOnlyForSpeakerAndMicrophone = YES;
+    _avoidMeasurementModeForBuiltInMic = YES;
+
+
+    if ( ![self initAudioSession] || ![self setup] ) {
+        NSLog(@"TAAE: error setting up audio session");
+        _audioGraph = NULL;
+        return NO;
+    }
+
+    if (wasStarted) {
+        if( ![self start:nil] ) {
+            NSLog(@"TAEE: error restarting controller");
+            return NO;
+        }
+    }
+
+    return YES;
+}
+
+
+
 
 - (void)dealloc {
     [_housekeepingTimer invalidate];
@@ -840,7 +905,6 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     free(_inputCallbacks);
     
     if ( _audiobusMonitorBuffer ) AEFreeAudioBufferList(_audiobusMonitorBuffer);
-    
 }
 
 -(BOOL)start:(NSError **)error {
@@ -870,7 +934,9 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     if ( _inputEnabled ) {
         __cachedInputLatency = audioSession.inputLatency;
     }
-    __cachedOutputLatency = audioSession.outputLatency;
+    if ( _outputEnabled ) {
+        __cachedOutputLatency = audioSession.outputLatency;
+    }
     
     _interrupted = NO;
     
@@ -1619,6 +1685,10 @@ static BOOL AEAudioControllerHasPendingMainThreadMessages(__unsafe_unretained AE
     return [self averagePowerLevel:averagePower peakHoldLevel:peakLevel forGroup:_topGroup];
 }
 
+- (void)outputAveragePowerLevels:(Float32*)averagePowers peakHoldLevels:(Float32*)peakLevels channelCount:(UInt32)count {
+    return [self averagePowerLevels:averagePowers peakHoldLevels:peakLevels forGroup:_topGroup channelCount:count];
+}
+
 - (void)averagePowerLevel:(Float32*)averagePower peakHoldLevel:(Float32*)peakLevel forGroup:(AEChannelGroupRef)group {
     if ( !group->level_monitor_data.monitoringEnabled ) {
         if ( ![NSThread isMainThread] ) {
@@ -1643,10 +1713,73 @@ static BOOL AEAudioControllerHasPendingMainThreadMessages(__unsafe_unretained AE
         }
     }
     
-    if ( averagePower ) *averagePower = 10.0f * log10f(group->level_monitor_data.average);
-    if ( peakLevel ) *peakLevel = 10.0f * log10f(group->level_monitor_data.peak);
+    if ( averagePower ) *averagePower = 20.0f * log10f(group->level_monitor_data.average);
+    if ( peakLevel ) *peakLevel = 20.0f * log10f(group->level_monitor_data.peak);
     
     group->level_monitor_data.reset = YES;
+}
+
+- (void)averagePowerLevels:(Float32*)averagePowers peakHoldLevels:(Float32*)peakLevels forGroup:(AEChannelGroupRef)group channelCount:(UInt32)count {
+    if ( !group->level_monitor_data.monitoringEnabled ) {
+        if ( ![NSThread isMainThread] ) {
+            dispatch_async(dispatch_get_main_queue(), ^{ [self averagePowerLevels:NULL peakHoldLevels:NULL forGroup:group channelCount:0]; });
+        } else {
+            AEFloatConverter *floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:group->channel->audioDescription];
+            group->level_monitor_data.channels = group->channel->audioDescription.mChannelsPerFrame;
+            group->level_monitor_data.floatConverter = (__bridge_retained void*)floatConverter;
+            group->level_monitor_data.scratchBuffer = AEAllocateAndInitAudioBufferList(floatConverter.floatingPointAudioDescription, kLevelMonitorScratchBufferSize);
+            OSMemoryBarrier();
+            group->level_monitor_data.monitoringEnabled = YES;
+
+            AEChannelGroupRef parentGroup = NULL;
+            int index=0;
+            if ( group != _topGroup ) {
+                parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
+                NSAssert(parentGroup != NULL, @"Channel group not found");
+            }
+
+            [self configureChannelsInRange:NSMakeRange(index, 1) forGroup:parentGroup];
+            checkResult([self updateGraph], "Update graph");
+        }
+    }
+
+    if ( averagePowers && count > 0) {
+        for (UInt32 i=0; i < count && i < kMaximumMonitoringChannels; ++i) {
+            averagePowers[i] = 20.0f * log10f(group->level_monitor_data.chanAverage[i]);
+        }
+    }
+    if ( peakLevels && count > 0) {
+        for (UInt32 i=0; i < count && i < kMaximumMonitoringChannels; ++i) {
+            peakLevels[i] = 20.0f * log10f(group->level_monitor_data.chanPeak[i]);
+        }
+    }
+
+    group->level_monitor_data.reset = YES;
+}
+
+- (void)inputAveragePowerLevels:(Float32*)averagePowers peakHoldLevels:(Float32*)peakLevels channelCount:(UInt32)count {
+    if ( !_inputLevelMonitorData.monitoringEnabled ) {
+        AEFloatConverter *floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:_rawInputAudioDescription];
+        _inputLevelMonitorData.channels = _rawInputAudioDescription.mChannelsPerFrame;
+        _inputLevelMonitorData.floatConverter = (__bridge_retained void*)floatConverter;
+        _inputLevelMonitorData.scratchBuffer = AEAllocateAndInitAudioBufferList(floatConverter.floatingPointAudioDescription, kLevelMonitorScratchBufferSize);
+        OSMemoryBarrier();
+        _inputLevelMonitorData.monitoringEnabled = YES;
+    }
+
+    if ( averagePowers && count > 0) {
+        for (UInt32 i=0; i < count && i < kMaximumMonitoringChannels; ++i) {
+            averagePowers[i] = 20.0f * log10f(_inputLevelMonitorData.chanAverage[i]);
+        }
+    }
+
+    if ( peakLevels && count > 0) {
+        for (UInt32 i=0; i < count && i < kMaximumMonitoringChannels; ++i) {
+            peakLevels[i] = 20.0f * log10f(_inputLevelMonitorData.chanPeak[i]);
+        }
+    }
+
+    _inputLevelMonitorData.reset = YES;
 }
 
 - (void)inputAveragePowerLevel:(Float32*)averagePower peakHoldLevel:(Float32*)peakLevel {
@@ -1659,8 +1792,8 @@ static BOOL AEAudioControllerHasPendingMainThreadMessages(__unsafe_unretained AE
         _inputLevelMonitorData.monitoringEnabled = YES;
     }
     
-    if ( averagePower ) *averagePower = 10.0f * log10f(_inputLevelMonitorData.average);
-    if ( peakLevel ) *peakLevel = 10.0f * log10f(_inputLevelMonitorData.peak);
+    if ( averagePower ) *averagePower = 20.0f * log10f(_inputLevelMonitorData.average);
+    if ( peakLevel ) *peakLevel = 20.0f * log10f(_inputLevelMonitorData.peak);
     
     _inputLevelMonitorData.reset = YES;
 }
@@ -1870,8 +2003,13 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
         }
     }
     
-    if ( __cachedOutputLatency == kNoValue ) {
-        __cachedOutputLatency = [((AVAudioSession*)[AVAudioSession sharedInstance]) outputLatency];
+    if ( __cachedOutputLatency == kNoValue) {
+        if ( THIS->_outputEnabled ) {
+            __cachedOutputLatency = [((AVAudioSession*)[AVAudioSession sharedInstance]) outputLatency];
+        }
+        else {
+            __cachedOutputLatency = 0.0;
+        }
     }
     return __cachedOutputLatency;
 }
@@ -2187,7 +2325,9 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
         if ( _inputEnabled ) {
             __cachedInputLatency = audioSession.inputLatency;
         }
-        __cachedOutputLatency = audioSession.outputLatency;
+        if (_outputEnabled) {
+            __cachedOutputLatency = audioSession.outputLatency;
+        }
         
         int reason = [notification.userInfo[AVAudioSessionRouteChangeReasonKey] intValue];
         if ( !updatedVP && (reason == AVAudioSessionRouteChangeReasonNewDeviceAvailable || reason == AVAudioSessionRouteChangeReasonOldDeviceUnavailable) && _inputEnabled ) {
@@ -2226,14 +2366,12 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 
 #pragma mark - Graph and audio session configuration
 
+
 - (BOOL)initAudioSession {
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     NSMutableString *extraInfo = [NSMutableString string];
     
-    // Register for notifications
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(interruptionNotification:) name:AVAudioSessionInterruptionNotification object:nil];
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(audioRouteChangeNotification:) name:AVAudioSessionRouteChangeNotification object:nil];
-    
+
     // Set sample rate
     Float64 sampleRate = _audioDescription.mSampleRate;
     NSError *error = nil;
@@ -2261,6 +2399,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     Float64 achievedSampleRate = audioSession.sampleRate;
     if ( achievedSampleRate != sampleRate ) {
         NSLog(@"TAAE: Hardware sample rate is %f", achievedSampleRate);
+        _audioDescription.mSampleRate = achievedSampleRate;
     }
 
     // Determine audio route
@@ -2283,7 +2422,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     Float32 bufferDuration = audioSession.IOBufferDuration;
     if ( _currentBufferDuration != bufferDuration ) self.currentBufferDuration = bufferDuration;
     
-    NSLog(@"TAAE: Audio session initialized (%@)", [extraInfo stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@", "]]);
+    NSLog(@"TAAE: Audio session initialized (%@) HW samplerate: %g", [extraInfo stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@", "]], achievedSampleRate);
     return YES;
 }
 
@@ -2438,7 +2577,14 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         OSStatus result = AudioUnitSetProperty(_ioAudioUnit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &enableInputFlag, sizeof(enableInputFlag));
         checkResult(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_EnableIO)");
     }
-    
+
+    if (!_outputEnabled) {
+        // disable output
+        UInt32 enableOutputFlag = 0;
+        OSStatus result = AudioUnitSetProperty(_ioAudioUnit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Output, 0, &enableOutputFlag, sizeof(enableOutputFlag));
+        checkResult(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_EnableIO) OUTPUT");
+    }
+
     if ( [self usingVPIO] ) {
         // Set quality
         UInt32 quality = 127;
@@ -2574,7 +2720,8 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
             if ( channels == AVAudioSessionErrorCodeIncompatibleCategory ) {
                 // Attempt to force category, and try again
                 NSString * originalCategory = _audioSessionCategory;
-                self.audioSessionCategory = AVAudioSessionCategoryPlayAndRecord;
+                NSString * testCategory = _outputEnabled ?  AVAudioSessionCategoryPlayAndRecord : AVAudioSessionCategoryRecord;
+                self.audioSessionCategory = testCategory;
                 channels = audioSession.inputNumberOfChannels;
                 hasChannelCount = channels < 128 && channels >= 0;
                 if ( !hasChannelCount ) {
@@ -2585,7 +2732,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
                     hasChannelCount = channels < 128 && channels >= 0;
                 }
                 
-                if ( ![originalCategory isEqualToString:AVAudioSessionCategoryPlayAndRecord] ) {
+                if ( ![originalCategory isEqualToString:testCategory] ) {
                     self.audioSessionCategory = originalCategory;
                 }
             }
@@ -3506,23 +3653,33 @@ static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferLi
     
     if ( monitor->reset ) {
         monitor->reset  = NO;
-        monitor->meanAccumulator = 0;
         monitor->meanBlockCount  = 0;
+        monitor->chanMeanBlockCount  = 0;
+        monitor->meanAccumulator = 0;
         monitor->average         = 0;
         monitor->peak            = 0;
+        for (int i=0; i < kMaximumMonitoringChannels; ++i) {
+            monitor->chanMeanAccumulator[i] = 0;
+            monitor->chanAverage[i]         = 0;
+            monitor->chanPeak[i]            = 0;
+        }
     }
     
     UInt32 monitorFrames = min(numberFrames, kLevelMonitorScratchBufferSize);
     AEFloatConverterToFloatBufferList((__bridge AEFloatConverter *)monitor->floatConverter, buffer, monitor->scratchBuffer, monitorFrames);
 
-    for ( int i=0; i<monitor->scratchBuffer->mNumberBuffers; i++ ) {
+    for ( int i=0; i<monitor->scratchBuffer->mNumberBuffers && i < kMaximumMonitoringChannels; i++ ) {
         float peak = 0.0;
         vDSP_maxmgv((float*)monitor->scratchBuffer->mBuffers[i].mData, 1, &peak, monitorFrames);
-        if ( peak > monitor->peak ) monitor->peak = peak;
+        if ( peak > monitor->chanPeak[i] ) monitor->chanPeak[i] = peak;
         float avg = 0.0;
         vDSP_meamgv((float*)monitor->scratchBuffer->mBuffers[i].mData, 1, &avg, monitorFrames);
+        monitor->chanMeanAccumulator[i] += avg;
+        if (i==0) monitor->chanMeanBlockCount++;
         monitor->meanAccumulator += avg;
         monitor->meanBlockCount++;
+
+        monitor->chanAverage[i] = monitor->chanMeanAccumulator[i] / (double)monitor->chanMeanBlockCount;
         monitor->average = monitor->meanAccumulator / (double)monitor->meanBlockCount;
     }
 }

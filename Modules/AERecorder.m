@@ -64,20 +64,43 @@ NSString * kAERecorderErrorKey = @"error";
     free(_buffer);
 }
 
+
 -(BOOL)beginRecordingToFileAtPath:(NSString *)path fileType:(AudioFileTypeID)fileType error:(NSError **)error {
-    BOOL result = [self prepareRecordingToFileAtPath:path fileType:fileType error:error];
+    return [self beginRecordingToFileAtPath:path fileType:fileType bitDepth:16 channels:0 error:error];
+}
+
+- (BOOL)beginRecordingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType bitDepth:(UInt32)bits error:(NSError**)error {
+    return [self beginRecordingToFileAtPath:path fileType:fileType bitDepth:16 channels:0 error:error];
+}
+
+- (BOOL)beginRecordingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType bitDepth:(UInt32)bits channels:(UInt32)channels error:(NSError**)error
+{
+    BOOL result = [self prepareRecordingToFileAtPath:path fileType:fileType bitDepth:bits channels:channels error:error];
     _recording = YES;
     return result;
 }
 
 - (BOOL)prepareRecordingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType error:(NSError**)error {
+    return [self prepareRecordingToFileAtPath:path fileType:fileType bitDepth:16 channels:0 error:error];
+}
+
+- (BOOL)prepareRecordingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType bitDepth:(UInt32)bits error:(NSError**)error {
+    return [self prepareRecordingToFileAtPath:path fileType:fileType bitDepth:16 channels:0 error:error];
+}
+
+- (BOOL)prepareRecordingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType bitDepth:(UInt32)bits channels:(UInt32)channels error:(NSError**)error
+{
     _currentTime = 0.0;
-    BOOL result = [_writer beginWritingToFileAtPath:path fileType:fileType error:error];
+    BOOL result = [_writer beginWritingToFileAtPath:path fileType:fileType bitDepth:bits channels:channels error:error];
     return result;
 }
 
 void AERecorderStartRecording(__unsafe_unretained AERecorder* THIS) {
     THIS->_recording = YES;
+}
+
+void AERecorderStopRecording(__unsafe_unretained AERecorder* THIS) {
+    THIS->_recording = NO;
 }
 
 - (void)finishRecording {
