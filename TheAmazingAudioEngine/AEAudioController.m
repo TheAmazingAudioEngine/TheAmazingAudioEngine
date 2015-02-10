@@ -39,6 +39,9 @@
 #import <mach/mach_time.h>
 #import <pthread.h>
 
+// Uncomment the following or define the following symbol as part of your build process to enable per-second performance reports
+// #define TAAE_REPORT_RENDER_TIME
+
 static double __hostTicksToSeconds = 0.0;
 static double __secondsToHostTicks = 0.0;
 
@@ -290,7 +293,8 @@ typedef struct {
     pthread_t           _renderThread;
     
 #ifdef DEBUG
-    uint64_t            _renderStartTime;
+    uint64_t            _renderStartTime[2];
+    uint64_t            _renderDuration[2];
 #endif
 }
 
@@ -525,8 +529,14 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
     if ( !THIS->_renderThread ) {
         THIS->_renderThread = pthread_self();
     }
-
-    if ( !THIS->_inputAudioBufferList ) return noErr;
+    
+    if ( !THIS->_inputAudioBufferList ) {
+        return noErr;
+    }
+    
+#ifdef DEBUG
+    THIS->_renderStartTime[1] = mach_absolute_time();
+#endif
     
     AudioTimeStamp timestamp = *inTimeStamp;
     
@@ -550,64 +560,68 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
         ((AEAudioControllerTimingCallback)callback->callback)((__bridge id)callback->userInfo, THIS, &timestamp, inNumberFrames, AEAudioTimingContextInput);
     }
     
-    for ( int i=0; i<THIS->_inputAudioBufferList->mNumberBuffers; i++ ) {
-        THIS->_inputAudioBufferList->mBuffers[i].mDataByteSize = kInputAudioBufferFrames * THIS->_rawInputAudioDescription.mBytesPerFrame;
-    }
+    OSStatus result = noErr;
     
     // Render audio into buffer
     if ( !useAudiobusReceiverPort ) {
         for ( int i=0; i<THIS->_inputAudioBufferList->mNumberBuffers; i++ ) {
-            THIS->_inputAudioBufferList->mBuffers[i].mDataByteSize = inNumberFrames * THIS->_rawInputAudioDescription.mBytesPerFrame;
+            THIS->_inputAudioBufferList->mBuffers[i].mDataByteSize = MIN(inNumberFrames, kInputAudioBufferFrames) * THIS->_rawInputAudioDescription.mBytesPerFrame;
         }
         OSStatus err = AudioUnitRender(THIS->_ioAudioUnit, ioActionFlags, &timestamp, 1, inNumberFrames, THIS->_inputAudioBufferList);
         if ( !checkResult(err, "AudioUnitRender") ) {
-            return err;
+            result = err;
         }
     }
     
-    if ( inNumberFrames == 0 ) return kNoAudioErr;
+    if ( result == noErr && inNumberFrames == 0 ) {
+        result = kNoAudioErr;
+    }
     
-    OSStatus result = noErr;
-    
-    for ( int tableIndex = 0; tableIndex < THIS->_inputCallbackCount; tableIndex++ ) {
-        input_callback_table_t *table = &THIS->_inputCallbacks[tableIndex];
-        
-        if ( !table->audioBufferList ) continue;
-        
-        input_producer_arg_t arg = {
-            .THIS = (__bridge void*)THIS,
-            .table = table,
-            .inTimeStamp = timestamp,
-            .ioActionFlags = ioActionFlags,
-            .nextFilterIndex = 0
-        };
-        
-        for ( int i=0; i<table->audioBufferList->mNumberBuffers; i++ ) {
-            table->audioBufferList->mBuffers[i].mDataByteSize = inNumberFrames * table->audioDescription.mBytesPerFrame;
-        }
-        
-        result = inputAudioProducer((void*)&arg, table->audioBufferList, &inNumberFrames);
-        
-        // Pass audio to callbacks
-        for ( int i=0; i<table->callbacks.count; i++ ) {
-            callback_t *callback = &table->callbacks.callbacks[i];
-            if ( !(callback->flags & kReceiverFlag) ) continue;
+    if ( result == noErr ) {
+        for ( int tableIndex = 0; tableIndex < THIS->_inputCallbackCount; tableIndex++ ) {
+            input_callback_table_t *table = &THIS->_inputCallbacks[tableIndex];
             
-            ((AEAudioControllerAudioCallback)callback->callback)((__bridge id)callback->userInfo, THIS, AEAudioSourceInput, &timestamp, inNumberFrames, table->audioBufferList);
+            if ( !table->audioBufferList ) continue;
+            
+            input_producer_arg_t arg = {
+                .THIS = (__bridge void*)THIS,
+                .table = table,
+                .inTimeStamp = timestamp,
+                .ioActionFlags = ioActionFlags,
+                .nextFilterIndex = 0
+            };
+            
+            for ( int i=0; i<table->audioBufferList->mNumberBuffers; i++ ) {
+                table->audioBufferList->mBuffers[i].mDataByteSize = inNumberFrames * table->audioDescription.mBytesPerFrame;
+            }
+            
+            result = inputAudioProducer((void*)&arg, table->audioBufferList, &inNumberFrames);
+            
+            // Pass audio to callbacks
+            for ( int i=0; i<table->callbacks.count; i++ ) {
+                callback_t *callback = &table->callbacks.callbacks[i];
+                if ( !(callback->flags & kReceiverFlag) ) continue;
+                
+                ((AEAudioControllerAudioCallback)callback->callback)((__bridge id)callback->userInfo, THIS, AEAudioSourceInput, &timestamp, inNumberFrames, table->audioBufferList);
+            }
         }
-    }
-    
-    // Perform input metering
-    if ( THIS->_inputLevelMonitorData.monitoringEnabled ) {
-        performLevelMonitoring(&THIS->_inputLevelMonitorData, THIS->_inputAudioBufferList, inNumberFrames);
+        
+        // Perform input metering
+        if ( THIS->_inputLevelMonitorData.monitoringEnabled ) {
+            performLevelMonitoring(&THIS->_inputLevelMonitorData, THIS->_inputAudioBufferList, inNumberFrames);
+        }
     }
 
-    // only do the pending messages here if our output isn't enabled
+    // Only do the pending messages here if our output isn't enabled
     if ( !THIS->_outputEnabled ) {
         processPendingMessagesOnRealtimeThread(THIS);
     }
-
-
+    
+#ifdef DEBUG
+    uint64_t renderEndTime = mach_absolute_time();
+    THIS->_renderDuration[1] = renderEndTime - THIS->_renderStartTime[1];
+#endif
+    
     return result;
 }
 
@@ -667,37 +681,44 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     
     __unsafe_unretained AEAudioController * THIS = (__bridge AEAudioController*)inRefCon;
     
-    if ( ((THIS->_inputEnabled && inBusNumber == 1) || (!THIS->_inputEnabled && inBusNumber == 0)) && *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
+    if ( inBusNumber == 0 && *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
         // Remember the time we started rendering
-        THIS->_renderStartTime = mach_absolute_time();
+        THIS->_renderStartTime[0] = mach_absolute_time();
         
     } else if ( inBusNumber == 0 && *ioActionFlags & kAudioUnitRenderAction_PostRender ) {
-        // Output bus renders last. Warn if total render takes longer than 50% of buffer duration (gives us a bit of headroom)
+        // Calculate total render duration
         uint64_t renderEndTime = mach_absolute_time();
-        uint64_t duration = renderEndTime - THIS->_renderStartTime;
-        NSTimeInterval threshold = THIS->_currentBufferDuration * 0.5;
-        if ( duration >= threshold * __secondsToHostTicks && AEAudioControllerRateLimit() ) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                NSLog(@"TAAE: Warning: render took too long (%lfs, should be less than %lfs). Expect glitches.", duration*__hostTicksToSeconds, threshold);
-            });
-        }
+        THIS->_renderDuration[0] = renderEndTime - THIS->_renderStartTime[MIN(1, inBusNumber)];
+        
+        if ( THIS->_renderDuration[0] && (!THIS->_inputEnabled || THIS->_renderDuration[1]) ) {
+            // Got render duration for all buses
+            uint64_t duration = THIS->_renderDuration[0] + THIS->_renderDuration[1];
+            THIS->_renderDuration[0] = THIS->_renderDuration[1] = THIS->_renderStartTime[0] = THIS->_renderStartTime[1] = 0;
+            // Warn if total render takes longer than 50% of buffer duration (gives us a bit of headroom)
+            NSTimeInterval threshold = THIS->_currentBufferDuration * 0.5;
+            if ( duration >= threshold * __secondsToHostTicks && AEAudioControllerRateLimit() ) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    NSLog(@"TAAE: Warning: render took too long (%lfs, should be less than %lfs). Expect glitches.", duration*__hostTicksToSeconds, threshold);
+                });
+            }
         
 #ifdef TAAE_REPORT_RENDER_TIME
-        // Define the above symbol to report ongoing (max) render time every second
-        static uint64_t max = 0;
-        static uint64_t lastReport = 0;
-        if ( duration > max ) {
-            max = duration;
-        }
-        if ( renderEndTime > lastReport + (1.0 * __secondsToHostTicks) ) {
-            uint64_t value = max;
-            dispatch_async(dispatch_get_main_queue(), ^{
-                NSLog(@"TAAE: Render time %lfs", value*__hostTicksToSeconds);
-            });
-            lastReport = renderEndTime;
-            max = 0;
-        }
+            // Define the above symbol to report ongoing (max) render time every second
+            static uint64_t max = 0;
+            static uint64_t lastReport = 0;
+            if ( duration > max ) {
+                max = duration;
+            }
+            if ( renderEndTime > lastReport + (1.0 * __secondsToHostTicks) ) {
+                uint64_t value = max;
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    NSLog(@"TAAE: Render time %lfs", value*__hostTicksToSeconds);
+                });
+                lastReport = renderEndTime;
+                max = 0;
+            }
 #endif
+        }
     }
     
     return noErr;
