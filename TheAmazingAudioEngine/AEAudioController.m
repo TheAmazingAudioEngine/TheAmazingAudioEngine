@@ -825,9 +825,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     _avoidMeasurementModeForBuiltInMic = YES;
     _inputCallbacks = (input_callback_table_t*)calloc(sizeof(input_callback_table_t), 1);
     _inputCallbackCount = 1;
-    
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationWillEnterForeground:) name:UIApplicationWillEnterForegroundNotification object:nil];
-    
+	
     if ( ABConnectionsChangedNotification ) {
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(audiobusConnectionsChanged:) name:ABConnectionsChangedNotification object:nil];
     }
@@ -2219,25 +2217,6 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
     }
 }
 
-- (void)applicationWillEnterForeground:(NSNotification*)notification {
-    NSError *error = nil;
-    if ( ![((AVAudioSession*)[AVAudioSession sharedInstance]) setActive:YES error:&error] ) {
-        NSLog(@"TAAE: Couldn't activate audio session: %@", error);
-    }
-    
-    if ( _interrupted ) {
-        _interrupted = NO;
-        
-        if ( _started && !self.running ) {
-            [self start:NULL];
-        }
-        
-        [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionEndedNotification object:self];
-    }
-    
-    if ( _hasSystemError ) [self attemptRecoveryFromSystemError:NULL];
-}
-
 -(void)audiobusConnectionsChanged:(NSNotification*)notification {
     if ( _inputEnabled ) {
         [self updateInputDeviceStatus];
@@ -2249,7 +2228,8 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
 
 - (void)interruptionNotification:(NSNotification*)notification {
     dispatch_async(dispatch_get_main_queue(), ^{
-        if ( [notification.userInfo[AVAudioSessionInterruptionTypeKey] intValue] == AVAudioSessionInterruptionTypeEnded ) {
+        if ( [notification.userInfo[AVAudioSessionInterruptionTypeKey] intValue] == AVAudioSessionInterruptionTypeEnded
+			&& [notification.userInfo[AVAudioSessionInterruptionOptionKey] intValue] == AVAudioSessionInterruptionOptionShouldResume ) {
             NSLog(@"TAAE: Audio session interruption ended");
             _interrupted = NO;
             
