@@ -1581,21 +1581,20 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
                     TPCircularBufferConsume(&_mainThreadMessageBuffer, messageLength);
                 }
             }
-            
-            if ( !message ) {
-                break;
-            }
-            
-            _pendingResponses--;
-            
-            if ( _pollThread && _pendingResponses == 0 ) {
-                _pollThread.pollInterval = kIdleMessagingPollDuration;
-            }
+        }
+        
+        if ( !message ) {
+            break;
         }
         
         if ( message->responseBlock ) {
             ((__bridge void(^)())message->responseBlock)();
             CFBridgingRelease(message->responseBlock);
+            
+            _pendingResponses--;
+            if ( _pollThread && _pendingResponses == 0 ) {
+                _pollThread.pollInterval = kIdleMessagingPollDuration;
+            }
         } else if ( message->handler ) {
             message->handler(self, 
                              message->userInfoLength > 0
