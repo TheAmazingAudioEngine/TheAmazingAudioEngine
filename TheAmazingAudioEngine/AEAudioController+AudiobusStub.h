@@ -47,5 +47,5 @@ typedef void (^ABReceiverPortAudioInputBlock)(ABReceiverPort *receiverPort, UInt
 - (BOOL)connectedToSelf;
 - (void)setAutomaticMonitoring:(BOOL)automaticMonitoring;
 - (AudioUnit)audioUnit;
-- (BOOL)connected;
+- (BOOL)isConnected;
 @end
