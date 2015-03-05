@@ -2422,7 +2422,6 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     Float64 achievedSampleRate = audioSession.sampleRate;
     if ( achievedSampleRate != sampleRate ) {
         NSLog(@"TAAE: Hardware sample rate is %f", achievedSampleRate);
-        _audioDescription.mSampleRate = achievedSampleRate;
     }
 
     // Determine audio route
