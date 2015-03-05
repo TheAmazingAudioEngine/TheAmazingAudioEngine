@@ -2740,7 +2740,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     
     BOOL inputAvailable          = audioSession.inputAvailable;
     BOOL hardwareInputAvailable  = inputAvailable;
-    int numberOfInputChannels = _audioDescription.mChannelsPerFrame;
+    int numberOfInputChannels    = _audioDescription.mChannelsPerFrame;
     BOOL usingAudiobus           = NO;
     UInt32 usingIAA              = NO;
     
@@ -2753,8 +2753,11 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         numberOfInputChannels   = 2;
         usingAudiobus           = YES;
     } else if ( usingIAA ) {
-        inputAvailable          = YES;
-        numberOfInputChannels   = 2;
+        AudioStreamBasicDescription inputDescription;
+        UInt32 size = sizeof(inputDescription);
+        AudioUnitGetProperty(_ioAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 1, &inputDescription, &size);
+        numberOfInputChannels   = inputDescription.mChannelsPerFrame;
+        inputAvailable          = numberOfInputChannels > 0;
     } else {
         numberOfInputChannels = 0;
         if ( inputAvailable ) {
