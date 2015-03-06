@@ -61,6 +61,7 @@ extern "C" {
 @property (nonatomic, readwrite) BOOL removeUponFinish;     //!< Whether the track automatically removes itself from the audio controller after playback completes
 @property (nonatomic, copy) void(^completionBlock)();       //!< A block to be called when playback finishes
 @property (nonatomic, copy) void(^startLoopBlock)();        //!< A block to be called when the loop restarts in loop mode
+@property (nonatomic, copy) void(^progressBlock)(Float32);  //!< A block to be called while the loop played
 @end
 
 #ifdef __cplusplus

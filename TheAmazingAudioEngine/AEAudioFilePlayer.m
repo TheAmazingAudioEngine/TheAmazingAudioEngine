@@ -42,7 +42,7 @@
 @end
 
 @implementation AEAudioFilePlayer
-@synthesize url = _url, loop=_loop, volume=_volume, pan=_pan, channelIsPlaying=_channelIsPlaying, channelIsMuted=_channelIsMuted, removeUponFinish=_removeUponFinish, completionBlock = _completionBlock, startLoopBlock = _startLoopBlock;
+@synthesize url = _url, loop=_loop, volume=_volume, pan=_pan, channelIsPlaying=_channelIsPlaying, channelIsMuted=_channelIsMuted, removeUponFinish=_removeUponFinish, completionBlock = _completionBlock, startLoopBlock = _startLoopBlock, progressBlock = _progressBlock;
 @dynamic duration, currentTime;
 
 + (id)audioFilePlayerWithURL:(NSURL*)url audioController:(AEAudioController *)audioController error:(NSError **)error {
@@ -112,6 +112,12 @@ static void notifyPlaybackStopped(AEAudioController *audioController, void *user
     THIS->_playhead = 0;
 }
 
+static void notifyPlaybackProgress(AEAudioController *audioController, void *userInfo, int length) {
+    AEAudioFilePlayer *THIS = (__bridge AEAudioFilePlayer*)*(void**)userInfo;
+
+    if ( THIS.progressBlock && THIS->_lengthInFrames) THIS.progressBlock((double)THIS->_playhead / (double)THIS->_lengthInFrames);
+}
+
 static OSStatus renderCallback(__unsafe_unretained AEAudioFilePlayer *THIS, __unsafe_unretained AEAudioController *audioController, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
     int32_t playhead = THIS->_playhead;
     int32_t originalPlayhead = playhead;
@@ -165,6 +171,10 @@ static OSStatus renderCallback(__unsafe_unretained AEAudioFilePlayer *THIS, __un
                 THIS->_channelIsPlaying = NO;
                 break;
             }
+        }
+        else if (THIS->_progressBlock)
+        {
+            AEAudioControllerSendAsynchronousMessageToMainThread(audioController, notifyPlaybackProgress, &THIS, sizeof(AEAudioFilePlayer*));
         }
     }
     
