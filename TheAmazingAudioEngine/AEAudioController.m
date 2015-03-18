@@ -275,6 +275,7 @@ typedef struct {
     int                 _inputCallbackCount;
     AudioStreamBasicDescription _rawInputAudioDescription;
     AudioBufferList    *_inputAudioBufferList;
+    AudioTimeStamp      _lastInputBusTimeStamp;
     
     TPCircularBuffer    _realtimeThreadMessageBuffer;
     TPCircularBuffer    _mainThreadMessageBuffer;
@@ -525,103 +526,15 @@ static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt3
 static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
     __unsafe_unretained AEAudioController *THIS = (__bridge AEAudioController *)inRefCon;
     
-    if ( !THIS->_renderThread ) {
-        THIS->_renderThread = pthread_self();
-    }
+    // Take note of timestamp, for use when we actually service the input
+    THIS->_lastInputBusTimeStamp = *inTimeStamp;
     
-    if ( !THIS->_inputAudioBufferList ) {
-        return noErr;
-    }
-    
-#ifdef DEBUG
-    THIS->_renderStartTime[1] = AECurrentTimeInHostTicks();
-#endif
-    
-    AudioTimeStamp timestamp = *inTimeStamp;
-    
-    BOOL useAudiobusReceiverPort = THIS->_audiobusReceiverPort && THIS->_usingAudiobusInput;
-    
-    if ( useAudiobusReceiverPort ) {
-        // If Audiobus is connected, then serve Audiobus queue rather than serving system input queue
-        static Float64 __sampleTime = 0;
-        ABReceiverPortReceive(THIS->_audiobusReceiverPort, nil, THIS->_inputAudioBufferList, inNumberFrames, &timestamp);
-        timestamp.mSampleTime = __sampleTime;
-        __sampleTime += inNumberFrames;
-    } else {
-        if ( THIS->_automaticLatencyManagement ) {
-            // Adjust timestamp to factor in hardware input latency
-            timestamp.mHostTime -= AEHostTicksFromSeconds(AEAudioControllerInputLatency(THIS));
-        }
-    }
-    
-    for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
-        callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
-        ((AEAudioControllerTimingCallback)callback->callback)((__bridge id)callback->userInfo, THIS, &timestamp, inNumberFrames, AEAudioTimingContextInput);
-    }
-    
-    OSStatus result = noErr;
-    
-    // Render audio into buffer
-    if ( !useAudiobusReceiverPort ) {
-        for ( int i=0; i<THIS->_inputAudioBufferList->mNumberBuffers; i++ ) {
-            THIS->_inputAudioBufferList->mBuffers[i].mDataByteSize = MIN(inNumberFrames, kInputAudioBufferFrames) * THIS->_rawInputAudioDescription.mBytesPerFrame;
-        }
-        OSStatus err = AudioUnitRender(THIS->_ioAudioUnit, ioActionFlags, &timestamp, 1, inNumberFrames, THIS->_inputAudioBufferList);
-        if ( !checkResult(err, "AudioUnitRender") ) {
-            result = err;
-        }
-    }
-    
-    if ( result == noErr && inNumberFrames == 0 ) {
-        result = kNoAudioErr;
-    }
-    
-    if ( result == noErr ) {
-        for ( int tableIndex = 0; tableIndex < THIS->_inputCallbackCount; tableIndex++ ) {
-            input_callback_table_t *table = &THIS->_inputCallbacks[tableIndex];
-            
-            if ( !table->audioBufferList ) continue;
-            
-            input_producer_arg_t arg = {
-                .THIS = (__bridge void*)THIS,
-                .table = table,
-                .inTimeStamp = timestamp,
-                .ioActionFlags = ioActionFlags,
-                .nextFilterIndex = 0
-            };
-            
-            for ( int i=0; i<table->audioBufferList->mNumberBuffers; i++ ) {
-                table->audioBufferList->mBuffers[i].mDataByteSize = inNumberFrames * table->audioDescription.mBytesPerFrame;
-            }
-            
-            result = inputAudioProducer((void*)&arg, table->audioBufferList, &inNumberFrames);
-            
-            // Pass audio to callbacks
-            for ( int i=0; i<table->callbacks.count; i++ ) {
-                callback_t *callback = &table->callbacks.callbacks[i];
-                if ( !(callback->flags & kReceiverFlag) ) continue;
-                
-                ((AEAudioControllerAudioCallback)callback->callback)((__bridge id)callback->userInfo, THIS, AEAudioSourceInput, &timestamp, inNumberFrames, table->audioBufferList);
-            }
-        }
-        
-        // Perform input metering
-        if ( THIS->_inputLevelMonitorData.monitoringEnabled ) {
-            performLevelMonitoring(&THIS->_inputLevelMonitorData, THIS->_inputAudioBufferList, inNumberFrames);
-        }
-    }
-
-    // Only do the pending messages here if our output isn't enabled
     if ( !THIS->_outputEnabled ) {
-        processPendingMessagesOnRealtimeThread(THIS);
+        // If output isn't enabled, service the input from here
+        serviceAudioInput(THIS, NULL, inTimeStamp, inNumberFrames);
     }
     
-#ifdef DEBUG
-    uint64_t renderEndTime = AECurrentTimeInHostTicks();
-    THIS->_renderDuration[1] = renderEndTime - THIS->_renderStartTime[1];
-#endif
-    
-    return result;
+    return noErr;
 }
 
 static OSStatus groupRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
@@ -654,10 +567,20 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     }
     
     if ( *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
-        // Before render: Perform timing callbacks
+        // Before main render: first service input
+        if ( THIS->_inputEnabled ) {
+            serviceAudioInput(THIS, inTimeStamp, &THIS->_lastInputBusTimeStamp, inNumberFrames);
+        }
+        
+        // Perform timing callbacks
+        AudioTimeStamp timestamp = *inTimeStamp;
+        if ( THIS->_automaticLatencyManagement ) {
+            // Adjust timestamp to factor in hardware output latency
+            timestamp.mHostTime += AEHostTicksFromSeconds(AEAudioControllerOutputLatency(THIS));
+        }
         for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
             callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
-            ((AEAudioControllerTimingCallback)callback->callback)((__bridge id)callback->userInfo, THIS, inTimeStamp, inNumberFrames, AEAudioTimingContextOutput);
+            ((AEAudioControllerTimingCallback)callback->callback)((__bridge id)callback->userInfo, THIS, &timestamp, inNumberFrames, AEAudioTimingContextOutput);
         }
     } else {
         // After render
@@ -671,6 +594,103 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     }
     
     return noErr;
+}
+
+static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, const AudioTimeStamp *outputBusTimeStamp, const AudioTimeStamp *inputBusTimeStamp, UInt32 inNumberFrames) {
+    
+#ifdef DEBUG
+    THIS->_renderStartTime[1] = AECurrentTimeInHostTicks();
+#endif
+    
+    AudioTimeStamp timestamp;
+    
+    BOOL useAudiobusReceiverPort = THIS->_audiobusReceiverPort && THIS->_usingAudiobusInput;
+    if ( useAudiobusReceiverPort ) {
+        // If Audiobus is connected, then serve Audiobus queue rather than serving system input queue
+        timestamp = outputBusTimeStamp ? *outputBusTimeStamp : *inputBusTimeStamp;
+        if ( outputBusTimeStamp && THIS->_automaticLatencyManagement ) {
+            // Adjust timestamp to factor in hardware output latency
+            timestamp.mHostTime += AEHostTicksFromSeconds(AEAudioControllerOutputLatency(THIS));
+        }
+        static Float64 __sampleTime = 0;
+        ABReceiverPortReceive(THIS->_audiobusReceiverPort, nil, THIS->_inputAudioBufferList, inNumberFrames, &timestamp);
+        timestamp.mSampleTime = __sampleTime;
+        __sampleTime += inNumberFrames;
+    } else {
+        timestamp = *inputBusTimeStamp;
+        if ( THIS->_automaticLatencyManagement ) {
+            // Adjust timestamp to factor in hardware input latency
+            timestamp.mHostTime -= AEHostTicksFromSeconds(AEAudioControllerInputLatency(THIS));
+        }
+    }
+    
+    for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
+        callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
+        ((AEAudioControllerTimingCallback)callback->callback)((__bridge id)callback->userInfo, THIS, &timestamp, inNumberFrames, AEAudioTimingContextInput);
+    }
+    
+    OSStatus result = noErr;
+    
+    // Render audio into buffer
+    if ( !useAudiobusReceiverPort ) {
+        for ( int i=0; i<THIS->_inputAudioBufferList->mNumberBuffers; i++ ) {
+            THIS->_inputAudioBufferList->mBuffers[i].mDataByteSize = MIN(inNumberFrames, kInputAudioBufferFrames) * THIS->_rawInputAudioDescription.mBytesPerFrame;
+        }
+        AudioUnitRenderActionFlags flags = 0;
+        OSStatus err = AudioUnitRender(THIS->_ioAudioUnit, &flags, &timestamp, 1, inNumberFrames, THIS->_inputAudioBufferList);
+        if ( !checkResult(err, "AudioUnitRender") ) {
+            result = err;
+        }
+    }
+    
+    if ( result == noErr && inNumberFrames == 0 ) {
+        result = kNoAudioErr;
+    }
+    
+    if ( result == noErr ) {
+        for ( int tableIndex = 0; tableIndex < THIS->_inputCallbackCount; tableIndex++ ) {
+            input_callback_table_t *table = &THIS->_inputCallbacks[tableIndex];
+            
+            if ( !table->audioBufferList ) continue;
+            
+            input_producer_arg_t arg = {
+                .THIS = (__bridge void*)THIS,
+                .table = table,
+                .inTimeStamp = timestamp,
+                .ioActionFlags = 0,
+                .nextFilterIndex = 0
+            };
+            
+            for ( int i=0; i<table->audioBufferList->mNumberBuffers; i++ ) {
+                table->audioBufferList->mBuffers[i].mDataByteSize = inNumberFrames * table->audioDescription.mBytesPerFrame;
+            }
+            
+            result = inputAudioProducer((void*)&arg, table->audioBufferList, &inNumberFrames);
+            
+            // Pass audio to callbacks
+            for ( int i=0; i<table->callbacks.count; i++ ) {
+                callback_t *callback = &table->callbacks.callbacks[i];
+                if ( !(callback->flags & kReceiverFlag) ) continue;
+                
+                ((AEAudioControllerAudioCallback)callback->callback)((__bridge id)callback->userInfo, THIS, AEAudioSourceInput, &timestamp, inNumberFrames, table->audioBufferList);
+            }
+        }
+        
+        // Perform input metering
+        if ( THIS->_inputLevelMonitorData.monitoringEnabled ) {
+            performLevelMonitoring(&THIS->_inputLevelMonitorData, THIS->_inputAudioBufferList, inNumberFrames);
+        }
+    }
+    
+    // Only do the pending messages here if our output isn't enabled
+    if ( !THIS->_outputEnabled ) {
+        processPendingMessagesOnRealtimeThread(THIS);
+    }
+    
+#ifdef DEBUG
+    uint64_t renderEndTime = AECurrentTimeInHostTicks();
+    THIS->_renderDuration[1] = renderEndTime - THIS->_renderStartTime[1];
+#endif
 }
 
 #ifdef DEBUG
