@@ -1388,7 +1388,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  *
  *  For example:
  *
- *      timestamp.mHostTime -= AEAudioControllerInputLatency(audioController)*__secondsToHostTicks;
+ *      timestamp.mHostTime -= AEHostTicksFromSeconds(AEAudioControllerInputLatency(audioController));
  *
  *  Note that when connected to Audiobus input, this function returns 0.
  *
@@ -1404,7 +1404,7 @@ NSTimeInterval AEAudioControllerInputLatency(AEAudioController *controller);
  *
  *  For example:
  *
- *      timestamp.mHostTime += AEAudioControllerOutputLatency(audioController)*__secondsToHostTicks;
+ *      timestamp.mHostTime += AEHostTicksFromSeconds(AEAudioControllerOutputLatency(audioController));
  *
  *  Note that when connected to Audiobus, this value will automatically account for any Audiobus latency.
  *

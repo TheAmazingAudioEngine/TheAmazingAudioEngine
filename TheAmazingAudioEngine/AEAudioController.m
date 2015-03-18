@@ -36,14 +36,10 @@
 #import "AEAudioController+AudiobusStub.h"
 #import "AEFloatConverter.h"
 #import "AEBlockChannel.h"
-#import <mach/mach_time.h>
 #import <pthread.h>
 
 // Uncomment the following or define the following symbol as part of your build process to enable per-second performance reports
 // #define TAAE_REPORT_RENDER_TIME
-
-static double __hostTicksToSeconds = 0.0;
-static double __secondsToHostTicks = 0.0;
 
 static const int kMaximumChannelsPerGroup              = 100;
 static const int kMaximumCallbacksPerSource            = 15;
@@ -88,8 +84,8 @@ static inline void AEAudioControllerError(OSStatus result, const char *operation
 static inline BOOL AEAudioControllerRateLimit() {
     static uint64_t lastMessage = 0;
     static int messageCount=0;
-    uint64_t now = mach_absolute_time();
-    if ( (now-lastMessage)*__hostTicksToSeconds > 2 ) {
+    uint64_t now = AECurrentTimeInHostTicks();
+    if ( AESecondsFromHostTicks(now-lastMessage) > 2 ) {
         messageCount = 0;
     }
     lastMessage = now;
@@ -406,7 +402,7 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     
     if ( THIS->_automaticLatencyManagement ) {
         // Adjust timestamp to factor in hardware output latency
-        timestamp.mHostTime += AEAudioControllerOutputLatency(THIS)*__secondsToHostTicks;
+        timestamp.mHostTime += AEHostTicksFromSeconds(AEAudioControllerOutputLatency(THIS));
     }
     
     if ( channel->timeStamp.mFlags == 0 ) {
@@ -538,7 +534,7 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
     }
     
 #ifdef DEBUG
-    THIS->_renderStartTime[1] = mach_absolute_time();
+    THIS->_renderStartTime[1] = AECurrentTimeInHostTicks();
 #endif
     
     AudioTimeStamp timestamp = *inTimeStamp;
@@ -554,7 +550,7 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
     } else {
         if ( THIS->_automaticLatencyManagement ) {
             // Adjust timestamp to factor in hardware input latency
-            timestamp.mHostTime -= AEAudioControllerInputLatency(THIS)*__secondsToHostTicks;
+            timestamp.mHostTime -= AEHostTicksFromSeconds(AEAudioControllerInputLatency(THIS));
         }
     }
     
@@ -621,7 +617,7 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
     }
     
 #ifdef DEBUG
-    uint64_t renderEndTime = mach_absolute_time();
+    uint64_t renderEndTime = AECurrentTimeInHostTicks();
     THIS->_renderDuration[1] = renderEndTime - THIS->_renderStartTime[1];
 #endif
     
@@ -686,11 +682,11 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     
     if ( inBusNumber == 0 && *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
         // Remember the time we started rendering
-        THIS->_renderStartTime[0] = mach_absolute_time();
+        THIS->_renderStartTime[0] = AECurrentTimeInHostTicks();
         
     } else if ( inBusNumber == 0 && *ioActionFlags & kAudioUnitRenderAction_PostRender ) {
         // Calculate total render duration
-        uint64_t renderEndTime = mach_absolute_time();
+        uint64_t renderEndTime = AECurrentTimeInHostTicks();
         THIS->_renderDuration[0] = renderEndTime - THIS->_renderStartTime[MIN(1, inBusNumber)];
         
         if ( THIS->_renderDuration[0] && (!THIS->_inputEnabled || THIS->_renderDuration[1]) ) {
@@ -699,9 +695,9 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
             THIS->_renderDuration[0] = THIS->_renderDuration[1] = THIS->_renderStartTime[0] = THIS->_renderStartTime[1] = 0;
             // Warn if total render takes longer than 50% of buffer duration (gives us a bit of headroom)
             NSTimeInterval threshold = THIS->_currentBufferDuration * 0.5;
-            if ( duration >= threshold * __secondsToHostTicks && AEAudioControllerRateLimit() ) {
+            if ( duration >= AEHostTicksFromSeconds(threshold) && AEAudioControllerRateLimit() ) {
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    NSLog(@"TAAE: Warning: render took too long (%lfs, should be less than %lfs). Expect glitches.", duration*__hostTicksToSeconds, threshold);
+                    NSLog(@"TAAE: Warning: render took too long (%lfs, should be less than %lfs). Expect glitches.", AESecondsFromHostTicks(duration), threshold);
                 });
             }
         
@@ -712,10 +708,10 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
             if ( duration > max ) {
                 max = duration;
             }
-            if ( renderEndTime > lastReport + (1.0 * __secondsToHostTicks) ) {
+            if ( renderEndTime > lastReport + AEHostTicksFromSeconds(1.0) ) {
                 uint64_t value = max;
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    NSLog(@"TAAE: Render time %lfs", value*__hostTicksToSeconds);
+                    NSLog(@"TAAE: Render time %lfs", AESecondsFromHostTicks(value));
                 });
                 lastReport = renderEndTime;
                 max = 0;
@@ -730,14 +726,6 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 #endif
 
 #pragma mark - Setup and start/stop
-
-+(void)initialize {
-    mach_timebase_info_data_t tinfo;
-    mach_timebase_info(&tinfo);
-    __hostTicksToSeconds = ((double)tinfo.numer / tinfo.denom) * 1.0e-9;
-    __secondsToHostTicks = 1.0 / __hostTicksToSeconds;
-}
-
 
 + (AudioStreamBasicDescription)interleaved16BitStereoAudioDescription {
     AudioStreamBasicDescription audioDescription;
@@ -1516,15 +1504,15 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
         
         if ( message.block ) {
 #ifdef DEBUG
-            uint64_t start = mach_absolute_time();
+            uint64_t start = AECurrentTimeInHostTicks();
 #endif
             ((__bridge void(^)())message.block)();
 #ifdef DEBUG
-            uint64_t end = mach_absolute_time();
+            uint64_t end = AECurrentTimeInHostTicks();
             uint64_t duration = end - start;
-            if ( duration >= (THIS->_currentBufferDuration * 0.5) * __secondsToHostTicks ) {
+            if ( duration >= AEHostTicksFromSeconds(THIS->_currentBufferDuration * 0.5) ) {
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    NSLog(@"TAAE: Warning: Block perform on realtime thread took too long (%0.4lfs)", duration*__hostTicksToSeconds);
+                    NSLog(@"TAAE: Warning: Block perform on realtime thread took too long (%0.4lfs)", AESecondsFromHostTicks(duration));
                 });
             }
 #endif
@@ -1660,8 +1648,8 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
                                          sourceThread:pthread_self()];
     
     // Wait for response
-    uint64_t giveUpTime = mach_absolute_time() + (1.0 * __secondsToHostTicks);
-    while ( !finished && mach_absolute_time() < giveUpTime && self.running ) {
+    uint64_t giveUpTime = AECurrentTimeInHostTicks() + AEHostTicksFromSeconds(1.0);
+    while ( !finished && AECurrentTimeInHostTicks() < giveUpTime && self.running ) {
         [self pollForMessageResponses];
         if ( finished ) break;
         [NSThread sleepForTimeInterval:_preferredBufferDuration ? _preferredBufferDuration : 0.01];
