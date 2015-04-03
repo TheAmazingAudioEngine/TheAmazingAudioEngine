@@ -479,10 +479,6 @@ static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt3
     input_producer_arg_t *arg = (input_producer_arg_t*)userInfo;
     __unsafe_unretained AEAudioController *THIS = (__bridge AEAudioController*)arg->THIS;
     
-    if ( !THIS->_inputAudioBufferList ) {
-        return noErr;
-    }
-    
     // See if there's another filter
     for ( int i=arg->table->callbacks.count-1, filterIndex=0; i>=0; i-- ) {
         callback_t *callback = &arg->table->callbacks.callbacks[i];
@@ -597,6 +593,11 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
 }
 
 static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, const AudioTimeStamp *outputBusTimeStamp, const AudioTimeStamp *inputBusTimeStamp, UInt32 inNumberFrames) {
+    
+    if ( !THIS->_inputAudioBufferList ) {
+        // If we're not yet prepared to receive audio, skip for now
+        return;
+    }
     
 #ifdef DEBUG
     THIS->_renderStartTime[1] = AECurrentTimeInHostTicks();
