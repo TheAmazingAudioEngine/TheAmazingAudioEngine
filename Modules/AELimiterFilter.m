@@ -84,10 +84,10 @@ const int kScratchBufferLength = 8192;
     AudioStreamBasicDescription oldClientFormat = _clientFormat;
     
     [_audioController performSynchronousMessageExchangeWithBlock:^{
-        _limiter = limiter;
-        _floatConverter = floatConverter;
-        _scratchBuffer = scratchBuffer;
-        _clientFormat = clientFormat;
+        self->_limiter = limiter;
+        self->_floatConverter = floatConverter;
+        self->_scratchBuffer = scratchBuffer;
+        self->_clientFormat = clientFormat;
     }];
     
     for ( int i=0; i<oldClientFormat.mChannelsPerFrame; i++ ) {

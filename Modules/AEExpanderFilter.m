@@ -129,9 +129,9 @@ typedef void (^AECalibrateCompletionBlock)(void);
     AudioStreamBasicDescription oldClientFormat = _clientFormat;
     
     [_audioController performSynchronousMessageExchangeWithBlock:^{
-        _floatConverter = floatConverter;
-        _scratchBuffer = scratchBuffer;
-        _clientFormat = clientFormat;
+        self->_floatConverter = floatConverter;
+        self->_scratchBuffer = scratchBuffer;
+        self->_clientFormat = clientFormat;
     }];
     
     for ( int i=0; i<oldClientFormat.mChannelsPerFrame; i++ ) {
