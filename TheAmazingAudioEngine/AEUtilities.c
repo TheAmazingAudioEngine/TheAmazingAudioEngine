@@ -129,11 +129,11 @@ static void AETimeInit() {
     });
 }
 
-uint64_t AECurrentTimeInHostTicks() {
+uint64_t AECurrentTimeInHostTicks(void) {
     return mach_absolute_time();
 }
 
-double AECurrentTimeInSeconds() {
+double AECurrentTimeInSeconds(void) {
     if ( !__hostTicksToSeconds ) AETimeInit();
     return mach_absolute_time() * __hostTicksToSeconds;
 }

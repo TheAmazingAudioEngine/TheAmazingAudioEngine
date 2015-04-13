@@ -120,12 +120,12 @@ void AEAudioStreamBasicDescriptionSetChannelsPerFrame(AudioStreamBasicDescriptio
 /*!
  * Get current global timestamp, in host ticks
  */
-uint64_t AECurrentTimeInHostTicks();
+uint64_t AECurrentTimeInHostTicks(void);
 
 /*!
  * Get current global timestamp, in seconds
  */
-double AECurrentTimeInSeconds();
+double AECurrentTimeInSeconds(void);
 
 /*!
  * Convert time in seconds to host ticks
