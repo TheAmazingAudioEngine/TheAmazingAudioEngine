@@ -154,7 +154,7 @@ static __inline__ __attribute__((always_inline)) void* TPCircularBufferHead(TPCi
  * @param buffer Circular buffer
  * @param amount Number of bytes to produce
  */
-static __inline__ __attribute__((always_inline)) void TPCircularBufferProduce(TPCircularBuffer *buffer, int amount) {
+static __inline__ __attribute__((always_inline)) void TPCircularBufferProduce(TPCircularBuffer *buffer, int32_t amount) {
     buffer->head = (buffer->head + amount) % buffer->length;
     OSAtomicAdd32Barrier(amount, &buffer->fillCount);
     assert(buffer->fillCount <= buffer->length);
@@ -163,7 +163,7 @@ static __inline__ __attribute__((always_inline)) void TPCircularBufferProduce(TP
 /*!
  * Version of TPCircularBufferProduce without the memory barrier, for more optimal use in single-threaded contexts
  */
-static __inline__ __attribute__((always_inline)) void TPCircularBufferProduceNoBarrier(TPCircularBuffer *buffer, int amount) {
+static __inline__ __attribute__((always_inline)) void TPCircularBufferProduceNoBarrier(TPCircularBuffer *buffer, int32_t amount) {
     buffer->head = (buffer->head + amount) % buffer->length;
     buffer->fillCount += amount;
     assert(buffer->fillCount <= buffer->length);
