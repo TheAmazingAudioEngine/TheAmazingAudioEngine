@@ -2402,14 +2402,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 - (BOOL)initAudioSession {
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     NSMutableString *extraInfo = [NSMutableString string];
-    
-
-    // Set sample rate
-    Float64 sampleRate = _audioDescription.mSampleRate;
     NSError *error = nil;
-    if ( ![audioSession setPreferredSampleRate:sampleRate error:&error] ) {
-        NSLog(@"TAAE: Couldn't set preferred sample rate: %@", error);
-    }
     
     UInt32 inputAvailable = NO;
     if ( _inputEnabled ) {
@@ -2425,6 +2418,13 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     // Start session
     if ( ![audioSession setActive:YES error:&error] ) {
         NSLog(@"TAAE: Couldn't activate audio session: %@", error);
+    }
+    
+    // Set sample rate
+    Float64 sampleRate = _audioDescription.mSampleRate;
+    
+    if ( ![audioSession setPreferredSampleRate:sampleRate error:&error] ) {
+        NSLog(@"TAAE: Couldn't set preferred sample rate: %@", error);
     }
     
     // Fetch sample rate, in case we didn't get quite what we requested
