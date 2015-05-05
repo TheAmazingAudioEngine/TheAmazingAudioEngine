@@ -3461,11 +3461,14 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
             NSLog(@"TAAE: Couldn't activate audio session: %@", e);
         }
         
-        if ( [self setup] && [self start:error recoveringFromErrors:NO] ) {
+        if ( [self setup] ) {
             [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerDidRecreateGraphNotification object:self];
-            NSLog(@"TAAE: Successfully recovered from system error");
-            _hasSystemError = NO;
-            return YES;
+            
+            if ( [self start:error recoveringFromErrors:NO] ) {
+                NSLog(@"TAAE: Successfully recovered from system error");
+                _hasSystemError = NO;
+                return YES;
+            }
         }
     }
     
