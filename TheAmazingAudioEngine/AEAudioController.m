@@ -3709,13 +3709,15 @@ static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferLi
         float peak = 0.0;
         vDSP_maxmgv((float*)monitor->scratchBuffer->mBuffers[i].mData, 1, &peak, monitorFrames);
         if ( peak > monitor->chanPeak[i] ) monitor->chanPeak[i] = peak;
+        if ( peak > monitor->peak ) monitor->peak = peak;
+        
         float avg = 0.0;
         vDSP_meamgv((float*)monitor->scratchBuffer->mBuffers[i].mData, 1, &avg, monitorFrames);
         monitor->chanMeanAccumulator[i] += avg;
-        if (i==0) monitor->chanMeanBlockCount++;
+        if ( i == 0 ) monitor->chanMeanBlockCount++;
         monitor->meanAccumulator += avg;
         monitor->meanBlockCount++;
-
+        
         monitor->chanAverage[i] = monitor->chanMeanAccumulator[i] / (double)monitor->chanMeanBlockCount;
         monitor->average = monitor->meanAccumulator / (double)monitor->meanBlockCount;
     }
