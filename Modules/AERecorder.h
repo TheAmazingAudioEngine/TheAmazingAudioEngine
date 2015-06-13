@@ -134,6 +134,11 @@ void AERecorderStopRecording(AERecorder* recorder);
  */
 @property (nonatomic, readonly) double currentTime;
 
+/*!
+ * Current state of the recorder
+ */
+@property (nonatomic, readonly) BOOL recording;
+
 @end
 
 #ifdef __cplusplus

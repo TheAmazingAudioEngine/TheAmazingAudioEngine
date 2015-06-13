@@ -205,14 +205,7 @@ UInt32 TPCircularBufferPeekContiguous(TPCircularBuffer *buffer, AudioTimeStamp *
  * @param audioFormat       The format of the audio stored in the buffer
  * @return The number of frames in the given audio format that can be stored in the buffer
  */
-static __inline__ __attribute__((always_inline)) UInt32 TPCircularBufferGetAvailableSpace(TPCircularBuffer *buffer, const AudioStreamBasicDescription *audioFormat) {
-    int32_t availableBytes;
-    TPCircularBufferHead(buffer, &availableBytes);
-    size_t blockSize = sizeof(TPCircularBufferABLBlockHeader)
-                            + (sizeof(AudioBuffer) * (audioFormat->mFormatFlags & kAudioFormatFlagIsNonInterleaved ? audioFormat->mChannelsPerFrame-1 : 0));
-    if ( availableBytes <= blockSize ) return 0;
-    return (UInt32)(availableBytes-blockSize) / (audioFormat->mBytesPerFrame * (audioFormat->mFormatFlags & kAudioFormatFlagIsNonInterleaved ? audioFormat->mChannelsPerFrame : 1));
-}
+UInt32 TPCircularBufferGetAvailableSpace(TPCircularBuffer *buffer, const AudioStreamBasicDescription *audioFormat);
     
 #ifdef __cplusplus
 }

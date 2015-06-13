@@ -95,6 +95,12 @@
 		4CE501971493F82600F23607 /* TheAmazingAudioEngine-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TheAmazingAudioEngine-Prefix.pch"; sourceTree = "<group>"; };
 		4CEC0EB716B5294200D11ED9 /* AEBlockFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEBlockFilter.h; sourceTree = "<group>"; };
 		4CEC0EB816B5294300D11ED9 /* AEBlockFilter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEBlockFilter.m; sourceTree = "<group>"; };
+		B0EE36FC1AD4270400D7AB17 /* AESequencerBeat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AESequencerBeat.h; sourceTree = "<group>"; };
+		B0EE36FD1AD4270400D7AB17 /* AESequencerBeat.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AESequencerBeat.m; sourceTree = "<group>"; };
+		B0EE36FE1AD4270400D7AB17 /* AESequencerChannel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AESequencerChannel.h; sourceTree = "<group>"; };
+		B0EE36FF1AD4270400D7AB17 /* AESequencerChannel.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AESequencerChannel.m; sourceTree = "<group>"; };
+		B0EE37001AD4270400D7AB17 /* AESequencerChannelSequence.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AESequencerChannelSequence.h; sourceTree = "<group>"; };
+		B0EE37011AD4270400D7AB17 /* AESequencerChannelSequence.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AESequencerChannelSequence.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -138,6 +144,7 @@
 		4C8A0F401540BBD700307CB6 /* Modules */ = {
 			isa = PBXGroup;
 			children = (
+				B0EE36FB1AD4270400D7AB17 /* AESequencer */,
 				4C698CF7162B02EF008B159D /* TPCircularBuffer */,
 				4C8A0F3D1540BBD300307CB6 /* AEMixerBuffer.h */,
 				4C8A0F3E1540BBD300307CB6 /* AEMixerBuffer.m */,
@@ -209,6 +216,20 @@
 				4C09450016FBD7460054608E /* AEBlockScheduler.m */,
 			);
 			path = TheAmazingAudioEngine;
+			sourceTree = "<group>";
+		};
+		B0EE36FB1AD4270400D7AB17 /* AESequencer */ = {
+			isa = PBXGroup;
+			children = (
+				B0EE36FC1AD4270400D7AB17 /* AESequencerBeat.h */,
+				B0EE36FD1AD4270400D7AB17 /* AESequencerBeat.m */,
+				B0EE36FE1AD4270400D7AB17 /* AESequencerChannel.h */,
+				B0EE36FF1AD4270400D7AB17 /* AESequencerChannel.m */,
+				B0EE37001AD4270400D7AB17 /* AESequencerChannelSequence.h */,
+				B0EE37011AD4270400D7AB17 /* AESequencerChannelSequence.m */,
+			);
+			name = AESequencer;
+			path = Modules/AESequencer;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -435,7 +456,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
-				ONLY_ACTIVE_ARCH = YES;
+				ONLY_ACTIVE_ARCH = NO;
 				SDKROOT = iphoneos;
 			};
 			name = Debug;

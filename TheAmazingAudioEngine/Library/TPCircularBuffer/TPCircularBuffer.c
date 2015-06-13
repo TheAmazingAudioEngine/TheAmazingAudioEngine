@@ -40,7 +40,7 @@ static inline bool _reportResult(kern_return_t result, const char *operation, co
     return true;
 }
 
-bool TPCircularBufferInit(TPCircularBuffer *buffer, int length) {
+bool TPCircularBufferInit(TPCircularBuffer *buffer, int32_t length) {
 
     // Keep trying until we get our buffer, needed to handle race conditions
     int retries = 3;

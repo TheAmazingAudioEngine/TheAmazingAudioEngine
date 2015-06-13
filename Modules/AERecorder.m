@@ -33,7 +33,6 @@ NSString * AERecorderDidEncounterErrorNotification = @"AERecorderDidEncounterErr
 NSString * kAERecorderErrorKey = @"error";
 
 @interface AERecorder () {
-    BOOL _recording;
     AudioBufferList *_buffer;
 }
 @property (nonatomic, strong) AEMixerBuffer *mixer;
@@ -115,6 +114,7 @@ void AERecorderStopRecording(__unsafe_unretained AERecorder* THIS) {
 struct reportError_t { void *THIS; OSStatus result; };
 static void reportError(AEAudioController *audioController, void *userInfo, int length) {
     struct reportError_t *arg = userInfo;
+    [((__bridge AERecorder*)arg->THIS) finishRecording];
     NSError *error = [NSError errorWithDomain:NSOSStatusErrorDomain 
                                          code:arg->result
                                      userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Error while saving audio: Code %d", @""), arg->result]}];
@@ -147,6 +147,7 @@ static void audioCallback(__unsafe_unretained AERecorder *THIS,
     if ( bufferLength > 0 ) {
         OSStatus status = AEAudioFileWriterAddAudio(THIS->_writer, THIS->_buffer, bufferLength);
         if ( status != noErr ) {
+            THIS->_recording = NO;
             AEAudioControllerSendAsynchronousMessageToMainThread(audioController, 
                                                                  reportError, 
                                                                  &(struct reportError_t) { .THIS = (__bridge void*)THIS, .result = status },

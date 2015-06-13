@@ -36,14 +36,10 @@
 #import "AEAudioController+AudiobusStub.h"
 #import "AEFloatConverter.h"
 #import "AEBlockChannel.h"
-#import <mach/mach_time.h>
 #import <pthread.h>
 
 // Uncomment the following or define the following symbol as part of your build process to enable per-second performance reports
 // #define TAAE_REPORT_RENDER_TIME
-
-static double __hostTicksToSeconds = 0.0;
-static double __secondsToHostTicks = 0.0;
 
 static const int kMaximumChannelsPerGroup              = 100;
 static const int kMaximumCallbacksPerSource            = 15;
@@ -88,8 +84,8 @@ static inline void AEAudioControllerError(OSStatus result, const char *operation
 static inline BOOL AEAudioControllerRateLimit() {
     static uint64_t lastMessage = 0;
     static int messageCount=0;
-    uint64_t now = mach_absolute_time();
-    if ( (now-lastMessage)*__hostTicksToSeconds > 2 ) {
+    uint64_t now = AECurrentTimeInHostTicks();
+    if ( AESecondsFromHostTicks(now-lastMessage) > 2 ) {
         messageCount = 0;
     }
     lastMessage = now;
@@ -279,6 +275,7 @@ typedef struct {
     int                 _inputCallbackCount;
     AudioStreamBasicDescription _rawInputAudioDescription;
     AudioBufferList    *_inputAudioBufferList;
+    AudioTimeStamp      _lastInputBusTimeStamp;
     
     TPCircularBuffer    _realtimeThreadMessageBuffer;
     TPCircularBuffer    _mainThreadMessageBuffer;
@@ -406,7 +403,7 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     
     if ( THIS->_automaticLatencyManagement ) {
         // Adjust timestamp to factor in hardware output latency
-        timestamp.mHostTime += AEAudioControllerOutputLatency(THIS)*__secondsToHostTicks;
+        timestamp.mHostTime += AEHostTicksFromSeconds(AEAudioControllerOutputLatency(THIS));
     }
     
     if ( channel->timeStamp.mFlags == 0 ) {
@@ -482,10 +479,6 @@ static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt3
     input_producer_arg_t *arg = (input_producer_arg_t*)userInfo;
     __unsafe_unretained AEAudioController *THIS = (__bridge AEAudioController*)arg->THIS;
     
-    if ( !THIS->_inputAudioBufferList ) {
-        return noErr;
-    }
-    
     // See if there's another filter
     for ( int i=arg->table->callbacks.count-1, filterIndex=0; i>=0; i-- ) {
         callback_t *callback = &arg->table->callbacks.callbacks[i];
@@ -529,103 +522,15 @@ static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt3
 static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
     __unsafe_unretained AEAudioController *THIS = (__bridge AEAudioController *)inRefCon;
     
-    if ( !THIS->_renderThread ) {
-        THIS->_renderThread = pthread_self();
-    }
+    // Take note of timestamp, for use when we actually service the input
+    THIS->_lastInputBusTimeStamp = *inTimeStamp;
     
-    if ( !THIS->_inputAudioBufferList ) {
-        return noErr;
-    }
-    
-#ifdef DEBUG
-    THIS->_renderStartTime[1] = mach_absolute_time();
-#endif
-    
-    AudioTimeStamp timestamp = *inTimeStamp;
-    
-    BOOL useAudiobusReceiverPort = THIS->_audiobusReceiverPort && THIS->_usingAudiobusInput;
-    
-    if ( useAudiobusReceiverPort ) {
-        // If Audiobus is connected, then serve Audiobus queue rather than serving system input queue
-        static Float64 __sampleTime = 0;
-        ABReceiverPortReceive(THIS->_audiobusReceiverPort, nil, THIS->_inputAudioBufferList, inNumberFrames, &timestamp);
-        timestamp.mSampleTime = __sampleTime;
-        __sampleTime += inNumberFrames;
-    } else {
-        if ( THIS->_automaticLatencyManagement ) {
-            // Adjust timestamp to factor in hardware input latency
-            timestamp.mHostTime -= AEAudioControllerInputLatency(THIS)*__secondsToHostTicks;
-        }
-    }
-    
-    for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
-        callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
-        ((AEAudioControllerTimingCallback)callback->callback)((__bridge id)callback->userInfo, THIS, &timestamp, inNumberFrames, AEAudioTimingContextInput);
-    }
-    
-    OSStatus result = noErr;
-    
-    // Render audio into buffer
-    if ( !useAudiobusReceiverPort ) {
-        for ( int i=0; i<THIS->_inputAudioBufferList->mNumberBuffers; i++ ) {
-            THIS->_inputAudioBufferList->mBuffers[i].mDataByteSize = MIN(inNumberFrames, kInputAudioBufferFrames) * THIS->_rawInputAudioDescription.mBytesPerFrame;
-        }
-        OSStatus err = AudioUnitRender(THIS->_ioAudioUnit, ioActionFlags, &timestamp, 1, inNumberFrames, THIS->_inputAudioBufferList);
-        if ( !checkResult(err, "AudioUnitRender") ) {
-            result = err;
-        }
-    }
-    
-    if ( result == noErr && inNumberFrames == 0 ) {
-        result = kNoAudioErr;
-    }
-    
-    if ( result == noErr ) {
-        for ( int tableIndex = 0; tableIndex < THIS->_inputCallbackCount; tableIndex++ ) {
-            input_callback_table_t *table = &THIS->_inputCallbacks[tableIndex];
-            
-            if ( !table->audioBufferList ) continue;
-            
-            input_producer_arg_t arg = {
-                .THIS = (__bridge void*)THIS,
-                .table = table,
-                .inTimeStamp = timestamp,
-                .ioActionFlags = ioActionFlags,
-                .nextFilterIndex = 0
-            };
-            
-            for ( int i=0; i<table->audioBufferList->mNumberBuffers; i++ ) {
-                table->audioBufferList->mBuffers[i].mDataByteSize = inNumberFrames * table->audioDescription.mBytesPerFrame;
-            }
-            
-            result = inputAudioProducer((void*)&arg, table->audioBufferList, &inNumberFrames);
-            
-            // Pass audio to callbacks
-            for ( int i=0; i<table->callbacks.count; i++ ) {
-                callback_t *callback = &table->callbacks.callbacks[i];
-                if ( !(callback->flags & kReceiverFlag) ) continue;
-                
-                ((AEAudioControllerAudioCallback)callback->callback)((__bridge id)callback->userInfo, THIS, AEAudioSourceInput, &timestamp, inNumberFrames, table->audioBufferList);
-            }
-        }
-        
-        // Perform input metering
-        if ( THIS->_inputLevelMonitorData.monitoringEnabled ) {
-            performLevelMonitoring(&THIS->_inputLevelMonitorData, THIS->_inputAudioBufferList, inNumberFrames);
-        }
-    }
-
-    // Only do the pending messages here if our output isn't enabled
     if ( !THIS->_outputEnabled ) {
-        processPendingMessagesOnRealtimeThread(THIS);
+        // If output isn't enabled, service the input from here
+        serviceAudioInput(THIS, NULL, inTimeStamp, inNumberFrames);
     }
     
-#ifdef DEBUG
-    uint64_t renderEndTime = mach_absolute_time();
-    THIS->_renderDuration[1] = renderEndTime - THIS->_renderStartTime[1];
-#endif
-    
-    return result;
+    return noErr;
 }
 
 static OSStatus groupRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
@@ -658,10 +563,20 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     }
     
     if ( *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
-        // Before render: Perform timing callbacks
+        // Before main render: first service input
+        if ( THIS->_inputEnabled ) {
+            serviceAudioInput(THIS, inTimeStamp, &THIS->_lastInputBusTimeStamp, inNumberFrames);
+        }
+        
+        // Perform timing callbacks
+        AudioTimeStamp timestamp = *inTimeStamp;
+        if ( THIS->_automaticLatencyManagement ) {
+            // Adjust timestamp to factor in hardware output latency
+            timestamp.mHostTime += AEHostTicksFromSeconds(AEAudioControllerOutputLatency(THIS));
+        }
         for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
             callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
-            ((AEAudioControllerTimingCallback)callback->callback)((__bridge id)callback->userInfo, THIS, inTimeStamp, inNumberFrames, AEAudioTimingContextOutput);
+            ((AEAudioControllerTimingCallback)callback->callback)((__bridge id)callback->userInfo, THIS, &timestamp, inNumberFrames, AEAudioTimingContextOutput);
         }
     } else {
         // After render
@@ -677,6 +592,108 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     return noErr;
 }
 
+static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, const AudioTimeStamp *outputBusTimeStamp, const AudioTimeStamp *inputBusTimeStamp, UInt32 inNumberFrames) {
+    
+    if ( !THIS->_inputAudioBufferList ) {
+        // If we're not yet prepared to receive audio, skip for now
+        return;
+    }
+    
+#ifdef DEBUG
+    THIS->_renderStartTime[1] = AECurrentTimeInHostTicks();
+#endif
+    
+    AudioTimeStamp timestamp;
+    
+    BOOL useAudiobusReceiverPort = THIS->_audiobusReceiverPort && THIS->_usingAudiobusInput;
+    if ( useAudiobusReceiverPort ) {
+        // If Audiobus is connected, then serve Audiobus queue rather than serving system input queue
+        timestamp = outputBusTimeStamp ? *outputBusTimeStamp : *inputBusTimeStamp;
+        if ( outputBusTimeStamp && THIS->_automaticLatencyManagement ) {
+            // Adjust timestamp to factor in hardware output latency
+            timestamp.mHostTime += AEHostTicksFromSeconds(AEAudioControllerOutputLatency(THIS));
+        }
+        static Float64 __sampleTime = 0;
+        ABReceiverPortReceive(THIS->_audiobusReceiverPort, nil, THIS->_inputAudioBufferList, inNumberFrames, &timestamp);
+        timestamp.mSampleTime = __sampleTime;
+        __sampleTime += inNumberFrames;
+    } else {
+        timestamp = *inputBusTimeStamp;
+        if ( THIS->_automaticLatencyManagement ) {
+            // Adjust timestamp to factor in hardware input latency
+            timestamp.mHostTime -= AEHostTicksFromSeconds(AEAudioControllerInputLatency(THIS));
+        }
+    }
+    
+    for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
+        callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
+        ((AEAudioControllerTimingCallback)callback->callback)((__bridge id)callback->userInfo, THIS, &timestamp, inNumberFrames, AEAudioTimingContextInput);
+    }
+    
+    OSStatus result = noErr;
+    
+    // Render audio into buffer
+    if ( !useAudiobusReceiverPort ) {
+        for ( int i=0; i<THIS->_inputAudioBufferList->mNumberBuffers; i++ ) {
+            THIS->_inputAudioBufferList->mBuffers[i].mDataByteSize = MIN(inNumberFrames, kInputAudioBufferFrames) * THIS->_rawInputAudioDescription.mBytesPerFrame;
+        }
+        AudioUnitRenderActionFlags flags = 0;
+        OSStatus err = AudioUnitRender(THIS->_ioAudioUnit, &flags, &timestamp, 1, inNumberFrames, THIS->_inputAudioBufferList);
+        if ( !checkResult(err, "AudioUnitRender") ) {
+            result = err;
+        }
+    }
+    
+    if ( result == noErr && inNumberFrames == 0 ) {
+        result = kNoAudioErr;
+    }
+    
+    if ( result == noErr ) {
+        for ( int tableIndex = 0; tableIndex < THIS->_inputCallbackCount; tableIndex++ ) {
+            input_callback_table_t *table = &THIS->_inputCallbacks[tableIndex];
+            
+            if ( !table->audioBufferList ) continue;
+            
+            input_producer_arg_t arg = {
+                .THIS = (__bridge void*)THIS,
+                .table = table,
+                .inTimeStamp = timestamp,
+                .ioActionFlags = 0,
+                .nextFilterIndex = 0
+            };
+            
+            for ( int i=0; i<table->audioBufferList->mNumberBuffers; i++ ) {
+                table->audioBufferList->mBuffers[i].mDataByteSize = inNumberFrames * table->audioDescription.mBytesPerFrame;
+            }
+            
+            result = inputAudioProducer((void*)&arg, table->audioBufferList, &inNumberFrames);
+            
+            // Pass audio to callbacks
+            for ( int i=0; i<table->callbacks.count; i++ ) {
+                callback_t *callback = &table->callbacks.callbacks[i];
+                if ( !(callback->flags & kReceiverFlag) ) continue;
+                
+                ((AEAudioControllerAudioCallback)callback->callback)((__bridge id)callback->userInfo, THIS, AEAudioSourceInput, &timestamp, inNumberFrames, table->audioBufferList);
+            }
+        }
+        
+        // Perform input metering
+        if ( THIS->_inputLevelMonitorData.monitoringEnabled ) {
+            performLevelMonitoring(&THIS->_inputLevelMonitorData, THIS->_inputAudioBufferList, inNumberFrames);
+        }
+    }
+    
+    // Only do the pending messages here if our output isn't enabled
+    if ( !THIS->_outputEnabled ) {
+        processPendingMessagesOnRealtimeThread(THIS);
+    }
+    
+#ifdef DEBUG
+    uint64_t renderEndTime = AECurrentTimeInHostTicks();
+    THIS->_renderDuration[1] = renderEndTime - THIS->_renderStartTime[1];
+#endif
+}
+
 #ifdef DEBUG
 
 // Performance monitoring in debug mode
@@ -686,11 +703,11 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     
     if ( inBusNumber == 0 && *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
         // Remember the time we started rendering
-        THIS->_renderStartTime[0] = mach_absolute_time();
+        THIS->_renderStartTime[0] = AECurrentTimeInHostTicks();
         
     } else if ( inBusNumber == 0 && *ioActionFlags & kAudioUnitRenderAction_PostRender ) {
         // Calculate total render duration
-        uint64_t renderEndTime = mach_absolute_time();
+        uint64_t renderEndTime = AECurrentTimeInHostTicks();
         THIS->_renderDuration[0] = renderEndTime - THIS->_renderStartTime[MIN(1, inBusNumber)];
         
         if ( THIS->_renderDuration[0] && (!THIS->_inputEnabled || THIS->_renderDuration[1]) ) {
@@ -699,9 +716,9 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
             THIS->_renderDuration[0] = THIS->_renderDuration[1] = THIS->_renderStartTime[0] = THIS->_renderStartTime[1] = 0;
             // Warn if total render takes longer than 50% of buffer duration (gives us a bit of headroom)
             NSTimeInterval threshold = THIS->_currentBufferDuration * 0.5;
-            if ( duration >= threshold * __secondsToHostTicks && AEAudioControllerRateLimit() ) {
+            if ( duration >= AEHostTicksFromSeconds(threshold) && AEAudioControllerRateLimit() ) {
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    NSLog(@"TAAE: Warning: render took too long (%lfs, should be less than %lfs). Expect glitches.", duration*__hostTicksToSeconds, threshold);
+                    NSLog(@"TAAE: Warning: render took too long (%lfs, should be less than %lfs). Expect glitches.", AESecondsFromHostTicks(duration), threshold);
                 });
             }
         
@@ -712,10 +729,10 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
             if ( duration > max ) {
                 max = duration;
             }
-            if ( renderEndTime > lastReport + (1.0 * __secondsToHostTicks) ) {
+            if ( renderEndTime > lastReport + AEHostTicksFromSeconds(1.0) ) {
                 uint64_t value = max;
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    NSLog(@"TAAE: Render time %lfs", value*__hostTicksToSeconds);
+                    NSLog(@"TAAE: Render time %lfs", AESecondsFromHostTicks(value));
                 });
                 lastReport = renderEndTime;
                 max = 0;
@@ -730,14 +747,6 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 #endif
 
 #pragma mark - Setup and start/stop
-
-+(void)initialize {
-    mach_timebase_info_data_t tinfo;
-    mach_timebase_info(&tinfo);
-    __hostTicksToSeconds = ((double)tinfo.numer / tinfo.denom) * 1.0e-9;
-    __secondsToHostTicks = 1.0 / __hostTicksToSeconds;
-}
-
 
 + (AudioStreamBasicDescription)interleaved16BitStereoAudioDescription {
     AudioStreamBasicDescription audioDescription;
@@ -1065,7 +1074,6 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     
     // Add to group's channel array
     for ( id<AEAudioPlayable> channel in channels ) {
-        NSParameterAssert([channel respondsToSelector:@selector(renderCallback)]);
         if ( group->channelCount == kMaximumChannelsPerGroup ) {
             NSLog(@"TAAE: Warning: Channel limit reached");
             break;
@@ -1299,40 +1307,31 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     return group->channel->muted;
 }
 
-Boolean AEChannelGroupIsMuted(AEChannelGroupRef group) {
-    return group->channel->muted;
-}
-
 #pragma mark - Filters
 
 - (void)addFilter:(id<AEAudioFilter>)filter {
-    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     if ( [self addCallback:filter.filterCallback userInfo:(__bridge void *)filter flags:kFilterFlag forChannelGroup:_topGroup] ) {
         CFBridgingRetain(filter);
     }
 }
 
 - (void)addFilter:(id<AEAudioFilter>)filter toChannel:(id<AEAudioPlayable>)channel {
-    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     if ( [self addCallback:filter.filterCallback userInfo:(__bridge void *)filter flags:kFilterFlag forChannel:channel] ) {
         CFBridgingRetain(filter);
     }
 }
 
 - (void)addFilter:(id<AEAudioFilter>)filter toChannelGroup:(AEChannelGroupRef)group {
-    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     if ( [self addCallback:filter.filterCallback userInfo:(__bridge void *)filter flags:kFilterFlag forChannelGroup:group] ) {
         CFBridgingRetain(filter);
     }
 }
 
 - (void)addInputFilter:(id<AEAudioFilter>)filter {
-    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     [self addInputFilter:filter forChannels:nil];
 }
 
 - (void)addInputFilter:(id<AEAudioFilter>)filter forChannels:(NSArray *)channels {
-    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     void *callback = filter.filterCallback;
     if ( [self addCallback:callback userInfo:(__bridge void *)filter flags:kFilterFlag forInputChannels:channels] ) {
         CFBridgingRetain(filter);
@@ -1340,28 +1339,24 @@ Boolean AEChannelGroupIsMuted(AEChannelGroupRef group) {
 }
 
 - (void)removeFilter:(id<AEAudioFilter>)filter {
-    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     if ( [self removeCallback:filter.filterCallback userInfo:(__bridge void *)filter fromChannelGroup:_topGroup] ) {
         CFBridgingRelease((__bridge CFTypeRef)filter);
     }
 }
 
 - (void)removeFilter:(id<AEAudioFilter>)filter fromChannel:(id<AEAudioPlayable>)channel {
-    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     if ( [self removeCallback:filter.filterCallback userInfo:(__bridge void *)filter fromChannel:channel] ) {
         CFBridgingRelease((__bridge CFTypeRef)filter);
     }
 }
 
 - (void)removeFilter:(id<AEAudioFilter>)filter fromChannelGroup:(AEChannelGroupRef)group {
-    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     if ( [self removeCallback:filter.filterCallback userInfo:(__bridge void *)filter fromChannelGroup:group] ) {
         CFBridgingRelease((__bridge CFTypeRef)filter);
     }
 }
 
 - (void)removeInputFilter:(id<AEAudioFilter>)filter {
-    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     void *callback = filter.filterCallback;
     __block BOOL found = NO;
     [self performSynchronousMessageExchangeWithBlock:^{
@@ -1398,42 +1393,36 @@ Boolean AEChannelGroupIsMuted(AEChannelGroupRef group) {
 #pragma mark - Output receivers
 
 - (void)addOutputReceiver:(id<AEAudioReceiver>)receiver {
-    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     if ( [self addCallback:receiver.receiverCallback userInfo:(__bridge void *)receiver flags:kReceiverFlag forChannelGroup:_topGroup] ) {
         CFBridgingRetain(receiver);
     }
 }
 
 - (void)addOutputReceiver:(id<AEAudioReceiver>)receiver forChannel:(id<AEAudioPlayable>)channel {
-    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     if ( [self addCallback:receiver.receiverCallback userInfo:(__bridge void *)receiver flags:kReceiverFlag forChannel:channel] ) {
         CFBridgingRetain(receiver);
     }
 }
 
 - (void)addOutputReceiver:(id<AEAudioReceiver>)receiver forChannelGroup:(AEChannelGroupRef)group {
-    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     if ( [self addCallback:receiver.receiverCallback userInfo:(__bridge void *)receiver flags:kReceiverFlag forChannelGroup:group] ) {
         CFBridgingRetain(receiver);
     }
 }
 
 - (void)removeOutputReceiver:(id<AEAudioReceiver>)receiver {
-    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     if ( [self removeCallback:receiver.receiverCallback userInfo:(__bridge void *)receiver fromChannelGroup:_topGroup] ) {
         CFBridgingRelease((__bridge CFTypeRef)receiver);
     }
 }
 
 - (void)removeOutputReceiver:(id<AEAudioReceiver>)receiver fromChannel:(id<AEAudioPlayable>)channel {
-    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     if ( [self removeCallback:receiver.receiverCallback userInfo:(__bridge void *)receiver fromChannel:channel] ) {
         CFBridgingRelease((__bridge CFTypeRef)receiver);
     }
 }
 
 - (void)removeOutputReceiver:(id<AEAudioReceiver>)receiver fromChannelGroup:(AEChannelGroupRef)group {
-    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     if ( [self removeCallback:receiver.receiverCallback userInfo:(__bridge void *)receiver fromChannelGroup:group] ) {
         CFBridgingRelease((__bridge CFTypeRef)receiver);
     }
@@ -1454,20 +1443,18 @@ Boolean AEChannelGroupIsMuted(AEChannelGroupRef group) {
 #pragma mark - Input receivers
 
 - (void)addInputReceiver:(id<AEAudioReceiver>)receiver {
-    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     [self addInputReceiver:receiver forChannels:nil];
 }
 
 - (void)addInputReceiver:(id<AEAudioReceiver>)receiver forChannels:(NSArray *)channels {
-    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     void *callback = receiver.receiverCallback;
+    
     if ( [self addCallback:callback userInfo:(__bridge void *)receiver flags:kReceiverFlag forInputChannels:channels] ) {
         CFBridgingRetain(receiver);
     }
 }
 
 - (void)removeInputReceiver:(id<AEAudioReceiver>)receiver {
-    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     void *callback = receiver.receiverCallback;
     __block BOOL found = NO;
     [self performSynchronousMessageExchangeWithBlock:^{
@@ -1538,15 +1525,15 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
         
         if ( message.block ) {
 #ifdef DEBUG
-            uint64_t start = mach_absolute_time();
+            uint64_t start = AECurrentTimeInHostTicks();
 #endif
             ((__bridge void(^)())message.block)();
 #ifdef DEBUG
-            uint64_t end = mach_absolute_time();
+            uint64_t end = AECurrentTimeInHostTicks();
             uint64_t duration = end - start;
-            if ( duration >= (THIS->_currentBufferDuration * 0.5) * __secondsToHostTicks ) {
+            if ( duration >= AEHostTicksFromSeconds(THIS->_currentBufferDuration * 0.5) ) {
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    NSLog(@"TAAE: Warning: Block perform on realtime thread took too long (%0.4lfs)", duration*__hostTicksToSeconds);
+                    NSLog(@"TAAE: Warning: Block perform on realtime thread took too long (%0.4lfs)", AESecondsFromHostTicks(duration));
                 });
             }
 #endif
@@ -1682,8 +1669,8 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
                                          sourceThread:pthread_self()];
     
     // Wait for response
-    uint64_t giveUpTime = mach_absolute_time() + (1.0 * __secondsToHostTicks);
-    while ( !finished && mach_absolute_time() < giveUpTime && self.running ) {
+    uint64_t giveUpTime = AECurrentTimeInHostTicks() + AEHostTicksFromSeconds(1.0);
+    while ( !finished && AECurrentTimeInHostTicks() < giveUpTime && self.running ) {
         [self pollForMessageResponses];
         if ( finished ) break;
         [NSThread sleepForTimeInterval:_preferredBufferDuration ? _preferredBufferDuration : 0.01];
@@ -2044,7 +2031,7 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
         __unsafe_unretained ABSenderPort * upstreamSenderPort = (__bridge ABSenderPort*)firstUpstreamAudiobusSenderPort(channelBeingRendered);
         if ( upstreamSenderPort && ABSenderPortIsMuted(upstreamSenderPort) ) {
             // We're sending via the sender port, and the receiver plays live - offset the timestamp by the reported latency
-            return ABSenderPortGetAverageLatency(upstreamSenderPort)*__secondsToHostTicks;
+            return ABSenderPortGetAverageLatency(upstreamSenderPort);
         }
     }
     
@@ -2415,14 +2402,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 - (BOOL)initAudioSession {
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     NSMutableString *extraInfo = [NSMutableString string];
-    
-
-    // Set sample rate
-    Float64 sampleRate = _audioDescription.mSampleRate;
     NSError *error = nil;
-    if ( ![audioSession setPreferredSampleRate:sampleRate error:&error] ) {
-        NSLog(@"TAAE: Couldn't set preferred sample rate: %@", error);
-    }
     
     UInt32 inputAvailable = NO;
     if ( _inputEnabled ) {
@@ -2438,6 +2418,13 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     // Start session
     if ( ![audioSession setActive:YES error:&error] ) {
         NSLog(@"TAAE: Couldn't activate audio session: %@", error);
+    }
+    
+    // Set sample rate
+    Float64 sampleRate = _audioDescription.mSampleRate;
+    
+    if ( ![audioSession setPreferredSampleRate:sampleRate error:&error] ) {
+        NSLog(@"TAAE: Couldn't set preferred sample rate: %@", error);
     }
     
     // Fetch sample rate, in case we didn't get quite what we requested
@@ -3474,11 +3461,14 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
             NSLog(@"TAAE: Couldn't activate audio session: %@", e);
         }
         
-        if ( [self setup] && [self start:error recoveringFromErrors:NO] ) {
+        if ( [self setup] ) {
             [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerDidRecreateGraphNotification object:self];
-            NSLog(@"TAAE: Successfully recovered from system error");
-            _hasSystemError = NO;
-            return YES;
+            
+            if ( [self start:error recoveringFromErrors:NO] ) {
+                NSLog(@"TAAE: Successfully recovered from system error");
+                _hasSystemError = NO;
+                return YES;
+            }
         }
     }
     
@@ -3719,13 +3709,15 @@ static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferLi
         float peak = 0.0;
         vDSP_maxmgv((float*)monitor->scratchBuffer->mBuffers[i].mData, 1, &peak, monitorFrames);
         if ( peak > monitor->chanPeak[i] ) monitor->chanPeak[i] = peak;
+        if ( peak > monitor->peak ) monitor->peak = peak;
+        
         float avg = 0.0;
         vDSP_meamgv((float*)monitor->scratchBuffer->mBuffers[i].mData, 1, &avg, monitorFrames);
         monitor->chanMeanAccumulator[i] += avg;
-        if (i==0) monitor->chanMeanBlockCount++;
+        if ( i == 0 ) monitor->chanMeanBlockCount++;
         monitor->meanAccumulator += avg;
         monitor->meanBlockCount++;
-
+        
         monitor->chanAverage[i] = monitor->chanMeanAccumulator[i] / (double)monitor->chanMeanBlockCount;
         monitor->average = monitor->meanAccumulator / (double)monitor->meanBlockCount;
     }

@@ -117,6 +117,32 @@ AudioComponentDescription AEAudioComponentDescriptionMake(OSType manufacturer, O
  */
 void AEAudioStreamBasicDescriptionSetChannelsPerFrame(AudioStreamBasicDescription *audioDescription, int numberOfChannels);
 
+/*!
+ * Get current global timestamp, in host ticks
+ */
+uint64_t AECurrentTimeInHostTicks(void);
+
+/*!
+ * Get current global timestamp, in seconds
+ */
+double AECurrentTimeInSeconds(void);
+
+/*!
+ * Convert time in seconds to host ticks
+ *
+ * @param seconds The time in seconds
+ * @return The time in host ticks
+ */
+uint64_t AEHostTicksFromSeconds(double seconds);
+
+/*!
+ * Convert time in host ticks to seconds
+ *
+ * @param ticks The time in host ticks
+ * @return The time in seconds
+ */
+double AESecondsFromHostTicks(uint64_t ticks);
+    
 #ifdef __cplusplus
 }
 #endif
