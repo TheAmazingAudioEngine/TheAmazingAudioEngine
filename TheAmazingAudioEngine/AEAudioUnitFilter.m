@@ -50,6 +50,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     void *_currentProducerToken;
     bool _wasBypassed;
 }
+@property (nonatomic, copy) void (^preInitializeBlock)(AudioUnit audioUnit);
 @end
 
 @implementation AEAudioUnitFilter
@@ -70,7 +71,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 -(id)initWithComponentDescription:(AudioComponentDescription)audioComponentDescription
                   audioController:(AEAudioController *)audioController
             useDefaultInputFormat:(BOOL)useDefaultInputFormat
-               preInitializeBlock:(void(^)(AudioUnit audioUnit))block
+               preInitializeBlock:(void(^)(AudioUnit audioUnit))preInitializeBlock
                             error:(NSError **)error {
     if ( !(self = [super init]) ) return nil;
     
@@ -79,8 +80,8 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     _componentDescription = audioComponentDescription;
     _useDefaultInputFormat = useDefaultInputFormat;
     _audioGraph = audioController.audioGraph;
-	
-    if ( ![self setup:block error:error] ) {
+    self.preInitializeBlock = preInitializeBlock;
+    if ( ![self setup:error] ) {
         return nil;
     }
 
@@ -92,7 +93,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     return self;
 }
 
-- (BOOL)setup:(void(^)(AudioUnit audioUnit))block error:(NSError**)error {
+- (BOOL)setup:(NSError**)error {
 
     OSStatus result;
     if ( !checkResult(result=AUGraphAddNode(_audioGraph, &_componentDescription, &_node), "AUGraphAddNode") ||
@@ -199,7 +200,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     
     checkResult(AUGraphUpdate(_audioGraph, NULL), "AUGraphUpdate");
 
-    if(block) block(_audioUnit);
+    if ( _preInitializeBlock ) _preInitializeBlock(_audioUnit);
 
     checkResult(AudioUnitInitialize(_audioUnit), "AudioUnitInitialize");
     
@@ -288,7 +289,7 @@ static OSStatus audioUnitRenderCallback(void                       *inRefCon,
     _outConverterNode = 0;
     _outConverterUnit = NULL;
     _audioGraph = _audioController.audioGraph;
-    [self setup:nil error:NULL];
+    [self setup:NULL];
 }
 
 @end

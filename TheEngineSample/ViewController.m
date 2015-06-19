@@ -573,9 +573,9 @@ static const int kInputChannelsChangedContext;
 
 - (void)reverbSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
-        self.reverb = [[AEAudioUnitFilter alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Effect, kAudioUnitSubType_Reverb2) audioController:_audioController error:NULL];
-        
-        AudioUnitSetParameter(_reverb.audioUnit, kReverb2Param_DryWetMix, kAudioUnitScope_Global, 0, 100.f, 0);
+        self.reverb = [[AEAudioUnitFilter alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Effect, kAudioUnitSubType_Reverb2)  audioController:_audioController useDefaultInputFormat:YES preInitializeBlock:^(AudioUnit audioUnit) {
+            AudioUnitSetParameter(audioUnit, kReverb2Param_DryWetMix, kAudioUnitScope_Global, 0, 100.f, 0);
+        } error:NULL];
         
         [_audioController addFilter:_reverb];
     } else {

@@ -44,6 +44,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     AudioUnit _converterUnit;
     AUGraph _audioGraph;
 }
+@property (nonatomic, copy) void (^preInitializeBlock)(AudioUnit audioUnit);
 @end
 
 @implementation AEAudioUnitChannel
@@ -51,12 +52,12 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 - (id)initWithComponentDescription:(AudioComponentDescription)audioComponentDescription
                        audioController:(AEAudioController*)audioController
                                  error:(NSError**)error {
-    return [self initWithComponentDescription:audioComponentDescription audioController:audioController  preInitializeBlock:nil error:error];
+    return [self initWithComponentDescription:audioComponentDescription audioController:audioController preInitializeBlock:nil error:error];
 }
 
 - (id)initWithComponentDescription:(AudioComponentDescription)audioComponentDescription
                    audioController:(AEAudioController*)audioController
-                preInitializeBlock:(void(^)(AudioUnit audioUnit))block
+                preInitializeBlock:(void(^)(AudioUnit audioUnit))preInitializeBlock
                              error:(NSError**)error {
     
     if ( !(self = [super init]) ) return nil;
@@ -65,8 +66,9 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     _audioController = audioController;
     _componentDescription = audioComponentDescription;
     _audioGraph = _audioController.audioGraph;
+    self.preInitializeBlock = preInitializeBlock;
     
-    if ( ![self setup:block error:error] ) {
+    if ( ![self setup:error] ) {
         return nil;
     }
     
@@ -80,7 +82,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     return self;
 }
 
-- (BOOL)setup:(void(^)(AudioUnit audioUnit))block error:(NSError**)error {
+- (BOOL)setup:(NSError**)error {
 	OSStatus result;
     if ( !checkResult(result=AUGraphAddNode(_audioGraph, &_componentDescription, &_node), "AUGraphAddNode") ||
          !checkResult(result=AUGraphNodeInfo(_audioGraph, _node, NULL, &_audioUnit), "AUGraphNodeInfo") ) {
@@ -126,7 +128,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     
     checkResult(AUGraphUpdate(_audioGraph, NULL), "AUGraphUpdate");
 
-    if(block) block(_audioUnit);
+    if( _preInitializeBlock ) _preInitializeBlock(_audioUnit);
 
     checkResult(AudioUnitInitialize(_audioUnit), "AudioUnitInitialize");
     
@@ -179,7 +181,7 @@ static OSStatus renderCallback(__unsafe_unretained AEAudioUnitChannel *THIS,
     _converterNode = 0;
     _converterUnit = NULL;
     _audioGraph = _audioController.audioGraph;
-    [self setup:nil error:NULL];
+    [self setup:NULL];
 }
 
 @end
