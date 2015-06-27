@@ -1413,6 +1413,12 @@ NSTimeInterval AEAudioControllerInputLatency(AEAudioController *controller);
  */
 NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller);
 
+/*!
+ * Get the mute status of a channel group
+ * @return Whether group is muted
+ */
+Boolean AEChannelGroupIsMuted(AEChannelGroupRef group);
+
 @end
 
 #ifdef __cplusplus

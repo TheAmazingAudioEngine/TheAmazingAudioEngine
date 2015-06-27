@@ -1307,31 +1307,40 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     return group->channel->muted;
 }
 
+Boolean AEChannelGroupIsMuted(AEChannelGroupRef group) {
+    return group->channel->muted;
+}
+
 #pragma mark - Filters
 
 - (void)addFilter:(id<AEAudioFilter>)filter {
+    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     if ( [self addCallback:filter.filterCallback userInfo:(__bridge void *)filter flags:kFilterFlag forChannelGroup:_topGroup] ) {
         CFBridgingRetain(filter);
     }
 }
 
 - (void)addFilter:(id<AEAudioFilter>)filter toChannel:(id<AEAudioPlayable>)channel {
+    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     if ( [self addCallback:filter.filterCallback userInfo:(__bridge void *)filter flags:kFilterFlag forChannel:channel] ) {
         CFBridgingRetain(filter);
     }
 }
 
 - (void)addFilter:(id<AEAudioFilter>)filter toChannelGroup:(AEChannelGroupRef)group {
+    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     if ( [self addCallback:filter.filterCallback userInfo:(__bridge void *)filter flags:kFilterFlag forChannelGroup:group] ) {
         CFBridgingRetain(filter);
     }
 }
 
 - (void)addInputFilter:(id<AEAudioFilter>)filter {
+    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     [self addInputFilter:filter forChannels:nil];
 }
 
 - (void)addInputFilter:(id<AEAudioFilter>)filter forChannels:(NSArray *)channels {
+    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     void *callback = filter.filterCallback;
     if ( [self addCallback:callback userInfo:(__bridge void *)filter flags:kFilterFlag forInputChannels:channels] ) {
         CFBridgingRetain(filter);
@@ -1339,24 +1348,28 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 }
 
 - (void)removeFilter:(id<AEAudioFilter>)filter {
+    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     if ( [self removeCallback:filter.filterCallback userInfo:(__bridge void *)filter fromChannelGroup:_topGroup] ) {
         CFBridgingRelease((__bridge CFTypeRef)filter);
     }
 }
 
 - (void)removeFilter:(id<AEAudioFilter>)filter fromChannel:(id<AEAudioPlayable>)channel {
+    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     if ( [self removeCallback:filter.filterCallback userInfo:(__bridge void *)filter fromChannel:channel] ) {
         CFBridgingRelease((__bridge CFTypeRef)filter);
     }
 }
 
 - (void)removeFilter:(id<AEAudioFilter>)filter fromChannelGroup:(AEChannelGroupRef)group {
+    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     if ( [self removeCallback:filter.filterCallback userInfo:(__bridge void *)filter fromChannelGroup:group] ) {
         CFBridgingRelease((__bridge CFTypeRef)filter);
     }
 }
 
 - (void)removeInputFilter:(id<AEAudioFilter>)filter {
+    NSParameterAssert([filter respondsToSelector:@selector(filterCallback)]);
     void *callback = filter.filterCallback;
     __block BOOL found = NO;
     [self performSynchronousMessageExchangeWithBlock:^{
@@ -1443,18 +1456,20 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 #pragma mark - Input receivers
 
 - (void)addInputReceiver:(id<AEAudioReceiver>)receiver {
+    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     [self addInputReceiver:receiver forChannels:nil];
 }
 
 - (void)addInputReceiver:(id<AEAudioReceiver>)receiver forChannels:(NSArray *)channels {
+    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     void *callback = receiver.receiverCallback;
-    
     if ( [self addCallback:callback userInfo:(__bridge void *)receiver flags:kReceiverFlag forInputChannels:channels] ) {
         CFBridgingRetain(receiver);
     }
 }
 
 - (void)removeInputReceiver:(id<AEAudioReceiver>)receiver {
+    NSParameterAssert([receiver respondsToSelector:@selector(receiverCallback)]);
     void *callback = receiver.receiverCallback;
     __block BOOL found = NO;
     [self performSynchronousMessageExchangeWithBlock:^{

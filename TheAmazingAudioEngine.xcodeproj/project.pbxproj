@@ -377,6 +377,7 @@
 					"-DTPCircularBufferDequeueBufferListFrames=AECBDequeueBLFrames",
 					"-DTPCircularBufferPeek=AECBPeek",
 					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
+					"-DTPCircularBufferGetAvailableSpace=AECBGetAvailableSpace",
 					"-DCA_PREFER_FIXED_POINT=NO",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -416,6 +417,7 @@
 					"-DTPCircularBufferDequeueBufferListFrames=AECBDequeueBLFrames",
 					"-DTPCircularBufferPeek=AECBPeek",
 					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
+					"-DTPCircularBufferGetAvailableSpace=AECBGetAvailableSpace",
 					"-DCA_PREFER_FIXED_POINT=NO",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
