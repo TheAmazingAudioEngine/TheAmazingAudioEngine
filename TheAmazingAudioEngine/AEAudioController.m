@@ -28,7 +28,11 @@
 #import <UIKit/UIKit.h>
 #import <AVFoundation/AVFoundation.h>
 #import <libkern/OSAtomic.h>
+#if COCOAPODS
+#import <TPCircularBuffer.h>
+#else
 #import "TPCircularBuffer.h"
+#endif
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #import <Accelerate/Accelerate.h>

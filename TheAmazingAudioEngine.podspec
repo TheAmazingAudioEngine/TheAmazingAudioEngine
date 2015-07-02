@@ -9,5 +9,6 @@ Pod::Spec.new do |s|
   s.platform     = :ios, '6.0'
   s.source_files = 'TheAmazingAudioEngine/**/*.{h,m,c}', 'Modules/*.{h,m,c}'
   s.frameworks = 'AudioToolbox', 'Accelerate'
+  s.dependency 'TPCircularBuffer', '~> 0.0'
   s.requires_arc = true
 end

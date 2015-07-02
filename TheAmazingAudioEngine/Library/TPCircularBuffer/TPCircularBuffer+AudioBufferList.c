@@ -27,7 +27,11 @@
 //  3. This notice may not be removed or altered from any source distribution.
 //
 
+#if COCOAPODS
+#include <TPCircularBuffer+AudioBufferList.h>
+#else
 #include "TPCircularBuffer+AudioBufferList.h"
+#endif
 #import <mach/mach_time.h>
 
 static double __secondsToHostTicks = 0.0;
