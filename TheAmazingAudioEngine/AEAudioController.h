@@ -1379,7 +1379,7 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
  */
 @property (nonatomic, readonly) AUGraph audioGraph;
 
-#pragma mark - C access to properties
+#pragma mark - Timing
 
 /*!
  * Input latency (in seconds)
@@ -1412,6 +1412,17 @@ NSTimeInterval AEAudioControllerInputLatency(__unsafe_unretained AEAudioControll
  * @returns The currently-reported hardware output latency
  */
 NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioController *controller);
+
+/*!
+ * Get the current audio system timestamp
+ *
+ *  For use on the audio thread; returns the latest audio timestamp, either for the input or the
+ *  output bus, depending on when this method is called.
+ *
+ * @param controller The audio controller
+ * @returns The last-seen audio timestamp for the most recently rendered bus
+ */
+AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudioController *controller);
 
 @end
 

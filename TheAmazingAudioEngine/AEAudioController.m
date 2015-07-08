@@ -278,6 +278,7 @@ typedef struct {
     AudioStreamBasicDescription _rawInputAudioDescription;
     AudioBufferList    *_inputAudioBufferList;
     AudioTimeStamp      _lastInputBusTimeStamp;
+    AudioTimeStamp      _lastInputOrOutputBusTimeStamp;
     
     TPCircularBuffer    _realtimeThreadMessageBuffer;
     TPCircularBuffer    _mainThreadMessageBuffer;
@@ -576,6 +577,9 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
             // Adjust timestamp to factor in hardware output latency
             timestamp.mHostTime += AEHostTicksFromSeconds(AEAudioControllerOutputLatency(THIS));
         }
+        
+        THIS->_lastInputOrOutputBusTimeStamp = timestamp;
+        
         for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
             callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
             ((AEAudioControllerTimingCallback)callback->callback)((__bridge id)callback->userInfo, THIS, &timestamp, inNumberFrames, AEAudioTimingContextOutput);
@@ -626,6 +630,8 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
             timestamp.mHostTime -= AEHostTicksFromSeconds(AEAudioControllerInputLatency(THIS));
         }
     }
+    
+    THIS->_lastInputOrOutputBusTimeStamp = timestamp;
     
     for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
         callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
@@ -2054,6 +2060,10 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
         }
     }
     return __cachedOutputLatency;
+}
+
+AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudioController *THIS) {
+    return THIS->_lastInputOrOutputBusTimeStamp;
 }
 
 -(void)setVoiceProcessingEnabled:(BOOL)voiceProcessingEnabled {
