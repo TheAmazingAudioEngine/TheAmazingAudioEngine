@@ -885,14 +885,17 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(interruptionNotification:) name:AVAudioSessionInterruptionNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(audioRouteChangeNotification:) name:AVAudioSessionRouteChangeNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(mediaServiceResetNotification:) name:AVAudioSessionMediaServicesWereResetNotification object:nil];
-#endif
+
     
     if ( ![self initAudioSession] || ![self setup] ) {
         _audioGraph = NULL;
     }
     
-#if TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR
     self.housekeepingTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:[[AEAudioControllerProxy alloc] initWithAudioController:self] selector:@selector(housekeeping) userInfo:nil repeats:YES];
+#else
+    if ( ![self setup] ) {
+        _audioGraph = NULL;
+    }
 #endif
 
     return self;
@@ -924,11 +927,19 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     _inputMode = AEInputModeFixedAudioFormat;
     _voiceProcessingOnlyForSpeakerAndMicrophone = YES;
 
+#if TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR
     if ( ![self initAudioSession] || ![self setup] ) {
         NSLog(@"TAAE: error setting up audio session");
         _audioGraph = NULL;
         return NO;
     }
+#else
+    if ( ![self setup] ) {
+        NSLog(@"TAAE: error with setup");
+        _audioGraph = NULL;
+        return NO;
+    }
+#endif
 
     if (wasStarted) {
         if( ![self start:nil] ) {
@@ -2480,8 +2491,8 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 
 #pragma mark - Graph and audio session configuration
 
-- (BOOL)initAudioSession {
 #if TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR
+- (BOOL)initAudioSession {
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     NSMutableString *extraInfo = [NSMutableString string];
     NSError *error = nil;
@@ -2536,9 +2547,9 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     if ( _currentBufferDuration != bufferDuration ) self.currentBufferDuration = bufferDuration;
     
     NSLog(@"TAAE: Audio session initialized (%@) HW samplerate: %g", [extraInfo stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@", "]], achievedSampleRate);
-#endif
     return YES;
 }
+#endif
 
 - (BOOL)setup {
     // Create a new AUGraph
@@ -2548,7 +2559,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     BOOL useVoiceProcessing = [self usingVPIO];
     
     OSType componentSubType;
-    if (useVoiceProcessing) {
+    if ( useVoiceProcessing ) {
         componentSubType = kAudioUnitSubType_VoiceProcessingIO;
     } else {
 #if TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR
@@ -2638,7 +2649,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     BOOL useVoiceProcessing = [self usingVPIO];
 
     OSType componentSubType;
-    if (useVoiceProcessing) {
+    if ( useVoiceProcessing ) {
         componentSubType = kAudioUnitSubType_VoiceProcessingIO;
     } else {
 #if TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR
@@ -2804,7 +2815,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     BOOL useVoiceProcessing = [self usingVPIO];
 
     OSType componentSubType;
-    if (useVoiceProcessing) {
+    if ( useVoiceProcessing ) {
         componentSubType = kAudioUnitSubType_VoiceProcessingIO;
     } else {
 #if TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR
@@ -3588,8 +3599,12 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
         [self teardown];
         
         [NSThread sleepForTimeInterval:0.5];
-        
+
+#if TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR
         if ( [self initAudioSession] && [self setup] ) {
+#else
+        if ( [self setup] ) {
+#endif
             [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerDidRecreateGraphNotification object:self];
             
             if ( !start || [self start:error recoveringFromErrors:NO] ) {
