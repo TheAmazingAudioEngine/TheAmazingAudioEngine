@@ -56,7 +56,6 @@ static const int kMaximumMonitoringChannels            = 16;
 static const NSTimeInterval kMaxBufferDurationWithVPIO = 0.01;
 static const Float32 kNoValue                          = -1.0;
 #endif
-
 #define kNoAudioErr                            -2222
 
 static void * kChannelPropertyChanged = &kChannelPropertyChanged;
