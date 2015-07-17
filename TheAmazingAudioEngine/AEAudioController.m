@@ -74,6 +74,8 @@ const NSString *kAEAudioControllerUserInfoKey = @"userinfo";
 
 static inline int min(int a, int b) { return a>b ? b : a; }
 
+static BOOL __AEAllocated = NO;
+
 static inline void AEAudioControllerError(OSStatus result, const char *operation, const char* file, int line) {
     int fourCC = CFSwapInt32HostToBig(result);
     @autoreleasepool {
@@ -276,6 +278,7 @@ typedef struct {
     AudioStreamBasicDescription _rawInputAudioDescription;
     AudioBufferList    *_inputAudioBufferList;
     AudioTimeStamp      _lastInputBusTimeStamp;
+    AudioTimeStamp      _lastInputOrOutputBusTimeStamp;
     
     TPCircularBuffer    _realtimeThreadMessageBuffer;
     TPCircularBuffer    _mainThreadMessageBuffer;
@@ -574,6 +577,9 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
             // Adjust timestamp to factor in hardware output latency
             timestamp.mHostTime += AEHostTicksFromSeconds(AEAudioControllerOutputLatency(THIS));
         }
+        
+        THIS->_lastInputOrOutputBusTimeStamp = timestamp;
+        
         for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
             callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
             ((AEAudioControllerTimingCallback)callback->callback)((__bridge id)callback->userInfo, THIS, &timestamp, inNumberFrames, AEAudioTimingContextOutput);
@@ -624,6 +630,8 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
             timestamp.mHostTime -= AEHostTicksFromSeconds(AEAudioControllerInputLatency(THIS));
         }
     }
+    
+    THIS->_lastInputOrOutputBusTimeStamp = timestamp;
     
     for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
         callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
@@ -824,7 +832,9 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     if ( !(self = [super init]) ) return nil;
 
     NSAssert([NSThread isMainThread], @"Should be initialized on the main thread");
-
+    NSAssert(!__AEAllocated, @"You may only use one TAAE instance at a time");
+    __AEAllocated = YES;
+    
     NSAssert(audioDescription.mFormatID == kAudioFormatLinearPCM, @"Only linear PCM supported");
 
     _audioSessionCategory = enableInput ? (enableOutput ? AVAudioSessionCategoryPlayAndRecord : AVAudioSessionCategoryRecord) : AVAudioSessionCategoryPlayback;
@@ -908,6 +918,8 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 
 
 - (void)dealloc {
+    __AEAllocated = NO;
+    
     [_housekeepingTimer invalidate];
     self.housekeepingTimer = nil;
     
@@ -2063,6 +2075,10 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
         }
     }
     return __cachedOutputLatency;
+}
+
+AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudioController *THIS) {
+    return THIS->_lastInputOrOutputBusTimeStamp;
 }
 
 -(void)setVoiceProcessingEnabled:(BOOL)voiceProcessingEnabled {

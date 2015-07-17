@@ -424,7 +424,7 @@ typedef struct _channel_group_t* AEChannelGroupRef;
  * @param userInfo          Pointer to your data
  * @param userInfoLength    Length of userInfo in bytes
  */
-typedef void (*AEAudioControllerMainThreadMessageHandler)(AEAudioController *audioController, void *userInfo, int userInfoLength);
+typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AEAudioController *audioController, void *userInfo, int userInfoLength);
 
 #pragma mark -
 
@@ -1033,7 +1033,7 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(AEAudioController *aud
  * @param userInfo        Pointer to user info data to pass to handler - this will be copied.
  * @param userInfoLength  Length of userInfo in bytes.
  */
-void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController                 *audioController, 
+void AEAudioControllerSendAsynchronousMessageToMainThread(__unsafe_unretained AEAudioController *audioController,
                                                           AEAudioControllerMainThreadMessageHandler    handler, 
                                                           void                              *userInfo,
                                                           int                                userInfoLength);
@@ -1106,22 +1106,22 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(AEAudioController     
 /*!
  * Get access to the configured AudioStreamBasicDescription
  */
-AudioStreamBasicDescription *AEAudioControllerAudioDescription(AEAudioController *audioController);
+AudioStreamBasicDescription *AEAudioControllerAudioDescription(__unsafe_unretained AEAudioController *audioController);
 
 /*!
  * Get access to the input AudioStreamBasicDescription
  */
-AudioStreamBasicDescription *AEAudioControllerInputAudioDescription(AEAudioController *audioController);
+AudioStreamBasicDescription *AEAudioControllerInputAudioDescription(__unsafe_unretained AEAudioController *audioController);
 
 /*!
  * Convert a time span in seconds into a number of frames at the current sample rate
  */
-long AEConvertSecondsToFrames(AEAudioController *audioController, NSTimeInterval seconds);
+long AEConvertSecondsToFrames(__unsafe_unretained AEAudioController *audioController, NSTimeInterval seconds);
 
 /*!
  * Convert a number of frames into a time span in seconds
  */
-NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long frames);
+NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *audioController, long frames);
 
 ///@}
 #pragma mark - Properties
@@ -1379,7 +1379,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  */
 @property (nonatomic, readonly) AUGraph audioGraph;
 
-#pragma mark - C access to properties
+#pragma mark - Timing
 
 /*!
  * Input latency (in seconds)
@@ -1395,7 +1395,7 @@ NSTimeInterval AEConvertFramesToSeconds(AEAudioController *audioController, long
  * @param controller The audio controller
  * @returns The currently-reported hardware input latency
  */
-NSTimeInterval AEAudioControllerInputLatency(AEAudioController *controller);
+NSTimeInterval AEAudioControllerInputLatency(__unsafe_unretained AEAudioController *controller);
 
 /*!
  * Output latency (in seconds)
@@ -1411,7 +1411,18 @@ NSTimeInterval AEAudioControllerInputLatency(AEAudioController *controller);
  * @param controller The audio controller
  * @returns The currently-reported hardware output latency
  */
-NSTimeInterval AEAudioControllerOutputLatency(AEAudioController *controller);
+NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioController *controller);
+
+/*!
+ * Get the current audio system timestamp
+ *
+ *  For use on the audio thread; returns the latest audio timestamp, either for the input or the
+ *  output bus, depending on when this method is called.
+ *
+ * @param controller The audio controller
+ * @returns The last-seen audio timestamp for the most recently rendered bus
+ */
+AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudioController *controller);
 
 /*!
  * Get the mute status of a channel group
