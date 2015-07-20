@@ -52,7 +52,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 @synthesize path = _path;
 
 + (BOOL)AACEncodingAvailable {
-#if TARGET_IPHONE_SIMULATOR
+#if !TARGET_OS_IPHONE
     return YES;
 #else
     static BOOL available;
@@ -130,10 +130,12 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
             return NO;
         }
         
+        UInt32 size = sizeof(_priorMixOverrideValue);
+        
+#if TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR
         AVAudioSession *audioSession = [AVAudioSession sharedInstance];
         
         // AAC won't work if the 'mix with others' session property is enabled. Disable it if it's on.
-        UInt32 size = sizeof(_priorMixOverrideValue);
         _priorMixOverrideValue = audioSession.categoryOptions & AVAudioSessionCategoryOptionMixWithOthers;
         
         if ( _priorMixOverrideValue != NO ) {
@@ -144,6 +146,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
                 NSLog(@"Couldn't update category options: %@", error);
             }
         }
+#endif
 
         // Get the output audio description
         AudioStreamBasicDescription destinationFormat;
@@ -176,7 +179,8 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
                                                   userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Couldn't open the output file (error %d/%4.4s)", @""), status, (char*)&fourCC]}];
             return NO;
         }
-        
+
+#if TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR
         UInt32 codecManfacturer = kAppleSoftwareAudioCodecManufacturer;
         status = ExtAudioFileSetProperty(_audioFile, kExtAudioFileProperty_CodecManufacturer, sizeof(UInt32), &codecManfacturer);
         
@@ -188,6 +192,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
             ExtAudioFileDispose(_audioFile);
             return NO;
         }
+#endif
     } else {
         
         // Derive the output audio description from the client format, but with interleaved, big endian (if AIFF) signed integers.
@@ -244,6 +249,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     
     checkResult(ExtAudioFileDispose(_audioFile), "AudioFileClose");
     
+#if TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR
     if ( _priorMixOverrideValue ) {
         NSError *error = nil;
         AVAudioSession *audioSession = [AVAudioSession sharedInstance];
@@ -253,6 +259,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
             NSLog(@"Couldn't update category options: %@", error);
         }
     }
+#endif
 }
 
 OSStatus AEAudioFileWriterAddAudio(__unsafe_unretained AEAudioFileWriter* THIS, AudioBufferList *bufferList, UInt32 lengthInFrames) {
