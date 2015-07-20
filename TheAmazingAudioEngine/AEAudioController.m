@@ -2756,7 +2756,6 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 - (void)configureAudioUnit {
 #if TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
-#endif
     if ( _inputEnabled ) {
         // Enable input
         UInt32 enableInputFlag = 1;
@@ -2775,6 +2774,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         OSStatus result = AudioUnitSetProperty(_ioAudioUnit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &enableInputFlag, sizeof(enableInputFlag));
         checkResult(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_EnableIO)");
     }
+#endif
 
     if (!_outputEnabled) {
         // disable output
@@ -2904,6 +2904,11 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 - (BOOL)updateInputDeviceStatus {
     if ( !_audioGraph ) return NO;
     NSAssert(_inputEnabled, @"Input must be enabled");
+    
+#if TARGET_OS_MAC
+    NSLog(@"TAAE: Warning: Audio input is not yet implemented on OS X");
+    return NO;
+#endif
     
     BOOL success = YES;
     BOOL inputAvailable = NO;
