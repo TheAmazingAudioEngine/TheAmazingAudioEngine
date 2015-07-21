@@ -132,7 +132,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
         
         UInt32 size = sizeof(_priorMixOverrideValue);
         
-#if TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR
+#if TARGET_OS_IPHONE
         AVAudioSession *audioSession = [AVAudioSession sharedInstance];
         
         // AAC won't work if the 'mix with others' session property is enabled. Disable it if it's on.
@@ -180,7 +180,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
             return NO;
         }
 
-#if TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR
+#if TARGET_OS_IPHONE
         UInt32 codecManfacturer = kAppleSoftwareAudioCodecManufacturer;
         status = ExtAudioFileSetProperty(_audioFile, kExtAudioFileProperty_CodecManufacturer, sizeof(UInt32), &codecManfacturer);
         
@@ -249,7 +249,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     
     checkResult(ExtAudioFileDispose(_audioFile), "AudioFileClose");
     
-#if TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR
+#if TARGET_OS_IPHONE
     if ( _priorMixOverrideValue ) {
         NSError *error = nil;
         AVAudioSession *audioSession = [AVAudioSession sharedInstance];
