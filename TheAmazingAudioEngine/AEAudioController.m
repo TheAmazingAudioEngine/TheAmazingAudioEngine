@@ -2261,9 +2261,9 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
             channelElement->muted = channel.channelIsMuted;
             
             if ( group->mixerAudioUnit ) {
-                AudioUnitParameterValue value = ([channel respondsToSelector:@selector(channelIsPlaying)] ? channel.channelIsPlaying : YES) && !channel.channelIsMuted;
-                OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
-                checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
+                AudioUnitParameterValue value = channelElement->muted ? 0.0 : channelElement->volume;
+                OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, index, value, 0);
+                checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
             }
             
         } else if ( [keyPath isEqualToString:@"audioDescription"] ) {
@@ -3337,7 +3337,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         
         if ( group ) {
             // Set volume
-            AudioUnitParameterValue volumeValue = channel->volume;
+            AudioUnitParameterValue volumeValue = channel->muted ? 0.0 : channel->volume;
             checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, i, volumeValue, 0),
                         "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
             
@@ -3347,7 +3347,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
                         "AudioUnitSetParameter(kMultiChannelMixerParam_Pan)");
             
             // Set enabled
-            AudioUnitParameterValue enabledValue = channel->playing && !channel->muted;
+            AudioUnitParameterValue enabledValue = channel->playing;
             checkResult(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, i, enabledValue, 0),
                         "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
             
