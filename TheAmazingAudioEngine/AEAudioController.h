@@ -153,6 +153,28 @@ typedef OSStatus (*AEAudioControllerRenderCallback) (__unsafe_unretained id    c
 @optional
 
 /*!
+ * Perform setup, to prepare for playback
+ *
+ *  Playable objects may implement this method to be notified when the object is
+ *  being added to the audio controller, or when the audio system is being restored
+ *  after a system error.
+ *
+ *  Use this method to allocate/initialise any required resources.
+ */
+- (void)setupWithAudioController:(AEAudioController *)audioController;
+
+/*!
+ * Clean up resources
+ *
+ *  Playable objects may implement this method to be notified when the object is
+ *  being removed from the audio controller, or when the audio system is being
+ *  cleaned up after a system error.
+ *
+ *  Use this method to free up any resources used.
+ */
+- (void)teardown;
+
+/*!
  * Track volume
  *
  *  Changes are tracked by Key-Value Observing, so be sure to send KVO notifications
@@ -336,6 +358,30 @@ typedef OSStatus (*AEAudioControllerFilterCallback)(__unsafe_unretained id    fi
  * @return Pointer to a variable speed filter callback
  */
 @property (nonatomic, readonly) AEAudioControllerFilterCallback filterCallback;
+    
+@optional
+    
+/*!
+ * Perform setup, to prepare for playback
+ *
+ *  Filter objects may implement this method to be notified when the object is
+ *  being added to the audio controller, or when the audio system is being restored
+ *  after a system error.
+ *
+ *  Use this method to allocate/initialise any required resources.
+ */
+- (void)setupWithAudioController:(AEAudioController *)audioController;
+
+/*!
+ * Clean up resources
+ *
+ *  Filter objects may implement this method to be notified when the object is
+ *  being removed from the audio controller, or when the audio system is being
+ *  cleaned up after a system error.
+ *
+ *  Use this method to free up any resources used.
+ */
+- (void)teardown;
 
 @end
 
