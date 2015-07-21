@@ -1725,6 +1725,14 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
                                        sourceThread:(pthread_t)sourceThread {
     @synchronized ( self ) {
 
+        int32_t availableBytes;
+        message_t *message = TPCircularBufferHead(&_realtimeThreadMessageBuffer, &availableBytes);
+        
+        if ( availableBytes < sizeof(message_t) ) {
+            NSLog(@"TAAE: Unable to perform message exchange - queue is full.");
+            return;
+        }
+        
         if ( responseBlock ) {
             _pendingResponses++;
             
@@ -1734,9 +1742,6 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
             }
         }
         
-        int32_t availableBytes;
-        message_t *message = TPCircularBufferHead(&_realtimeThreadMessageBuffer, &availableBytes);
-        assert(availableBytes >= sizeof(message_t));
         memset(message, 0, sizeof(message_t));
         message->block         = block ? (__bridge_retained void*)[block copy] : NULL;
         message->responseBlock = responseBlock ? (__bridge_retained void*)[responseBlock copy] : NULL;
