@@ -105,9 +105,7 @@ static const int kInputChannelsChangedContext;
     _oscillator.channelIsMuted = YES;
     
     // Create an audio unit channel (a file player)
-    self.audioUnitPlayer = [[AEAudioUnitChannel alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Generator, kAudioUnitSubType_AudioFilePlayer)
-                                                                     audioController:_audioController
-                                                                               error:NULL];
+    self.audioUnitPlayer = [[AEAudioUnitChannel alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Generator, kAudioUnitSubType_AudioFilePlayer)];
     
     // Create a group for loop1, loop2 and oscillator
     _group = [_audioController createChannelGroup];
@@ -573,9 +571,9 @@ static const int kInputChannelsChangedContext;
 
 - (void)reverbSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
-        self.reverb = [[AEAudioUnitFilter alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Effect, kAudioUnitSubType_Reverb2)  audioController:_audioController useDefaultInputFormat:YES preInitializeBlock:^(AudioUnit audioUnit) {
+        self.reverb = [[AEAudioUnitFilter alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Effect, kAudioUnitSubType_Reverb2) preInitializeBlock:^(AudioUnit audioUnit) {
             AudioUnitSetParameter(audioUnit, kReverb2Param_DryWetMix, kAudioUnitScope_Global, 0, 100.f, 0);
-        } error:NULL];
+        }];
         
         [_audioController addFilter:_reverb];
     } else {
