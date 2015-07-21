@@ -89,6 +89,16 @@ extern "C" {
                 preInitializeBlock:(void(^)(AudioUnit audioUnit))block
                              error:(NSError**)error;
 
+/*!
+ * Retrieve audio unit reference
+ *
+ *  This method, for use on the realtime audio thread, allows subclasses and external
+ *  classes to access the audio unit.
+ *
+ * @param filter The filter
+ * @returns Audio unit reference
+ */
+AudioUnit AEAudioUnitFilterGetAudioUnit(__unsafe_unretained AEAudioUnitFilter * filter);
     
 /*!
  * The audio unit

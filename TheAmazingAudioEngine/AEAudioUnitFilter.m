@@ -93,6 +93,10 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     return self;
 }
 
+AudioUnit AEAudioUnitFilterGetAudioUnit(__unsafe_unretained AEAudioUnitFilter * filter) {
+    return filter->_audioUnit;
+}
+
 - (BOOL)setup:(NSError**)error {
 
     OSStatus result;

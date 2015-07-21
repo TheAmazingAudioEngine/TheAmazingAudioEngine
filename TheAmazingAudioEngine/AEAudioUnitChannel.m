@@ -82,6 +82,10 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     return self;
 }
 
+AudioUnit AEAudioUnitChannelGetAudioUnit(__unsafe_unretained AEAudioUnitChannel * channel) {
+    return channel->_audioUnit;
+}
+
 - (BOOL)setup:(NSError**)error {
 	OSStatus result;
     if ( !checkResult(result=AUGraphAddNode(_audioGraph, &_componentDescription, &_node), "AUGraphAddNode") ||

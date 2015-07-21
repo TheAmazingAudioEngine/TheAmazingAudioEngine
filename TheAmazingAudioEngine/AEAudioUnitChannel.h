@@ -68,6 +68,17 @@ extern "C" {
                              error:(NSError**)error;
 
 /*!
+ * Retrieve audio unit reference
+ *
+ *  This method, for use on the realtime audio thread, allows subclasses and external
+ *  classes to access the audio unit.
+ *
+ * @param channel The channel
+ * @returns Audio unit reference
+ */
+AudioUnit AEAudioUnitChannelGetAudioUnit(__unsafe_unretained AEAudioUnitChannel * channel);
+
+/*!
  * Track volume
  *
  * Range: 0.0 to 1.0
