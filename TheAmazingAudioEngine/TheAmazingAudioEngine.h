@@ -283,10 +283,8 @@ extern "C" {
  The AEAudioUnitChannel class acts as a host for audio units, allowing you to use any generator audio unit as an
  audio source.
  
- To use it, call @link AEAudioUnitChannel::initWithComponentDescription:audioController:error: initWithComponentDescription:audioController:error: @endlink,
- passing in an `AudioComponentDescription` structure (you can use the utility function @link AEAudioComponentDescriptionMake @endlink for this),
- along with a reference to the AEAudioController instance, and optionally, a pointer to an NSError to be filled if the audio unit
- creation failed.
+ To use it, call @link AEAudioUnitChannel::initWithComponentDescription: initWithComponentDescription: @endlink,
+ passing in an `AudioComponentDescription` structure (you can use the utility function @link AEAudioComponentDescriptionMake @endlink for this).
  
  @code
  AudioComponentDescription component
@@ -294,18 +292,13 @@ extern "C" {
                                       kAudioUnitType_MusicDevice,
                                       kAudioUnitSubType_Sampler)
  
- NSError *error = NULL;
- self.sampler = [[AEAudioUnitChannel alloc]
-                       initWithComponentDescription:component
-                                    audioController:_audioController
-                                              error:&error];
- 
- if ( !_sampler ) {
-    // Report error
- }
+ self.sampler = [[AEAudioUnitChannel alloc] initWithComponentDescription:component];
  @endcode
  
- You can then access the audio unit directly via the [audioUnit](@ref AEAudioUnitFilter::audioUnit) property.
+ Once you have added the channel to the audio controller, you can then access the audio unit directly via the 
+ [audioUnit](@ref AEAudioUnitChannel::audioUnit) property. You can also add your own initialization step via the
+ @link AEAudioUnitChannel::initWithComponentDescription:preInitializeBlock: initWithComponentDescription:preInitializeBlock: @endlink
+ initializer.
  
  @section Adding-Channels Adding Channels
  
@@ -429,10 +422,8 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  
  The AEAudioUnitFilter class allows you to use audio units to apply effects to audio.
  
- To use it, call @link AEAudioUnitFilter::initWithComponentDescription:audioController:error: initWithComponentDescription:audioController:error: @endlink,
- passing in an `AudioComponentDescription` structure (you can use the utility function @link AEAudioComponentDescriptionMake @endlink for this),
- along with a reference to the AEAudioController instance, and optionally, a pointer to an NSError to be filled if the audio unit
- creation failed.
+ To use it, call @link AEAudioUnitFilter::initWithComponentDescription: initWithComponentDescription: @endlink,
+ passing in an `AudioComponentDescription` structure (you can use the utility function @link AEAudioComponentDescriptionMake @endlink for this):
  
  @code
  AudioComponentDescription component
@@ -440,18 +431,13 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
                                       kAudioUnitType_Effect,
                                       kAudioUnitSubType_Reverb2)
  
- NSError *error = NULL;
- self.reverb = [[AEAudioUnitFilter alloc]
-                       initWithComponentDescription:component
-                                    audioController:_audioController
-                                              error:&error];
- 
- if ( !_reverb ) {
-    // Report error
- }
+ self.reverb = [[AEAudioUnitFilter alloc] initWithComponentDescription:component];
  @endcode
  
- You can then access the audio unit directly via the [audioUnit](@ref AEAudioUnitFilter::audioUnit) property:
+ Once you have added the filter to a channel, channel group or main output, you can then access the audio unit directly via the
+ [audioUnit](@ref AEAudioUnitFilter::audioUnit) property. You can also add your own initialization step via the
+ @link AEAudioUnitFilter::initWithComponentDescription:preInitializeBlock: initWithComponentDescription:preInitializeBlock: @endlink
+ initializer.
  
  @code
  AudioUnitSetParameter(_reverb.audioUnit,
