@@ -717,7 +717,29 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
 - (float)panForChannelGroup:(AEChannelGroupRef)group;
 
 /*!
+ * Set the playing status of a channel group
+ *
+ *  If this is NO, then the group will be silenced and no further render callbacks
+ *  will be performed on child channels until set to YES again.
+ *
+ * @param playing   Whether group is playing
+ * @param group     Group identifier
+ */
+- (void)setPlaying:(BOOL)playing forChannelGroup:(AEChannelGroupRef)group;
+
+/*!
+ * Get the playing status of a channel group
+ *
+ * @param group     Group identifier
+ * @return Whether group is playing
+ */
+- (BOOL)channelGroupIsPlaying:(AEChannelGroupRef)group;
+
+/*!
  * Set the mute status of a channel group
+ *
+ *  If YES, group will be silenced, but render callbacks of child channels
+ *  will continue to be performed.
  *
  * @param muted     Whether group is muted
  * @param group     Group identifier
