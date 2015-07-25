@@ -533,6 +533,7 @@ static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt3
     return noErr;
 }
 
+#if TARGET_OS_IPHONE
 static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
     __unsafe_unretained AEAudioController *THIS = (__bridge AEAudioController *)inRefCon;
     
@@ -546,6 +547,7 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
     
     return noErr;
 }
+#endif
 
 static OSStatus groupRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
     AEChannelRef channel = (AEChannelRef)inRefCon;
@@ -2798,7 +2800,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     // Only update if graph is running
     if ( self.running ) {
         // Retry a few times (as sometimes the graph will be in the wrong state to update)
-        OSStatus err;
+        OSStatus err = noErr;
         for ( int retry=0; retry<6; retry++ ) {
             err = AUGraphUpdate(_audioGraph, NULL);
             if ( err != kAUGraphErr_CannotDoInCurrentContext ) break;
