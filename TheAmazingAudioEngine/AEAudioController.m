@@ -3324,6 +3324,13 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
                 
                 // Set the mixer unit to handle up to 4096 frames per slice to keep rendering during screen lock
                 AudioUnitSetProperty(subgroup->mixerAudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &kMaxFramesPerSlice, sizeof(kMaxFramesPerSlice));
+
+#if !TARGET_OS_IPHONE
+				// Set output volume
+				// see http://stackoverflow.com/questions/9904369/silence-when-adding-kaudiounitsubtype-multichannelmixer-to-augraph
+				checkResult(AudioUnitSetParameter(subgroup->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Output, 0, 1, 0),
+							"AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
+#endif
             }
             
             // Set bus count
