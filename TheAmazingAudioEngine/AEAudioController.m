@@ -3326,10 +3326,10 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
                 AudioUnitSetProperty(subgroup->mixerAudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &kMaxFramesPerSlice, sizeof(kMaxFramesPerSlice));
 
 #if !TARGET_OS_IPHONE
-				// Set output volume
-				// see http://stackoverflow.com/questions/9904369/silence-when-adding-kaudiounitsubtype-multichannelmixer-to-augraph
-				checkResult(AudioUnitSetParameter(subgroup->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Output, 0, 1, 0),
-							"AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
+                // Set output volume
+                // see http://stackoverflow.com/questions/9904369/silence-when-adding-kaudiounitsubtype-multichannelmixer-to-augraph
+                checkResult(AudioUnitSetParameter(subgroup->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Output, 0, 1, 0),
+                    "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
 #endif
             }
             
