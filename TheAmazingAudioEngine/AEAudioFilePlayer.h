@@ -30,6 +30,8 @@ extern "C" {
 #import <Foundation/Foundation.h>
 #import "AEAudioController.h"
 
+typedef void (^AEFilePostRenderBlock)(UInt32 playhead, UInt32 frames, AudioBufferList *audio);
+
 /*!
  * Audio file player
  *
@@ -52,6 +54,7 @@ extern "C" {
 
 @property (nonatomic, strong, readonly) NSURL *url;         //!< Original media URL
 @property (nonatomic, readonly) NSTimeInterval duration;    //!< Length of audio, in seconds
+@property (nonatomic, readonly) UInt32 lengthInFrames;      //!< Length of audio, in frames
 @property (nonatomic, assign) NSTimeInterval currentTime;   //!< Current playback position, in seconds
 @property (nonatomic, readwrite) BOOL loop;                 //!< Whether to loop this track
 @property (nonatomic, readwrite) float volume;              //!< Track volume
@@ -61,6 +64,7 @@ extern "C" {
 @property (nonatomic, readwrite) BOOL removeUponFinish;     //!< Whether the track automatically removes itself from the audio controller after playback completes
 @property (nonatomic, copy) void(^completionBlock)();       //!< A block to be called when playback finishes
 @property (nonatomic, copy) void(^startLoopBlock)();        //!< A block to be called when the loop restarts in loop mode
+@property (nonatomic, copy) AEFilePostRenderBlock postRenderBlock;  //!< A block to be called for additional post-processing of file data during playback; this is a high-priority block, therefore no I/O or Objective-C messaging is permitted
 @end
 
 #ifdef __cplusplus
