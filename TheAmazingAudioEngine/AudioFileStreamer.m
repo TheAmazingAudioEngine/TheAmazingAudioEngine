@@ -7,6 +7,7 @@
 //  AudioFileStreamer is based on code written by Michael Tyson from The Amazing Audio Engine.
 //  It also uses code written by Rob Rampley for The Amazing Audio Engine.
 //  This source file is released under The Amazing Audio Engine license, pasted below.
+//  This notice, beginning with "Created by Ryan..." may not be removed or altered from any source distribution.
 //
 //
 //  The Amazing Audio Engine
