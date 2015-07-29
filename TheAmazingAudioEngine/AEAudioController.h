@@ -1201,6 +1201,7 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
  *  The default value is AVAudioSessionCategoryPlayAndRecord if audio input is enabled, or
  *  AVAudioSessionCategoryPlayback otherwise, with mixing with other apps enabled.
  */
+
 #if TARGET_OS_IPHONE
 @property (nonatomic, assign) NSString * audioSessionCategory;
 #endif
