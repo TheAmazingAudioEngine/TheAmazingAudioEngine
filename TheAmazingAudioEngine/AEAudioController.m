@@ -1317,7 +1317,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     int index;
     AEChannelGroupRef parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
     NSAssert(parentGroup != NULL, @"Channel not found");
-    group->channel->muted = playing;
+    group->channel->playing = playing;
     AudioUnitParameterValue value = group->channel->playing;
     OSStatus result = AudioUnitSetParameter(parentGroup->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
     checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
