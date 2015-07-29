@@ -1,5 +1,5 @@
 //
-//  AudioFileStreamer.h
+//  AEAudioUnitFileStreamer.h
 //
 //  Created by Ryan King and Jeremy Huff of Hello World Engineering, Inc on 7/15/15.
 //  Copyright (c) 2015 Hello World Engineering, Inc. All rights reserved.
@@ -54,11 +54,11 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     return YES;
 }
 #define checkResultForError(resultop,operation,errormsg,errorval,resultvar,errorvar) if(!(_checkResult((resultvar)=(resultop),(operation),strrchr(__FILE__, '/')+1,__LINE__))) \
-    { \
-        if ( (errorvar) ) \
-            *(errorvar) = [NSError errorWithDomain:NSOSStatusErrorDomain code:(resultvar) userInfo:[NSDictionary dictionaryWithObject:@(errormsg) forKey:NSLocalizedDescriptionKey]]; \
-        return (errorval); \
-    }
+{ \
+if ( (errorvar) ) \
+*(errorvar) = [NSError errorWithDomain:NSOSStatusErrorDomain code:(resultvar) userInfo:[NSDictionary dictionaryWithObject:@(errormsg) forKey:NSLocalizedDescriptionKey]]; \
+return (errorval); \
+}
 #endif
 
 /*!
@@ -67,26 +67,18 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
  *  This class allows you to play audio files through audio units without having to load the entire file into memory.
  *
  *  To use, create an instance, then add it to the audio controller.
+ *  
+ *  When subclassing this class, to modify the render callback methods, implement a pre or post render notification callback, as this class does.
  */
-@interface AudioFileStreamer : NSObject <AEAudioPlayable>
+@interface AEAudioUnitFileStreamer : AEAudioUnitChannel
 {
-    @protected
+@protected
     UInt32 _lengthInFrames;                         //!< Audio file length in frames
     AudioStreamBasicDescription _audioDescription;  //!< Audio description
+    AudioStreamBasicDescription _controllerDescription; //!< The description of the audio controller's file type
     volatile int32_t _playhead;                     //!< The location of the playhead in frames
     
-    // When moving the audio playhead from inside the class, this should be set EXCEPT
-    //      -   During initialization
-    //      -   During the playhead's update due to song play, during the render callback
-    BOOL _reloadAudioRegionOnPlay;                  //!< If set, the streamer will reschedule the region of the audio unit when channelIsPlaying is set to YES
-    
     // Audio unit related variables
-    AEAudioController* _audioController;            //!< The audio controller this belongs to
-    AUNode _node;                                   //!< The main audio unit node
-    AudioUnit _audioUnit;                           //!< The main audio unit for playing the file
-    AUNode _converterNode;                          //!< An optional node that converts file formats
-    AudioUnit _converterUnit;                       //!< An optional unit that converts file formats
-    AUGraph _audioGraph;                            //!< The audio controller's audio graph
     AudioFileID _audioUnitFile;                     //!< The file to be played as an audio file ID
 }
 
@@ -125,29 +117,25 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
  */
 - (void) unmute;
 
-+ (OSStatus) renderCallback: (__unsafe_unretained AudioFileStreamer*) THIS audioController: (__unsafe_unretained AEAudioController*) audioController time: (const AudioTimeStamp*) time numberOfFrames: (UInt32) frames audioBufferList: (AudioBufferList*) audio;
-
 @property (nonatomic, strong, readonly) NSURL *url;         //<! The URL of the audio file
 @property (nonatomic, readonly) NSTimeInterval duration;    //<! The length of the audio file in time
 @property (nonatomic, assign) NSTimeInterval currentTime;   //<! The current location of the playhead in time
 
 // AEAudioPlayable Properties
 @property (nonatomic, assign) BOOL channelIsPlaying;        //<! Whether the channel is playing or not
-@property (nonatomic, assign) BOOL channelIsMuted;          //<! Whether the channel is muted or not
-@property (nonatomic, assign) float volume;                 //<! The volume, from 0.0 to 1.0
-@property (nonatomic, assign) float pan;                    //<! The pan, from -1.0 to 1.0
 
 @property (nonatomic, assign) int playbackDelay;            //<! The number of frames to wait before starting playback. Can be used to synchronize with effects audio units that introduce delay of their own.
 @property (nonatomic, assign) Float64 playbackDelayInSeconds;  //<! The number of seconds to wait before starting playback.
 @property (nonatomic, assign) BOOL looping;                 //<! If true, the audio file loops.
 
-@property (nonatomic, readonly) AudioUnit audioUnit;       //<! The audio unit.
-@property (nonatomic, readonly) AUNode node;          //<! The audio node;
+@property (nonatomic, readonly) int32_t playbackStoppedCallbackScheduled;   //<! If true, disallows the channelIsPlayingProperty from being set to true
 
 @property (nonatomic, copy) void(^completionBlock)();       //<! The block to be called when playback ends
 
 // MARK: Debug Properties
 @property (nonatomic, readonly) int32_t currentFrame;       //<! The current frame of playback
 @property (nonatomic, readonly) UInt32 totalFrames;         //<! The total number of frames in the audio file
+
+@property (weak, readonly) AEAudioController* audioController;        //<! Our copy of the audio controller, which is needed for the postRender callback
 
 @end
