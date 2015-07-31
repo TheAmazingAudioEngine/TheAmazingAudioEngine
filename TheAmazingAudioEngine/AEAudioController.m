@@ -284,8 +284,10 @@ typedef struct {
     int                 _inputCallbackCount;
     AudioStreamBasicDescription _rawInputAudioDescription;
     AudioBufferList    *_inputAudioBufferList;
+#if TARGET_OS_IPHONE
     AudioBufferList    *_inputAudioScratchBufferList;
     AEFloatConverter   *_inputAudioFloatConverter;
+#endif
     AudioTimeStamp      _lastInputBusTimeStamp;
     AudioTimeStamp      _lastInputOrOutputBusTimeStamp;
     
@@ -673,6 +675,7 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
             result = err;
         }
         
+#if TARGET_OS_IPHONE
         if ( THIS->_recordingThroughDeviceMicrophone && THIS->_useMeasurementMode && THIS->_boostBuiltInMicGainInMeasurementMode && THIS->_inputAudioFloatConverter ) {
             // Boost input volume
             AEFloatConverterToFloatBufferList(THIS->_inputAudioFloatConverter, THIS->_inputAudioBufferList, THIS->_inputAudioScratchBufferList, inNumberFrames);
@@ -681,6 +684,7 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
             }
             AEFloatConverterFromFloatBufferList(THIS->_inputAudioFloatConverter, THIS->_inputAudioScratchBufferList, THIS->_inputAudioBufferList, inNumberFrames);
         }
+#endif
     }
     
     if ( result == noErr && inNumberFrames == 0 ) {
@@ -998,9 +1002,11 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
         AEFreeAudioBufferList(_inputAudioBufferList);
     }
     
+#if TARGET_OS_IPHONE
     if ( _inputAudioScratchBufferList ) {
         AEFreeAudioBufferList(_inputAudioScratchBufferList);
     }
+#endif
     
     for ( int i=0; i<_inputCallbackCount; i++ ) {
         if ( _inputCallbacks[i].channelMap ) {
@@ -2046,13 +2052,13 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
     
     [self updateInputDeviceStatus];
 }
-#endif
 
 - (void)setBoostBuiltInMicGainInMeasurementMode:(BOOL)boostBuiltInMicGainInMeasurementMode {
     _boostBuiltInMicGainInMeasurementMode = boostBuiltInMicGainInMeasurementMode;
     
     [self updateInputDeviceStatus];
 }
+#endif
 
 -(void)setMasterOutputVolume:(float)masterOutputVolume {
     _masterOutputVolume = masterOutputVolume;
@@ -2992,9 +2998,11 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     
     AudioStreamBasicDescription rawAudioDescription = _rawInputAudioDescription;
     AudioBufferList *inputAudioBufferList           = _inputAudioBufferList;
+    audio_level_monitor_t inputLevelMonitorData     = _inputLevelMonitorData;
+#if TARGET_OS_IPHONE
     AudioBufferList *inputAudioScratchBufferList    = _inputAudioScratchBufferList;
     AEFloatConverter *inputAudioFloatConverter      = _inputAudioFloatConverter;
-    audio_level_monitor_t inputLevelMonitorData     = _inputLevelMonitorData;
+#endif
     
     BOOL inputChannelsChanged = _numberOfInputChannels != numberOfInputChannels;
     BOOL inputDescriptionChanged = inputChannelsChanged;
@@ -3135,6 +3143,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
             inputAudioBufferList = AEAllocateAndInitAudioBufferList(rawAudioDescription, kInputAudioBufferFrames);
         }
         
+#if TARGET_OS_IPHONE
         if ( _useMeasurementMode && _boostBuiltInMicGainInMeasurementMode ) {
             if ( !inputAudioScratchBufferList || rawInputAudioDescriptionChanged ) {
                 inputAudioScratchBufferList = AEAllocateAndInitAudioBufferList(rawAudioDescription, kInputAudioBufferFrames);
@@ -3146,6 +3155,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
             inputAudioScratchBufferList = NULL;
             inputAudioFloatConverter = nil;
         }
+#endif
         
     } else if ( !inputAvailable ) {
 #if TARGET_OS_IPHONE
@@ -3178,7 +3188,10 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     }
     
     AudioBufferList *oldInputBuffer     = _inputAudioBufferList;
+    
+#if TARGET_OS_IPHONE
     AudioBufferList *oldInputScratchBuffer = _inputAudioScratchBufferList;
+#endif
     
     input_callback_table_t *oldInputCallbacks = _inputCallbacks;
     int oldInputCallbackCount = _inputCallbackCount;
@@ -3196,8 +3209,10 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         _numberOfInputChannels    = numberOfInputChannels;
         _rawInputAudioDescription = rawAudioDescription;
         _inputAudioBufferList     = inputAudioBufferList;
+#if TARGET_OS_IPHONE
         _inputAudioScratchBufferList = inputAudioScratchBufferList;
         _inputAudioFloatConverter = inputAudioFloatConverter;
+#endif
         _audioInputAvailable      = inputAvailable;
         _hardwareInputAvailable   = hardwareInputAvailable;
         _inputCallbacks           = inputCallbacks;
@@ -3222,9 +3237,11 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         AEFreeAudioBufferList(oldInputBuffer);
     }
     
+#if TARGET_OS_IPHONE
     if ( oldInputScratchBuffer && oldInputScratchBuffer != inputAudioScratchBufferList ) {
         AEFreeAudioBufferList(oldInputScratchBuffer);
     }
+#endif
     
     if ( oldInputCallbacks != inputCallbacks ) {
         for ( int entryIndex = 0; entryIndex < oldInputCallbackCount; entryIndex++ ) {
