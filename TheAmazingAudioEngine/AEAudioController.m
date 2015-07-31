@@ -51,6 +51,7 @@ static const int kInputAudioBufferFrames               = kMaxFramesPerSlice;
 static const int kLevelMonitorScratchBufferSize        = kMaxFramesPerSlice;
 static const int kMaximumMonitoringChannels            = 16;
 static const NSTimeInterval kMaxBufferDurationWithVPIO = 0.01;
+static const float kBoostForBuiltInMicInMeasurementMode= 4.0;
 static const Float32 kNoValue                          = -1.0;
 #define kNoAudioErr                            -2222
 
@@ -277,6 +278,8 @@ typedef struct {
     int                 _inputCallbackCount;
     AudioStreamBasicDescription _rawInputAudioDescription;
     AudioBufferList    *_inputAudioBufferList;
+    AudioBufferList    *_inputAudioScratchBufferList;
+    AEFloatConverter   *_inputAudioFloatConverter;
     AudioTimeStamp      _lastInputBusTimeStamp;
     AudioTimeStamp      _lastInputOrOutputBusTimeStamp;
     
@@ -650,6 +653,15 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
         if ( !checkResult(err, "AudioUnitRender") ) {
             result = err;
         }
+        
+        if ( THIS->_recordingThroughDeviceMicrophone && THIS->_useMeasurementMode && THIS->_boostBuiltInMicGainInMeasurementMode && THIS->_inputAudioFloatConverter ) {
+            // Boost input volume
+            AEFloatConverterToFloatBufferList(THIS->_inputAudioFloatConverter, THIS->_inputAudioBufferList, THIS->_inputAudioScratchBufferList, inNumberFrames);
+            for ( int i=0; i<THIS->_inputAudioScratchBufferList->mNumberBuffers; i++ ) {
+                vDSP_vsmul(THIS->_inputAudioScratchBufferList->mBuffers[i].mData, 1, &kBoostForBuiltInMicInMeasurementMode, THIS->_inputAudioScratchBufferList->mBuffers[i].mData, 1, inNumberFrames);
+            }
+            AEFloatConverterFromFloatBufferList(THIS->_inputAudioFloatConverter, THIS->_inputAudioScratchBufferList, THIS->_inputAudioBufferList, inNumberFrames);
+        }
     }
     
     if ( result == noErr && inNumberFrames == 0 ) {
@@ -846,7 +858,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     _voiceProcessingEnabled = useVoiceProcessing;
     _inputMode = AEInputModeFixedAudioFormat;
     _voiceProcessingOnlyForSpeakerAndMicrophone = YES;
-    _avoidMeasurementModeForBuiltInMic = YES;
+    _boostBuiltInMicGainInMeasurementMode = YES;
     _inputCallbacks = (input_callback_table_t*)calloc(sizeof(input_callback_table_t), 1);
     _inputCallbackCount = 1;
     
@@ -895,7 +907,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     _voiceProcessingEnabled = useVoiceProcessing;
     _inputMode = AEInputModeFixedAudioFormat;
     _voiceProcessingOnlyForSpeakerAndMicrophone = YES;
-    _avoidMeasurementModeForBuiltInMic = YES;
+    _boostBuiltInMicGainInMeasurementMode = YES;
 
 
     if ( ![self initAudioSession] || ![self setup] ) {
@@ -944,6 +956,10 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     
     if ( _inputAudioBufferList ) {
         AEFreeAudioBufferList(_inputAudioBufferList);
+    }
+    
+    if ( _inputAudioScratchBufferList ) {
+        AEFreeAudioBufferList(_inputAudioScratchBufferList);
     }
     
     for ( int i=0; i<_inputCallbackCount; i++ ) {
@@ -1966,15 +1982,21 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     
     NSError *error = nil;
-    if ( ![audioSession setMode:_useMeasurementMode && (!_avoidMeasurementModeForBuiltInMic || !_recordingThroughDeviceMicrophone)
-                                    ? AVAudioSessionModeMeasurement : AVAudioSessionModeDefault
-                          error:&error] ) {
+    if ( ![audioSession setMode:_useMeasurementMode ? AVAudioSessionModeMeasurement : AVAudioSessionModeDefault error:&error] ) {
         NSLog(@"TAAE: Couldn't set audio session mode: %@", error);
     } else {
         if ( ![audioSession setPreferredIOBufferDuration:_preferredBufferDuration error:&error] ) {
             NSLog(@"TAAE: Couldn't set preferred IO buffer duration: %@", error);
         }
     }
+    
+    [self updateInputDeviceStatus];
+}
+
+- (void)setBoostBuiltInMicGainInMeasurementMode:(BOOL)boostBuiltInMicGainInMeasurementMode {
+    _boostBuiltInMicGainInMeasurementMode = boostBuiltInMicGainInMeasurementMode;
+    
+    [self updateInputDeviceStatus];
 }
 
 -(void)setMasterOutputVolume:(float)masterOutputVolume {
@@ -2410,18 +2432,6 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
             [self willChangeValueForKey:@"recordingThroughDeviceMicrophone"];
             _recordingThroughDeviceMicrophone = recordingThroughMic;
             [self didChangeValueForKey:@"recordingThroughDeviceMicrophone"];
-            
-            if ( _useMeasurementMode && _avoidMeasurementModeForBuiltInMic ) {
-                NSError *error = nil;
-                if ( ![audioSession setMode:_useMeasurementMode && !_recordingThroughDeviceMicrophone ? AVAudioSessionModeMeasurement : AVAudioSessionModeDefault
-                                      error:&error] ) {
-                    NSLog(@"TAAE: Couldn't set audio session mode: %@", error);
-                } else {
-                    if ( ![audioSession setPreferredIOBufferDuration:_preferredBufferDuration error:&error] ) {
-                        NSLog(@"TAAE: Couldn't set preferred IO buffer duration: %@", error);
-                    }
-                }
-            }
         }
         
         if ( _inputEnabled ) {
@@ -2864,6 +2874,8 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     
     AudioStreamBasicDescription rawAudioDescription = _rawInputAudioDescription;
     AudioBufferList *inputAudioBufferList           = _inputAudioBufferList;
+    AudioBufferList *inputAudioScratchBufferList    = _inputAudioScratchBufferList;
+    AEFloatConverter *inputAudioFloatConverter      = _inputAudioFloatConverter;
     audio_level_monitor_t inputLevelMonitorData     = _inputLevelMonitorData;
     
     BOOL inputChannelsChanged = _numberOfInputChannels != numberOfInputChannels;
@@ -2998,8 +3010,21 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
             }
         }
         
-        if ( !inputAudioBufferList || memcmp(&_rawInputAudioDescription, &rawAudioDescription, sizeof(_rawInputAudioDescription)) != 0 ) {
+        BOOL rawInputAudioDescriptionChanged = memcmp(&_rawInputAudioDescription, &rawAudioDescription, sizeof(_rawInputAudioDescription)) != 0;
+        if ( !inputAudioBufferList || rawInputAudioDescriptionChanged ) {
             inputAudioBufferList = AEAllocateAndInitAudioBufferList(rawAudioDescription, kInputAudioBufferFrames);
+        }
+        
+        if ( _useMeasurementMode && _boostBuiltInMicGainInMeasurementMode ) {
+            if ( !inputAudioScratchBufferList || rawInputAudioDescriptionChanged ) {
+                inputAudioScratchBufferList = AEAllocateAndInitAudioBufferList(rawAudioDescription, kInputAudioBufferFrames);
+            }
+            if ( !inputAudioFloatConverter || rawInputAudioDescriptionChanged ) {
+                inputAudioFloatConverter = [[AEFloatConverter alloc] initWithSourceFormat:rawAudioDescription];
+            }
+        } else {
+            inputAudioScratchBufferList = NULL;
+            inputAudioFloatConverter = nil;
         }
         
     } else if ( !inputAvailable ) {
@@ -3031,6 +3056,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     }
     
     AudioBufferList *oldInputBuffer     = _inputAudioBufferList;
+    AudioBufferList *oldInputScratchBuffer = _inputAudioScratchBufferList;
     
     input_callback_table_t *oldInputCallbacks = _inputCallbacks;
     int oldInputCallbackCount = _inputCallbackCount;
@@ -3048,6 +3074,8 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         _numberOfInputChannels    = numberOfInputChannels;
         _rawInputAudioDescription = rawAudioDescription;
         _inputAudioBufferList     = inputAudioBufferList;
+        _inputAudioScratchBufferList = inputAudioScratchBufferList;
+        _inputAudioFloatConverter = inputAudioFloatConverter;
         _audioInputAvailable      = inputAvailable;
         _hardwareInputAvailable   = hardwareInputAvailable;
         _inputCallbacks           = inputCallbacks;
@@ -3070,6 +3098,10 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     
     if ( oldInputBuffer && oldInputBuffer != inputAudioBufferList ) {
         AEFreeAudioBufferList(oldInputBuffer);
+    }
+    
+    if ( oldInputScratchBuffer && oldInputScratchBuffer != inputAudioScratchBufferList ) {
+        AEFreeAudioBufferList(oldInputScratchBuffer);
     }
     
     if ( oldInputCallbacks != inputCallbacks ) {
