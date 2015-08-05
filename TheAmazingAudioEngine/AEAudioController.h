@@ -1201,7 +1201,6 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
  *  The default value is AVAudioSessionCategoryPlayAndRecord if audio input is enabled, or
  *  AVAudioSessionCategoryPlayback otherwise, with mixing with other apps enabled.
  */
-
 #if TARGET_OS_IPHONE
 @property (nonatomic, assign) NSString * audioSessionCategory;
 #endif
@@ -1224,7 +1223,8 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
 /*!
  * Whether to use the "Measurement" Audio Session Mode for improved audio quality and bass response.
  *
- *  Note also the @link avoidMeasurementModeForBuiltInMic @endlink property.
+ *  Note that when the device's built-in mic is being used, TAAE can automatically boost the gain, as this
+ *  is very low while Measurement Mode is enabled. See @link boostBuiltInMicGainInMeasurementMode @endlink.
  *
  * Default: NO
  */
@@ -1233,16 +1233,17 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
 #endif
 
 /*!
- * Whether to avoid using Measurement Mode with the built-in mic
+ * Whether to boost the input volume while using Measurement Mode with the built-in mic
  *
- *  When used with the built-in microphone, Measurement Mode results in quite low audio
- *  input levels. Setting this property to YES causes TAAE to avoid using Measurement Mode
- *  with the built-in mic, avoiding this problem.
+ *  When the device's built-in mic is being used while Measurement Mode is enabled (see
+ *  @link useMeasurementMode @endlink), TAAE can automatically boost the gain, as this
+ *  is very low with Measurement Mode. This takes place independently of the @link
+ *  inputGain @endlink setting.
  *
  *  Default is YES.
  */
 #if TARGET_OS_IPHONE
-@property (nonatomic, assign) BOOL avoidMeasurementModeForBuiltInMic;
+@property (nonatomic, assign) BOOL boostBuiltInMicGainInMeasurementMode;
 #endif
 
 /*! 
