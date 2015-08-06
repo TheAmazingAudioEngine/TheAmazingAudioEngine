@@ -56,8 +56,13 @@ static void VRAMPMUL(const SAMPLETYPE *__vDSP_I, vDSP_Stride __vDSP_IS, SAMPLETY
     _conversionBuffer = AEAllocateAndInitAudioBufferList(_floatConverter.floatingPointAudioDescription, kMaxConversionSize);
     _buffer = (SAMPLETYPE*)calloc(kBufferLength, sizeof(SAMPLETYPE));
     _scratchBuffer = (CGPoint*)malloc(kBufferLength * sizeof(CGPoint));
+    
+#if TARGET_OS_IPHONE
     self.contentsScale = [[UIScreen mainScreen] scale];
     self.lineColor = [UIColor blackColor];
+#else
+    self.lineColor = [NSColor blackColor];
+#endif
     
     // Disable animating view refreshes
     self.actions = @{@"contents": [NSNull null]};
@@ -67,7 +72,8 @@ static void VRAMPMUL(const SAMPLETYPE *__vDSP_I, vDSP_Stride __vDSP_IS, SAMPLETY
 
 - (void)start {
     if ( _timer ) return;
-    
+
+#if TARGET_OS_IPHONE
     if ( NSClassFromString(@"CADisplayLink") ) {
         _timer = [CADisplayLink displayLinkWithTarget:self selector:@selector(setNeedsDisplay)];
         ((CADisplayLink*)_timer).frameInterval = 2;
@@ -75,6 +81,10 @@ static void VRAMPMUL(const SAMPLETYPE *__vDSP_I, vDSP_Stride __vDSP_IS, SAMPLETY
     } else {
         _timer = [NSTimer scheduledTimerWithTimeInterval:1.0/30.0 target:self selector:@selector(setNeedsDisplay) userInfo:nil repeats:YES];
     }
+#else
+    _timer = [NSTimer scheduledTimerWithTimeInterval:1.0/30.0 target:self selector:@selector(setNeedsDisplay) userInfo:nil repeats:YES];
+#endif
+    
 }
 
 - (void)stop {
