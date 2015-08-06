@@ -29,6 +29,8 @@
     self.viewController = [[ViewController alloc] initWithAudioController:self.audioController];
     self.window.contentViewController = self.viewController;
     self.window.contentView = self.viewController.view;
+    self.window.backgroundColor = [NSColor whiteColor];
+    [self.window setStyleMask:[self.window styleMask] & ~NSResizableWindowMask];
 }
 
 - (void)applicationWillTerminate:(NSNotification *)aNotification {

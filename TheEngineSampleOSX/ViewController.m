@@ -53,77 +53,91 @@ static const int kInputChannelsChangedContext;
 @property (nonatomic, strong) AEAudioFilePlayer *player;
 @property (nonatomic, strong) NSButton *recordButton;
 @property (nonatomic, strong) NSButton *playButton;
-@property (nonatomic, strong) NSButton *oneshotButton;
-@property (nonatomic, strong) NSButton *oneshotAudioUnitButton;
 
 @end
 
 @implementation ViewController
 
 - (void)loadView {
-    self.view = [[NSView alloc] initWithFrame:CGRectMake(0, 0, 400, 600)];
+    self.view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 400, 600)];
 }
 
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-    _headerView = [[NSView alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 100)];
+    int headerYPos = self.view.bounds.size.height - 100;
+    
+    _headerView = [[NSView alloc] initWithFrame:NSMakeRect(0, headerYPos, self.view.bounds.size.width, 100)];
+    _headerView.layer = [[CALayer alloc] init];
+
 
     self.outputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioController:_audioController];
-    _outputOscilloscope.frame = CGRectMake(0, 500, _headerView.bounds.size.width, 80);
+    _outputOscilloscope.frame = NSMakeRect(0, headerYPos + 10, _headerView.bounds.size.width, 80);
+    _outputOscilloscope.lineColor = [NSColor blueColor];
     [_headerView.layer addSublayer:_outputOscilloscope];
     [_audioController addOutputReceiver:_outputOscilloscope];
     [_outputOscilloscope start];
     
-    self.inputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioController:_audioController];
-    _inputOscilloscope.frame = CGRectMake(0, 500, _headerView.bounds.size.width, 80);
-    _inputOscilloscope.lineColor = [NSColor colorWithWhite:0.0 alpha:0.3];
-    [_headerView.layer addSublayer:_inputOscilloscope];
-    [_audioController addInputReceiver:_inputOscilloscope];
-    [_inputOscilloscope start];
     
-    self.inputLevelLayer = [CALayer layer];
-    _inputLevelLayer.backgroundColor = [[NSColor colorWithWhite:0.0 alpha:0.3] CGColor];
-    _inputLevelLayer.frame = CGRectMake(_headerView.bounds.size.width/2.0 - 5.0 - (0.0), 90, 0, 10);
-    [_headerView.layer addSublayer:_inputLevelLayer];
+//    [NSTimer scheduledTimerWithTimeInterval:1.0/30.0 target:_outputOscilloscope selector:@selector(setNeedsDisplay) userInfo:nil repeats:YES];
     
-    self.outputLevelLayer = [CALayer layer];
-    _outputLevelLayer.backgroundColor = [[NSColor colorWithWhite:0.0 alpha:0.3] CGColor];
-    _outputLevelLayer.frame = CGRectMake(_headerView.bounds.size.width/2.0 + 5.0, 90, 0, 10);
-    [_headerView.layer addSublayer:_outputLevelLayer];
+//    self.inputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioController:_audioController];
+//    _inputOscilloscope.frame = NSMakeRect(0, headerYPos + 10, _headerView.bounds.size.width, 80);
+//    _inputOscilloscope.lineColor = [NSColor colorWithWhite:0.0 alpha:0.3];
+//    [_headerView.layer addSublayer:_inputOscilloscope];
+//    [_audioController addInputReceiver:_inputOscilloscope];
+//    [_inputOscilloscope start];
     
+//    self.inputLevelLayer = [CALayer layer];
+//    _inputLevelLayer.backgroundColor = [[NSColor colorWithWhite:0.0 alpha:0.3] CGColor];
+//    _inputLevelLayer.frame = NSMakeRect(_headerView.bounds.size.width/2.0 - 5.0 - (0.0), headerYPos, 50, 10);
+//    [_headerView.layer addSublayer:_inputLevelLayer];
+//    
+//    self.outputLevelLayer = [CALayer layer];
+//    _outputLevelLayer.backgroundColor = [[NSColor colorWithWhite:0.0 alpha:0.3] CGColor];
+//    _outputLevelLayer.frame = NSMakeRect(_headerView.bounds.size.width/2.0 + 5.0, headerYPos, 50, 10);
+//    [_headerView setLayer:_outputLevelLayer];
+
     [self.view addSubview:_headerView];
+    _headerView.wantsLayer = YES;
     
-    _tableView = [[NSTableView alloc] initWithFrame:CGRectMake(0, 100, self.view.bounds.size.width, 400)];
+//    NSTextField *testField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 500, 100, 20)];
+//    testField.stringValue = @"WOOP";
+//    [_headerView addSubview:testField];
+    
+
+    
+    _tableView = [[NSTableView alloc] initWithFrame:NSMakeRect(0, 100, self.view.bounds.size.width, 400)];
     [self.view addSubview:_tableView];
     _tableView.delegate = self;
     _tableView.dataSource = self;
+    _tableView.backgroundColor = [NSColor whiteColor];
     
     _nameColumn = [[NSTableColumn alloc] initWithIdentifier:@"nameColumn"];
-    _nameColumn.width = 400 / 2.0;
+    _nameColumn.width = 390 / 2.0;
     [_tableView addTableColumn:_nameColumn];
 
     _sliderColumn = [[NSTableColumn alloc] initWithIdentifier:@"sliderColumn"];
-    _sliderColumn.width = 400 / 2.0;
+    _sliderColumn.width = 390 / 2.0;
     [_tableView addTableColumn:_sliderColumn];
     
-    NSView *footerView = [[NSView alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 80)];
+    NSView *footerView = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, self.view.bounds.size.width, 80)];
 
     self.recordButton = [[NSButton alloc] init];
+    self.recordButton.bezelStyle = NSRoundRectBezelStyle;
     [self.recordButton setButtonType:NSPushOnPushOffButton];
     self.recordButton.title = @"Record";
     self.recordButton.action = @selector(record:);
     self.recordButton.target = self;
-    self.recordButton.frame = CGRectMake(20, 10, (footerView.bounds.size.width - 50) / 2, footerView.bounds.size.height - 20);
-    //    _recordButton.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleRightMargin;
+    self.recordButton.frame = NSMakeRect(20, 10, (footerView.bounds.size.width - 50) / 2, footerView.bounds.size.height - 20);
     
     self.playButton = [[NSButton alloc] init];
+    self.playButton.bezelStyle = NSRoundRectBezelStyle;
     [self.playButton setButtonType:NSPushOnPushOffButton];
     self.playButton.title = @"Play";
     self.playButton.action = @selector(play:);
     self.playButton.target = self;
-    self.playButton.frame = CGRectMake(CGRectGetMaxX(_recordButton.frame) + 10, 10, ((footerView.bounds.size.width - 50) / 2), footerView.bounds.size.height - 20);
-    //    _playButton.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleLeftMargin;
+    self.playButton.frame = NSMakeRect(CGRectGetMaxX(_recordButton.frame) + 10, 10, ((footerView.bounds.size.width - 50) / 2), footerView.bounds.size.height - 20);
     
     [footerView addSubview:self.recordButton];
     [footerView addSubview:self.playButton];
@@ -213,13 +227,13 @@ static const int kInputChannelsChangedContext;
     
     [_audioController removeChannels:channelsToRemove];
     
-//    if ( _limiter ) {
-//        [_audioController removeFilter:_limiter];
-//    }
-//    
-//    if ( _expander ) {
-//        [_audioController removeFilter:_expander];
-//    }
+    if ( _limiter ) {
+        [_audioController removeFilter:_limiter];
+    }
+    
+    if ( _expander ) {
+        [_audioController removeFilter:_expander];
+    }
     
     if ( _reverb ) {
         [_audioController removeFilter:_reverb];
@@ -252,12 +266,12 @@ static inline float translate(float val, float min, float max) {
     [_audioController inputAveragePowerLevel:&inputAvg peakHoldLevel:&inputPeak];
     [_audioController outputAveragePowerLevel:&outputAvg peakHoldLevel:&outputPeak];
     
-    _inputLevelLayer.frame = CGRectMake(_headerView.bounds.size.width/2.0 - 5.0 - (translate(inputAvg, -20, 0) * (_headerView.bounds.size.width/2.0 - 15.0)),
+    _inputLevelLayer.frame = NSMakeRect(_headerView.bounds.size.width/2.0 - 5.0 - (translate(inputAvg, -20, 0) * (_headerView.bounds.size.width/2.0 - 15.0)),
                                         90,
                                         translate(inputAvg, -20, 0) * (_headerView.bounds.size.width/2.0 - 15.0),
                                         10);
     
-    _outputLevelLayer.frame = CGRectMake(_headerView.bounds.size.width/2.0,
+    _outputLevelLayer.frame = NSMakeRect(_headerView.bounds.size.width/2.0,
                                          _outputLevelLayer.frame.origin.y,
                                          translate(outputAvg, -20, 0) * (_headerView.bounds.size.width/2.0 - 15.0),
                                          10);
@@ -284,6 +298,10 @@ static inline float translate(float val, float min, float max) {
 
 #pragma mark - NSTableViewDelegate
 
+- (BOOL)tableView:(NSTableView *)tableView shouldSelectTableColumn:(NSTableColumn *)tableColumn {
+    return NO;
+}
+
 - (BOOL)tableView:(NSTableView *)tableView shouldSelectRow:(NSInteger)row {
     return NO;
 }
@@ -300,12 +318,16 @@ static inline float translate(float val, float min, float max) {
         view = [tableView makeViewWithIdentifier:nameIdentifier owner:self];
         
         if (!view) {
-            view = [[NSButton alloc] initWithFrame:NSMakeRect(0, 0, 400, 20)];
+            view = [[NSButton alloc] initWithFrame:NSMakeRect(0, 0, 400, 40)];
             view.identifier = nameIdentifier;
         }
         NSButton *button = (NSButton *)view;
         button.bezelStyle = NSRoundRectBezelStyle;
         [button setButtonType:NSPushOnPushOffButton];
+        
+        NSTextField *label = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 400, 40)];
+        label.alignment = NSCenterTextAlignment;
+        label.bordered = NO;
         
         switch (row) {
             case 0:
@@ -328,36 +350,54 @@ static inline float translate(float val, float min, float max) {
                 break;
             case 3:
                 button.title = @"Group";
-                button.state = NSOnState;
+                button.state = [_audioController channelGroupIsMuted:_group] ? NSOffState : NSOnState;
+                button.target = self;
+                button.action = @selector(channelGroupSwitchChanged:);
                 break;
             case 4:
                 button.title = @"One shot";
-                [button setButtonType:NSMomentaryLightButton];
+                button.target = self;
+                button.action = @selector(oneshotPlayButtonPressed:);
                 break;
             case 5:
                 button.title = @"One shot (audio unit)";
                 [button setButtonType:NSMomentaryLightButton];
+                button.target = self;
+                button.action = @selector(oneshotAudioUnitPlayButtonPressed:);
                 break;
             case 6:
                 button.title = @"Limiter";
+                button.state = _limiter ? NSOnState : NSOffState;
+                button.target = self;
+                button.action = @selector(limiterSwitchChanged:);
                 break;
             case 7:
                 button.title = @"Expander";
+                button.state = _expander ? NSOnState : NSOffState;
+                button.target = self;
+                button.action = @selector(expanderSwitchChanged:);
                 break;
             case 8:
-                button.title = @"Reverb";
+                button.title = @"Cathedral Reverb";
+                button.state = _reverb ? NSOnState : NSOffState;
+                button.target = self;
+                button.action = @selector(reverbSwitchChanged:);
                 break;
             case 9:
                 button.title = @"Input Playthrough";
+                button.enabled = NO;
                 break;
             case 10:
                 button.title = @"Measurement Mode";
+                button.enabled = NO;
                 break;
             case 11:
-                button.title = @"Input Gain";
+                label.stringValue = @"Input Gain";
+                view = label;
                 break;
             case 12:
-                button.title = @"Channels";
+                label.stringValue = @"Channels";
+                view = label;
                 break;
             default:
                 button.title = @"";
@@ -389,7 +429,9 @@ static inline float translate(float val, float min, float max) {
                 slider.action = @selector(oscillatorVolumeChanged:);
                 break;
             case 3:
-                slider.doubleValue = 1.0;
+                slider.doubleValue = [_audioController volumeForChannelGroup:_group];
+                slider.target = self;
+                slider.action = @selector(channelGroupVolumeChanged:);
                 break;
             case 11:
                 slider.enabled = NO;
@@ -399,169 +441,9 @@ static inline float translate(float val, float min, float max) {
         }
     }
     return view;
-    
-
-
-//    switch ( indexPath.section ) {
-//        case 0: {
-//            cell.accessoryView = [[UISwitch alloc] initWithFrame:CGRectZero];
-//            UISlider *slider = [[UISlider alloc] initWithFrame:CGRectMake(cell.bounds.size.width - (isiPad ? 250 : 210), 0, 100, cell.bounds.size.height)];
-//            slider.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
-//            slider.tag = kAuxiliaryViewTag;
-//            slider.maximumValue = 1.0;
-//            slider.minimumValue = 0.0;
-//            [cell addSubview:slider];
-//            
-//            switch ( indexPath.row ) {
-//                case 0: {
-//                    cell.textLabel.text = @"Drums";
-//                    ((UISwitch*)cell.accessoryView).on = !_loop1.channelIsMuted;
-//                    slider.value = _loop1.volume;
-//                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(loop1SwitchChanged:) forControlEvents:UIControlEventValueChanged];
-//                    [slider addTarget:self action:@selector(loop1VolumeChanged:) forControlEvents:UIControlEventValueChanged];
-//                    break;
-//                }
-//                case 1: {
-//                    cell.textLabel.text = @"Organ";
-//                    ((UISwitch*)cell.accessoryView).on = !_loop2.channelIsMuted;
-//                    slider.value = _loop2.volume;
-//                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(loop2SwitchChanged:) forControlEvents:UIControlEventValueChanged];
-//                    [slider addTarget:self action:@selector(loop2VolumeChanged:) forControlEvents:UIControlEventValueChanged];
-//                    break;
-//                }
-//                case 2: {
-//                    cell.textLabel.text = @"Oscillator";
-//                    ((UISwitch*)cell.accessoryView).on = !_oscillator.channelIsMuted;
-//                    slider.value = _oscillator.volume;
-//                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(oscillatorSwitchChanged:) forControlEvents:UIControlEventValueChanged];
-//                    [slider addTarget:self action:@selector(oscillatorVolumeChanged:) forControlEvents:UIControlEventValueChanged];
-//                    break;
-//                }
-//                case 3: {
-//                    cell.textLabel.text = @"Group";
-//                    ((UISwitch*)cell.accessoryView).on = ![_audioController channelGroupIsMuted:_group];
-//                    slider.value = [_audioController volumeForChannelGroup:_group];
-//                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(channelGroupSwitchChanged:) forControlEvents:UIControlEventValueChanged];
-//                    [slider addTarget:self action:@selector(channelGroupVolumeChanged:) forControlEvents:UIControlEventValueChanged];
-//                    break;
-//                }
-//            }
-//            break;
-//        }
-//        case 1: {
-//            switch ( indexPath.row ) {
-//                case 0: {
-//                    cell.accessoryView = self.oneshotButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
-//                    [_oneshotButton setTitle:@"Play" forState:UIControlStateNormal];
-//                    [_oneshotButton setTitle:@"Stop" forState:UIControlStateSelected];
-//                    [_oneshotButton sizeToFit];
-//                    [_oneshotButton setSelected:_oneshot != nil];
-//                    [_oneshotButton addTarget:self action:@selector(oneshotPlayButtonPressed:) forControlEvents:UIControlEventTouchUpInside];
-//                    cell.textLabel.text = @"One Shot";
-//                    break;
-//                }
-//                case 1: {
-//                    cell.accessoryView = self.oneshotAudioUnitButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
-//                    [_oneshotAudioUnitButton setTitle:@"Play" forState:UIControlStateNormal];
-//                    [_oneshotAudioUnitButton setTitle:@"Stop" forState:UIControlStateSelected];
-//                    [_oneshotAudioUnitButton sizeToFit];
-//                    [_oneshotAudioUnitButton setSelected:_oneshot != nil];
-//                    [_oneshotAudioUnitButton addTarget:self action:@selector(oneshotAudioUnitPlayButtonPressed:) forControlEvents:UIControlEventTouchUpInside];
-//                    cell.textLabel.text = @"One Shot (Audio Unit)";
-//                    break;
-//                }
-//            }
-//            break;
-//        }
-//        case 2: {
-//            cell.accessoryView = [[UISwitch alloc] initWithFrame:CGRectZero];
-//            
-//            switch ( indexPath.row ) {
-//                case 0: {
-//                    cell.textLabel.text = @"Limiter";
-//                    ((UISwitch*)cell.accessoryView).on = _limiter != nil;
-//                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(limiterSwitchChanged:) forControlEvents:UIControlEventValueChanged];
-//                    break;
-//                }
-//                case 1: {
-//                    cell.textLabel.text = @"Expander";
-//                    ((UISwitch*)cell.accessoryView).on = _expander != nil;
-//                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(expanderSwitchChanged:) forControlEvents:UIControlEventValueChanged];
-//                    break;
-//                }
-//                case 2: {
-//                    cell.textLabel.text = @"Reverb";
-//                    ((UISwitch*)cell.accessoryView).on = _reverb != nil;
-//                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(reverbSwitchChanged:) forControlEvents:UIControlEventValueChanged];
-//                    break;
-//                }
-//            }
-//            break;
-//        }
-//        case 3: {
-//            cell.accessoryView = [[UISwitch alloc] initWithFrame:CGRectZero];
-//            
-//            switch ( indexPath.row ) {
-//                case 0: {
-//                    cell.textLabel.text = @"Input Playthrough";
-//                    ((UISwitch*)cell.accessoryView).on = _playthrough != nil;
-//                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(playthroughSwitchChanged:) forControlEvents:UIControlEventValueChanged];
-//                    break;
-//                }
-//                case 1: {
-//                    cell.textLabel.text = @"Measurement Mode";
-//                    ((UISwitch*)cell.accessoryView).on = _audioController.useMeasurementMode;
-//                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(measurementModeSwitchChanged:) forControlEvents:UIControlEventValueChanged];
-//                    break;
-//                }
-//                case 2: {
-//                    cell.textLabel.text = @"Input Gain";
-//                    UISlider *inputGainSlider = [[UISlider alloc] initWithFrame:CGRectMake(0, 0, 100, 40)];
-//                    inputGainSlider.minimumValue = 0.0;
-//                    inputGainSlider.maximumValue = 1.0;
-//                    inputGainSlider.value = _audioController.inputGain;
-//                    [inputGainSlider addTarget:self action:@selector(inputGainSliderChanged:) forControlEvents:UIControlEventValueChanged];
-//                    cell.accessoryView = inputGainSlider;
-//                    break;
-//                }
-//                case 3: {
-//                    cell.textLabel.text = @"Channels";
-//                    
-//                    int channelCount = _audioController.numberOfInputChannels;
-//                    CGSize buttonSize = CGSizeMake(30, 30);
-//                    
-//                    UIScrollView *channelStrip = [[UIScrollView alloc] initWithFrame:CGRectMake(0,
-//                                                                                                0,
-//                                                                                                MIN(channelCount * (buttonSize.width+5) + 5,
-//                                                                                                    isiPad ? 400 : 200),
-//                                                                                                cell.bounds.size.height)];
-//                    channelStrip.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth;
-//                    channelStrip.backgroundColor = [UIColor clearColor];
-//                    
-//                    for ( int i=0; i<channelCount; i++ ) {
-//                        UIButton *button = [UIButton buttonWithType:UIButtonTypeRoundedRect];
-//                        button.frame = CGRectMake(i*(buttonSize.width+5), round((channelStrip.bounds.size.height-buttonSize.height)/2), buttonSize.width, buttonSize.height);
-//                        [button setTitle:[NSString stringWithFormat:@"%d", i+1] forState:UIControlStateNormal];
-//                        button.highlighted = [_audioController.inputChannelSelection containsObject:@(i)];
-//                        button.tag = i;
-//                        [button addTarget:self action:@selector(channelButtonPressed:) forControlEvents:UIControlEventTouchUpInside];
-//                        [channelStrip addSubview:button];
-//                    }
-//                    
-//                    channelStrip.contentSize = CGSizeMake(channelCount * (buttonSize.width+5) + 5, channelStrip.bounds.size.height);
-//                    
-//                    cell.accessoryView = channelStrip;
-//                    
-//                    break;
-//                }
-//            }
-//            break;
-//        }
-//            
-//    }
-//    
-//    return cell;
 }
+
+#pragma mark - UI Control
 
 - (void)loop1SwitchChanged:(NSButton *)sender {
     _loop1.channelIsMuted = (sender.state == NSOffState);
@@ -595,103 +477,88 @@ static inline float translate(float val, float min, float max) {
 
 - (void)channelGroupSwitchChanged:(NSButton *)sender {
     BOOL isOn = (sender.state == NSOnState);
-    [_audioController setMuted:isOn forChannelGroup:_group];
+    [_audioController setMuted:!isOn forChannelGroup:_group];
 }
 
 - (void)channelGroupVolumeChanged:(NSSlider *)sender {
+    BOOL muted = [_audioController channelGroupIsMuted:_group];
     [_audioController setVolume:sender.doubleValue forChannelGroup:_group];
+    [_audioController setMuted:muted forChannelGroup:_group];
 }
 
-//- (void)oneshotPlayButtonPressed:(NSButton *)sender {
-//    if ( _oneshot ) {
-//        [_audioController removeChannels:@[_oneshot]];
-//        self.oneshot = nil;
-//        _oneshotButton.selected = NO;
-//    } else {
-//        self.oneshot = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Organ Run" withExtension:@"m4a"]
-//                                                 audioController:_audioController
-//                                                           error:NULL];
-//        _oneshot.removeUponFinish = YES;
-//        __weak ViewController *weakSelf = self;
-//        _oneshot.completionBlock = ^{
-//            ViewController *strongSelf = weakSelf;
-//            strongSelf.oneshot = nil;
-//            strongSelf->_oneshotButton.selected = NO;
-//        };
-//        [_audioController addChannels:@[_oneshot]];
-//        _oneshotButton.selected = YES;
-//    }
-//}
-//
-//- (void)oneshotAudioUnitPlayButtonPressed:(UIButton*)sender {
-//    if ( !_audioUnitFile ) {
-//        NSURL *playerFile = [[NSBundle mainBundle] URLForResource:@"Organ Run" withExtension:@"m4a"];
-//        checkResult(AudioFileOpenURL((__bridge CFURLRef)playerFile, kAudioFileReadPermission, 0, &_audioUnitFile), "AudioFileOpenURL");
-//    }
-//    
-//    // Set the file to play
-//    checkResult(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFileIDs, kAudioUnitScope_Global, 0, &_audioUnitFile, sizeof(_audioUnitFile)),
-//                "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileIDs)");
-//    
-//    // Determine file properties
-//    UInt64 packetCount;
-//    UInt32 size = sizeof(packetCount);
-//    checkResult(AudioFileGetProperty(_audioUnitFile, kAudioFilePropertyAudioDataPacketCount, &size, &packetCount),
-//                "AudioFileGetProperty(kAudioFilePropertyAudioDataPacketCount)");
-//    
-//    AudioStreamBasicDescription dataFormat;
-//    size = sizeof(dataFormat);
-//    checkResult(AudioFileGetProperty(_audioUnitFile, kAudioFilePropertyDataFormat, &size, &dataFormat),
-//                "AudioFileGetProperty(kAudioFilePropertyDataFormat)");
-//    
-//    // Assign the region to play
-//    ScheduledAudioFileRegion region;
-//    memset (&region.mTimeStamp, 0, sizeof(region.mTimeStamp));
-//    region.mTimeStamp.mFlags = kAudioTimeStampSampleTimeValid;
-//    region.mTimeStamp.mSampleTime = 0;
-//    region.mCompletionProc = NULL;
-//    region.mCompletionProcUserData = NULL;
-//    region.mAudioFile = _audioUnitFile;
-//    region.mLoopCount = 0;
-//    region.mStartFrame = 0;
-//    region.mFramesToPlay = (UInt32)packetCount * dataFormat.mFramesPerPacket;
-//    checkResult(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFileRegion, kAudioUnitScope_Global, 0, &region, sizeof(region)),
-//                "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileRegion)");
-//    
-//    // Prime the player by reading some frames from disk
-//    UInt32 defaultNumberOfFrames = 0;
-//    checkResult(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFilePrime, kAudioUnitScope_Global, 0, &defaultNumberOfFrames, sizeof(defaultNumberOfFrames)),
-//                "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFilePrime)");
-//    
-//    // Set the start time (now = -1)
-//    AudioTimeStamp startTime;
-//    memset (&startTime, 0, sizeof(startTime));
-//    startTime.mFlags = kAudioTimeStampSampleTimeValid;
-//    startTime.mSampleTime = -1;
-//    checkResult(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduleStartTimeStamp, kAudioUnitScope_Global, 0, &startTime, sizeof(startTime)),
-//                "AudioUnitSetProperty(kAudioUnitProperty_ScheduleStartTimeStamp)");
-//    
-//}
-//
-//- (void)playthroughSwitchChanged:(UISwitch*)sender {
-//    if ( sender.isOn ) {
-//        self.playthrough = [[AEPlaythroughChannel alloc] initWithAudioController:_audioController];
-//        [_audioController addInputReceiver:_playthrough];
-//        [_audioController addChannels:@[_playthrough]];
-//    } else {
-//        [_audioController removeChannels:@[_playthrough]];
-//        [_audioController removeInputReceiver:_playthrough];
-//        self.playthrough = nil;
-//    }
-//}
-//
-//- (void)measurementModeSwitchChanged:(UISwitch*)sender {
-//    _audioController.useMeasurementMode = sender.on;
-//}
+- (void)oneshotPlayButtonPressed:(NSButton *)sender {
+    if ( _oneshot ) {
+        [_audioController removeChannels:@[_oneshot]];
+        self.oneshot = nil;
+        sender.state = NSOffState;
+    } else {
+        self.oneshot = [AEAudioFilePlayer
+                        audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Organ Run" withExtension:@"m4a"]
+                        audioController:_audioController
+                        error:NULL];
+        _oneshot.removeUponFinish = YES;
+        __weak ViewController *weakSelf = self;
+        __weak NSButton *weakOneshotButton = sender;
+        _oneshot.completionBlock = ^{
+            ViewController *strongSelf = weakSelf;
+            strongSelf.oneshot = nil;
+            NSButton *oneshotButton = weakOneshotButton;
+            oneshotButton.state = NSOffState;
+        };
+        [_audioController addChannels:@[_oneshot]];
+        sender.state = NSOnState;
+    }
+}
 
-//-(void)inputGainSliderChanged:(NSSlider *)slider {
-//    _audioController.inputGain = slider.doubleValue;
-//}
+- (void)oneshotAudioUnitPlayButtonPressed:(NSButton *)sender {
+    if ( !_audioUnitFile ) {
+        NSURL *playerFile = [[NSBundle mainBundle] URLForResource:@"Organ Run" withExtension:@"m4a"];
+        checkResult(AudioFileOpenURL((__bridge CFURLRef)playerFile, kAudioFileReadPermission, 0, &_audioUnitFile), "AudioFileOpenURL");
+    }
+    
+    // Set the file to play
+    checkResult(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFileIDs, kAudioUnitScope_Global, 0, &_audioUnitFile, sizeof(_audioUnitFile)),
+                "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileIDs)");
+    
+    // Determine file properties
+    UInt64 packetCount;
+    UInt32 size = sizeof(packetCount);
+    checkResult(AudioFileGetProperty(_audioUnitFile, kAudioFilePropertyAudioDataPacketCount, &size, &packetCount),
+                "AudioFileGetProperty(kAudioFilePropertyAudioDataPacketCount)");
+    
+    AudioStreamBasicDescription dataFormat;
+    size = sizeof(dataFormat);
+    checkResult(AudioFileGetProperty(_audioUnitFile, kAudioFilePropertyDataFormat, &size, &dataFormat),
+                "AudioFileGetProperty(kAudioFilePropertyDataFormat)");
+    
+    // Assign the region to play
+    ScheduledAudioFileRegion region;
+    memset (&region.mTimeStamp, 0, sizeof(region.mTimeStamp));
+    region.mTimeStamp.mFlags = kAudioTimeStampSampleTimeValid;
+    region.mTimeStamp.mSampleTime = 0;
+    region.mCompletionProc = NULL;
+    region.mCompletionProcUserData = NULL;
+    region.mAudioFile = _audioUnitFile;
+    region.mLoopCount = 0;
+    region.mStartFrame = 0;
+    region.mFramesToPlay = (UInt32)packetCount * dataFormat.mFramesPerPacket;
+    checkResult(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFileRegion, kAudioUnitScope_Global, 0, &region, sizeof(region)),
+                "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileRegion)");
+    
+    // Prime the player by reading some frames from disk
+    UInt32 defaultNumberOfFrames = 0;
+    checkResult(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFilePrime, kAudioUnitScope_Global, 0, &defaultNumberOfFrames, sizeof(defaultNumberOfFrames)),
+                "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFilePrime)");
+    
+    // Set the start time (now = -1)
+    AudioTimeStamp startTime;
+    memset (&startTime, 0, sizeof(startTime));
+    startTime.mFlags = kAudioTimeStampSampleTimeValid;
+    startTime.mSampleTime = -1;
+    checkResult(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduleStartTimeStamp, kAudioUnitScope_Global, 0, &startTime, sizeof(startTime)),
+                "AudioUnitSetProperty(kAudioUnitProperty_ScheduleStartTimeStamp)");
+    
+}
 
 - (void)limiterSwitchChanged:(NSButton *)sender {
     BOOL isOn = (sender.state == NSOnState);
@@ -716,34 +583,51 @@ static inline float translate(float val, float min, float max) {
     }
 }
 
-//- (void)reverbSwitchChanged:(NSButton *)sender {
-//    BOOL isOn = (sender.state == NSOnState);
-//    if ( isOn ) {
-//        self.reverb = [[AEAudioUnitFilter alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Effect, kAudioUnitSubType_Reverb2) preInitializeBlock:^(AudioUnit audioUnit) {
-//            AudioUnitSetParameter(audioUnit, kReverb2Param_DryWetMix, kAudioUnitScope_Global, 0, 100.f, 0);
-//        }];
-//        
-//        [_audioController addFilter:_reverb];
-//    } else {
-//        [_audioController removeFilter:_reverb];
-//        self.reverb = nil;
-//    }
-//}
-//
-//- (void)channelButtonPressed:(UIButton*)sender {
-//    BOOL selected = [_audioController.inputChannelSelection containsObject:@(sender.tag)];
-//    selected = !selected;
-//    if ( selected ) {
-//        _audioController.inputChannelSelection = [[_audioController.inputChannelSelection arrayByAddingObject:@(sender.tag)] sortedArrayUsingSelector:@selector(compare:)];
-//        [self performSelector:@selector(highlightButtonDelayed:) withObject:sender afterDelay:0.01];
-//    } else {
-//        NSMutableArray *channels = [_audioController.inputChannelSelection mutableCopy];
-//        [channels removeObject:@(sender.tag)];
-//        _audioController.inputChannelSelection = channels;
-//        sender.highlighted = NO;
-//    }
-//}
+- (void)reverbSwitchChanged:(NSButton *)sender {
+    BOOL isOn = (sender.state == NSOnState);
+    if ( isOn ) {
+        self.reverb = [[AEAudioUnitFilter alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Effect, kAudioUnitSubType_MatrixReverb) preInitializeBlock:^(AudioUnit audioUnit) {
+            
+            CFArrayRef presets;
+            UInt32 arraySize = sizeof(presets);
 
-
+            // Get all reverb presets
+            AudioUnitGetProperty(audioUnit,
+                                 kAudioUnitProperty_FactoryPresets,
+                                 kAudioUnitScope_Global,
+                                 0,
+                                 &presets,
+                                 &arraySize);
+            
+            // Find the cathedral preset
+            long arrayCount = CFArrayGetCount(presets);
+            long presetNumber = 0;
+            for (int i = 0; i < arrayCount; i++) {
+                AUPreset *preset = (AUPreset *)CFArrayGetValueAtIndex(presets, i);
+                NSString *name = (__bridge NSString *)(preset->presetName);
+                if ([name isEqualToString:@"Cathedral"]) {
+                    presetNumber = preset->presetNumber;
+                }
+            }
+            
+            UInt32 presetNumberSize = sizeof(presetNumber);
+            
+            // Set the cathedral preset
+            AudioUnitSetProperty(audioUnit,
+                                 kAudioUnitProperty_PresentPreset,
+                                 kAudioUnitScope_Global,
+                                 0,
+                                 &presetNumber,
+                                 presetNumberSize);
+            
+            CFRelease(presets);
+        }];
+        
+        [_audioController addFilter:_reverb];
+    } else {
+        [_audioController removeFilter:_reverb];
+        self.reverb = nil;
+    }
+}
 
 @end
