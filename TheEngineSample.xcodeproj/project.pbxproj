@@ -39,6 +39,10 @@
 		4C7C680F16F1609800721E60 /* README.markdown in Resources */ = {isa = PBXBuildFile; fileRef = 4C7C680416F1609800721E60 /* README.markdown */; };
 		4C7C681016F1609800721E60 /* TPCircularBuffer+AudioBufferList.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C7C680516F1609800721E60 /* TPCircularBuffer+AudioBufferList.c */; };
 		4C7C681116F1609800721E60 /* TPCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C7C680716F1609800721E60 /* TPCircularBuffer.c */; };
+		7A5244D01B7423B60004A10F /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7A5244CF1B7423B60004A10F /* QuartzCore.framework */; };
+		7A5244D21B7423BD0004A10F /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7A5244D11B7423BD0004A10F /* CoreGraphics.framework */; };
+		7A5244D41B7423CE0004A10F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7A5244D31B7423CE0004A10F /* Foundation.framework */; };
+		7A5244D61B7423DA0004A10F /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7A5244D51B7423DA0004A10F /* AppKit.framework */; };
 		7A8D22FB1B72AF5C0054D2B2 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 7A8D22FA1B72AF5C0054D2B2 /* AppDelegate.m */; };
 		7A8D22FD1B72AF5C0054D2B2 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 7A8D22FC1B72AF5C0054D2B2 /* main.m */; };
 		7A8D22FF1B72AF5C0054D2B2 /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7A8D22FE1B72AF5C0054D2B2 /* Images.xcassets */; };
@@ -137,6 +141,11 @@
 		4C7C680616F1609800721E60 /* TPCircularBuffer+AudioBufferList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "TPCircularBuffer+AudioBufferList.h"; sourceTree = "<group>"; };
 		4C7C680716F1609800721E60 /* TPCircularBuffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = TPCircularBuffer.c; sourceTree = "<group>"; };
 		4C7C680816F1609800721E60 /* TPCircularBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TPCircularBuffer.h; sourceTree = "<group>"; };
+		7A5244CD1B7423AB0004A10F /* Quartz.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Quartz.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.10.sdk/System/Library/Frameworks/Quartz.framework; sourceTree = DEVELOPER_DIR; };
+		7A5244CF1B7423B60004A10F /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.10.sdk/System/Library/Frameworks/QuartzCore.framework; sourceTree = DEVELOPER_DIR; };
+		7A5244D11B7423BD0004A10F /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.10.sdk/System/Library/Frameworks/CoreGraphics.framework; sourceTree = DEVELOPER_DIR; };
+		7A5244D31B7423CE0004A10F /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.10.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		7A5244D51B7423DA0004A10F /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.10.sdk/System/Library/Frameworks/AppKit.framework; sourceTree = DEVELOPER_DIR; };
 		7A8D22F51B72AF5C0054D2B2 /* TheEngineSampleOSX.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TheEngineSampleOSX.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7A8D22F81B72AF5C0054D2B2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		7A8D22F91B72AF5C0054D2B2 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
@@ -170,6 +179,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7A5244D61B7423DA0004A10F /* AppKit.framework in Frameworks */,
+				7A5244D41B7423CE0004A10F /* Foundation.framework in Frameworks */,
+				7A5244D21B7423BD0004A10F /* CoreGraphics.framework in Frameworks */,
+				7A5244D01B7423B60004A10F /* QuartzCore.framework in Frameworks */,
 				7A8D23191B72AFB40054D2B2 /* Accelerate.framework in Frameworks */,
 				7A8D23171B72AFAF0054D2B2 /* AudioToolbox.framework in Frameworks */,
 				7A8D23151B72AF9E0054D2B2 /* libTheAmazingAudioEngine OS X.a in Frameworks */,
@@ -202,6 +215,11 @@
 		4C0C24881599FADD00D23E13 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				7A5244D51B7423DA0004A10F /* AppKit.framework */,
+				7A5244D31B7423CE0004A10F /* Foundation.framework */,
+				7A5244D11B7423BD0004A10F /* CoreGraphics.framework */,
+				7A5244CF1B7423B60004A10F /* QuartzCore.framework */,
+				7A5244CD1B7423AB0004A10F /* Quartz.framework */,
 				7A8D23181B72AFB40054D2B2 /* Accelerate.framework */,
 				7A8D23161B72AFAF0054D2B2 /* AudioToolbox.framework */,
 				4C58F8971945573C0039FB0A /* AVFoundation.framework */,
@@ -710,6 +728,7 @@
 				7A8D23111B72AF5C0054D2B2 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

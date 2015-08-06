@@ -38,11 +38,16 @@ static void VRAMPMUL(const SAMPLETYPE *__vDSP_I, vDSP_Stride __vDSP_IS, SAMPLETY
 #endif
 
 @interface TPOscilloscopeLayer () {
-    id           _timer;
+
     SAMPLETYPE  *_buffer;
     CGPoint     *_scratchBuffer;
     int          _buffer_head;
     AudioBufferList *_conversionBuffer;
+#if TARGET_OS_IPHONE
+    id           _timer;
+#else
+    CVDisplayLinkRef _displayLink;
+#endif
 }
 @property (nonatomic, strong) AEFloatConverter *floatConverter;
 @end
@@ -73,9 +78,8 @@ static void VRAMPMUL(const SAMPLETYPE *__vDSP_I, vDSP_Stride __vDSP_IS, SAMPLETY
 }
 
 - (void)start {
-    if ( _timer ) return;
-
 #if TARGET_OS_IPHONE
+    if ( _timer ) return;
     if ( NSClassFromString(@"CADisplayLink") ) {
         _timer = [CADisplayLink displayLinkWithTarget:self selector:@selector(setNeedsDisplay)];
         ((CADisplayLink*)_timer).frameInterval = 2;
@@ -84,25 +88,42 @@ static void VRAMPMUL(const SAMPLETYPE *__vDSP_I, vDSP_Stride __vDSP_IS, SAMPLETY
         _timer = [NSTimer scheduledTimerWithTimeInterval:1.0/30.0 target:self selector:@selector(setNeedsDisplay) userInfo:nil repeats:YES];
     }
 #else
-//    CVDisplayLinkRef displayLink;
-//    CGDirectDisplayID   displayID = CGMainDisplayID();
-//    CVReturn            error = kCVReturnSuccess;
-//    error = CVDisplayLinkCreateWithCGDisplay(displayID, &displayLink);
-//    if (error)
-//    {
-//        NSLog(@"DisplayLink created with error:%d", error);
-//        displayLink = NULL;
-//    }
-//    CVDisplayLinkSetOutputCallback(displayLink, displayLinkRenderCallback, (__bridge void *)self);
-//    
-//    _timer = @"WOOP";
-//    CVDisplayLinkStart(displayLink);
+    if (_displayLink) return;
     
-    _timer = [NSTimer scheduledTimerWithTimeInterval:1.0/30.0 target:self selector:@selector(setNeedsDisplay) userInfo:nil repeats:YES];
+    CGDirectDisplayID displayID = CGMainDisplayID();
+    CVReturn error = kCVReturnSuccess;
+    error = CVDisplayLinkCreateWithCGDisplay(displayID, &_displayLink);
+    if (error)
+    {
+        NSLog(@"DisplayLink created with error:%d", error);
+        _displayLink = NULL;
+    }
+    CVDisplayLinkSetOutputCallback(_displayLink, displayLinkRenderCallback, (__bridge void *)self);
+    
+    CVDisplayLinkStart(_displayLink);
+//    _timer = [NSTimer scheduledTimerWithTimeInterval:1.0/30.0 target:self selector:@selector(setNeedsDisplay) userInfo:nil repeats:YES];
 #endif
     
 }
 
+- (void)stop {
+#if TARGET_OS_IPHONE
+    if ( !_timer ) return;
+    [_timer invalidate];
+    _timer = nil;
+#else
+    if ( !_displayLink ) return;
+    CVDisplayLinkStop(_displayLink);
+    CVDisplayLinkRelease(_displayLink);
+    _displayLink = NULL;
+#endif
+}
+
+-(AEAudioControllerAudioCallback)receiverCallback {
+    return &audioCallback;
+}
+
+#if !TARGET_OS_IPHONE
 static CVReturn displayLinkRenderCallback(CVDisplayLinkRef displayLink,
                                           const CVTimeStamp *inNow,
                                           const CVTimeStamp *inOutputTime,
@@ -110,20 +131,13 @@ static CVReturn displayLinkRenderCallback(CVDisplayLinkRef displayLink,
                                           CVOptionFlags *flagsOut,
                                           void *displayLinkContext)
 {
-    TPOscilloscopeLayer *oLayer = (__bridge TPOscilloscopeLayer *)displayLinkContext;
-    [oLayer setNeedsDisplay];
-    return noErr;
-}
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [(__bridge TPOscilloscopeLayer *)displayLinkContext setNeedsDisplay];
+    });
 
-- (void)stop {
-    if ( !_timer ) return;
-    [_timer invalidate];
-    _timer = nil;
+    return kCVReturnSuccess;
 }
-
--(AEAudioControllerAudioCallback)receiverCallback {
-    return &audioCallback;
-}
+#endif
 
 -(void)dealloc {
     [self stop];
@@ -154,6 +168,8 @@ static CVReturn displayLinkRenderCallback(CVDisplayLinkRef displayLink,
     SAMPLETYPE xIncrement = (self.bounds.size.width / (float)(frames-1)) * (float)(kSkipFrames+1);
     SAMPLETYPE multiplier = self.bounds.size.height / 2.0;
     
+
+    
     // Generate samples
     SAMPLETYPE *scratchPtr = (SAMPLETYPE*)_scratchBuffer;
     while ( frames > 0 ) {
@@ -161,7 +177,7 @@ static CVReturn displayLinkRenderCallback(CVDisplayLinkRef displayLink,
         int samplesToRender = framesToRender / kSkipFrames;
         
         VRAMP(&x, &xIncrement, (SAMPLETYPE*)scratchPtr, 2, samplesToRender);
-        VSMUL(&_buffer[tail], kSkipFrames, &multiplier, ((SAMPLETYPE*)scratchPtr)+1, 2, samplesToRender);
+        VSMUL(&_buffer[tail], kSkipFrames, &multiplier, (SAMPLETYPE*)(scratchPtr) + 1, 2, samplesToRender);
         
         scratchPtr += 2 * samplesToRender;
         x += (samplesToRender-1)*xIncrement;
@@ -182,21 +198,9 @@ static CVReturn displayLinkRenderCallback(CVDisplayLinkRef displayLink,
     step = -step;
     VRAMPMUL((SAMPLETYPE*)(_scratchBuffer) + 1 + (envelopeLength*2), 2, &start, &step, (SAMPLETYPE*)(_scratchBuffer) + 1 + (envelopeLength*2), 2, envelopeLength);
     
-//    for (int i = 0; i < sampleCount; i++) {
-////        _scratchBuffer[i] = CGPointMake(i, 50);
-//        CGPoint pt = _scratchBuffer[i];
-//        printf("%f %f\n", pt.x, pt.y);
-//    }
-    
     // Assign midpoint
     SAMPLETYPE midpoint = self.bounds.size.height / 2.0;
     VSADD((SAMPLETYPE*)(_scratchBuffer) + 1, 2, &midpoint, (SAMPLETYPE*)(_scratchBuffer) + 1, 2, sampleCount);
-    
-    for (int i = 0; i < sampleCount; i++) {
-//        _scratchBuffer[i] = CGPointMake(i, 50);
-        CGPoint pt = _scratchBuffer[i];
-        printf("%f %f\n", pt.x, pt.y);
-    }
     
     // Render lines
     CGContextBeginPath(ctx);
