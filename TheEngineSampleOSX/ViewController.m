@@ -69,24 +69,22 @@ static const int kInputChannelsChangedContext;
     
     _headerView = [[NSView alloc] initWithFrame:NSMakeRect(0, headerYPos, self.view.bounds.size.width, 100)];
     _headerView.layer = [[CALayer alloc] init];
-
+    [self.view addSubview:_headerView];
+    _headerView.wantsLayer = YES;
 
     self.outputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioController:_audioController];
-    _outputOscilloscope.frame = NSMakeRect(0, headerYPos + 10, _headerView.bounds.size.width, 80);
-    _outputOscilloscope.lineColor = [NSColor blueColor];
+    _outputOscilloscope.frame = NSMakeRect(0, 10, _headerView.bounds.size.width, 80);
     [_headerView.layer addSublayer:_outputOscilloscope];
     [_audioController addOutputReceiver:_outputOscilloscope];
     [_outputOscilloscope start];
     
     
-//    [NSTimer scheduledTimerWithTimeInterval:1.0/30.0 target:_outputOscilloscope selector:@selector(setNeedsDisplay) userInfo:nil repeats:YES];
-    
-//    self.inputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioController:_audioController];
-//    _inputOscilloscope.frame = NSMakeRect(0, headerYPos + 10, _headerView.bounds.size.width, 80);
-//    _inputOscilloscope.lineColor = [NSColor colorWithWhite:0.0 alpha:0.3];
-//    [_headerView.layer addSublayer:_inputOscilloscope];
-//    [_audioController addInputReceiver:_inputOscilloscope];
-//    [_inputOscilloscope start];
+    self.inputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioController:_audioController];
+    _inputOscilloscope.frame = NSMakeRect(0, headerYPos + 10, _headerView.bounds.size.width, 80);
+    _inputOscilloscope.lineColor = [NSColor colorWithWhite:0.0 alpha:0.3];
+    [_headerView.layer addSublayer:_inputOscilloscope];
+    [_audioController addInputReceiver:_inputOscilloscope];
+    [_inputOscilloscope start];
     
 //    self.inputLevelLayer = [CALayer layer];
 //    _inputLevelLayer.backgroundColor = [[NSColor colorWithWhite:0.0 alpha:0.3] CGColor];
@@ -98,8 +96,7 @@ static const int kInputChannelsChangedContext;
 //    _outputLevelLayer.frame = NSMakeRect(_headerView.bounds.size.width/2.0 + 5.0, headerYPos, 50, 10);
 //    [_headerView setLayer:_outputLevelLayer];
 
-    [self.view addSubview:_headerView];
-    _headerView.wantsLayer = YES;
+
     
 //    NSTextField *testField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 500, 100, 20)];
 //    testField.stringValue = @"WOOP";
