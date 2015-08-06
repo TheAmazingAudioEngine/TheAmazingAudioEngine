@@ -67,6 +67,8 @@ static void VRAMPMUL(const SAMPLETYPE *__vDSP_I, vDSP_Stride __vDSP_IS, SAMPLETY
     // Disable animating view refreshes
     self.actions = @{@"contents": [NSNull null]};
     
+    self.delegate = self;
+    
     return self;
 }
 
@@ -82,9 +84,35 @@ static void VRAMPMUL(const SAMPLETYPE *__vDSP_I, vDSP_Stride __vDSP_IS, SAMPLETY
         _timer = [NSTimer scheduledTimerWithTimeInterval:1.0/30.0 target:self selector:@selector(setNeedsDisplay) userInfo:nil repeats:YES];
     }
 #else
+//    CVDisplayLinkRef displayLink;
+//    CGDirectDisplayID   displayID = CGMainDisplayID();
+//    CVReturn            error = kCVReturnSuccess;
+//    error = CVDisplayLinkCreateWithCGDisplay(displayID, &displayLink);
+//    if (error)
+//    {
+//        NSLog(@"DisplayLink created with error:%d", error);
+//        displayLink = NULL;
+//    }
+//    CVDisplayLinkSetOutputCallback(displayLink, displayLinkRenderCallback, (__bridge void *)self);
+//    
+//    _timer = @"WOOP";
+//    CVDisplayLinkStart(displayLink);
+    
     _timer = [NSTimer scheduledTimerWithTimeInterval:1.0/30.0 target:self selector:@selector(setNeedsDisplay) userInfo:nil repeats:YES];
 #endif
     
+}
+
+static CVReturn displayLinkRenderCallback(CVDisplayLinkRef displayLink,
+                                          const CVTimeStamp *inNow,
+                                          const CVTimeStamp *inOutputTime,
+                                          CVOptionFlags flagsIn,
+                                          CVOptionFlags *flagsOut,
+                                          void *displayLinkContext)
+{
+    TPOscilloscopeLayer *oLayer = (__bridge TPOscilloscopeLayer *)displayLinkContext;
+    [oLayer setNeedsDisplay];
+    return noErr;
 }
 
 - (void)stop {
@@ -113,6 +141,7 @@ static void VRAMPMUL(const SAMPLETYPE *__vDSP_I, vDSP_Stride __vDSP_IS, SAMPLETY
 #pragma mark - Rendering
 
 -(void)drawInContext:(CGContextRef)ctx {
+
     CGContextSetShouldAntialias(ctx, false);
     
     // Render ring buffer as path
@@ -147,15 +176,27 @@ static void VRAMPMUL(const SAMPLETYPE *__vDSP_I, vDSP_Stride __vDSP_IS, SAMPLETY
     SAMPLETYPE start = 0.0;
     int envelopeLength = sampleCount / 2;
     SAMPLETYPE step = 1.0 / (float)envelopeLength;
-    VRAMPMUL((SAMPLETYPE*)_scratchBuffer + 1, 2, &start, &step, (SAMPLETYPE*)_scratchBuffer + 1, 2, envelopeLength);
+    VRAMPMUL((SAMPLETYPE*)(_scratchBuffer) + 1, 2, &start, &step, (SAMPLETYPE*)(_scratchBuffer) + 1, 2, envelopeLength);
     
     start = 1.0;
     step = -step;
-    VRAMPMUL((SAMPLETYPE*)_scratchBuffer + 1 + (envelopeLength*2), 2, &start, &step, (SAMPLETYPE*)_scratchBuffer + 1 + (envelopeLength*2), 2, envelopeLength);
+    VRAMPMUL((SAMPLETYPE*)(_scratchBuffer) + 1 + (envelopeLength*2), 2, &start, &step, (SAMPLETYPE*)(_scratchBuffer) + 1 + (envelopeLength*2), 2, envelopeLength);
+    
+//    for (int i = 0; i < sampleCount; i++) {
+////        _scratchBuffer[i] = CGPointMake(i, 50);
+//        CGPoint pt = _scratchBuffer[i];
+//        printf("%f %f\n", pt.x, pt.y);
+//    }
     
     // Assign midpoint
     SAMPLETYPE midpoint = self.bounds.size.height / 2.0;
-    VSADD((SAMPLETYPE*)_scratchBuffer+1, 2, &midpoint, (SAMPLETYPE*)_scratchBuffer+1, 2, sampleCount);
+    VSADD((SAMPLETYPE*)(_scratchBuffer) + 1, 2, &midpoint, (SAMPLETYPE*)(_scratchBuffer) + 1, 2, sampleCount);
+    
+    for (int i = 0; i < sampleCount; i++) {
+//        _scratchBuffer[i] = CGPointMake(i, 50);
+        CGPoint pt = _scratchBuffer[i];
+        printf("%f %f\n", pt.x, pt.y);
+    }
     
     // Render lines
     CGContextBeginPath(ctx);
