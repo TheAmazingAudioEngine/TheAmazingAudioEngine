@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name         = "TheAmazingAudioEngine"
-  s.version      = "1.4.7"
+  s.version      = "1.4.8"
   s.summary      = "Core Audio, Cordially: A sophisticated framework for iOS audio applications, built so you don't have to."
   s.homepage     = "http://theamazingaudioengine.com"
   s.license      = 'zlib'
