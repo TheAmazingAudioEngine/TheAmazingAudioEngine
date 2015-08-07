@@ -5,7 +5,7 @@ Pod::Spec.new do |s|
   s.homepage     = "http://theamazingaudioengine.com"
   s.license      = 'zlib'
   s.author       = { "Michael Tyson" => "michael@atastypixel.com" }
-  s.source       = { :git => "https://github.com/TheAmazingAudioEngine/TheAmazingAudioEngine.git", :tag => "1.4.7" }
+  s.source       = { :git => "https://github.com/TheAmazingAudioEngine/TheAmazingAudioEngine.git", :tag => "1.4.8" }
   s.ios.deployment_target = '6.0'
   s.osx.deployment_target = '10.9'
   s.source_files = 'TheAmazingAudioEngine/**/*.{h,m,c}', 'Modules/*.{h,m,c}'
