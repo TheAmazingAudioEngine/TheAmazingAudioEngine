@@ -80,7 +80,6 @@ static void VRAMPMUL(const SAMPLETYPE *__vDSP_I, vDSP_Stride __vDSP_IS, SAMPLETY
 - (void)start {
 #if TARGET_OS_IPHONE
     if ( _timer ) return;
-    
     if ( NSClassFromString(@"CADisplayLink") ) {
         _timer = [CADisplayLink displayLinkWithTarget:self selector:@selector(setNeedsDisplay)];
         ((CADisplayLink*)_timer).frameInterval = 2;
@@ -94,8 +93,7 @@ static void VRAMPMUL(const SAMPLETYPE *__vDSP_I, vDSP_Stride __vDSP_IS, SAMPLETY
     CGDirectDisplayID displayID = CGMainDisplayID();
     CVReturn error = kCVReturnSuccess;
     error = CVDisplayLinkCreateWithCGDisplay(displayID, &_displayLink);
-    if ( error )
-    {
+    if ( error ) {
         NSLog(@"DisplayLink created with error:%d", error);
         _displayLink = NULL;
     }
@@ -166,6 +164,8 @@ static CVReturn displayLinkRenderCallback(CVDisplayLinkRef displayLink,
     SAMPLETYPE xIncrement = (self.bounds.size.width / (float)(frames-1)) * (float)(kSkipFrames+1);
     SAMPLETYPE multiplier = self.bounds.size.height / 2.0;
     
+
+    
     // Generate samples
     SAMPLETYPE *scratchPtr = (SAMPLETYPE*)_scratchBuffer;
     while ( frames > 0 ) {
@@ -173,7 +173,7 @@ static CVReturn displayLinkRenderCallback(CVDisplayLinkRef displayLink,
         int samplesToRender = framesToRender / kSkipFrames;
         
         VRAMP(&x, &xIncrement, (SAMPLETYPE*)scratchPtr, 2, samplesToRender);
-        VSMUL(&_buffer[tail], kSkipFrames, &multiplier, ((SAMPLETYPE*)scratchPtr)+1, 2, samplesToRender);
+        VSMUL(&_buffer[tail], kSkipFrames, &multiplier, (SAMPLETYPE*)(scratchPtr) + 1, 2, samplesToRender);
         
         scratchPtr += 2 * samplesToRender;
         x += (samplesToRender-1)*xIncrement;
@@ -188,15 +188,15 @@ static CVReturn displayLinkRenderCallback(CVDisplayLinkRef displayLink,
     SAMPLETYPE start = 0.0;
     int envelopeLength = sampleCount / 2;
     SAMPLETYPE step = 1.0 / (float)envelopeLength;
-    VRAMPMUL((SAMPLETYPE*)_scratchBuffer + 1, 2, &start, &step, (SAMPLETYPE*)_scratchBuffer + 1, 2, envelopeLength);
+    VRAMPMUL((SAMPLETYPE*)(_scratchBuffer) + 1, 2, &start, &step, (SAMPLETYPE*)(_scratchBuffer) + 1, 2, envelopeLength);
     
     start = 1.0;
     step = -step;
-    VRAMPMUL((SAMPLETYPE*)_scratchBuffer + 1 + (envelopeLength*2), 2, &start, &step, (SAMPLETYPE*)_scratchBuffer + 1 + (envelopeLength*2), 2, envelopeLength);
+    VRAMPMUL((SAMPLETYPE*)(_scratchBuffer) + 1 + (envelopeLength*2), 2, &start, &step, (SAMPLETYPE*)(_scratchBuffer) + 1 + (envelopeLength*2), 2, envelopeLength);
     
     // Assign midpoint
     SAMPLETYPE midpoint = self.bounds.size.height / 2.0;
-    VSADD((SAMPLETYPE*)_scratchBuffer+1, 2, &midpoint, (SAMPLETYPE*)_scratchBuffer+1, 2, sampleCount);
+    VSADD((SAMPLETYPE*)(_scratchBuffer) + 1, 2, &midpoint, (SAMPLETYPE*)(_scratchBuffer) + 1, 2, sampleCount);
     
     // Render lines
     CGContextBeginPath(ctx);

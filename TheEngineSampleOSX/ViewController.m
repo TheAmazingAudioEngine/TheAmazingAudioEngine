@@ -109,6 +109,7 @@ static const int kInputChannelsChangedContext;
     
     NSView *footerView = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, self.view.bounds.size.width, 80)];
 
+<<<<<<< HEAD
     self.recordButton = [[NSButton alloc] init];
     self.recordButton.bezelStyle = NSRegularSquareBezelStyle;
     [self.recordButton setButtonType:NSPushOnPushOffButton];
@@ -127,6 +128,27 @@ static const int kInputChannelsChangedContext;
     
     [footerView addSubview:self.recordButton];
     [footerView addSubview:self.playButton];
+
+    [self.view addSubview:footerView];
+=======
+    NSButton *recordButton = [[NSButton alloc] init];
+    recordButton.bezelStyle = NSRegularSquareBezelStyle;
+    [recordButton setButtonType:NSPushOnPushOffButton];
+    recordButton.title = @"Record";
+    recordButton.action = @selector(record:);
+    recordButton.target = self;
+    recordButton.frame = NSMakeRect(20, 10, (footerView.bounds.size.width - 50) / 2, footerView.bounds.size.height - 20);
+    
+    NSButton *playButton = [[NSButton alloc] init];
+    playButton.bezelStyle = NSRegularSquareBezelStyle;
+    [playButton setButtonType:NSPushOnPushOffButton];
+    playButton.title = @"Play";
+    playButton.action = @selector(play:);
+    playButton.target = self;
+    playButton.frame = NSMakeRect(CGRectGetMaxX(recordButton.frame) + 10, 10, ((footerView.bounds.size.width - 50) / 2), footerView.bounds.size.height - 20);
+    
+    [footerView addSubview:recordButton];
+    [footerView addSubview:playButton];
 
     [self.view addSubview:footerView];
 }
