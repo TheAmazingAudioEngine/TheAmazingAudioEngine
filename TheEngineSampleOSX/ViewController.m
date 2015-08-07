@@ -126,7 +126,6 @@ static const int kInputChannelsChangedContext;
     [footerView addSubview:playButton];
 
     [self.view addSubview:footerView];
-
 }
 
 - (instancetype)initWithAudioController:(AEAudioController *)audioController {
@@ -135,17 +134,19 @@ static const int kInputChannelsChangedContext;
     self.audioController = audioController;
     
     // Create the first loop player
-    self.loop1 = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Drums" withExtension:@"m4a"]
-                                           audioController:_audioController
-                                                     error:NULL];
+    self.loop1 = [AEAudioFilePlayer
+                  audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Drums" withExtension:@"m4a"]
+                  audioController:_audioController
+                  error:NULL];
     _loop1.volume = 1.0;
     _loop1.channelIsMuted = YES;
     _loop1.loop = YES;
     
     // Create the second loop player
-    self.loop2 = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Organ" withExtension:@"m4a"]
-                                           audioController:_audioController
-                                                     error:NULL];
+    self.loop2 = [AEAudioFilePlayer
+                  audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Organ" withExtension:@"m4a"]
+                  audioController:_audioController
+                  error:NULL];
     _loop2.volume = 1.0;
     _loop2.channelIsMuted = YES;
     _loop2.loop = YES;
@@ -168,8 +169,6 @@ static const int kInputChannelsChangedContext;
         }
     }];
     _oscillator.audioDescription = audioController.audioDescription;
-//    _oscillator.audioDescription = [AEAudioController nonInterleaved16BitStereoAudioDescription];
-    
     _oscillator.channelIsMuted = YES;
     
     // Create an audio unit channel (a file player)
@@ -185,7 +184,6 @@ static const int kInputChannelsChangedContext;
     [_audioController addObserver:self forKeyPath:@"numberOfInputChannels" options:0 context:(void*)&kInputChannelsChangedContext];
     
     return self;
-
 }
 
 -(void)dealloc {
@@ -202,11 +200,6 @@ static const int kInputChannelsChangedContext;
     if ( _oneshot ) {
         [channelsToRemove addObject:_oneshot];
     }
-    
-//    if ( _playthrough ) {
-//        [channelsToRemove addObject:_playthrough];
-//        [_audioController removeInputReceiver:_playthrough];
-//    }
     
     [_audioController removeChannels:channelsToRemove];
     
@@ -296,11 +289,11 @@ static inline float translate(float val, float min, float max) {
 - (NSView *)tableView:(NSTableView *)tableView viewForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
     NSView *view;
     
-    if ([tableColumn isEqualTo:_nameColumn]) {
+    if ( [tableColumn isEqualTo:_nameColumn] ) {
         static NSString *nameIdentifier = @"nameItem";
         view = [tableView makeViewWithIdentifier:nameIdentifier owner:self];
         
-        if (!view) {
+        if ( !view ) {
             view = [[NSButton alloc] initWithFrame:NSMakeRect(0, 0, 400, 40)];
             view.identifier = nameIdentifier;
         }
@@ -312,7 +305,7 @@ static inline float translate(float val, float min, float max) {
         label.alignment = NSCenterTextAlignment;
         label.bordered = NO;
         
-        switch (row) {
+        switch ( row ) {
             case 0:
                 button.title = @"Drums";
                 button.state = _loop1.channelIsMuted ? NSOffState : NSOnState;
@@ -386,16 +379,16 @@ static inline float translate(float val, float min, float max) {
                 button.title = @"";
                 break;
         }
-    } else if ([tableColumn isEqualTo:_sliderColumn]) {
+    } else if ( [tableColumn isEqualTo:_sliderColumn] ) {
         static NSString *sliderIdentifier = @"sliderItem";
         view = [tableView makeViewWithIdentifier:sliderIdentifier owner:self];
         
-        if (!view) {
+        if ( !view ) {
             view = [[NSSlider alloc] initWithFrame:NSMakeRect(0, 0, 400, 20)];
             view.identifier = sliderIdentifier;
         }
         NSSlider *slider = (NSSlider *)view;
-        switch (row) {
+        switch ( row ) {
             case 0:
                 slider.doubleValue = _loop1.volume;
                 slider.target = self;
