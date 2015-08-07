@@ -151,7 +151,6 @@ static CVReturn displayLinkRenderCallback(CVDisplayLinkRef displayLink,
 #pragma mark - Rendering
 
 -(void)drawInContext:(CGContextRef)ctx {
-
     CGContextSetShouldAntialias(ctx, false);
     
     // Render ring buffer as path
@@ -164,8 +163,6 @@ static CVReturn displayLinkRenderCallback(CVDisplayLinkRef displayLink,
     SAMPLETYPE xIncrement = (self.bounds.size.width / (float)(frames-1)) * (float)(kSkipFrames+1);
     SAMPLETYPE multiplier = self.bounds.size.height / 2.0;
     
-
-    
     // Generate samples
     SAMPLETYPE *scratchPtr = (SAMPLETYPE*)_scratchBuffer;
     while ( frames > 0 ) {
@@ -173,7 +170,7 @@ static CVReturn displayLinkRenderCallback(CVDisplayLinkRef displayLink,
         int samplesToRender = framesToRender / kSkipFrames;
         
         VRAMP(&x, &xIncrement, (SAMPLETYPE*)scratchPtr, 2, samplesToRender);
-        VSMUL(&_buffer[tail], kSkipFrames, &multiplier, (SAMPLETYPE*)(scratchPtr) + 1, 2, samplesToRender);
+        VSMUL(&_buffer[tail], kSkipFrames, &multiplier, ((SAMPLETYPE*)scratchPtr)+1, 2, samplesToRender);
         
         scratchPtr += 2 * samplesToRender;
         x += (samplesToRender-1)*xIncrement;
@@ -188,15 +185,15 @@ static CVReturn displayLinkRenderCallback(CVDisplayLinkRef displayLink,
     SAMPLETYPE start = 0.0;
     int envelopeLength = sampleCount / 2;
     SAMPLETYPE step = 1.0 / (float)envelopeLength;
-    VRAMPMUL((SAMPLETYPE*)(_scratchBuffer) + 1, 2, &start, &step, (SAMPLETYPE*)(_scratchBuffer) + 1, 2, envelopeLength);
+    VRAMPMUL((SAMPLETYPE*)_scratchBuffer + 1, 2, &start, &step, (SAMPLETYPE*)_scratchBuffer + 1, 2, envelopeLength);
     
     start = 1.0;
     step = -step;
-    VRAMPMUL((SAMPLETYPE*)(_scratchBuffer) + 1 + (envelopeLength*2), 2, &start, &step, (SAMPLETYPE*)(_scratchBuffer) + 1 + (envelopeLength*2), 2, envelopeLength);
+    VRAMPMUL((SAMPLETYPE*)_scratchBuffer + 1 + (envelopeLength*2), 2, &start, &step, (SAMPLETYPE*)_scratchBuffer + 1 + (envelopeLength*2), 2, envelopeLength);
     
     // Assign midpoint
     SAMPLETYPE midpoint = self.bounds.size.height / 2.0;
-    VSADD((SAMPLETYPE*)(_scratchBuffer) + 1, 2, &midpoint, (SAMPLETYPE*)(_scratchBuffer) + 1, 2, sampleCount);
+    VSADD((SAMPLETYPE*)_scratchBuffer+1, 2, &midpoint, (SAMPLETYPE*)_scratchBuffer+1, 2, sampleCount);
     
     // Render lines
     CGContextBeginPath(ctx);
