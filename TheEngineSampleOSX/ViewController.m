@@ -51,26 +51,21 @@ static const int kInputChannelsChangedContext;
 @property (nonatomic, weak) NSTimer *levelsTimer;
 //@property (nonatomic, strong) AERecorder *recorder;
 @property (nonatomic, strong) AEAudioFilePlayer *player;
-@property (nonatomic, strong) NSButton *recordButton;
-@property (nonatomic, strong) NSButton *playButton;
 
 @end
 
 @implementation ViewController
 
 - (void)loadView {
-    self.view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 400, 600)];
+    self.view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 400, 500)];
 }
 
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-    int headerYPos = self.view.bounds.size.height - 100;
-    
-    _headerView = [[NSView alloc] initWithFrame:NSMakeRect(0, headerYPos, self.view.bounds.size.width, 100)];
-    _headerView.layer = [[CALayer alloc] init];
-    [self.view addSubview:_headerView];
+    _headerView = [[NSView alloc] initWithFrame:NSMakeRect(0, self.view.bounds.size.height - 100, self.view.bounds.size.width, 100)];
     _headerView.wantsLayer = YES;
+    [self.view addSubview:_headerView];
 
     self.outputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioController:_audioController];
     _outputOscilloscope.frame = NSMakeRect(0, 10, _headerView.bounds.size.width, 80);
@@ -78,66 +73,57 @@ static const int kInputChannelsChangedContext;
     [_audioController addOutputReceiver:_outputOscilloscope];
     [_outputOscilloscope start];
     
-    
     self.inputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioController:_audioController];
-    _inputOscilloscope.frame = NSMakeRect(0, headerYPos + 10, _headerView.bounds.size.width, 80);
+    _inputOscilloscope.frame = NSMakeRect(0, 10, _headerView.bounds.size.width, 80);
     _inputOscilloscope.lineColor = [NSColor colorWithWhite:0.0 alpha:0.3];
     [_headerView.layer addSublayer:_inputOscilloscope];
     [_audioController addInputReceiver:_inputOscilloscope];
     [_inputOscilloscope start];
     
-//    self.inputLevelLayer = [CALayer layer];
-//    _inputLevelLayer.backgroundColor = [[NSColor colorWithWhite:0.0 alpha:0.3] CGColor];
-//    _inputLevelLayer.frame = NSMakeRect(_headerView.bounds.size.width/2.0 - 5.0 - (0.0), headerYPos, 50, 10);
-//    [_headerView.layer addSublayer:_inputLevelLayer];
-//    
-//    self.outputLevelLayer = [CALayer layer];
-//    _outputLevelLayer.backgroundColor = [[NSColor colorWithWhite:0.0 alpha:0.3] CGColor];
-//    _outputLevelLayer.frame = NSMakeRect(_headerView.bounds.size.width/2.0 + 5.0, headerYPos, 50, 10);
-//    [_headerView setLayer:_outputLevelLayer];
-
-
+    self.inputLevelLayer = [CALayer layer];
+    _inputLevelLayer.backgroundColor = [[NSColor colorWithWhite:0.0 alpha:0.3] CGColor];
+    _inputLevelLayer.frame = NSMakeRect(_headerView.bounds.size.width/2.0 - 5.0 - (0.0), 0, 50, 10);
+    [_headerView.layer addSublayer:_inputLevelLayer];
     
-//    NSTextField *testField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 500, 100, 20)];
-//    testField.stringValue = @"WOOP";
-//    [_headerView addSubview:testField];
+    self.outputLevelLayer = [CALayer layer];
+    _outputLevelLayer.backgroundColor = [[NSColor colorWithWhite:0.0 alpha:0.3] CGColor];
+    _outputLevelLayer.frame = NSMakeRect(_headerView.bounds.size.width/2.0 + 5.0, 0, 50, 10);
+    [_headerView.layer addSublayer:_outputLevelLayer];
     
-
-    
-    _tableView = [[NSTableView alloc] initWithFrame:NSMakeRect(0, 100, self.view.bounds.size.width, 400)];
+    _tableView = [[NSTableView alloc] initWithFrame:NSMakeRect(0, 75, self.view.bounds.size.width, 300)];
     [self.view addSubview:_tableView];
     _tableView.delegate = self;
     _tableView.dataSource = self;
     _tableView.backgroundColor = [NSColor whiteColor];
     
     _nameColumn = [[NSTableColumn alloc] initWithIdentifier:@"nameColumn"];
-    _nameColumn.width = 390 / 2.0;
+    _nameColumn.width = 395 / 2.0;
     [_tableView addTableColumn:_nameColumn];
 
     _sliderColumn = [[NSTableColumn alloc] initWithIdentifier:@"sliderColumn"];
-    _sliderColumn.width = 390 / 2.0;
+    _sliderColumn.width = 395 / 2.0;
     [_tableView addTableColumn:_sliderColumn];
     
     NSView *footerView = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, self.view.bounds.size.width, 80)];
 
-    self.recordButton = [[NSButton alloc] init];
-    self.recordButton.bezelStyle = NSRoundRectBezelStyle;
-    [self.recordButton setButtonType:NSPushOnPushOffButton];
-    self.recordButton.title = @"Record";
-    self.recordButton.action = @selector(record:);
-    self.recordButton.target = self;
-    self.recordButton.frame = NSMakeRect(20, 10, (footerView.bounds.size.width - 50) / 2, footerView.bounds.size.height - 20);
+    NSButton *recordButton = [[NSButton alloc] init];
+    recordButton.bezelStyle = NSRegularSquareBezelStyle;
+    [recordButton setButtonType:NSPushOnPushOffButton];
+    recordButton.title = @"Record";
+    recordButton.action = @selector(record:);
+    recordButton.target = self;
+    recordButton.frame = NSMakeRect(20, 10, (footerView.bounds.size.width - 50) / 2, footerView.bounds.size.height - 20);
     
-    self.playButton = [[NSButton alloc] init];
-    self.playButton.bezelStyle = NSRoundRectBezelStyle;
-    [self.playButton setButtonType:NSPushOnPushOffButton];
-    self.playButton.title = @"Play";
-    self.playButton.action = @selector(play:);
-    self.playButton.target = self;
-    self.playButton.frame = NSMakeRect(CGRectGetMaxX(_recordButton.frame) + 10, 10, ((footerView.bounds.size.width - 50) / 2), footerView.bounds.size.height - 20);
+    NSButton *playButton = [[NSButton alloc] init];
+    playButton.bezelStyle = NSRegularSquareBezelStyle;
+    [playButton setButtonType:NSPushOnPushOffButton];
+    playButton.title = @"Play";
+    playButton.action = @selector(play:);
+    playButton.target = self;
+    playButton.frame = NSMakeRect(CGRectGetMaxX(recordButton.frame) + 10, 10, ((footerView.bounds.size.width - 50) / 2), footerView.bounds.size.height - 20);
     
-    [footerView addSubview:self.recordButton];
-    [footerView addSubview:self.playButton];
+    [footerView addSubview:recordButton];
+    [footerView addSubview:playButton];
 
     [self.view addSubview:footerView];
 
@@ -447,9 +433,7 @@ static inline float translate(float val, float min, float max) {
 }
 
 - (void)loop1VolumeChanged:(NSSlider *)sender {
-    BOOL muted = _loop1.channelIsMuted;
     _loop1.volume = sender.doubleValue;
-    _loop1.channelIsMuted = muted;
 }
 
 - (void)loop2SwitchChanged:(NSButton *)sender {
@@ -457,9 +441,7 @@ static inline float translate(float val, float min, float max) {
 }
 
 - (void)loop2VolumeChanged:(NSSlider *)sender {
-    BOOL muted = _loop2.channelIsMuted;
     _loop2.volume = sender.doubleValue;
-    _loop2.channelIsMuted = muted;
 }
 
 - (void)oscillatorSwitchChanged:(NSButton *)sender {
@@ -467,9 +449,7 @@ static inline float translate(float val, float min, float max) {
 }
 
 - (void)oscillatorVolumeChanged:(NSButton *)sender {
-    BOOL muted = _oscillator.channelIsMuted;
     _oscillator.volume = sender.doubleValue;
-    _oscillator.channelIsMuted = muted;
 }
 
 - (void)channelGroupSwitchChanged:(NSButton *)sender {
@@ -478,9 +458,7 @@ static inline float translate(float val, float min, float max) {
 }
 
 - (void)channelGroupVolumeChanged:(NSSlider *)sender {
-    BOOL muted = [_audioController channelGroupIsMuted:_group];
     [_audioController setVolume:sender.doubleValue forChannelGroup:_group];
-    [_audioController setMuted:muted forChannelGroup:_group];
 }
 
 - (void)oneshotPlayButtonPressed:(NSButton *)sender {
