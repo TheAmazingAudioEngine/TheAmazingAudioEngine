@@ -61,6 +61,7 @@
 		7A8D23351B72B50A0054D2B2 /* AEMixerBuffer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C7C67FE16F1609800721E60 /* AEMixerBuffer.m */; };
 		7A8D23361B72B5170054D2B2 /* TPCircularBuffer+AudioBufferList.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C7C680516F1609800721E60 /* TPCircularBuffer+AudioBufferList.c */; };
 		7A8D23371B72B5170054D2B2 /* TPCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C7C680716F1609800721E60 /* TPCircularBuffer.c */; };
+		7AFFB76C1B75307500892749 /* AERecorder.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C7C680216F1609800721E60 /* AERecorder.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -494,6 +495,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7AFFB76C1B75307500892749 /* AERecorder.m in Sources */,
 				7A8D23361B72B5170054D2B2 /* TPCircularBuffer+AudioBufferList.c in Sources */,
 				7A8D23371B72B5170054D2B2 /* TPCircularBuffer.c in Sources */,
 				7A8D23351B72B50A0054D2B2 /* AEMixerBuffer.m in Sources */,

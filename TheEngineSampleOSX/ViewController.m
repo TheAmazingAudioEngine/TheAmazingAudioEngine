@@ -11,6 +11,7 @@
 #import "TPOscilloscopeLayer.h"
 #import "AEExpanderFilter.h"
 #import "AELimiterFilter.h"
+#import "AERecorder.h"
 #import <QuartzCore/QuartzCore.h>
 
 #define checkResult(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/')+1,__LINE__))
@@ -49,8 +50,10 @@ static const int kInputChannelsChangedContext;
 @property (nonatomic, strong) CALayer *inputLevelLayer;
 @property (nonatomic, strong) CALayer *outputLevelLayer;
 @property (nonatomic, weak) NSTimer *levelsTimer;
-//@property (nonatomic, strong) AERecorder *recorder;
+@property (nonatomic, strong) AERecorder *recorder;
 @property (nonatomic, strong) AEAudioFilePlayer *player;
+@property (nonatomic, strong) NSButton *playButton;
+@property (nonatomic, strong) NSButton *recordButton;
 
 @end
 
@@ -106,24 +109,24 @@ static const int kInputChannelsChangedContext;
     
     NSView *footerView = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, self.view.bounds.size.width, 80)];
 
-    NSButton *recordButton = [[NSButton alloc] init];
-    recordButton.bezelStyle = NSRegularSquareBezelStyle;
-    [recordButton setButtonType:NSPushOnPushOffButton];
-    recordButton.title = @"Record";
-    recordButton.action = @selector(record:);
-    recordButton.target = self;
-    recordButton.frame = NSMakeRect(20, 10, (footerView.bounds.size.width - 50) / 2, footerView.bounds.size.height - 20);
+    self.recordButton = [[NSButton alloc] init];
+    self.recordButton.bezelStyle = NSRegularSquareBezelStyle;
+    [self.recordButton setButtonType:NSPushOnPushOffButton];
+    self.recordButton.title = @"Record";
+    self.recordButton.action = @selector(record:);
+    self.recordButton.target = self;
+    self.recordButton.frame = NSMakeRect(20, 10, (footerView.bounds.size.width - 50) / 2, footerView.bounds.size.height - 20);
     
-    NSButton *playButton = [[NSButton alloc] init];
-    playButton.bezelStyle = NSRegularSquareBezelStyle;
-    [playButton setButtonType:NSPushOnPushOffButton];
-    playButton.title = @"Play";
-    playButton.action = @selector(play:);
-    playButton.target = self;
-    playButton.frame = NSMakeRect(CGRectGetMaxX(recordButton.frame) + 10, 10, ((footerView.bounds.size.width - 50) / 2), footerView.bounds.size.height - 20);
+    self.playButton = [[NSButton alloc] init];
+    self.playButton.bezelStyle = NSRegularSquareBezelStyle;
+    [self.playButton setButtonType:NSPushOnPushOffButton];
+    self.playButton.title = @"Play";
+    self.playButton.action = @selector(play:);
+    self.playButton.target = self;
+    self.playButton.frame = NSMakeRect(CGRectGetMaxX(self.recordButton.frame) + 10, 10, ((footerView.bounds.size.width - 50) / 2), footerView.bounds.size.height - 20);
     
-    [footerView addSubview:recordButton];
-    [footerView addSubview:playButton];
+    [footerView addSubview:self.recordButton];
+    [footerView addSubview:self.playButton];
 
     [self.view addSubview:footerView];
 }
@@ -221,11 +224,68 @@ static const int kInputChannelsChangedContext;
 }
 
 - (void)record:(id)sender {
-    
+    if ( _recorder ) {
+        [_recorder finishRecording];
+        [_audioController removeOutputReceiver:_recorder];
+        [_audioController removeInputReceiver:_recorder];
+        self.recorder = nil;
+        _recordButton.state = NSOffState;
+    } else {
+        self.recorder = [[AERecorder alloc] initWithAudioController:_audioController];
+        NSArray *documentsFolders = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+        NSString *path = [documentsFolders[0] stringByAppendingPathComponent:@"Recording.aiff"];
+        NSError *error = nil;
+        if ( ![_recorder beginRecordingToFileAtPath:path fileType:kAudioFileAIFFType error:&error] ) {
+            NSAlert *alert = [[NSAlert alloc] init];
+            alert.alertStyle = NSCriticalAlertStyle;
+            alert.messageText = @"Couldn't start recording";
+            alert.informativeText = [error localizedDescription];
+            [alert runModal];
+            self.recorder = nil;
+            return;
+        }
+        
+        _recordButton.state = NSOnState;
+        
+        [_audioController addOutputReceiver:_recorder];
+        [_audioController addInputReceiver:_recorder];
+    }
 }
 
 - (void)play:(id)sender {
-
+    if ( _player ) {
+        [_audioController removeChannels:@[_player]];
+        self.player = nil;
+        _playButton.state = NSOffState;
+    } else {
+        NSArray *documentsFolders = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+        NSString *path = [documentsFolders[0] stringByAppendingPathComponent:@"Recording.aiff"];
+        
+        if ( ![[NSFileManager defaultManager] fileExistsAtPath:path] ) return;
+        
+        NSError *error = nil;
+        self.player = [AEAudioFilePlayer audioFilePlayerWithURL:[NSURL fileURLWithPath:path] audioController:_audioController error:&error];
+        
+        if ( !_player ) {
+            NSAlert *alert = [[NSAlert alloc] init];
+            alert.alertStyle = NSCriticalAlertStyle;
+            alert.messageText = @"Couldn't start playback";
+            alert.informativeText = [error localizedDescription];
+            [alert runModal];
+            return;
+        }
+        
+        _player.removeUponFinish = YES;
+        __weak ViewController *weakSelf = self;
+        _player.completionBlock = ^{
+            ViewController *strongSelf = weakSelf;
+            strongSelf->_playButton.state = NSOffState;
+            weakSelf.player = nil;
+        };
+        [_audioController addChannels:@[_player]];
+        
+        _playButton.state = NSOnState;
+    }
 }
 
 static inline float translate(float val, float min, float max) {
