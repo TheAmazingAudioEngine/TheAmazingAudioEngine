@@ -38,11 +38,16 @@ static void VRAMPMUL(const SAMPLETYPE *__vDSP_I, vDSP_Stride __vDSP_IS, SAMPLETY
 #endif
 
 @interface TPOscilloscopeLayer () {
-    id           _timer;
+
     SAMPLETYPE  *_buffer;
     CGPoint     *_scratchBuffer;
     int          _buffer_head;
     AudioBufferList *_conversionBuffer;
+#if TARGET_OS_IPHONE
+    id           _timer;
+#else
+    CVDisplayLinkRef _displayLink;
+#endif
 }
 @property (nonatomic, strong) AEFloatConverter *floatConverter;
 @end
@@ -56,18 +61,25 @@ static void VRAMPMUL(const SAMPLETYPE *__vDSP_I, vDSP_Stride __vDSP_IS, SAMPLETY
     _conversionBuffer = AEAllocateAndInitAudioBufferList(_floatConverter.floatingPointAudioDescription, kMaxConversionSize);
     _buffer = (SAMPLETYPE*)calloc(kBufferLength, sizeof(SAMPLETYPE));
     _scratchBuffer = (CGPoint*)malloc(kBufferLength * sizeof(CGPoint));
+    
+#if TARGET_OS_IPHONE
     self.contentsScale = [[UIScreen mainScreen] scale];
     self.lineColor = [UIColor blackColor];
+#else
+    self.lineColor = [NSColor blackColor];
+#endif
     
     // Disable animating view refreshes
     self.actions = @{@"contents": [NSNull null]};
+    
+    self.delegate = self;
     
     return self;
 }
 
 - (void)start {
+#if TARGET_OS_IPHONE
     if ( _timer ) return;
-    
     if ( NSClassFromString(@"CADisplayLink") ) {
         _timer = [CADisplayLink displayLinkWithTarget:self selector:@selector(setNeedsDisplay)];
         ((CADisplayLink*)_timer).frameInterval = 2;
@@ -75,17 +87,53 @@ static void VRAMPMUL(const SAMPLETYPE *__vDSP_I, vDSP_Stride __vDSP_IS, SAMPLETY
     } else {
         _timer = [NSTimer scheduledTimerWithTimeInterval:1.0/30.0 target:self selector:@selector(setNeedsDisplay) userInfo:nil repeats:YES];
     }
+#else
+    if ( _displayLink ) return;
+    
+    CGDirectDisplayID displayID = CGMainDisplayID();
+    CVReturn error = kCVReturnSuccess;
+    error = CVDisplayLinkCreateWithCGDisplay(displayID, &_displayLink);
+    if ( error ) {
+        NSLog(@"DisplayLink created with error:%d", error);
+        _displayLink = NULL;
+    }
+    CVDisplayLinkSetOutputCallback(_displayLink, displayLinkRenderCallback, (__bridge void *)self);
+    CVDisplayLinkStart(_displayLink);
+#endif
 }
 
 - (void)stop {
+#if TARGET_OS_IPHONE
     if ( !_timer ) return;
     [_timer invalidate];
     _timer = nil;
+#else
+    if ( !_displayLink ) return;
+    CVDisplayLinkStop(_displayLink);
+    CVDisplayLinkRelease(_displayLink);
+    _displayLink = NULL;
+#endif
 }
 
 -(AEAudioControllerAudioCallback)receiverCallback {
     return &audioCallback;
 }
+
+#if !TARGET_OS_IPHONE
+static CVReturn displayLinkRenderCallback(CVDisplayLinkRef displayLink,
+                                          const CVTimeStamp *inNow,
+                                          const CVTimeStamp *inOutputTime,
+                                          CVOptionFlags flagsIn,
+                                          CVOptionFlags *flagsOut,
+                                          void *displayLinkContext)
+{
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [(__bridge TPOscilloscopeLayer *)displayLinkContext setNeedsDisplay];
+    });
+
+    return kCVReturnSuccess;
+}
+#endif
 
 -(void)dealloc {
     [self stop];

@@ -3764,7 +3764,7 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
 #else
         if ( [self setup] ) {
 #endif
-			[self sendSetupToChannelsAndFilters];
+            [self sendSetupToChannelsAndFilters];
             [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerDidRecreateGraphNotification object:self];
             
             if ( !start || [self start:error recoveringFromErrors:NO] ) {
