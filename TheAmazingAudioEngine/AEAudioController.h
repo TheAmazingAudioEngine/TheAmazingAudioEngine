@@ -30,6 +30,8 @@ extern "C" {
 #import <AudioToolbox/AudioToolbox.h>
 #import <AudioUnit/AudioUnit.h>
 
+#import <Foundation/NSDate.h>
+
 @class AEAudioController;
 
 #pragma mark - Notifications and constants

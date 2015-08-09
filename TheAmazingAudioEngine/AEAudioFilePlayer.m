@@ -34,7 +34,6 @@
 
 @interface AEAudioFilePlayer () {
     AudioBufferList              *_audio;
-    UInt32                        _lengthInFrames;
     AudioStreamBasicDescription   _audioDescription;
     volatile int32_t              _playhead;
 }
@@ -169,7 +168,10 @@ static OSStatus renderCallback(__unsafe_unretained AEAudioFilePlayer *THIS, __un
     }
     
     OSAtomicCompareAndSwap32(originalPlayhead, playhead, &THIS->_playhead);
-    
+
+    if (THIS->_postRenderBlock)
+        THIS->_postRenderBlock(originalPlayhead, frames, audio);
+
     return noErr;
 }
 
