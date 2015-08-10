@@ -39,6 +39,7 @@ extern "C" {
 #import "AEBlockAudioReceiver.h"
 #import "AEAudioUnitChannel.h"
 #import "AEAudioUnitFilter.h"
+#import "AEAudioUnitFilePlayer.h"
 #import "AEFloatConverter.h"
 #import "AEBlockScheduler.h"
 #import "AEUtilities.h"

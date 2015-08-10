@@ -37,6 +37,8 @@
 		4C99588E16C0825F0011FB01 /* AEAudioUnitFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C99588C16C0825F0011FB01 /* AEAudioUnitFilter.m */; };
 		4CEC0EB916B5294300D11ED9 /* AEBlockFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CEC0EB716B5294200D11ED9 /* AEBlockFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4CEC0EBA16B5294300D11ED9 /* AEBlockFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CEC0EB816B5294300D11ED9 /* AEBlockFilter.m */; };
+		94F5199F1B7801E300944F63 /* AEAudioUnitFilePlayer.h in Headers */ = {isa = PBXBuildFile; fileRef = 94F5199D1B7801E300944F63 /* AEAudioUnitFilePlayer.h */; };
+		94F519A01B7801E300944F63 /* AEAudioUnitFilePlayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 94F5199E1B7801E300944F63 /* AEAudioUnitFilePlayer.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -95,6 +97,8 @@
 		4CE501971493F82600F23607 /* TheAmazingAudioEngine-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TheAmazingAudioEngine-Prefix.pch"; sourceTree = "<group>"; };
 		4CEC0EB716B5294200D11ED9 /* AEBlockFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEBlockFilter.h; sourceTree = "<group>"; };
 		4CEC0EB816B5294300D11ED9 /* AEBlockFilter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEBlockFilter.m; sourceTree = "<group>"; };
+		94F5199D1B7801E300944F63 /* AEAudioUnitFilePlayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEAudioUnitFilePlayer.h; sourceTree = "<group>"; };
+		94F5199E1B7801E300944F63 /* AEAudioUnitFilePlayer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEAudioUnitFilePlayer.m; sourceTree = "<group>"; };
 		B0EE36FC1AD4270400D7AB17 /* AESequencerBeat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AESequencerBeat.h; sourceTree = "<group>"; };
 		B0EE36FD1AD4270400D7AB17 /* AESequencerBeat.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AESequencerBeat.m; sourceTree = "<group>"; };
 		B0EE36FE1AD4270400D7AB17 /* AESequencerChannel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AESequencerChannel.h; sourceTree = "<group>"; };
@@ -201,6 +205,8 @@
 				4C99588C16C0825F0011FB01 /* AEAudioUnitFilter.m */,
 				4C99588316BB74720011FB01 /* AEAudioUnitChannel.h */,
 				4C99588416BB74720011FB01 /* AEAudioUnitChannel.m */,
+				94F5199D1B7801E300944F63 /* AEAudioUnitFilePlayer.h */,
+				94F5199E1B7801E300944F63 /* AEAudioUnitFilePlayer.m */,
 				4CEC0EB716B5294200D11ED9 /* AEBlockFilter.h */,
 				4CEC0EB816B5294300D11ED9 /* AEBlockFilter.m */,
 				4C456B8B16D59365008ED99D /* AEBlockAudioReceiver.h */,
@@ -240,6 +246,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4C215D121523A94200D36CAD /* TheAmazingAudioEngine.h in Headers */,
+				94F5199F1B7801E300944F63 /* AEAudioUnitFilePlayer.h in Headers */,
 				4C2886381556FC620074175A /* AEAudioController+Audiobus.h in Headers */,
 				4C215D131523A94200D36CAD /* AEAudioController.h in Headers */,
 				4C49FE32153DC21A008725E0 /* AEAudioFileLoaderOperation.h in Headers */,
@@ -344,6 +351,7 @@
 				4C215D091523A8E500D36CAD /* AEAudioFilePlayer.m in Sources */,
 				4C215D0A1523A8E500D36CAD /* AEUtilities.c in Sources */,
 				4C49FE34153DC21A008725E0 /* AEAudioFileLoaderOperation.m in Sources */,
+				94F519A01B7801E300944F63 /* AEAudioUnitFilePlayer.m in Sources */,
 				4C38DC5715458AB1009F4454 /* AEAudioFileWriter.m in Sources */,
 				4C2886521557DB800074175A /* AEAudioController+Audiobus.m in Sources */,
 				4C25747415F0D8E100D232E8 /* TPCircularBuffer.c in Sources */,
