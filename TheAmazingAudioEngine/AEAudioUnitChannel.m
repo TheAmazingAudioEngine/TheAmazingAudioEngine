@@ -146,14 +146,18 @@ AudioUnit AEAudioUnitChannelGetAudioUnit(__unsafe_unretained AEAudioUnitChannel 
     }
 }
 
--(void)dealloc {
+- (void)dealloc {
     if ( _audioUnit ) {
         [self teardown];
     }
 }
 
--(AudioUnit)audioUnit {
+- (AudioUnit)audioUnit {
     return _audioUnit;
+}
+
+- (AudioUnit)converterUnit {
+    return _converterUnit;
 }
 
 static OSStatus renderCallback(__unsafe_unretained AEAudioUnitChannel *THIS,
