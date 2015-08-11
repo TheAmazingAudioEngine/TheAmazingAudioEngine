@@ -104,6 +104,11 @@ AudioUnit AEAudioUnitChannelGetAudioUnit(__unsafe_unretained AEAudioUnitChannel 
  */
 @property (nonatomic, readonly) AudioUnit audioUnit;
 
+/*!
+ * The converter unit
+ */
+@property (nonatomic, readonly) AudioUnit converterUnit;
+
 @end
 
 #ifdef __cplusplus
