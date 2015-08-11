@@ -24,6 +24,7 @@
 //
 
 #import "AEAudioUnitChannel.h"
+#import "AEUtilities.h"
 
 #define checkResult(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/')+1,__LINE__))
 static inline BOOL _checkResult(OSStatus result, const char *operation, const char* file, int line) {

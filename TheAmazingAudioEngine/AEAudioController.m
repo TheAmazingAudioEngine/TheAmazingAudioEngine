@@ -2335,7 +2335,7 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
             channelElement->volume = channel.volume;
             
             if ( group->mixerAudioUnit ) {
-                AudioUnitParameterValue value = channelElement->volume;
+                AudioUnitParameterValue value = channelElement->muted ? 0.0 : channelElement->volume;
                 OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, index, value, 0);
                 checkResult(result, "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
             }

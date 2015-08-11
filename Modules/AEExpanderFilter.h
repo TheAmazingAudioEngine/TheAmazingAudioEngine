@@ -62,11 +62,8 @@ typedef enum {
 
 /*!
  * Initialise
- *
- * @param audioController The Audio Controller
  */
-- (id)initWithAudioController:(AEAudioController*)audioController;
-
+- (id)init;
 
 /*!
  * Apply a preset
@@ -84,8 +81,6 @@ typedef enum {
  * @param block Block to perform when calibration is complete
  */
 - (void)startCalibratingWithCompletionBlock:(void (^)(void))block;
-
-@property (nonatomic, assign) AudioStreamBasicDescription clientFormat;
 
 @property (nonatomic, assign) float ratio;
 @property (nonatomic, assign) double threshold;
