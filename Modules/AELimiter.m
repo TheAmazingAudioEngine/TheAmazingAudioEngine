@@ -374,7 +374,7 @@ static element_t findMaxValueInRange(__unsafe_unretained AELimiter *THIS, AudioB
                 int length = (buffer->mBuffers[i].mDataByteSize / sizeof(float)) - bufferOffset;
                 length = MIN(length, ((int)(range.location+range.length) - framesSeen));
                 
-                vDSP_Length buffer_max_index;
+                vDSP_Length buffer_max_index = 0;
                 float buffer_max = max;
                 for ( int i=0; i<buffer->mNumberBuffers; i++ ) {
                     vDSP_maxmgvi(position, 1, &buffer_max, &buffer_max_index, length);
