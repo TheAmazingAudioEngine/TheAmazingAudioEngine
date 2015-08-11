@@ -6,7 +6,11 @@
 //  Copyright (c) 2012 A Tasty Pixel. All rights reserved.
 //
 
+#if TARGET_OS_IPHONE
 #import <UIKit/UIKit.h>
+#else
+#import <Cocoa/Cocoa.h>
+#endif
 #import <QuartzCore/QuartzCore.h>
 #import "TheAmazingAudioEngine.h"
 
@@ -33,7 +37,11 @@
 - (void)stop;
 
 /*! The line color to render with */
+#if TARGET_OS_IPHONE
 @property (nonatomic, strong) UIColor *lineColor;
+#else
+@property (nonatomic, strong) NSColor *lineColor;
+#endif
 
 - (AEAudioControllerAudioCallback)receiverCallback;
 
