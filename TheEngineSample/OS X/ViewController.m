@@ -139,7 +139,6 @@ static const int kInputChannelsChangedContext;
     // Create the first loop player
     self.loop1 = [AEAudioFilePlayer
                   audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Drums" withExtension:@"m4a"]
-                  audioController:_audioController
                   error:NULL];
     _loop1.volume = 1.0;
     _loop1.channelIsMuted = YES;
@@ -148,7 +147,6 @@ static const int kInputChannelsChangedContext;
     // Create the second loop player
     self.loop2 = [AEAudioFilePlayer
                   audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Organ" withExtension:@"m4a"]
-                  audioController:_audioController
                   error:NULL];
     _loop2.volume = 1.0;
     _loop2.channelIsMuted = YES;
@@ -264,7 +262,7 @@ static const int kInputChannelsChangedContext;
         if ( ![[NSFileManager defaultManager] fileExistsAtPath:path] ) return;
         
         NSError *error = nil;
-        self.player = [AEAudioFilePlayer audioFilePlayerWithURL:[NSURL fileURLWithPath:path] audioController:_audioController error:&error];
+        self.player = [AEAudioFilePlayer audioFilePlayerWithURL:[NSURL fileURLWithPath:path] error:&error];
         
         if ( !_player ) {
             NSAlert *alert = [[NSAlert alloc] init];
@@ -522,7 +520,6 @@ static inline float translate(float val, float min, float max) {
     } else {
         self.oneshot = [AEAudioFilePlayer
                         audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Organ Run" withExtension:@"m4a"]
-                        audioController:_audioController
                         error:NULL];
         _oneshot.removeUponFinish = YES;
         __weak ViewController *weakSelf = self;
@@ -591,7 +588,7 @@ static inline float translate(float val, float min, float max) {
 - (void)limiterSwitchChanged:(NSButton *)sender {
     BOOL isOn = (sender.state == NSOnState);
     if ( isOn ) {
-        self.limiter = [[AELimiterFilter alloc] initWithAudioController:_audioController];
+        self.limiter = [[AELimiterFilter alloc] init];
         _limiter.level = 0.1;
         [_audioController addFilter:_limiter];
     } else {
@@ -603,7 +600,7 @@ static inline float translate(float val, float min, float max) {
 - (void)expanderSwitchChanged:(NSButton *)sender {
     BOOL isOn = (sender.state == NSOnState);
     if ( isOn ) {
-        self.expander = [[AEExpanderFilter alloc] initWithAudioController:_audioController];
+        self.expander = [[AEExpanderFilter alloc] init];
         [_audioController addFilter:_expander];
     } else {
         [_audioController removeFilter:_expander];
