@@ -110,6 +110,9 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 
 - (void)setCurrentTime:(NSTimeInterval)currentTime {
     if ( _lengthInFrames == 0 ) return;
+    if ( self.audioUnit ) {
+        AudioUnitReset(self.audioUnit, kAudioUnitScope_Global, 0);
+    }
     [self schedulePlayRegionFromPosition:(UInt32)(currentTime * _fileDescription.mSampleRate) % _lengthInFrames];
 }
 
