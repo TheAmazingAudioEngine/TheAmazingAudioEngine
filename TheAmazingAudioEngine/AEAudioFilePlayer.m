@@ -247,7 +247,7 @@ static void AEAudioFilePlayerNotifyCompletion(__unsafe_unretained AEAudioControl
 }
 
 static void AEAudioFilePlayerCompletionProc(void *userData, ScheduledAudioFileRegion *fileRegion, OSStatus result) {
-    AEAudioFilePlayer *THIS = (__bridge AEAudioFilePlayer*)userData;
+    __unsafe_unretained AEAudioFilePlayer *THIS = (__bridge AEAudioFilePlayer*)userData;
     THIS->_currentRegionOffset = ((UInt32)fileRegion->mTimeStamp.mSampleTime % THIS->_lengthInFrames);
     if ( THIS->_audioController && (UInt32)fileRegion->mTimeStamp.mSampleTime == THIS->_lengthInFrames ) {
         AEAudioControllerSendAsynchronousMessageToMainThread(THIS->_audioController, AEAudioFilePlayerNotifyCompletion, &THIS, sizeof(AEAudioFilePlayer*));
