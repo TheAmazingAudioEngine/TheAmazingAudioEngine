@@ -66,17 +66,13 @@ static const int kInputChannelsChangedContext;
     self.audioController = audioController;
     
     // Create the first loop player
-    self.loop1 = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Drums" withExtension:@"m4a"]
-                                           audioController:_audioController
-                                                     error:NULL];
+    self.loop1 = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Drums" withExtension:@"m4a"] error:NULL];
     _loop1.volume = 1.0;
     _loop1.channelIsMuted = YES;
     _loop1.loop = YES;
     
     // Create the second loop player
-    self.loop2 = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Organ" withExtension:@"m4a"]
-                                           audioController:_audioController
-                                                     error:NULL];
+    self.loop2 = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Organ" withExtension:@"m4a"] error:NULL];
     _loop2.volume = 1.0;
     _loop2.channelIsMuted = YES;
     _loop2.loop = YES;
@@ -463,9 +459,7 @@ static const int kInputChannelsChangedContext;
         self.oneshot = nil;
         _oneshotButton.selected = NO;
     } else {
-        self.oneshot = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Organ Run" withExtension:@"m4a"]
-                                                 audioController:_audioController
-                                                           error:NULL];
+        self.oneshot = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Organ Run" withExtension:@"m4a"] error:NULL];
         _oneshot.removeUponFinish = YES;
         __weak ViewController *weakSelf = self;
         _oneshot.completionBlock = ^{
@@ -641,7 +635,7 @@ static const int kInputChannelsChangedContext;
         if ( ![[NSFileManager defaultManager] fileExistsAtPath:path] ) return;
         
         NSError *error = nil;
-        self.player = [AEAudioFilePlayer audioFilePlayerWithURL:[NSURL fileURLWithPath:path] audioController:_audioController error:&error];
+        self.player = [AEAudioFilePlayer audioFilePlayerWithURL:[NSURL fileURLWithPath:path] error:&error];
         
         if ( !_player ) {
             [[[UIAlertView alloc] initWithTitle:@"Error" 
