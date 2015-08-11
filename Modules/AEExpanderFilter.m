@@ -36,10 +36,10 @@ typedef enum {
     kStateClosing
 } AEExpanderFilterState;
 
-static inline int min(int a, int b) { return (a>b ? b : a); }
-static inline double ratio_from_db(float db) { return pow(10.0, db / 10.0); };
-static inline double db_from_ratio(float value) { return 10.0 * log10(value); };
-static inline double db_from_value(UInt16 value) { return db_from_ratio((double)value / INT16_MAX); };
+static inline float min(float a, float b) { return (a>b ? b : a); }
+static inline float ratio_from_db(float db) { return pow(10.0, db / 10.0); };
+static inline float db_from_ratio(float value) { return 10.0 * log10(value); };
+static inline float db_from_value(float value) { return db_from_ratio((float)value); };
 
 #define kScratchBufferLength 8192
 #define kCalibrationTime 2.0
@@ -50,10 +50,10 @@ typedef void (^AECalibrateCompletionBlock)(void);
 
 @interface AEExpanderFilter ()  {
     AudioStreamBasicDescription _clientFormat;
+    AudioBufferList *_scratchBuffer;
     float        _maxValue;
-    float      **_scratchBuffer;
-    UInt16       _threshold;
-    UInt16       _offThreshold;
+    float        _threshold;
+    float        _offThreshold;
     double       _thresholdOffset;
     double       _hysteresis_db;
     AEExpanderFilterPreset _preset;
@@ -69,23 +69,10 @@ typedef void (^AECalibrateCompletionBlock)(void);
 @end
 
 @implementation AEExpanderFilter
-@synthesize ratio = _ratio, attack = _attack, decay = _decay, calibrateCompletionBlock = _calibrateCompletionBlock, floatConverter = _floatConverter, audioController = _audioController;
 @dynamic threshold, hysteresis;
 
-- (id)initWithAudioController:(AEAudioController *)audioController {
+- (id)init {
     if ( !(self = [super init]) ) return nil;
-    
-    self.audioController = audioController;
-    _clientFormat = audioController.audioDescription;
-    
-    self.floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:_clientFormat];
-    
-    _scratchBuffer = (float**)malloc(sizeof(float*) * _clientFormat.mChannelsPerFrame);
-    assert(_scratchBuffer);
-    for ( int i=0; i<_clientFormat.mChannelsPerFrame; i++ ) {
-        _scratchBuffer[i] = malloc(sizeof(float) * kScratchBufferLength);
-        assert(_scratchBuffer[i]);
-    }
     
     self.threshold = -13.0;
     
@@ -97,37 +84,18 @@ typedef void (^AECalibrateCompletionBlock)(void);
     return self;
 }
 
-- (void)dealloc {
-    for ( int i=0; i<_clientFormat.mChannelsPerFrame; i++ ) {
-        free(_scratchBuffer[i]);
-    }
-    free(_scratchBuffer);
+- (void)setupWithAudioController:(AEAudioController *)audioController {
+    self.audioController = audioController;
+    _clientFormat = audioController.audioDescription;
+    
+    self.floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:_clientFormat];
+    _scratchBuffer = AEAllocateAndInitAudioBufferList(_floatConverter.floatingPointAudioDescription, kScratchBufferLength);
 }
 
--(void)setClientFormat:(AudioStreamBasicDescription)clientFormat {
-    
-    AEFloatConverter *floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:clientFormat];
-    
-    float **scratchBuffer = (float**)malloc(sizeof(float*) * clientFormat.mChannelsPerFrame);
-    assert(scratchBuffer);
-    for ( int i=0; i<clientFormat.mChannelsPerFrame; i++ ) {
-        scratchBuffer[i] = malloc(sizeof(float) * kScratchBufferLength);
-        assert(scratchBuffer[i]);
-    }
-    
-    float** oldScratchBuffer = _scratchBuffer;
-    AudioStreamBasicDescription oldClientFormat = _clientFormat;
-    
-    [_audioController performSynchronousMessageExchangeWithBlock:^{
-        _floatConverter = floatConverter;
-        _scratchBuffer = scratchBuffer;
-        _clientFormat = clientFormat;
-    }];
-    
-    for ( int i=0; i<oldClientFormat.mChannelsPerFrame; i++ ) {
-        free(oldScratchBuffer[i]);
-    }
-    free(oldScratchBuffer);
+- (void)teardown {
+    self.audioController = nil;
+    self.floatConverter = nil;
+    AEFreeAudioBufferList(_scratchBuffer);
 }
 
 - (void)assignPreset:(AEExpanderFilterPreset)preset {
@@ -187,8 +155,8 @@ typedef void (^AECalibrateCompletionBlock)(void);
 
 -(void)setThreshold:(double)threshold {
     _thresholdOffset = ratio_from_db(0);
-    _threshold = ratio_from_db(threshold) * INT16_MAX;
-    _offThreshold = ratio_from_db(threshold - _hysteresis_db) * INT16_MAX;
+    _threshold = ratio_from_db(threshold);
+    _offThreshold = ratio_from_db(threshold - _hysteresis_db);
 }
 
 -(double)threshold {
@@ -202,7 +170,7 @@ typedef void (^AECalibrateCompletionBlock)(void);
 -(void)setHysteresis:(double)hysteresis {
     _hysteresis_db = hysteresis;
     double threshold = db_from_value(_threshold);
-    _offThreshold = ratio_from_db(threshold - _hysteresis_db) * INT16_MAX;
+    _offThreshold = ratio_from_db(threshold - _hysteresis_db);
     _preset = AEExpanderFilterPresetNone;
 }
 
@@ -211,11 +179,11 @@ typedef void (^AECalibrateCompletionBlock)(void);
 }
 
 static void completeCalibration(AEAudioController *audioController, void *userInfo, int len) {
-    __unsafe_unretained AEExpanderFilter *THIS = (__bridge AEExpanderFilter*)*(void**)userInfo;
-    THIS->_threshold = min((THIS->_calibrationMaxValue + kCalibrationThresholdOffset),
-                           ratio_from_db(kMaxAutoThreshold) * INT16_MAX) * THIS->_thresholdOffset;
+    AEExpanderFilter *THIS = (__bridge AEExpanderFilter*)*(void**)userInfo;
+    THIS->_threshold = min((THIS->_calibrationMaxValue + ratio_from_db(kCalibrationThresholdOffset)),
+                           ratio_from_db(kMaxAutoThreshold)) * THIS->_thresholdOffset;
     double threshold_db = db_from_value(THIS->_threshold);
-    THIS->_offThreshold = ratio_from_db(threshold_db - THIS->_hysteresis_db) * INT16_MAX;
+    THIS->_offThreshold = ratio_from_db(threshold_db - THIS->_hysteresis_db);
     
     THIS->_calibrateCompletionBlock();
     THIS->_calibrateCompletionBlock = nil;
@@ -233,11 +201,11 @@ static OSStatus filterCallback(__unsafe_unretained AEExpanderFilter *THIS,
     if ( status != noErr ) return status;
     
     // Convert audio to floats on scratch buffer for processing, and find maxima
+    AEFloatConverterToFloatBufferList(THIS->_floatConverter, audio, THIS->_scratchBuffer, frames);
     float max = 0;
-    for ( int i=0; i<audio->mNumberBuffers; i++ ) {
-        vDSP_vflt16((SInt16*)audio->mBuffers[i].mData, 1, THIS->_scratchBuffer[i], 1, frames);
+    for ( int i=0; i<THIS->_scratchBuffer->mNumberBuffers; i++ ) {
         float vmax = 0;
-        vDSP_maxmgv(THIS->_scratchBuffer[i], 1, &vmax, frames);
+        vDSP_maxmgv((float*)THIS->_scratchBuffer->mBuffers[i].mData, 1, &vmax, frames);
         if ( vmax > max ) max = vmax;
     }
     
@@ -277,7 +245,7 @@ static OSStatus filterCallback(__unsafe_unretained AEExpanderFilter *THIS,
             break;
         case kStateClosed:
             for ( int i=0; i<audio->mNumberBuffers; i++ ) {
-                vDSP_vsmul(THIS->_scratchBuffer[i], 1, &THIS->_ratio, THIS->_scratchBuffer[i], 1, frames);
+                vDSP_vsmul((float*)THIS->_scratchBuffer->mBuffers[i].mData, 1, &THIS->_ratio, (float*)THIS->_scratchBuffer->mBuffers[i].mData, 1, frames);
             }
             break;
             
@@ -288,11 +256,11 @@ static OSStatus filterCallback(__unsafe_unretained AEExpanderFilter *THIS,
             float multiplierStart = (THIS->_multiplier * (1.0-THIS->_ratio)) + THIS->_ratio;
             float multiplierStep = -(1.0 / decayFrames) * (1.0-THIS->_ratio);
             if ( audio->mNumberBuffers == 2 ) {
-                vDSP_vrampmul2(THIS->_scratchBuffer[0], THIS->_scratchBuffer[1], 1, &multiplierStart, &multiplierStep, THIS->_scratchBuffer[0], THIS->_scratchBuffer[1], 1, rampDuration);
+                vDSP_vrampmul2((float*)THIS->_scratchBuffer->mBuffers[0].mData, (float*)THIS->_scratchBuffer->mBuffers[1].mData, 1, &multiplierStart, &multiplierStep, (float*)THIS->_scratchBuffer->mBuffers[0].mData, (float*)THIS->_scratchBuffer->mBuffers[1].mData, 1, rampDuration);
             } else {
                 for ( int i=0; i<audio->mNumberBuffers; i++ ) {
                     float mul = multiplierStart;
-                    vDSP_vrampmul(THIS->_scratchBuffer[i], 1, &mul, &multiplierStep, THIS->_scratchBuffer[i], 1, rampDuration);
+                    vDSP_vrampmul((float*)THIS->_scratchBuffer->mBuffers[i].mData, 1, &mul, &multiplierStep, (float*)THIS->_scratchBuffer->mBuffers[i].mData, 1, rampDuration);
                 }
             }
             
@@ -305,7 +273,7 @@ static OSStatus filterCallback(__unsafe_unretained AEExpanderFilter *THIS,
             // Then multiply by the ratio
             if ( decayFrames < frames ) {
                 for ( int i=0; i<audio->mNumberBuffers; i++ ) {
-                    vDSP_vsmul(THIS->_scratchBuffer[i]+decayFrames, 1, &THIS->_ratio, THIS->_scratchBuffer[i], 1, frames-decayFrames);
+                    vDSP_vsmul((float*)THIS->_scratchBuffer->mBuffers[i].mData+decayFrames, 1, &THIS->_ratio, (float*)THIS->_scratchBuffer->mBuffers[i].mData, 1, frames-decayFrames);
                 }
             }
             break;
@@ -318,11 +286,11 @@ static OSStatus filterCallback(__unsafe_unretained AEExpanderFilter *THIS,
             float multiplierStart = (THIS->_multiplier * (1.0-THIS->_ratio)) + THIS->_ratio;
             float multiplierStep = (1.0 / attackFrames) * (1.0-THIS->_ratio);
             if ( audio->mNumberBuffers == 2 ) {
-                vDSP_vrampmul2(THIS->_scratchBuffer[0], THIS->_scratchBuffer[1], 1, &multiplierStart, &multiplierStep, THIS->_scratchBuffer[0], THIS->_scratchBuffer[1], 1, rampDuration);
+                vDSP_vrampmul2((float*)THIS->_scratchBuffer->mBuffers[0].mData, (float*)THIS->_scratchBuffer->mBuffers[1].mData, 1, &multiplierStart, &multiplierStep, (float*)THIS->_scratchBuffer->mBuffers[0].mData, (float*)THIS->_scratchBuffer->mBuffers[1].mData, 1, rampDuration);
             } else {
                 for ( int i=0; i<audio->mNumberBuffers; i++ ) {
                     float mul = multiplierStart;
-                    vDSP_vrampmul(THIS->_scratchBuffer[i], 1, &mul, &multiplierStep, THIS->_scratchBuffer[i], 1, rampDuration);
+                    vDSP_vrampmul((float*)THIS->_scratchBuffer->mBuffers[i].mData, 1, &mul, &multiplierStep, (float*)THIS->_scratchBuffer->mBuffers[i].mData, 1, rampDuration);
                 }
             }
             
@@ -337,9 +305,7 @@ static OSStatus filterCallback(__unsafe_unretained AEExpanderFilter *THIS,
     }
     
     // Copy audio back to buffers
-    for ( int i=0; i<audio->mNumberBuffers; i++ ) {
-        vDSP_vfix16(THIS->_scratchBuffer[i], 1, (SInt16*)audio->mBuffers[i].mData, 1, frames);
-    }
+    AEFloatConverterFromFloatBufferList(THIS->_floatConverter, THIS->_scratchBuffer, audio, frames);
     
     return noErr;
 }

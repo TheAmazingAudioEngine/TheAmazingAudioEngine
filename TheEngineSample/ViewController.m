@@ -343,8 +343,21 @@ static const int kInputChannelsChangedContext;
                 }
                 case 1: {
                     cell.textLabel.text = @"Expander";
-                    ((UISwitch*)cell.accessoryView).on = _expander != nil;
-                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(expanderSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                    UIView *view = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 250, 40)];
+                    UIButton *calibrateButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+                    calibrateButton.translatesAutoresizingMaskIntoConstraints = NO;
+                    [calibrateButton setTitle:@"Calibrate" forState:UIControlStateNormal];
+                    [calibrateButton addTarget:self action:@selector(calibrateExpander:) forControlEvents:UIControlEventTouchUpInside];
+                    UISwitch * onSwitch = [[UISwitch alloc] initWithFrame:CGRectZero];
+                    onSwitch.translatesAutoresizingMaskIntoConstraints = NO;
+                    onSwitch.on = _expander != nil;
+                    [onSwitch addTarget:self action:@selector(expanderSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                    [view addSubview:calibrateButton];
+                    [view addSubview:onSwitch];
+                    [view addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|[calibrateButton][onSwitch]|" options:0 metrics:nil views:NSDictionaryOfVariableBindings(calibrateButton, onSwitch)]];
+                    [view addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:|[calibrateButton]|" options:0 metrics:nil views:NSDictionaryOfVariableBindings(calibrateButton)]];
+                    [view addConstraint:[NSLayoutConstraint constraintWithItem:onSwitch attribute:NSLayoutAttributeCenterY relatedBy:NSLayoutRelationEqual toItem:view attribute:NSLayoutAttributeCenterY multiplier:1 constant:0]];
+                    cell.accessoryView = view;
                     break;
                 }
                 case 2: {
@@ -544,7 +557,7 @@ static const int kInputChannelsChangedContext;
 
 - (void)limiterSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
-        self.limiter = [[AELimiterFilter alloc] initWithAudioController:_audioController];
+        self.limiter = [[AELimiterFilter alloc] init];
         _limiter.level = 0.1;
         [_audioController addFilter:_limiter];
     } else {
@@ -555,12 +568,20 @@ static const int kInputChannelsChangedContext;
 
 - (void)expanderSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
-        self.expander = [[AEExpanderFilter alloc] initWithAudioController:_audioController];
+        self.expander = [[AEExpanderFilter alloc] init];
         [_audioController addFilter:_expander];
     } else {
         [_audioController removeFilter:_expander];
         self.expander = nil;
     }
+}
+
+- (void)calibrateExpander:(UIButton*)sender {
+    if ( !_expander ) return;
+    sender.enabled = NO;
+    [_expander startCalibratingWithCompletionBlock:^{
+        sender.enabled = YES;
+    }];
 }
 
 - (void)reverbSwitchChanged:(UISwitch*)sender {
