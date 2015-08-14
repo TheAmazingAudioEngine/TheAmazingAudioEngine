@@ -37,6 +37,7 @@
 #import "AEAudioController+Audiobus.h"
 #import "AEAudioController+AudiobusStub.h"
 #import "AEFloatConverter.h"
+#import "AESampleRateConverter.h"
 #import "AEBlockChannel.h"
 #import <pthread.h>
 
@@ -276,6 +277,7 @@ typedef struct {
     BOOL                _hasSystemError;
 #if !TARGET_OS_IPHONE
     AudioUnit           _iAudioUnit;
+    AESampleRateConverter *_iSampleRateConverter;
 #endif
     
     AEChannelGroupRef   _topGroup;
@@ -287,8 +289,8 @@ typedef struct {
     int                 _inputCallbackCount;
     AudioStreamBasicDescription _rawInputAudioDescription;
     AudioBufferList    *_inputAudioBufferList;
-#if TARGET_OS_IPHONE
     AudioBufferList    *_inputAudioScratchBufferList;
+#if TARGET_OS_IPHONE
     AEFloatConverter   *_inputAudioFloatConverter;
 #endif
     AudioTimeStamp      _lastInputBusTimeStamp;
@@ -678,11 +680,23 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
         }
         AudioUnitRenderActionFlags flags = 0;
 #if TARGET_OS_IPHONE
-        AudioUnit inputAudioUnit = THIS->_ioAudioUnit;
+        OSStatus err = AudioUnitRender(THIS->_ioAudioUnit, &flags, &timestamp, 1, inNumberFrames, THIS->_inputAudioBufferList);
 #else
-        AudioUnit inputAudioUnit = THIS->_iAudioUnit;
+        OSStatus err = AudioUnitRender(THIS->_iAudioUnit, &flags, &timestamp, 1, inNumberFrames, THIS->_inputAudioBufferList);
+        
+        // Convert sample rate from input if necessary
+        if ( THIS->_rawInputAudioDescription.mSampleRate != THIS->_audioDescription.mSampleRate ) {
+            UInt32 convertedNumFrames = 0;
+            AESampleRateConverterToBufferList(THIS->_iSampleRateConverter, THIS->_inputAudioBufferList, THIS->_inputAudioScratchBufferList, inNumberFrames, &convertedNumFrames);
+
+            UInt32 convertedDataSize = THIS->_audioDescription.mBytesPerFrame * convertedNumFrames;
+            for (int i = 0; i < THIS->_inputAudioBufferList->mNumberBuffers; i++) {
+                memcpy(THIS->_inputAudioBufferList->mBuffers[i].mData, THIS->_inputAudioScratchBufferList->mBuffers[i].mData, convertedDataSize);
+                THIS->_inputAudioBufferList->mBuffers[i].mDataByteSize = convertedDataSize;
+            }
+            inNumberFrames = convertedNumFrames;
+        }
 #endif
-        OSStatus err = AudioUnitRender(inputAudioUnit, &flags, &timestamp, 1, inNumberFrames, THIS->_inputAudioBufferList);
         if ( !checkResult(err, "AudioUnitRender") ) {
             result = err;
         }
@@ -1014,11 +1028,9 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
         AEFreeAudioBufferList(_inputAudioBufferList);
     }
     
-#if TARGET_OS_IPHONE
     if ( _inputAudioScratchBufferList ) {
         AEFreeAudioBufferList(_inputAudioScratchBufferList);
     }
-#endif
     
     for ( int i=0; i<_inputCallbackCount; i++ ) {
         if ( _inputCallbacks[i].channelMap ) {
@@ -2868,6 +2880,9 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         result = AudioUnitSetProperty(_iAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, inputBus, &_rawInputAudioDescription, propertySize);
         checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
         
+        _iSampleRateConverter = [[AESampleRateConverter alloc] initWithSourceFormat:_rawInputAudioDescription];
+        _iSampleRateConverter.destFormat = _audioDescription;
+
         // Register a callback to receive audio
         AURenderCallbackStruct inRenderProc;
         inRenderProc.inputProc = &inputAvailableCallback;
@@ -3091,8 +3106,8 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     AudioStreamBasicDescription rawAudioDescription = _rawInputAudioDescription;
     AudioBufferList *inputAudioBufferList           = _inputAudioBufferList;
     audio_level_monitor_t inputLevelMonitorData     = _inputLevelMonitorData;
-#if TARGET_OS_IPHONE
     AudioBufferList *inputAudioScratchBufferList    = _inputAudioScratchBufferList;
+#if TARGET_OS_IPHONE
     AEFloatConverter *inputAudioFloatConverter      = _inputAudioFloatConverter;
 #endif
     
@@ -3247,6 +3262,11 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
             inputAudioScratchBufferList = NULL;
             inputAudioFloatConverter = nil;
         }
+#else
+        if ( !inputAudioScratchBufferList || rawInputAudioDescriptionChanged ) {
+            float rateMultiplier = _audioDescription.mSampleRate / _rawInputAudioDescription.mSampleRate;
+            inputAudioScratchBufferList = AEAllocateAndInitAudioBufferList(_audioDescription, (int)ceil(kInputAudioBufferFrames * rateMultiplier));
+        }
 #endif
         
     } else if ( !inputAvailable ) {
@@ -3301,8 +3321,8 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         _numberOfInputChannels    = numberOfInputChannels;
         _rawInputAudioDescription = rawAudioDescription;
         _inputAudioBufferList     = inputAudioBufferList;
-#if TARGET_OS_IPHONE
         _inputAudioScratchBufferList = inputAudioScratchBufferList;
+#if TARGET_OS_IPHONE
         _inputAudioFloatConverter = inputAudioFloatConverter;
 #endif
         _audioInputAvailable      = inputAvailable;
