@@ -1,8 +1,12 @@
 //
-//  AEAudioFilePlayer.h
+//  AEAudioFilePlayer.m
 //  The Amazing Audio Engine
 //
 //  Created by Michael Tyson on 13/02/2012.
+//
+//  Contributions by Ryan King and Jeremy Huff of Hello World Engineering, Inc on 7/15/15.
+//      Copyright (c) 2015 Hello World Engineering, Inc. All rights reserved.
+//  Contributions by Ryan Holmes
 //
 //  This software is provided 'as-is', without any express or implied
 //  warranty.  In no event will the authors be held liable for any damages
