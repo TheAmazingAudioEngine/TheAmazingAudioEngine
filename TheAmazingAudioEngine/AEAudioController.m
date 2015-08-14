@@ -2936,6 +2936,11 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     checkResult(DisposeAUGraph(_audioGraph), "DisposeAUGraph");
     _audioGraph = NULL;
     _ioAudioUnit = NULL;
+#if !TARGET_OS_IPHONE
+    checkResult(AudioUnitUninitialize(_iAudioUnit), "AudioUnitUninitialize");
+    checkResult(AudioComponentInstanceDispose(_iAudioUnit), "AudioComponentInstanceDispose");
+    _iAudioUnit = NULL;
+#endif
     
     for ( int i=0; i<_inputCallbackCount; i++ ) {
         if ( _inputCallbacks[i].audioConverter ) {
