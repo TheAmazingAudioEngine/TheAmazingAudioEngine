@@ -162,7 +162,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     AudioFilePacketTableInfo packetInfo;
     size = sizeof(packetInfo);
     result = AudioFileGetProperty(_audioFile, kAudioFilePropertyPacketTableInfo, &size, &packetInfo);
-    if ( !checkResult(result, "AudioFileGetProperty(kAudioFilePropertyPacketTableInfo)") ) {
+    if ( result != noErr ) {
         size = 0;
     }
     
