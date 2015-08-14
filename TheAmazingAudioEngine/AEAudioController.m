@@ -2284,7 +2284,7 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
 
         } else if ( [keyPath isEqualToString:@"channelIsPlaying"] ) {
             channelElement->playing = channel.channelIsPlaying;
-            AudioUnitParameterValue value = channel.channelIsPlaying && (![channel respondsToSelector:@selector(channelIsMuted)] || !channel.channelIsMuted);
+            AudioUnitParameterValue value = channel.channelIsPlaying;
             
             if ( group->mixerAudioUnit ) {
                 OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
