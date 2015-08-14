@@ -2050,13 +2050,16 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
         }
     }
     
-    [self updateInputDeviceStatus];
+    if ( _inputEnabled ) {
+        [self updateInputDeviceStatus];
+    }
 }
 
 - (void)setBoostBuiltInMicGainInMeasurementMode:(BOOL)boostBuiltInMicGainInMeasurementMode {
     _boostBuiltInMicGainInMeasurementMode = boostBuiltInMicGainInMeasurementMode;
-    
-    [self updateInputDeviceStatus];
+    if ( _inputEnabled ) {
+        [self updateInputDeviceStatus];
+    }
 }
 #endif
 
@@ -2351,7 +2354,7 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
 
         } else if ( [keyPath isEqualToString:@"channelIsPlaying"] ) {
             channelElement->playing = channel.channelIsPlaying;
-            AudioUnitParameterValue value = channel.channelIsPlaying && (![channel respondsToSelector:@selector(channelIsMuted)] || !channel.channelIsMuted);
+            AudioUnitParameterValue value = channel.channelIsPlaying;
             
             if ( group->mixerAudioUnit ) {
                 OSStatus result = AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, value, 0);
@@ -3914,8 +3917,9 @@ static void removeCallbackFromTable(__unsafe_unretained AEAudioController *THIS,
     
     if ( inputCallbacks ) {
         free(oldMultichannelInputCallbacks);
-        
-        [self updateInputDeviceStatus];
+        if ( _inputEnabled ) {
+            [self updateInputDeviceStatus];
+        }
     }
     
     return YES;
