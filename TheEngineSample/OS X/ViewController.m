@@ -11,6 +11,7 @@
 #import "TPOscilloscopeLayer.h"
 #import "AEExpanderFilter.h"
 #import "AELimiterFilter.h"
+#import "AEPlaythroughChannel.h"
 #import "AERecorder.h"
 #import <QuartzCore/QuartzCore.h>
 
@@ -41,7 +42,7 @@ static const int kInputChannelsChangedContext;
 @property (nonatomic, strong) AEBlockChannel *oscillator;
 @property (nonatomic, strong) AEAudioUnitChannel *audioUnitPlayer;
 @property (nonatomic, strong) AEAudioFilePlayer *oneshot;
-//@property (nonatomic, strong) AEPlaythroughChannel *playthrough;
+@property (nonatomic, strong) AEPlaythroughChannel *playthrough;
 @property (nonatomic, strong) AELimiterFilter *limiter;
 @property (nonatomic, strong) AEExpanderFilter *expander;
 @property (nonatomic, strong) AEAudioUnitFilter *reverb;
@@ -202,6 +203,11 @@ static const int kInputChannelsChangedContext;
         [channelsToRemove addObject:_oneshot];
     }
     
+    if ( _playthrough ) {
+        [channelsToRemove addObject:_playthrough];
+        [_audioController removeInputReceiver:_playthrough];
+    }
+    
     [_audioController removeChannels:channelsToRemove];
     
     if ( _limiter ) {
@@ -327,7 +333,7 @@ static inline float translate(float val, float min, float max) {
 #pragma mark - NSTableViewDataSource
 
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
-    return 13;
+    return 11;
 }
 
 #pragma mark - NSTableViewDelegate
@@ -419,17 +425,11 @@ static inline float translate(float val, float min, float max) {
                 break;
             case 9:
                 button.title = @"Input Playthrough";
-                button.enabled = NO;
+                button.state = _playthrough ? NSOnState : NSOffState;
+                button.target = self;
+                button.action = @selector(playthroughSwitchChanged:);
                 break;
             case 10:
-                button.title = @"Measurement Mode";
-                button.enabled = NO;
-                break;
-            case 11:
-                label.stringValue = @"Input Gain";
-                view = label;
-                break;
-            case 12:
                 label.stringValue = @"Channels";
                 view = label;
                 break;
@@ -446,6 +446,7 @@ static inline float translate(float val, float min, float max) {
             view.identifier = sliderIdentifier;
         }
         NSSlider *slider = (NSSlider *)view;
+
         switch ( row ) {
             case 0:
                 slider.doubleValue = _loop1.volume;
@@ -467,11 +468,25 @@ static inline float translate(float val, float min, float max) {
                 slider.target = self;
                 slider.action = @selector(channelGroupVolumeChanged:);
                 break;
-            case 11:
-                slider.enabled = NO;
-                break;
             default:
                 view = nil;
+        }
+        if (row == 10) {
+            NSView *channelStrip = [[NSView alloc] initWithFrame:view.frame];
+            int channelCount = _audioController.numberOfInputChannels;
+            for ( int i=0; i<channelCount; i++ ) {
+                NSButton *button = [[NSButton alloc] init];
+                button.bezelStyle = NSRoundRectBezelStyle;
+                [button setButtonType:NSPushOnPushOffButton];
+                button.frame = NSMakeRect(i * 30, 2, 25, 20);
+                button.title = [NSString stringWithFormat:@"%d", i + 1];
+                button.state = [_audioController.inputChannelSelection containsObject:@(i)] ? NSOnState : NSOffState;
+                button.tag = i;
+                button.target = self;
+                button.action = @selector(channelButtonPressed:);
+                [channelStrip addSubview:button];
+            }
+            view = channelStrip;
         }
     }
     return view;
@@ -608,6 +623,19 @@ static inline float translate(float val, float min, float max) {
     }
 }
 
+- (void)playthroughSwitchChanged:(NSButton *)sender {
+    BOOL isOn = (sender.state == NSOnState);
+    if ( isOn ) {
+        self.playthrough = [[AEPlaythroughChannel alloc] initWithAudioController:_audioController];
+        [_audioController addInputReceiver:_playthrough];
+        [_audioController addChannels:@[_playthrough]];
+    } else {
+        [_audioController removeChannels:@[_playthrough]];
+        [_audioController removeInputReceiver:_playthrough];
+        self.playthrough = nil;
+    }
+}
+
 - (void)reverbSwitchChanged:(NSButton *)sender {
     BOOL isOn = (sender.state == NSOnState);
     if ( isOn ) {
@@ -652,6 +680,19 @@ static inline float translate(float val, float min, float max) {
     } else {
         [_audioController removeFilter:_reverb];
         self.reverb = nil;
+    }
+}
+
+- (void)channelButtonPressed:(NSButton *)sender {
+    BOOL selected = [_audioController.inputChannelSelection containsObject:@(sender.tag)];
+    selected = !selected;
+    if ( selected ) {
+        _audioController.inputChannelSelection = [[_audioController.inputChannelSelection arrayByAddingObject:@(sender.tag)] sortedArrayUsingSelector:@selector(compare:)];
+    } else {
+        NSMutableArray *channels = [_audioController.inputChannelSelection mutableCopy];
+        [channels removeObject:@(sender.tag)];
+        _audioController.inputChannelSelection = channels;
+        sender.state = NSOffState;
     }
 }
 

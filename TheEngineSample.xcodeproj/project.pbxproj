@@ -40,6 +40,7 @@
 		4C7C680F16F1609800721E60 /* README.markdown in Resources */ = {isa = PBXBuildFile; fileRef = 4C7C680416F1609800721E60 /* README.markdown */; };
 		4C7C681016F1609800721E60 /* TPCircularBuffer+AudioBufferList.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C7C680516F1609800721E60 /* TPCircularBuffer+AudioBufferList.c */; };
 		4C7C681116F1609800721E60 /* TPCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C7C680716F1609800721E60 /* TPCircularBuffer.c */; };
+		7A532D2B1B7C6FA8006056DB /* AEPlaythroughChannel.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C7C680016F1609800721E60 /* AEPlaythroughChannel.m */; };
 		7A8D23151B72AF9E0054D2B2 /* libTheAmazingAudioEngine OS X.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 7A8D22F01B72AF250054D2B2 /* libTheAmazingAudioEngine OS X.a */; };
 		7A8D23321B72B4DD0054D2B2 /* AELimiter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C7C67FA16F1609800721E60 /* AELimiter.m */; };
 		7A8D23331B72B4E20054D2B2 /* AEExpanderFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C7C67F816F1609800721E60 /* AEExpanderFilter.m */; };
@@ -456,6 +457,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7A532D2B1B7C6FA8006056DB /* AEPlaythroughChannel.m in Sources */,
 				4C50FF331B75936000E56620 /* ViewController.m in Sources */,
 				4C50FF321B75936000E56620 /* main.m in Sources */,
 				7AFFB76C1B75307500892749 /* AERecorder.m in Sources */,
