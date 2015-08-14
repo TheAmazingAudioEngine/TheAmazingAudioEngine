@@ -1990,13 +1990,16 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
         }
     }
     
-    [self updateInputDeviceStatus];
+    if ( _inputEnabled ) {
+        [self updateInputDeviceStatus];
+    }
 }
 
 - (void)setBoostBuiltInMicGainInMeasurementMode:(BOOL)boostBuiltInMicGainInMeasurementMode {
     _boostBuiltInMicGainInMeasurementMode = boostBuiltInMicGainInMeasurementMode;
-    
-    [self updateInputDeviceStatus];
+    if ( _inputEnabled ) {
+        [self updateInputDeviceStatus];
+    }
 }
 
 -(void)setMasterOutputVolume:(float)masterOutputVolume {
@@ -3764,8 +3767,9 @@ static void removeCallbackFromTable(__unsafe_unretained AEAudioController *THIS,
     
     if ( inputCallbacks ) {
         free(oldMultichannelInputCallbacks);
-        
-        [self updateInputDeviceStatus];
+        if ( _inputEnabled ) {
+            [self updateInputDeviceStatus];
+        }
     }
     
     return YES;
