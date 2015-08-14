@@ -86,7 +86,7 @@ static const int kInputChannelsChangedContext;
     
     self.inputLevelLayer = [CALayer layer];
     _inputLevelLayer.backgroundColor = [[NSColor colorWithWhite:0.0 alpha:0.3] CGColor];
-    _inputLevelLayer.frame = NSMakeRect(_headerView.bounds.size.width/2.0 - 5.0 - (0.0), 0, 50, 10);
+    _inputLevelLayer.frame = NSMakeRect(_headerView.bounds.size.width/2.0 - 5.0, 0, 50, 10);
     [_headerView.layer addSublayer:_inputLevelLayer];
     
     self.outputLevelLayer = [CALayer layer];
@@ -307,7 +307,7 @@ static inline float translate(float val, float min, float max) {
     [_audioController outputAveragePowerLevel:&outputAvg peakHoldLevel:&outputPeak];
     
     _inputLevelLayer.frame = NSMakeRect(_headerView.bounds.size.width/2.0 - 5.0 - (translate(inputAvg, -20, 0) * (_headerView.bounds.size.width/2.0 - 15.0)),
-                                        90,
+                                        _inputLevelLayer.frame.origin.y,
                                         translate(inputAvg, -20, 0) * (_headerView.bounds.size.width/2.0 - 15.0),
                                         10);
     
