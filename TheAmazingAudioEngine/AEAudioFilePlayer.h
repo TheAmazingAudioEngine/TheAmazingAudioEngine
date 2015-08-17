@@ -61,6 +61,15 @@ extern "C" {
  */
 - (instancetype)initWithURL:(NSURL *)url error:(NSError **)error;
 
+/*!
+ * Get playhead position, in frames
+ *
+ *  For use on the realtime thread.
+ *
+ * @param The player
+ */
+UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * filePlayer);
+
 @property (nonatomic, strong, readonly) NSURL *url;         //!< Original media URL
 @property (nonatomic, readonly) NSTimeInterval duration;    //!< Length of audio, in seconds
 @property (nonatomic, assign) NSTimeInterval currentTime;   //!< Current playback position, in seconds
