@@ -2844,18 +2844,32 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         result = AudioUnitSetProperty(_iAudioUnit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Output, outputBus, &disableFlag, sizeof(disableFlag));
         checkResult(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_EnableIO)");
         
-        // Set the input device to the system's default input device
+        // Get the system's default input device
         AudioDeviceID defaultDevice = kAudioDeviceUnknown;
         UInt32 propertySize = sizeof(defaultDevice);
-        AudioObjectPropertyAddress defaultDeviceProperty;
-        defaultDeviceProperty.mSelector = kAudioHardwarePropertyDefaultInputDevice;
-        defaultDeviceProperty.mScope = kAudioObjectPropertyScopeGlobal;
-        defaultDeviceProperty.mElement = kAudioObjectPropertyElementMaster;
+        AudioObjectPropertyAddress defaultDeviceProperty = {
+            .mSelector = kAudioHardwarePropertyDefaultInputDevice,
+            .mScope = kAudioObjectPropertyScopeGlobal,
+            .mElement = kAudioObjectPropertyElementMaster
+        };
         result = AudioObjectGetPropertyData(kAudioObjectSystemObject, &defaultDeviceProperty, 0, NULL, &propertySize, &defaultDevice);
         checkResult(result, "AudioObjectGetPropertyData(kAudioObjectSystemObject)");
+        
+        // Set the sample rate of the input device to the output samplerate (if possible)
+        AudioValueRange inputSampleRate;
+        inputSampleRate.mMinimum = _audioDescription.mSampleRate;
+        inputSampleRate.mMaximum = _audioDescription.mSampleRate;
+        defaultDeviceProperty.mSelector = kAudioDevicePropertyNominalSampleRate;
+        result = AudioObjectSetPropertyData(defaultDevice, &defaultDeviceProperty, 0, NULL, sizeof(inputSampleRate), &inputSampleRate);
+        if (result == kAudioCodecUnsupportedFormatError) {
+            NSLog(@"TAAE: Warning: could not set hardware input to same sample rate as output (%.f Hz)", _audioDescription.mSampleRate);
+        }
+        checkResult(result, "AudioObjectSetPropertyData(kAudioDevicePropertyNominalSampleRate)");
+        
+        // Set the input device to the system's default input device
         result = AudioUnitSetProperty(_iAudioUnit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, outputBus, &defaultDevice, sizeof(defaultDevice));
         checkResult(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_CurrentDevice)");
-        
+    
         // Set input unit ASBD output to match the hardware input ASBD
         propertySize = sizeof(AudioStreamBasicDescription);
         result = AudioUnitGetProperty(_iAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, inputBus, &_rawInputAudioDescription, &propertySize);
@@ -2865,6 +2879,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         result = AudioUnitGetProperty(_iAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, inputBus, &deviceFormat, &propertySize);
         checkResult(result, "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)");
         
+        deviceFormat.mSampleRate = _audioDescription.mSampleRate;
         _rawInputAudioDescription.mSampleRate = deviceFormat.mSampleRate;
         
         propertySize = sizeof(AudioStreamBasicDescription);
