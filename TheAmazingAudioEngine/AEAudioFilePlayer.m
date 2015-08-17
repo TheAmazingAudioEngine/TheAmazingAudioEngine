@@ -185,6 +185,7 @@ UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * THIS
         fileLengthInFrames = packetCount * _fileDescription.mFramesPerPacket;
     }
     _lengthInFrames = (UInt32)fileLengthInFrames;
+    self.url = url;
     
     return YES;
 }
