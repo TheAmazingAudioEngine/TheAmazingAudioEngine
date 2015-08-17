@@ -67,6 +67,9 @@ extern "C" {
 @property (nonatomic, readwrite) BOOL loop;                 //!< Whether to loop this track
 @property (nonatomic, readwrite) BOOL removeUponFinish;     //!< Whether the track automatically removes itself from the audio controller after playback completes
 @property (nonatomic, copy) void(^completionBlock)();       //!< A block to be called when playback finishes
+
+int AEAudioFilePlayerGetPlayhead(AEAudioFilePlayer *filePlayer);
+
 @end
 
 #ifdef __cplusplus
