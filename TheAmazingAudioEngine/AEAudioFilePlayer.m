@@ -137,6 +137,10 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     }
 }
 
+UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * THIS) {
+    return THIS->_playhead;
+}
+
 - (BOOL)loadAudioFileWithURL:(NSURL*)url error:(NSError**)error {
     OSStatus result;
     
