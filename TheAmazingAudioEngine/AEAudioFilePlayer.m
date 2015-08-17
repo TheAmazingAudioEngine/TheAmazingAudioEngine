@@ -304,4 +304,8 @@ static void AEAudioFilePlayerNotifyCompletion(__unsafe_unretained AEAudioControl
     }
 }
 
+int AEAudioFilePlayerGetPlayhead(AEAudioFilePlayer *filePlayer) {
+    return filePlayer->_playhead;
+}
+
 @end
