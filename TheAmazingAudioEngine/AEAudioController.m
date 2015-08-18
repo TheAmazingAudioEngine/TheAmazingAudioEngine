@@ -1084,7 +1084,9 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     @synchronized ( self ) {
         status = AUGraphStart(_audioGraph);
 #if !TARGET_OS_IPHONE
-        checkResult(AudioOutputUnitStart(_iAudioUnit), "AudioOutputUnitStart (OSX input)");
+        if (_inputEnabled) {
+            checkResult(AudioOutputUnitStart(_iAudioUnit), "AudioOutputUnitStart (OSX input)");
+        }
 #endif
     }
     
@@ -1143,7 +1145,9 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     
     checkResult(AUGraphStop(_audioGraph), "AUGraphStop");
 #if !TARGET_OS_IPHONE
-    checkResult(AudioOutputUnitStop(_iAudioUnit), "AudioOutputUnitStop (OSX input)");
+    if ( _inputEnabled ) {
+        checkResult(AudioOutputUnitStop(_iAudioUnit), "AudioOutputUnitStop (OSX input)");
+    }
 #endif
     
     if ( self.running ) {
@@ -2685,17 +2689,19 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 #endif
     
 #if !TARGET_OS_IPHONE
-    // Initialize the audio unit for OSX input
-    AudioComponentDescription i_desc = {
-        .componentType = kAudioUnitType_Output,
-        .componentSubType = kAudioUnitSubType_HALOutput,
-        .componentManufacturer = kAudioUnitManufacturer_Apple,
-        .componentFlags = 0,
-        .componentFlagsMask = 0
-    };
-    
-    AudioComponent inputComponent = AudioComponentFindNext(NULL, &i_desc);
-    checkResult(AudioComponentInstanceNew(inputComponent, &_iAudioUnit), "AudioComponentInstanceNew");
+    if ( _iAudioUnit ) {
+        // Initialize the audio unit for OSX input
+        AudioComponentDescription i_desc = {
+            .componentType = kAudioUnitType_Output,
+            .componentSubType = kAudioUnitSubType_HALOutput,
+            .componentManufacturer = kAudioUnitManufacturer_Apple,
+            .componentFlags = 0,
+            .componentFlagsMask = 0
+        };
+        
+        AudioComponent inputComponent = AudioComponentFindNext(NULL, &i_desc);
+        checkResult(AudioComponentInstanceNew(inputComponent, &_iAudioUnit), "AudioComponentInstanceNew");
+    }
 #endif
     
     [self configureAudioUnit];
@@ -2939,8 +2945,10 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
                 "AudioUnitSetProperty(kAudioUnitProperty_MaximumFramesPerSlice)");
 
 #if !TARGET_OS_IPHONE
-    checkResult(AudioUnitSetProperty(_iAudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &kMaxFramesPerSlice, sizeof(kMaxFramesPerSlice)),
-                "AudioUnitSetProperty(kAudioUnitProperty_MaximumFramesPerSlice)");
+    if ( _inputEnabled ) {
+        checkResult(AudioUnitSetProperty(_iAudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &kMaxFramesPerSlice, sizeof(kMaxFramesPerSlice)),
+                    "AudioUnitSetProperty(kAudioUnitProperty_MaximumFramesPerSlice)");
+    }
 #endif
     
 #if TARGET_OS_IPHONE
@@ -2955,9 +2963,11 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     _audioGraph = NULL;
     _ioAudioUnit = NULL;
 #if !TARGET_OS_IPHONE
-    checkResult(AudioUnitUninitialize(_iAudioUnit), "AudioUnitUninitialize");
-    checkResult(AudioComponentInstanceDispose(_iAudioUnit), "AudioComponentInstanceDispose");
-    _iAudioUnit = NULL;
+    if ( _inputEnabled ) {
+        checkResult(AudioUnitUninitialize(_iAudioUnit), "AudioUnitUninitialize");
+        checkResult(AudioComponentInstanceDispose(_iAudioUnit), "AudioComponentInstanceDispose");
+        _iAudioUnit = NULL;
+    }
 #endif
     
     for ( int i=0; i<_inputCallbackCount; i++ ) {
