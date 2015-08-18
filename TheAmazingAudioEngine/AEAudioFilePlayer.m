@@ -257,18 +257,17 @@ static OSStatus AEAudioFilePlayerRenderNotify(void * inRefCon,
     if ( !THIS->_running ) return noErr;
     
     int32_t playhead = THIS->_playhead;
-    int32_t originalPlayhead = playhead;
+    int32_t originalPlayhead = THIS->_playhead;
     
     double sourceToOutputSampleRateScale = THIS->_unitOutputDescription.mSampleRate / THIS->_fileDescription.mSampleRate;
     UInt32 lengthInFrames = ceil(THIS->_lengthInFrames * sourceToOutputSampleRateScale);
-    playhead = (playhead + inNumberFrames) % lengthInFrames;
     
-    if ( playhead < originalPlayhead && !THIS->_loop ) {
+    if ( playhead + inNumberFrames >= THIS->_lengthInFrames && !THIS->_loop ) {
         // We just crossed the loop boundary; if not looping, end the track.
-        UInt32 muteFrames = MIN(playhead, inNumberFrames);
+        UInt32 finalFrames = MIN(THIS->_lengthInFrames - playhead, inNumberFrames);
         for ( int i=0; i<ioData->mNumberBuffers; i++) {
             // Silence the rest of the buffer past the end
-            memset((char*)ioData->mBuffers[i].mData + (THIS->_unitOutputDescription.mBytesPerFrame * (inNumberFrames-muteFrames)), 0, (THIS->_unitOutputDescription.mBytesPerFrame * muteFrames));
+            memset((char*)ioData->mBuffers[i].mData + (THIS->_unitOutputDescription.mBytesPerFrame * finalFrames), 0, (THIS->_unitOutputDescription.mBytesPerFrame * (inNumberFrames - finalFrames)));
         }
         
         // Reset the unit, to cease playback
@@ -283,7 +282,8 @@ static OSStatus AEAudioFilePlayerRenderNotify(void * inRefCon,
         THIS->_running = NO;
     }
     
-    // update the playhead
+    // Update the playhead
+    playhead = (playhead + inNumberFrames) % lengthInFrames;
     OSAtomicCompareAndSwap32(originalPlayhead, playhead, &THIS->_playhead);
     
     return noErr;
