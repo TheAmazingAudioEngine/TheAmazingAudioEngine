@@ -887,6 +887,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 #if TARGET_OS_IPHONE
     _audioSessionCategory = enableInput ? (enableOutput ? AVAudioSessionCategoryPlayAndRecord : AVAudioSessionCategoryRecord) : AVAudioSessionCategoryPlayback;
     _allowMixingWithOtherApps = enableOutput ? YES : NO;
+    _avoidMeasurementModeForBuiltInSpeaker = YES;
     _boostBuiltInMicGainInMeasurementMode = YES;
 #endif
     _audioDescription = audioDescription;
@@ -947,6 +948,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 #if TARGET_OS_IPHONE
     _audioSessionCategory = enableInput ? (enableOutput ? AVAudioSessionCategoryPlayAndRecord : AVAudioSessionCategoryRecord) : AVAudioSessionCategoryPlayback;
     _allowMixingWithOtherApps = enableOutput ? YES : NO;
+    _avoidMeasurementModeForBuiltInSpeaker = YES;
     _boostBuiltInMicGainInMeasurementMode = YES;
 #endif
     _audioDescription = audioDescription;
@@ -2064,7 +2066,9 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     
     NSError *error = nil;
-    if ( ![audioSession setMode:_useMeasurementMode ? AVAudioSessionModeMeasurement : AVAudioSessionModeDefault error:&error] ) {
+    if ( ![audioSession setMode:_useMeasurementMode && (!_avoidMeasurementModeForBuiltInSpeaker || !_playingThroughDeviceSpeaker)
+                                    ? AVAudioSessionModeMeasurement : AVAudioSessionModeDefault
+                          error:&error] ) {
         NSLog(@"TAAE: Couldn't set audio session mode: %@", error);
     } else {
         if ( ![audioSession setPreferredIOBufferDuration:_preferredBufferDuration error:&error] ) {
@@ -2513,6 +2517,18 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
                 if ( [self mustUpdateVoiceProcessingSettings] ) {
                     [self replaceIONode];
                     updatedVP = YES;
+                }
+            }
+            
+            if ( _useMeasurementMode && _avoidMeasurementModeForBuiltInSpeaker ) {
+                NSError *error = nil;
+                if ( ![audioSession setMode:!_playingThroughDeviceSpeaker ? AVAudioSessionModeMeasurement : AVAudioSessionModeDefault
+                                      error:&error] ) {
+                    NSLog(@"TAAE: Couldn't set audio session mode: %@", error);
+                } else {
+                    if ( ![audioSession setPreferredIOBufferDuration:_preferredBufferDuration error:&error] ) {
+                        NSLog(@"TAAE: Couldn't set preferred IO buffer duration: %@", error);
+                    }
                 }
             }
         }
