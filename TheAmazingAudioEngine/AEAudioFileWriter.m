@@ -25,7 +25,6 @@
 
 #import "AEAudioFileWriter.h"
 #import "TheAmazingAudioEngine.h"
-#import <AVFoundation/AVFoundation.h>
 
 NSString * const AEAudioFileWriterErrorDomain = @"com.theamazingaudioengine.AEAudioFileWriterErrorDomain";
 
@@ -41,7 +40,6 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 @interface AEAudioFileWriter () {
     BOOL                        _writing;
     ExtAudioFileRef             _audioFile;
-    UInt32                      _priorMixOverrideValue;
     AudioStreamBasicDescription _audioDescription;
 }
 
@@ -130,31 +128,13 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
             return NO;
         }
         
-        UInt32 size = sizeof(_priorMixOverrideValue);
-        
-#if TARGET_OS_IPHONE
-        AVAudioSession *audioSession = [AVAudioSession sharedInstance];
-        
-        // AAC won't work if the 'mix with others' session property is enabled. Disable it if it's on.
-        _priorMixOverrideValue = audioSession.categoryOptions & AVAudioSessionCategoryOptionMixWithOthers;
-        
-        if ( _priorMixOverrideValue != NO ) {
-            NSError *error = nil;
-            if ( ![audioSession setCategory:audioSession.category
-                                withOptions:audioSession.categoryOptions & ~AVAudioSessionCategoryOptionMixWithOthers
-                                      error:&error] ) {
-                NSLog(@"Couldn't update category options: %@", error);
-            }
-        }
-#endif
-
         // Get the output audio description
         AudioStreamBasicDescription destinationFormat;
         memset(&destinationFormat, 0, sizeof(destinationFormat));
         destinationFormat.mChannelsPerFrame = channels;
         destinationFormat.mSampleRate = _audioDescription.mSampleRate;
         destinationFormat.mFormatID = kAudioFormatMPEG4AAC;
-        size = sizeof(destinationFormat);
+        UInt32 size = sizeof(destinationFormat);
         status = AudioFormatGetProperty(kAudioFormatProperty_FormatInfo, 0, NULL, &size, &destinationFormat);
         if ( !checkResult(status, "AudioFormatGetProperty(kAudioFormatProperty_FormatInfo") ) {
             int fourCC = CFSwapInt32HostToBig(status);
@@ -248,18 +228,6 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     _writing = NO;
     
     checkResult(ExtAudioFileDispose(_audioFile), "AudioFileClose");
-    
-#if TARGET_OS_IPHONE
-    if ( _priorMixOverrideValue ) {
-        NSError *error = nil;
-        AVAudioSession *audioSession = [AVAudioSession sharedInstance];
-        if ( ![audioSession setCategory:audioSession.category
-                            withOptions:audioSession.categoryOptions | AVAudioSessionCategoryOptionMixWithOthers
-                                  error:&error] ) {
-            NSLog(@"Couldn't update category options: %@", error);
-        }
-    }
-#endif
 }
 
 OSStatus AEAudioFileWriterAddAudio(__unsafe_unretained AEAudioFileWriter* THIS, AudioBufferList *bufferList, UInt32 lengthInFrames) {
