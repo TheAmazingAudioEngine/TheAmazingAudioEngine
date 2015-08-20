@@ -3004,19 +3004,15 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 }
 
 - (OSStatus)updateGraph {
-    // Only update if graph is running
-    if ( self.running ) {
-        // Retry a few times (as sometimes the graph will be in the wrong state to update)
-        OSStatus err = noErr;
-        for ( int retry=0; retry<6; retry++ ) {
-            err = AUGraphUpdate(_audioGraph, NULL);
-            if ( err != kAUGraphErr_CannotDoInCurrentContext ) break;
-            [NSThread sleepForTimeInterval:0.01];
-        }
-        
-        return err;
+    // Retry a few times (as sometimes the graph will be in the wrong state to update)
+    OSStatus err;
+    for ( int retry=0; retry<6; retry++ ) {
+        err = AUGraphUpdate(_audioGraph, NULL);
+        if ( err != kAUGraphErr_CannotDoInCurrentContext ) break;
+        [NSThread sleepForTimeInterval:0.01];
     }
-    return noErr;
+    
+    return err;
 }
 
 - (BOOL)mustUpdateVoiceProcessingSettings {
