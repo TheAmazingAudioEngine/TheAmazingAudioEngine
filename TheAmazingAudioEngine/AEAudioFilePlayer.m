@@ -262,9 +262,9 @@ static OSStatus AEAudioFilePlayerRenderNotify(void * inRefCon,
     double sourceToOutputSampleRateScale = THIS->_unitOutputDescription.mSampleRate / THIS->_fileDescription.mSampleRate;
     UInt32 lengthInFrames = ceil(THIS->_lengthInFrames * sourceToOutputSampleRateScale);
     
-    if ( playhead + inNumberFrames >= THIS->_lengthInFrames && !THIS->_loop ) {
+    if ( playhead + inNumberFrames >= lengthInFrames && !THIS->_loop ) {
         // We just crossed the loop boundary; if not looping, end the track.
-        UInt32 finalFrames = MIN(THIS->_lengthInFrames - playhead, inNumberFrames);
+        UInt32 finalFrames = MIN(lengthInFrames - playhead, inNumberFrames);
         for ( int i=0; i<ioData->mNumberBuffers; i++) {
             // Silence the rest of the buffer past the end
             memset((char*)ioData->mBuffers[i].mData + (THIS->_unitOutputDescription.mBytesPerFrame * finalFrames), 0, (THIS->_unitOutputDescription.mBytesPerFrame * (inNumberFrames - finalFrames)));
