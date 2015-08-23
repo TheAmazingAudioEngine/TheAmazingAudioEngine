@@ -3495,6 +3495,7 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
 }
 
 - (void)iterateChannelsBeneathGroup:(AEChannelGroupRef)group block:(void(^)(AEChannelRef channel))block {
+    block(group->channel);
     for ( int i=0; i<group->channelCount; i++ ) {
         if ( group->channels[i] ) {
             if ( group->channels[i]->type == kChannelTypeChannel ) {
@@ -3513,7 +3514,7 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
                 [filter teardown];
             }
         }
-        if ( [(__bridge id<AEAudioPlayable>)channel->object respondsToSelector:@selector(teardown)] ) {
+        if ( channel->type == kChannelTypeChannel && [(__bridge id<AEAudioPlayable>)channel->object respondsToSelector:@selector(teardown)] ) {
             [(__bridge id<AEAudioPlayable>)channel->object teardown];
         }
     }];
@@ -3526,7 +3527,7 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
                 [filter setupWithAudioController:self];
             }
         }
-        if ( [(__bridge id<AEAudioPlayable>)channel->object respondsToSelector:@selector(setupWithAudioController:)] ) {
+        if ( channel->type == kChannelTypeChannel && [(__bridge id<AEAudioPlayable>)channel->object respondsToSelector:@selector(setupWithAudioController:)] ) {
             [(__bridge id<AEAudioPlayable>)channel->object setupWithAudioController:self];
         }
     }];
