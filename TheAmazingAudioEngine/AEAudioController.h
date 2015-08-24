@@ -1244,17 +1244,6 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
 @property (nonatomic, assign) BOOL avoidMeasurementModeForBuiltInSpeaker;
 
 /*!
- * Whether to avoid using Measurement Mode with the built-in speaker
- *
- *  When used with the built-in speaker, Measurement Mode results in quite low audio
- *  output levels. Setting this property to YES causes TAAE to avoid using Measurement Mode
- *  with the built-in speaker, avoiding this problem.
- *
- *  Default is YES.
- */
-@property (nonatomic, assign) BOOL avoidMeasurementModeForBuiltInSpeaker;
-
-/*!
  * Whether to boost the input volume while using Measurement Mode with the built-in mic
  *
  *  When the device's built-in mic is being used while Measurement Mode is enabled (see
