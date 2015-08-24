@@ -38,7 +38,10 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 
 @interface AEAudioUnitChannel () {
     AudioComponentDescription _componentDescription;
+    AUGraph _audioGraph;
+    AUNode _node;
     AudioUnit _audioUnit;
+    AUNode _converterNode;
     AudioUnit _converterUnit;
 }
 @property (nonatomic, copy) void (^preInitializeBlock)(AudioUnit audioUnit);
@@ -73,10 +76,13 @@ AudioUnit AEAudioUnitChannelGetAudioUnit(__unsafe_unretained AEAudioUnitChannel 
 
 - (void)setupWithAudioController:(AEAudioController *)audioController {
     
+    _audioGraph = audioController.audioGraph;
+    
     // Create an instance of the audio unit
-    AudioComponent audioComponent = AudioComponentFindNext(NULL, &_componentDescription);
-    OSStatus result = AudioComponentInstanceNew(audioComponent, &_audioUnit);
-    if ( !checkResult(result, "AudioComponentInstanceNew") ) {
+    OSStatus result;
+    if ( !checkResult(result=AUGraphAddNode(_audioGraph, &_componentDescription, &_node), "AUGraphAddNode") ||
+        !checkResult(result=AUGraphNodeInfo(_audioGraph, _node, NULL, &_audioUnit), "AUGraphNodeInfo") ) {
+        
         NSLog(@"%@: Couldn't initialise audio unit", NSStringFromClass([self class]));
         return;
     }
@@ -96,16 +102,16 @@ AudioUnit AEAudioUnitChannelGetAudioUnit(__unsafe_unretained AEAudioUnitChannel 
         defaultAudioDescription.mSampleRate = audioDescription.mSampleRate;
         AEAudioStreamBasicDescriptionSetChannelsPerFrame(&defaultAudioDescription, audioDescription.mChannelsPerFrame);
         if ( !checkResult(result=AudioUnitSetProperty(_audioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &defaultAudioDescription, size), "AudioUnitSetProperty") ) {
-            AudioComponentInstanceDispose(_audioUnit);
+            AUGraphRemoveNode(_audioGraph, _node);
+            _node = 0;
             _audioUnit = NULL;
             NSLog(@"%@: Incompatible audio format", NSStringFromClass([self class]));
             return;
         }
         
         AudioComponentDescription audioConverterDescription = AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_FormatConverter, kAudioUnitSubType_AUConverter);
-        audioComponent = AudioComponentFindNext(NULL, &audioConverterDescription);
-        if ( !checkResult(result=AudioComponentInstanceNew(audioComponent, &_converterUnit), "AudioComponentInstanceNew") ||
-            !checkResult(result=AudioUnitSetProperty(_converterUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &defaultAudioDescription, sizeof(AudioStreamBasicDescription)), "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)") ||
+        if ( !checkResult(result=AUGraphAddNode(_audioGraph, &audioConverterDescription, &_converterNode), "AUGraphAddNode") ||
+            !checkResult(result=AUGraphNodeInfo(_audioGraph, _converterNode, NULL, &_converterUnit), "AUGraphNodeInfo") ||
             !checkResult(result=AudioUnitSetProperty(_converterUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &audioDescription, sizeof(AudioStreamBasicDescription)), "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)") ||
             !checkResult(result=AudioUnitSetProperty(_converterUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFPS, sizeof(maxFPS)), "kAudioUnitProperty_MaximumFramesPerSlice") ||
             !checkResult(result=AudioUnitSetProperty(_converterUnit, kAudioUnitProperty_MakeConnection, kAudioUnitScope_Input, 0, &(AudioUnitConnection) {
@@ -113,11 +119,13 @@ AudioUnit AEAudioUnitChannelGetAudioUnit(__unsafe_unretained AEAudioUnitChannel 
             .sourceOutputNumber = 0,
             .destInputNumber = 0
         }, sizeof(AudioUnitConnection)), "kAudioUnitProperty_MakeConnection") ) {
-            AudioComponentInstanceDispose(_audioUnit);
+            AUGraphRemoveNode(_audioGraph, _node);
+            _node = 0;
             _audioUnit = NULL;
-            if ( _converterUnit ) {
-                AudioComponentInstanceDispose(_converterUnit);
+            if ( _converterNode ) {
+                AUGraphRemoveNode(_audioGraph, _converterNode);
                 _converterUnit = NULL;
+                _converterNode = 0;
             }
             NSLog(@"%@: Couldn't setup converter audio unit", NSStringFromClass([self class]));
             return;
@@ -134,16 +142,17 @@ AudioUnit AEAudioUnitChannelGetAudioUnit(__unsafe_unretained AEAudioUnitChannel 
 }
 
 - (void)teardown {
-    if ( _audioUnit ) {
-        checkResult(AudioUnitUninitialize(_audioUnit), "AudioUnitUninitialize");
-        checkResult(AudioComponentInstanceDispose(_audioUnit), "AudioComponentInstanceDispose");
+    if ( _node ) {
+        AUGraphRemoveNode(_audioGraph, _node);
+        _node = 0;
         _audioUnit = NULL;
     }
-    if ( _converterUnit ) {
-        checkResult(AudioUnitUninitialize(_converterUnit), "AudioUnitUninitialize");
-        checkResult(AudioComponentInstanceDispose(_converterUnit), "AudioComponentInstanceDispose");
+    if ( _converterNode ) {
+        AUGraphRemoveNode(_audioGraph, _converterNode);
         _converterUnit = NULL;
+        _converterNode = 0;
     }
+    _audioGraph = NULL;
 }
 
 -(void)dealloc {
@@ -161,6 +170,11 @@ static OSStatus renderCallback(__unsafe_unretained AEAudioUnitChannel *THIS,
                                const AudioTimeStamp     *time,
                                UInt32                    frames,
                                AudioBufferList          *audio) {
+    
+    if ( !THIS->_audioUnit ) {
+        return noErr;
+    }
+    
     AudioUnitRenderActionFlags flags = 0;
     checkResult(AudioUnitRender(THIS->_converterUnit ? THIS->_converterUnit : THIS->_audioUnit, &flags, time, 0, frames, audio), "AudioUnitRender");
     return noErr;
