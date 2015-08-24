@@ -569,7 +569,10 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     }
     
     if ( *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
-        // Before main render: first service input
+        // Before main render: First process messages
+        processPendingMessagesOnRealtimeThread(THIS);
+        
+        // Service input
         if ( THIS->_inputEnabled ) {
             serviceAudioInput(THIS, inTimeStamp, &THIS->_lastInputBusTimeStamp, inNumberFrames);
         }
@@ -594,8 +597,6 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
                 memset(ioData->mBuffers[i].mData, 0, ioData->mBuffers[i].mDataByteSize);
             }
         }
-        
-        processPendingMessagesOnRealtimeThread(THIS);
     }
     
     return noErr;
