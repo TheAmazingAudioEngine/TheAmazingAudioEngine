@@ -1241,7 +1241,9 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
  *
  *  Default is YES.
  */
+#if TARGET_OS_IPHONE
 @property (nonatomic, assign) BOOL avoidMeasurementModeForBuiltInSpeaker;
+#endif
 
 /*!
  * Whether to boost the input volume while using Measurement Mode with the built-in mic
