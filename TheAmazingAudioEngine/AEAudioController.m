@@ -255,6 +255,7 @@ typedef struct {
 
 @interface AEAudioControllerMessagePollThread : NSThread
 - (id)initWithAudioController:(AEAudioController*)audioController;
+@property (nonatomic, weak, readonly) AEAudioController * audioController;
 @property (nonatomic, assign) NSTimeInterval pollInterval;
 @end
 
@@ -3974,9 +3975,7 @@ static void * firstUpstreamAudiobusSenderPort(AEChannelRef channel) {
 }
 @end
 
-@interface AEAudioControllerMessagePollThread () {
-    AEAudioController *_audioController;
-}
+@interface AEAudioControllerMessagePollThread ()
 @end
 @implementation AEAudioControllerMessagePollThread
 @synthesize pollInterval = _pollInterval;
