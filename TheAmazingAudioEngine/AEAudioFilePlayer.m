@@ -31,16 +31,6 @@
 #import "AEUtilities.h"
 #import <libkern/OSAtomic.h>
 
-#define checkResult(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/')+1,__LINE__))
-static inline BOOL _checkResult(OSStatus result, const char *operation, const char* file, int line) {
-    if ( result != noErr ) {
-        int fourCC = CFSwapInt32HostToBig(result);
-        NSLog(@"%s:%d: %s result %d %08X %4.4s\n", file, line, operation, (int)result, (int)result, (char*)&fourCC);
-        return NO;
-    }
-    return YES;
-}
-
 @interface AEAudioFilePlayer () {
     AudioFileID _audioFile;
     AudioStreamBasicDescription _fileDescription;
@@ -79,11 +69,11 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
 - (void)setupWithAudioController:(AEAudioController *)audioController {
     [super setupWithAudioController:audioController];
     
-    checkResult(AudioUnitAddRenderNotify(self.audioUnit, AEAudioFilePlayerRenderNotify, (__bridge void*)self), "AudioUnitAddRenderNotify");
+    AECheckOSStatus(AudioUnitAddRenderNotify(self.audioUnit, AEAudioFilePlayerRenderNotify, (__bridge void*)self), "AudioUnitAddRenderNotify");
     
     Float64 priorOutputSampleRate = _unitOutputDescription.mSampleRate;
     UInt32 size = sizeof(AudioStreamBasicDescription);
-    checkResult(AudioUnitGetProperty(self.audioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &_unitOutputDescription, &size), "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)");
+    AECheckOSStatus(AudioUnitGetProperty(self.audioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &_unitOutputDescription, &size), "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)");
     
     double sampleRateScaleFactor = _unitOutputDescription.mSampleRate / (priorOutputSampleRate ? priorOutputSampleRate : _fileDescription.mSampleRate);
     _playhead = _playhead * sampleRateScaleFactor;
@@ -92,7 +82,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
     // Set the file to play
     size = sizeof(_audioFile);
     OSStatus result = AudioUnitSetProperty(self.audioUnit, kAudioUnitProperty_ScheduledFileIDs, kAudioUnitScope_Global, 0, &_audioFile, size);
-    checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileIDs)");
+    AECheckOSStatus(result, "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileIDs)");
     
     // Play the file region
     if ( self.channelIsPlaying ) {
@@ -132,7 +122,7 @@ static inline BOOL _checkResult(OSStatus result, const char *operation, const ch
             double outputToSourceSampleRateScale = _fileDescription.mSampleRate / _unitOutputDescription.mSampleRate;
             [self schedulePlayRegionFromPosition:_playhead * outputToSourceSampleRateScale];
         } else {
-            checkResult(AudioUnitReset(self.audioUnit, kAudioUnitScope_Global, 0), "AudioUnitReset");
+            AECheckOSStatus(AudioUnitReset(self.audioUnit, kAudioUnitScope_Global, 0), "AudioUnitReset");
         }
     }
 }
@@ -146,7 +136,7 @@ UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * THIS
     
     // Open the file
     result = AudioFileOpenURL((__bridge CFURLRef)url, kAudioFileReadPermission, 0, &_audioFile);
-    if ( !checkResult(result, "AudioFileOpenURL") ) {
+    if ( !AECheckOSStatus(result, "AudioFileOpenURL") ) {
         *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:result
                                  userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't open the audio file", @"")}];
         return NO;
@@ -155,7 +145,7 @@ UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * THIS
     // Get the file data format
     UInt32 size = sizeof(_fileDescription);
     result = AudioFileGetProperty(_audioFile, kAudioFilePropertyDataFormat, &size, &_fileDescription);
-    if ( !checkResult(result, "AudioFileGetProperty(kAudioFilePropertyDataFormat)") ) {
+    if ( !AECheckOSStatus(result, "AudioFileGetProperty(kAudioFilePropertyDataFormat)") ) {
         *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:result
                                  userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't read the audio file", @"")}];
         return NO;
@@ -177,7 +167,7 @@ UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * THIS
         UInt64 packetCount;
         size = sizeof(packetCount);
         result = AudioFileGetProperty(_audioFile, kAudioFilePropertyAudioDataPacketCount, &size, &packetCount);
-        if ( !checkResult(result, "AudioFileGetProperty(kAudioFilePropertyAudioDataPacketCount)") ) {
+        if ( !AECheckOSStatus(result, "AudioFileGetProperty(kAudioFilePropertyAudioDataPacketCount)") ) {
             *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:result
                                      userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't read the audio file", @"")}];
             return NO;
@@ -202,7 +192,7 @@ UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * THIS
     _playhead = position * sourceToOutputSampleRateScale;
     
     // Reset the unit, to clear prior schedules
-    checkResult(AudioUnitReset(audioUnit, kAudioUnitScope_Global, 0), "AudioUnitReset");
+    AECheckOSStatus(AudioUnitReset(audioUnit, kAudioUnitScope_Global, 0), "AudioUnitReset");
     
     // Determine start time
     Float64 mainRegionStartTime = 0;
@@ -216,7 +206,7 @@ UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * THIS
             .mFramesToPlay = _lengthInFrames - position
         };
         OSStatus result = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_ScheduledFileRegion, kAudioUnitScope_Global, 0, &region, sizeof(region));
-        checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileRegion)");
+        AECheckOSStatus(result, "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileRegion)");
         
         mainRegionStartTime = (_lengthInFrames - position) * sourceToOutputSampleRateScale;
     }
@@ -231,17 +221,17 @@ UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * THIS
         .mFramesToPlay = (UInt32)-1,
     };
     OSStatus result = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_ScheduledFileRegion, kAudioUnitScope_Global, 0, &region, sizeof(region));
-    checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileRegion)");
+    AECheckOSStatus(result, "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileRegion)");
     
     // Prime the player
     UInt32 primeFrames = 0;
     result = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_ScheduledFilePrime, kAudioUnitScope_Global, 0, &primeFrames, sizeof(primeFrames));
-    checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFilePrime)");
+    AECheckOSStatus(result, "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFilePrime)");
     
     // Set the start time
     AudioTimeStamp startTime = { .mFlags = kAudioTimeStampSampleTimeValid, .mSampleTime = -1 /* ASAP */ };
     result = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_ScheduleStartTimeStamp, kAudioUnitScope_Global, 0, &startTime, sizeof(startTime));
-    checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_ScheduleStartTimeStamp)");
+    AECheckOSStatus(result, "AudioUnitSetProperty(kAudioUnitProperty_ScheduleStartTimeStamp)");
 }
 
 static OSStatus AEAudioFilePlayerRenderNotify(void * inRefCon,
@@ -271,7 +261,7 @@ static OSStatus AEAudioFilePlayerRenderNotify(void * inRefCon,
         }
         
         // Reset the unit, to cease playback
-        checkResult(AudioUnitReset(AEAudioUnitChannelGetAudioUnit(THIS), kAudioUnitScope_Global, 0), "AudioUnitReset");
+        AECheckOSStatus(AudioUnitReset(AEAudioUnitChannelGetAudioUnit(THIS), kAudioUnitScope_Global, 0), "AudioUnitReset");
         playhead = 0;
         
         // Schedule the playback ended callback (if it hasn't been scheduled already)

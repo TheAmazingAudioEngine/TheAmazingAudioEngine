@@ -15,16 +15,6 @@
 #import "AERecorder.h"
 #import <QuartzCore/QuartzCore.h>
 
-#define checkResult(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/')+1,__LINE__))
-static inline BOOL _checkResult(OSStatus result, const char *operation, const char* file, int line) {
-    if ( result != noErr ) {
-        int fourCC = CFSwapInt32HostToBig(result);
-        NSLog(@"%s:%d: %s result %d %08X %4.4s\n", file, line, operation, (int)result, (int)result, (char*)&fourCC);
-        return NO;
-    }
-    return YES;
-}
-
 static const int kInputChannelsChangedContext;
 
 
@@ -488,22 +478,22 @@ static const int kInputChannelsChangedContext;
 - (void)oneshotAudioUnitPlayButtonPressed:(UIButton*)sender {
     if ( !_audioUnitFile ) {
         NSURL *playerFile = [[NSBundle mainBundle] URLForResource:@"Organ Run" withExtension:@"m4a"];
-        checkResult(AudioFileOpenURL((__bridge CFURLRef)playerFile, kAudioFileReadPermission, 0, &_audioUnitFile), "AudioFileOpenURL");
+        AECheckOSStatus(AudioFileOpenURL((__bridge CFURLRef)playerFile, kAudioFileReadPermission, 0, &_audioUnitFile), "AudioFileOpenURL");
     }
     
     // Set the file to play
-    checkResult(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFileIDs, kAudioUnitScope_Global, 0, &_audioUnitFile, sizeof(_audioUnitFile)),
+    AECheckOSStatus(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFileIDs, kAudioUnitScope_Global, 0, &_audioUnitFile, sizeof(_audioUnitFile)),
                 "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileIDs)");
 
     // Determine file properties
     UInt64 packetCount;
 	UInt32 size = sizeof(packetCount);
-	checkResult(AudioFileGetProperty(_audioUnitFile, kAudioFilePropertyAudioDataPacketCount, &size, &packetCount),
+	AECheckOSStatus(AudioFileGetProperty(_audioUnitFile, kAudioFilePropertyAudioDataPacketCount, &size, &packetCount),
                 "AudioFileGetProperty(kAudioFilePropertyAudioDataPacketCount)");
 	
 	AudioStreamBasicDescription dataFormat;
 	size = sizeof(dataFormat);
-	checkResult(AudioFileGetProperty(_audioUnitFile, kAudioFilePropertyDataFormat, &size, &dataFormat),
+	AECheckOSStatus(AudioFileGetProperty(_audioUnitFile, kAudioFilePropertyDataFormat, &size, &dataFormat),
                 "AudioFileGetProperty(kAudioFilePropertyDataFormat)");
     
 	// Assign the region to play
@@ -517,12 +507,12 @@ static const int kInputChannelsChangedContext;
 	region.mLoopCount = 0;
 	region.mStartFrame = 0;
 	region.mFramesToPlay = (UInt32)packetCount * dataFormat.mFramesPerPacket;
-	checkResult(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFileRegion, kAudioUnitScope_Global, 0, &region, sizeof(region)),
+	AECheckOSStatus(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFileRegion, kAudioUnitScope_Global, 0, &region, sizeof(region)),
                 "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileRegion)");
 	
 	// Prime the player by reading some frames from disk
 	UInt32 defaultNumberOfFrames = 0;
-	checkResult(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFilePrime, kAudioUnitScope_Global, 0, &defaultNumberOfFrames, sizeof(defaultNumberOfFrames)),
+	AECheckOSStatus(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFilePrime, kAudioUnitScope_Global, 0, &defaultNumberOfFrames, sizeof(defaultNumberOfFrames)),
                 "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFilePrime)");
     
     // Set the start time (now = -1)
@@ -530,7 +520,7 @@ static const int kInputChannelsChangedContext;
 	memset (&startTime, 0, sizeof(startTime));
 	startTime.mFlags = kAudioTimeStampSampleTimeValid;
 	startTime.mSampleTime = -1;
-	checkResult(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduleStartTimeStamp, kAudioUnitScope_Global, 0, &startTime, sizeof(startTime)),
+	AECheckOSStatus(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduleStartTimeStamp, kAudioUnitScope_Global, 0, &startTime, sizeof(startTime)),
 			   "AudioUnitSetProperty(kAudioUnitProperty_ScheduleStartTimeStamp)");
 
 }

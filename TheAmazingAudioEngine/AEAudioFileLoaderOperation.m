@@ -26,15 +26,6 @@
 #import "AEAudioFileLoaderOperation.h"
 #import "AEUtilities.h"
 
-#define checkResult(result,operation) (_checkResult((result),(operation),strrchr(__FILE__, '/')+1,__LINE__))
-static inline BOOL _checkResult(OSStatus result, const char *operation, const char* file, int line) {
-    if ( result != noErr ) {
-        NSLog(@"%s:%d: %s result %d %08X %4.4s\n", file, line, operation, (int)result, (int)result, (char*)&result); 
-        return NO;
-    }
-    return YES;
-}
-
 static const int kIncrementalLoadBufferSize = 4096;
 static const int kMaxAudioFileReadSize = 16384;
 
@@ -57,7 +48,7 @@ static const int kMaxAudioFileReadSize = 16384;
     
     // Open file
     status = ExtAudioFileOpenURL((__bridge CFURLRef)url, &audioFile);
-    if ( !checkResult(status, "ExtAudioFileOpenURL") ) {
+    if ( !AECheckOSStatus(status, "ExtAudioFileOpenURL") ) {
         if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
                                               userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't open the audio file", @"")}];
         return NO;
@@ -67,7 +58,7 @@ static const int kMaxAudioFileReadSize = 16384;
         // Get data format
         UInt32 size = sizeof(AudioStreamBasicDescription);
         status = ExtAudioFileGetProperty(audioFile, kExtAudioFileProperty_FileDataFormat, &size, audioDescription);
-        if ( !checkResult(status, "ExtAudioFileGetProperty") ) {
+        if ( !AECheckOSStatus(status, "ExtAudioFileGetProperty") ) {
             if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
                                                   userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't read the audio file", @"")}];
             return NO;
@@ -79,7 +70,7 @@ static const int kMaxAudioFileReadSize = 16384;
         UInt64 fileLengthInFrames = 0;
         UInt32 size = sizeof(fileLengthInFrames);
         status = ExtAudioFileGetProperty(audioFile, kExtAudioFileProperty_FileLengthFrames, &size, &fileLengthInFrames);
-        if ( !checkResult(status, "ExtAudioFileGetProperty(kExtAudioFileProperty_FileLengthFrames)") ) {
+        if ( !AECheckOSStatus(status, "ExtAudioFileGetProperty(kExtAudioFileProperty_FileLengthFrames)") ) {
             ExtAudioFileDispose(audioFile);
             if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
                                                   userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't read the audio file", @"")}];
@@ -109,7 +100,7 @@ static const int kMaxAudioFileReadSize = 16384;
     
     // Open file
     status = ExtAudioFileOpenURL((__bridge CFURLRef)_url, &audioFile);
-    if ( !checkResult(status, "ExtAudioFileOpenURL") ) {
+    if ( !AECheckOSStatus(status, "ExtAudioFileOpenURL") ) {
         self.error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
                                      userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't open the audio file", @"")}];
         return;
@@ -119,7 +110,7 @@ static const int kMaxAudioFileReadSize = 16384;
     AudioStreamBasicDescription fileAudioDescription;
     UInt32 size = sizeof(fileAudioDescription);
     status = ExtAudioFileGetProperty(audioFile, kExtAudioFileProperty_FileDataFormat, &size, &fileAudioDescription);
-    if ( !checkResult(status, "ExtAudioFileGetProperty(kExtAudioFileProperty_FileDataFormat)") ) {
+    if ( !AECheckOSStatus(status, "ExtAudioFileGetProperty(kExtAudioFileProperty_FileDataFormat)") ) {
         ExtAudioFileDispose(audioFile);
         self.error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
                                      userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't read the audio file", @"")}];
@@ -128,7 +119,7 @@ static const int kMaxAudioFileReadSize = 16384;
     
     // Apply client format
     status = ExtAudioFileSetProperty(audioFile, kExtAudioFileProperty_ClientDataFormat, sizeof(_targetAudioDescription), &_targetAudioDescription);
-    if ( !checkResult(status, "ExtAudioFileSetProperty(kExtAudioFileProperty_ClientDataFormat)") ) {
+    if ( !AECheckOSStatus(status, "ExtAudioFileSetProperty(kExtAudioFileProperty_ClientDataFormat)") ) {
         ExtAudioFileDispose(audioFile);
         int fourCC = CFSwapInt32HostToBig(status);
         self.error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
@@ -140,16 +131,16 @@ static const int kMaxAudioFileReadSize = 16384;
         // More channels in target format than file format - set up a map to duplicate channel
         SInt32 channelMap[8];
         AudioConverterRef converter;
-        checkResult(ExtAudioFileGetProperty(audioFile, kExtAudioFileProperty_AudioConverter, &size, &converter),
+        AECheckOSStatus(ExtAudioFileGetProperty(audioFile, kExtAudioFileProperty_AudioConverter, &size, &converter),
                     "ExtAudioFileGetProperty(kExtAudioFileProperty_AudioConverter)");
         for ( int outChannel=0, inChannel=0; outChannel < _targetAudioDescription.mChannelsPerFrame; outChannel++ ) {
             channelMap[outChannel] = inChannel;
             if ( inChannel+1 < fileAudioDescription.mChannelsPerFrame ) inChannel++;
         }
-        checkResult(AudioConverterSetProperty(converter, kAudioConverterChannelMap, sizeof(SInt32)*_targetAudioDescription.mChannelsPerFrame, channelMap),
+        AECheckOSStatus(AudioConverterSetProperty(converter, kAudioConverterChannelMap, sizeof(SInt32)*_targetAudioDescription.mChannelsPerFrame, channelMap),
                     "AudioConverterSetProperty(kAudioConverterChannelMap)");
         CFArrayRef config = NULL;
-        checkResult(ExtAudioFileSetProperty(audioFile, kExtAudioFileProperty_ConverterConfig, sizeof(CFArrayRef), &config),
+        AECheckOSStatus(ExtAudioFileSetProperty(audioFile, kExtAudioFileProperty_ConverterConfig, sizeof(CFArrayRef), &config),
                     "ExtAudioFileSetProperty(kExtAudioFileProperty_ConverterConfig)");
     }
     
@@ -157,7 +148,7 @@ static const int kMaxAudioFileReadSize = 16384;
     UInt64 fileLengthInFrames;
     size = sizeof(fileLengthInFrames);
     status = ExtAudioFileGetProperty(audioFile, kExtAudioFileProperty_FileLengthFrames, &size, &fileLengthInFrames);
-    if ( !checkResult(status, "ExtAudioFileGetProperty(kExtAudioFileProperty_FileLengthFrames)") ) {
+    if ( !AECheckOSStatus(status, "ExtAudioFileGetProperty(kExtAudioFileProperty_FileLengthFrames)") ) {
         ExtAudioFileDispose(audioFile);
         self.error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
                                      userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't read the audio file", @"")}];
