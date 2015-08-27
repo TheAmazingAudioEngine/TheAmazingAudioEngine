@@ -670,7 +670,7 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
         for ( int tableIndex = 0; tableIndex < THIS->_inputCallbackCount; tableIndex++ ) {
             input_callback_table_t *table = &THIS->_inputCallbacks[tableIndex];
             
-            if ( !table->audioBufferList ) continue;
+            if ( !table->audioBufferList || table->callbacks.count == 0 ) continue;
             
             input_producer_arg_t arg = {
                 .THIS = (__bridge void*)THIS,
