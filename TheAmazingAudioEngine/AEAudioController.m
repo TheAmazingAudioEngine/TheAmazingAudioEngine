@@ -2668,7 +2668,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 #endif
     
 #if !TARGET_OS_IPHONE
-    if ( _iAudioUnit ) {
+    if ( _inputEnabled ) {
         // Initialize the audio unit for OSX input
         AudioComponentDescription i_desc = {
             .componentType = kAudioUnitType_Output,
