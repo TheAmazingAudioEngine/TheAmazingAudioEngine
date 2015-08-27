@@ -29,6 +29,7 @@ extern "C" {
 
 #import <AudioToolbox/AudioToolbox.h>
 #import <AudioUnit/AudioUnit.h>
+#import <Foundation/Foundation.h>
 
 @class AEAudioController;
 
