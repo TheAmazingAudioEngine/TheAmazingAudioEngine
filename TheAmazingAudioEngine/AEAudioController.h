@@ -1002,9 +1002,19 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
 /*!
  * Remove an input receiver
  *
+ *  If receiver is registered for multiple channels, it will be removed for all of them.
+ *
  * @param receiver Receiver to remove
  */
 - (void)removeInputReceiver:(id<AEAudioReceiver>)receiver;
+
+/*!
+ * Remove an input receiver
+ *
+ * @param receiver Receiver to remove
+ * @param channels Specific channels to remove receiver from
+ */
+- (void)removeInputReceiver:(id<AEAudioReceiver>)receiver fromChannels:(NSArray*)channels;
 
 /*!
  * Obtain a list of all input receivers
