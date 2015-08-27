@@ -1050,7 +1050,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
         status = AUGraphStart(_audioGraph);
 #if !TARGET_OS_IPHONE
         if (_inputEnabled) {
-            checkResult(AudioOutputUnitStart(_iAudioUnit), "AudioOutputUnitStart (OSX input)");
+            AECheckOSStatus(AudioOutputUnitStart(_iAudioUnit), "AudioOutputUnitStart (OSX input)");
         }
 #endif
     }
@@ -2679,7 +2679,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         };
         
         AudioComponent inputComponent = AudioComponentFindNext(NULL, &i_desc);
-        checkResult(AudioComponentInstanceNew(inputComponent, &_iAudioUnit), "AudioComponentInstanceNew");
+        AECheckOSStatus(AudioComponentInstanceNew(inputComponent, &_iAudioUnit), "AudioComponentInstanceNew");
     }
 #endif
     
@@ -2824,10 +2824,10 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         
         // Enable input and disable output on the audio unit
         result = AudioUnitSetProperty(_iAudioUnit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, inputBus, &enableFlag, sizeof(enableFlag));
-        checkResult(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_EnableIO)");
+        AECheckOSStatus(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_EnableIO)");
         
         result = AudioUnitSetProperty(_iAudioUnit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Output, outputBus, &disableFlag, sizeof(disableFlag));
-        checkResult(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_EnableIO)");
+        AECheckOSStatus(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_EnableIO)");
         
         // Get the system's default input device
         AudioDeviceID defaultDevice = kAudioDeviceUnknown;
@@ -2838,7 +2838,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
             .mElement = kAudioObjectPropertyElementMaster
         };
         result = AudioObjectGetPropertyData(kAudioObjectSystemObject, &defaultDeviceProperty, 0, NULL, &propertySize, &defaultDevice);
-        checkResult(result, "AudioObjectGetPropertyData(kAudioObjectSystemObject)");
+        AECheckOSStatus(result, "AudioObjectGetPropertyData(kAudioObjectSystemObject)");
         
         // Set the sample rate of the input device to the output samplerate (if possible)
         AudioValueRange inputSampleRate;
@@ -2849,38 +2849,38 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         if (result == kAudioCodecUnsupportedFormatError) {
             NSLog(@"TAAE: Warning: could not set hardware input to same sample rate as output (%.f Hz)", _audioDescription.mSampleRate);
         }
-        checkResult(result, "AudioObjectSetPropertyData(kAudioDevicePropertyNominalSampleRate)");
+        AECheckOSStatus(result, "AudioObjectSetPropertyData(kAudioDevicePropertyNominalSampleRate)");
         
         // Set the input device to the system's default input device
         result = AudioUnitSetProperty(_iAudioUnit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, outputBus, &defaultDevice, sizeof(defaultDevice));
-        checkResult(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_CurrentDevice)");
+        AECheckOSStatus(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_CurrentDevice)");
     
         // Set input unit ASBD output to match the hardware input ASBD
         propertySize = sizeof(AudioStreamBasicDescription);
         result = AudioUnitGetProperty(_iAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, inputBus, &_rawInputAudioDescription, &propertySize);
-        checkResult(result, "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)");
+        AECheckOSStatus(result, "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)");
         
         AudioStreamBasicDescription deviceFormat;
         result = AudioUnitGetProperty(_iAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, inputBus, &deviceFormat, &propertySize);
-        checkResult(result, "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)");
+        AECheckOSStatus(result, "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)");
         
         deviceFormat.mSampleRate = _audioDescription.mSampleRate;
         _rawInputAudioDescription.mSampleRate = deviceFormat.mSampleRate;
         
         propertySize = sizeof(AudioStreamBasicDescription);
         result = AudioUnitSetProperty(_iAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, inputBus, &_rawInputAudioDescription, propertySize);
-        checkResult(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
+        AECheckOSStatus(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
         
         // Register a callback to receive audio
         AURenderCallbackStruct inRenderProc;
         inRenderProc.inputProc = &inputAvailableCallback;
         inRenderProc.inputProcRefCon = (__bridge void *)self;
         result = AudioUnitSetProperty(_iAudioUnit, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 0, &inRenderProc, sizeof(inRenderProc));
-        checkResult(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_SetInputCallback)");
+        AECheckOSStatus(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_SetInputCallback)");
         
         // Initialize the input audio unit
         result = AudioUnitInitialize(_iAudioUnit);
-        checkResult(result, "AudioUnitInitialize");
+        AECheckOSStatus(result, "AudioUnitInitialize");
     }
 #endif
 
@@ -2943,8 +2943,8 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     _ioAudioUnit = NULL;
 #if !TARGET_OS_IPHONE
     if ( _inputEnabled ) {
-        checkResult(AudioUnitUninitialize(_iAudioUnit), "AudioUnitUninitialize");
-        checkResult(AudioComponentInstanceDispose(_iAudioUnit), "AudioComponentInstanceDispose");
+        AECheckOSStatus(AudioUnitUninitialize(_iAudioUnit), "AudioUnitUninitialize");
+        AECheckOSStatus(AudioComponentInstanceDispose(_iAudioUnit), "AudioComponentInstanceDispose");
         _iAudioUnit = NULL;
     }
 #endif
@@ -2968,7 +2968,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 
 - (OSStatus)updateGraph {
     // Retry a few times (as sometimes the graph will be in the wrong state to update)
-    OSStatus err;
+    OSStatus err = 0;
     for ( int retry=0; retry<6; retry++ ) {
         err = AUGraphUpdate(_audioGraph, NULL);
         if ( err != kAUGraphErr_CannotDoInCurrentContext ) break;
@@ -3474,7 +3474,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 #if !TARGET_OS_IPHONE
                 // Set output volume
                 // see http://stackoverflow.com/questions/9904369/silence-when-adding-kaudiounitsubtype-multichannelmixer-to-augraph
-                checkResult(AudioUnitSetParameter(subgroup->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Output, 0, 1, 0),
+                AECheckOSStatus(AudioUnitSetParameter(subgroup->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Output, 0, 1, 0),
                     "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
 #endif
             }
