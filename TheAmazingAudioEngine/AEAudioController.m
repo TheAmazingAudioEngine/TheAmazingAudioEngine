@@ -3706,10 +3706,12 @@ static void removeCallbackFromTable(__unsafe_unretained AEAudioController *THIS,
     if ( !channels ) {
         callbackTable = &_inputCallbacks[0].callbacks;
     } else {
-        for ( int i=1; i<_inputCallbackCount; i++ ) {
+        for ( int i=0; i<_inputCallbackCount; i++ ) {
             // Compare channel maps to find a match
-            if ( [(__bridge NSArray*)_inputCallbacks[i].channelMap isEqualToArray:channels] ) {
+            if ( (_inputCallbacks[i].channelMap && [(__bridge NSArray*)_inputCallbacks[i].channelMap isEqualToArray:channels]) ||
+                    (i == 0 && !_inputCallbacks[i].channelMap && [self.inputChannelSelection isEqualToArray:channels]) ) {
                 callbackTable = &_inputCallbacks[i].callbacks;
+                break;
             }
         }
         
