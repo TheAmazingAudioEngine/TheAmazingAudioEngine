@@ -1512,6 +1512,28 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     }
 }
 
+- (void)removeInputReceiver:(id<AEAudioReceiver>)receiver fromChannels:(NSArray *)channels {
+    void *callback = receiver.receiverCallback;
+    for ( int i=0; i<_inputCallbackCount; i++ ) {
+        // Compare channel maps to find a matching entry
+        if ( (_inputCallbacks[i].channelMap && [(__bridge NSArray*)_inputCallbacks[i].channelMap isEqualToArray:channels]) ||
+            (i == 0 && !_inputCallbacks[i].channelMap && [self.inputChannelSelection isEqualToArray:channels]) ) {
+            
+            __block BOOL found = NO;
+            
+            [self performSynchronousMessageExchangeWithBlock:^{
+                removeCallbackFromTable(self, &_inputCallbacks[i].callbacks, callback, (__bridge void *)receiver, &found);
+            }];
+
+            if ( found ) {
+                CFBridgingRelease((__bridge CFTypeRef)receiver);
+            }
+            
+            break;
+        }
+    }
+}
+
 -(NSArray *)inputReceivers {
     NSMutableArray *result = [NSMutableArray array];
     for ( int i=0; i<_inputCallbackCount; i++ ) {
