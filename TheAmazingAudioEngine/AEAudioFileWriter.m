@@ -98,7 +98,7 @@ NSString * const AEAudioFileWriterErrorDomain = @"com.theamazingaudioengine.AEAu
 }
 
 - (BOOL)beginWritingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType bitDepth:(UInt32)bits error:(NSError**)error {
-    return [self beginWritingToFileAtPath:path fileType:fileType bitDepth:16 channels:0 error:error];
+    return [self beginWritingToFileAtPath:path fileType:fileType bitDepth:bits channels:0 error:error];
 }
 
 - (BOOL)beginWritingToFileAtPath:(NSString*)path fileType:(AudioFileTypeID)fileType bitDepth:(UInt32)bits channels:(UInt32)channels error:(NSError**)error
