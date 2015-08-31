@@ -4,6 +4,10 @@
 //
 //  Created by Michael Tyson on 13/02/2012.
 //
+//  Contributions by Ryan King and Jeremy Huff of Hello World Engineering, Inc on 7/15/15.
+//      Copyright (c) 2015 Hello World Engineering, Inc. All rights reserved.
+//  Contributions by Ryan Holmes
+//
 //  This software is provided 'as-is', without any express or implied
 //  warranty.  In no event will the authors be held liable for any damages
 //  arising from the use of this software.
@@ -24,167 +28,296 @@
 //
 
 #import "AEAudioFilePlayer.h"
-#import "AEAudioFileLoaderOperation.h"
+#import "AEUtilities.h"
 #import <libkern/OSAtomic.h>
 
-#define checkStatus(status) \
-    if ( (status) != noErr ) {\
-        NSLog(@"Error: %ld -> %s:%d", (status), __FILE__, __LINE__);\
-    }
-
 @interface AEAudioFilePlayer () {
-    AudioBufferList              *_audio;
-    UInt32                        _lengthInFrames;
-    AudioStreamBasicDescription   _audioDescription;
-    volatile int32_t              _playhead;
+    AudioFileID _audioFile;
+    AudioStreamBasicDescription _fileDescription;
+    AudioStreamBasicDescription _unitOutputDescription;
+    UInt32 _lengthInFrames;
+    volatile int32_t _playhead;
+    volatile int32_t _playbackStoppedCallbackScheduled;
+    BOOL _running;
 }
-@property (nonatomic, strong, readwrite) NSURL *url;
+@property (nonatomic, strong, readwrite) NSURL * url;
+@property (nonatomic, weak) AEAudioController * audioController;
 @end
 
 @implementation AEAudioFilePlayer
-@synthesize url = _url, loop=_loop, volume=_volume, pan=_pan, channelIsPlaying=_channelIsPlaying, channelIsMuted=_channelIsMuted, removeUponFinish=_removeUponFinish, completionBlock = _completionBlock, startLoopBlock = _startLoopBlock, progressBlock = _progressBlock;
-@dynamic duration, currentTime;
+@synthesize startLoopBlock = _startLoopBlock, progressBlock = _progressBlock;
 
-+ (id)audioFilePlayerWithURL:(NSURL*)url audioController:(AEAudioController *)audioController error:(NSError **)error {
++ (instancetype)audioFilePlayerWithURL:(NSURL *)url error:(NSError **)error {
+    return [[self alloc] initWithURL:url error:error];
+}
+
+- (instancetype)initWithURL:(NSURL *)url error:(NSError **)error {
+    if ( !(self = [super initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Generator, kAudioUnitSubType_AudioFilePlayer)]) ) return nil;
     
-    AEAudioFilePlayer *player = [[self alloc] init];
-    player->_volume = 1.0;
-    player->_channelIsPlaying = YES;
-    player->_audioDescription = audioController.audioDescription;
-    player.url = url;
-    
-    AEAudioFileLoaderOperation *operation = [[AEAudioFileLoaderOperation alloc] initWithFileURL:url targetAudioDescription:player->_audioDescription];
-    [operation start];
-    
-    if ( operation.error ) {
-        if ( error ) {
-            *error = operation.error;
-        }
+    if ( ![self loadAudioFileWithURL:url error:error] ) {
         return nil;
     }
     
-    player->_audio = operation.bufferList;
-    player->_lengthInFrames = operation.lengthInFrames;
-    
-    
-    return player;
+    return self;
 }
 
 - (void)dealloc {
-    if ( _audio ) {
-        for ( int i=0; i<_audio->mNumberBuffers; i++ ) {
-            free(_audio->mBuffers[i].mData);
-        }
-        free(_audio);
+    if ( _audioFile ) {
+        AudioFileClose(_audioFile);
     }
 }
 
--(NSTimeInterval)duration {
-    return (double)_lengthInFrames / (double)_audioDescription.mSampleRate;
-}
-
--(NSTimeInterval)currentTime {
-    if (_lengthInFrames == 0) return 0.0;
-    else return ((double)_playhead / (double)_lengthInFrames) * [self duration];
-}
-
--(void)setCurrentTime:(NSTimeInterval)currentTime {
-    if (_lengthInFrames == 0) return;
-    _playhead = (int32_t)((currentTime / [self duration]) * _lengthInFrames) % _lengthInFrames;
-}
-
-static void notifyLoopRestart(AEAudioController *audioController, void *userInfo, int length) {
-    AEAudioFilePlayer *THIS = (__bridge AEAudioFilePlayer*)*(void**)userInfo;
+- (void)setupWithAudioController:(AEAudioController *)audioController {
+    [super setupWithAudioController:audioController];
     
+    AECheckOSStatus(AudioUnitAddRenderNotify(self.audioUnit, AEAudioFilePlayerRenderNotify, (__bridge void*)self), "AudioUnitAddRenderNotify");
+    
+    Float64 priorOutputSampleRate = _unitOutputDescription.mSampleRate;
+    UInt32 size = sizeof(AudioStreamBasicDescription);
+    AECheckOSStatus(AudioUnitGetProperty(self.audioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &_unitOutputDescription, &size), "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)");
+    
+    double sampleRateScaleFactor = _unitOutputDescription.mSampleRate / (priorOutputSampleRate ? priorOutputSampleRate : _fileDescription.mSampleRate);
+    _playhead = _playhead * sampleRateScaleFactor;
+    self.audioController = audioController;
+    
+    // Set the file to play
+    size = sizeof(_audioFile);
+    OSStatus result = AudioUnitSetProperty(self.audioUnit, kAudioUnitProperty_ScheduledFileIDs, kAudioUnitScope_Global, 0, &_audioFile, size);
+    AECheckOSStatus(result, "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileIDs)");
+    
+    // Play the file region
+    if ( self.channelIsPlaying ) {
+        double outputToSourceSampleRateScale = _fileDescription.mSampleRate / _unitOutputDescription.mSampleRate;
+        [self schedulePlayRegionFromPosition:_playhead * outputToSourceSampleRateScale];
+        _running = YES;
+    }
+}
+
+- (void)teardown {
+    self.audioController = nil;
+    [super teardown];
+}
+
+- (NSTimeInterval)duration {
+    return (double)_lengthInFrames / (double)_fileDescription.mSampleRate;
+}
+
+- (NSTimeInterval)currentTime {
+    return (double)_playhead / (_unitOutputDescription.mSampleRate ? _unitOutputDescription.mSampleRate : _fileDescription.mSampleRate);
+}
+
+- (void)setCurrentTime:(NSTimeInterval)currentTime {
+    if ( _lengthInFrames == 0 ) return;
+    [self schedulePlayRegionFromPosition:((UInt32)(currentTime * _fileDescription.mSampleRate) % _lengthInFrames)];
+}
+
+- (void)setChannelIsPlaying:(BOOL)playing {
+    BOOL wasPlaying = self.channelIsPlaying;
+    [super setChannelIsPlaying:playing];
+    
+    if ( wasPlaying == playing ) return;
+    
+    _running = playing;
+    if ( self.audioUnit ) {
+        if ( playing ) {
+            double outputToSourceSampleRateScale = _fileDescription.mSampleRate / _unitOutputDescription.mSampleRate;
+            [self schedulePlayRegionFromPosition:_playhead * outputToSourceSampleRateScale];
+        } else {
+            AECheckOSStatus(AudioUnitReset(self.audioUnit, kAudioUnitScope_Global, 0), "AudioUnitReset");
+        }
+    }
+}
+
+UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * THIS) {
+    return THIS->_playhead;
+}
+
+- (BOOL)loadAudioFileWithURL:(NSURL*)url error:(NSError**)error {
+    OSStatus result;
+    
+    // Open the file
+    result = AudioFileOpenURL((__bridge CFURLRef)url, kAudioFileReadPermission, 0, &_audioFile);
+    if ( !AECheckOSStatus(result, "AudioFileOpenURL") ) {
+        *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:result
+                                 userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't open the audio file", @"")}];
+        return NO;
+    }
+    
+    // Get the file data format
+    UInt32 size = sizeof(_fileDescription);
+    result = AudioFileGetProperty(_audioFile, kAudioFilePropertyDataFormat, &size, &_fileDescription);
+    if ( !AECheckOSStatus(result, "AudioFileGetProperty(kAudioFilePropertyDataFormat)") ) {
+        *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:result
+                                 userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't read the audio file", @"")}];
+        return NO;
+        
+    }
+    
+    // Determine length in frames (in original file's sample rate)
+    AudioFilePacketTableInfo packetInfo;
+    size = sizeof(packetInfo);
+    result = AudioFileGetProperty(_audioFile, kAudioFilePropertyPacketTableInfo, &size, &packetInfo);
+    if ( result != noErr ) {
+        size = 0;
+    }
+    
+    UInt64 fileLengthInFrames;
+    if ( size > 0 ) {
+        fileLengthInFrames = packetInfo.mNumberValidFrames;
+    } else {
+        UInt64 packetCount;
+        size = sizeof(packetCount);
+        result = AudioFileGetProperty(_audioFile, kAudioFilePropertyAudioDataPacketCount, &size, &packetCount);
+        if ( !AECheckOSStatus(result, "AudioFileGetProperty(kAudioFilePropertyAudioDataPacketCount)") ) {
+            *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:result
+                                     userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't read the audio file", @"")}];
+            return NO;
+        }
+        fileLengthInFrames = packetCount * _fileDescription.mFramesPerPacket;
+    }
+    _lengthInFrames = (UInt32)fileLengthInFrames;
+    self.url = url;
+    
+    return YES;
+}
+
+- (void)schedulePlayRegionFromPosition:(UInt32)position {
+    // Note: "position" is in frames, in the input file's sample rate
+    
+    AudioUnit audioUnit = self.audioUnit;
+    if ( !audioUnit || !_audioFile ) {
+        return;
+    }
+    
+    double sourceToOutputSampleRateScale = _unitOutputDescription.mSampleRate / _fileDescription.mSampleRate;
+    _playhead = position * sourceToOutputSampleRateScale;
+    
+    // Reset the unit, to clear prior schedules
+    AECheckOSStatus(AudioUnitReset(audioUnit, kAudioUnitScope_Global, 0), "AudioUnitReset");
+    
+    // Determine start time
+    Float64 mainRegionStartTime = 0;
+    
+    if ( position > 0 ) {
+        // Schedule the remaining part of the audio, from startFrame to the end (starting immediately, without the delay)
+        ScheduledAudioFileRegion region = {
+            .mTimeStamp = { .mFlags = kAudioTimeStampSampleTimeValid, .mSampleTime = 0 },
+            .mAudioFile = _audioFile,
+            .mStartFrame = position,
+            .mFramesToPlay = _lengthInFrames - position
+        };
+        OSStatus result = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_ScheduledFileRegion, kAudioUnitScope_Global, 0, &region, sizeof(region));
+        AECheckOSStatus(result, "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileRegion)");
+        
+        mainRegionStartTime = (_lengthInFrames - position) * sourceToOutputSampleRateScale;
+    }
+    
+    // Set the main file region to play
+    ScheduledAudioFileRegion region = {
+        .mTimeStamp = { .mFlags = kAudioTimeStampSampleTimeValid, .mSampleTime = mainRegionStartTime },
+        .mAudioFile = _audioFile,
+            // Always loop the unit, even if we're not actually looping, to avoid expensive rescheduling when switching loop mode.
+            // We'll handle play completion in AEAudioFilePlayerRenderNotify
+        .mLoopCount = (UInt32)-1,
+        .mFramesToPlay = (UInt32)-1,
+    };
+    OSStatus result = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_ScheduledFileRegion, kAudioUnitScope_Global, 0, &region, sizeof(region));
+    AECheckOSStatus(result, "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileRegion)");
+    
+    // Prime the player
+    UInt32 primeFrames = 0;
+    result = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_ScheduledFilePrime, kAudioUnitScope_Global, 0, &primeFrames, sizeof(primeFrames));
+    AECheckOSStatus(result, "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFilePrime)");
+    
+    // Set the start time
+    AudioTimeStamp startTime = { .mFlags = kAudioTimeStampSampleTimeValid, .mSampleTime = -1 /* ASAP */ };
+    result = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_ScheduleStartTimeStamp, kAudioUnitScope_Global, 0, &startTime, sizeof(startTime));
+    AECheckOSStatus(result, "AudioUnitSetProperty(kAudioUnitProperty_ScheduleStartTimeStamp)");
+}
+
+static OSStatus AEAudioFilePlayerRenderNotify(void * inRefCon,
+                                              AudioUnitRenderActionFlags *ioActionFlags,
+                                              const AudioTimeStamp *inTimeStamp,
+                                              UInt32 inBusNumber,
+                                              UInt32 inNumberFrames,
+                                              AudioBufferList *ioData) {
+    if ( !(*ioActionFlags & kAudioUnitRenderAction_PostRender) ) return noErr;
+    
+    __unsafe_unretained AEAudioFilePlayer * THIS = (__bridge AEAudioFilePlayer*)inRefCon;
+    
+    if ( !THIS->_running ) return noErr;
+    
+    int32_t playhead = THIS->_playhead;
+    int32_t originalPlayhead = THIS->_playhead;
+    
+    double sourceToOutputSampleRateScale = THIS->_unitOutputDescription.mSampleRate / THIS->_fileDescription.mSampleRate;
+    UInt32 lengthInFrames = ceil(THIS->_lengthInFrames * sourceToOutputSampleRateScale);
+    
+    if ( playhead + inNumberFrames >= lengthInFrames ) {
+        // Reached the end of the audio - either loop, or stop
+        if ( THIS->_loop ) {
+            playhead = 0;
+            if ( THIS->_startLoopBlock ) {
+                // Notify main thread that the loop playback has restarted
+                AEAudioControllerSendAsynchronousMessageToMainThread(THIS->_audioController, AEAudioFilePlayerNotifyLoopRestart, &THIS, sizeof(AEAudioFilePlayer*));
+            }
+        } else {
+            // We just crossed the loop boundary; if not looping, end the track.
+            UInt32 finalFrames = MIN(lengthInFrames - playhead, inNumberFrames);
+            for ( int i=0; i<ioData->mNumberBuffers; i++) {
+                // Silence the rest of the buffer past the end
+                memset((char*)ioData->mBuffers[i].mData + (THIS->_unitOutputDescription.mBytesPerFrame * finalFrames), 0, (THIS->_unitOutputDescription.mBytesPerFrame * (inNumberFrames - finalFrames)));
+            }
+
+            // Reset the unit, to cease playback
+            AECheckOSStatus(AudioUnitReset(AEAudioUnitChannelGetAudioUnit(THIS), kAudioUnitScope_Global, 0), "AudioUnitReset");
+            playhead = 0;
+
+            // Schedule the playback ended callback (if it hasn't been scheduled already)
+            if ( OSAtomicCompareAndSwap32(NO, YES, &THIS->_playbackStoppedCallbackScheduled) ) {
+                AEAudioControllerSendAsynchronousMessageToMainThread(THIS->_audioController, AEAudioFilePlayerNotifyCompletion, &THIS, sizeof(AEAudioFilePlayer*));
+            }
+            
+            THIS->_running = NO;
+        }
+
+    }
+    else if (THIS->_progressBlock)
+    {
+        // Update the playhead
+        playhead = (playhead + inNumberFrames) % lengthInFrames;
+        OSAtomicCompareAndSwap32(originalPlayhead, playhead, &THIS->_playhead);
+        AEAudioControllerSendAsynchronousMessageToMainThread(THIS->_audioController, AEAudioFilePlayerNotifyProgress, &THIS, sizeof(AEAudioFilePlayer*));
+    }
+    return noErr;
+}
+
+static void AEAudioFilePlayerNotifyLoopRestart(AEAudioController *audioController, void *userInfo, int length) {
+    AEAudioFilePlayer *THIS = (__bridge AEAudioFilePlayer*)*(void**)userInfo;
+
     if ( THIS.startLoopBlock ) THIS.startLoopBlock();
 }
 
-static void notifyPlaybackStopped(AEAudioController *audioController, void *userInfo, int length) {
-    AEAudioFilePlayer *THIS = (__bridge AEAudioFilePlayer*)*(void**)userInfo;
-    THIS.channelIsPlaying = NO;
-
-    if ( THIS->_removeUponFinish ) {
-        [audioController removeChannels:@[THIS]];
-    }
-    
-    if ( THIS.completionBlock ) THIS.completionBlock();
-    
-    THIS->_playhead = 0;
-}
-
-static void notifyPlaybackProgress(AEAudioController *audioController, void *userInfo, int length) {
+static void AEAudioFilePlayerNotifyProgress(AEAudioController *audioController, void *userInfo, int length) {
     AEAudioFilePlayer *THIS = (__bridge AEAudioFilePlayer*)*(void**)userInfo;
 
     if ( THIS.progressBlock && THIS->_lengthInFrames) THIS.progressBlock((double)THIS->_playhead / (double)THIS->_lengthInFrames);
 }
 
-static OSStatus renderCallback(__unsafe_unretained AEAudioFilePlayer *THIS, __unsafe_unretained AEAudioController *audioController, const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
-    int32_t playhead = THIS->_playhead;
-    int32_t originalPlayhead = playhead;
-    
-    if ( !THIS->_channelIsPlaying ) return noErr;
-    
-    if ( !THIS->_loop && playhead == THIS->_lengthInFrames ) {
-        // Notify main thread that playback has finished
-        AEAudioControllerSendAsynchronousMessageToMainThread(audioController, notifyPlaybackStopped, &THIS, sizeof(AEAudioFilePlayer*));
-        THIS->_channelIsPlaying = NO;
-        return noErr;
+static void AEAudioFilePlayerNotifyCompletion(__unsafe_unretained AEAudioController *audioController, void *userInfo, int userInfoLength) {
+    AEAudioFilePlayer *THIS = (__bridge AEAudioFilePlayer*)*(void**)userInfo;
+    if ( !OSAtomicCompareAndSwap32(YES, NO, &THIS->_playbackStoppedCallbackScheduled) ) {
+        // We've been pre-empted by another scheduled callback: bail for now
+        return;
     }
     
-    // Get pointers to each buffer that we can advance
-    char *audioPtrs[audio->mNumberBuffers];
-    for ( int i=0; i<audio->mNumberBuffers; i++ ) {
-        audioPtrs[i] = audio->mBuffers[i].mData;
+    if ( THIS.removeUponFinish ) {
+        [THIS.audioController removeChannels:@[THIS]];
     }
-    
-    int bytesPerFrame = THIS->_audioDescription.mBytesPerFrame;
-    int remainingFrames = frames;
-    
-    // Copy audio in contiguous chunks, wrapping around if we're looping
-    while ( remainingFrames > 0 ) {
-        // The number of frames left before the end of the audio
-        int framesToCopy = MIN(remainingFrames, THIS->_lengthInFrames - playhead);
-
-        // Fill each buffer with the audio
-        for ( int i=0; i<audio->mNumberBuffers; i++ ) {
-            memcpy(audioPtrs[i], ((char*)THIS->_audio->mBuffers[i].mData) + playhead * bytesPerFrame, framesToCopy * bytesPerFrame);
-            
-            // Advance the output buffers
-            audioPtrs[i] += framesToCopy * bytesPerFrame;
-        }
-        
-        // Advance playhead
-        remainingFrames -= framesToCopy;
-        playhead += framesToCopy;
-        
-        if ( playhead >= THIS->_lengthInFrames ) {
-            // Reached the end of the audio - either loop, or stop
-            if ( THIS->_loop ) {
-                playhead = 0;
-                if ( THIS->_startLoopBlock ) {
-                    // Notify main thread that the loop playback has restarted
-                    AEAudioControllerSendAsynchronousMessageToMainThread(audioController, notifyLoopRestart, &THIS, sizeof(AEAudioFilePlayer*));
-                }
-            } else {
-                // Notify main thread that playback has finished
-                AEAudioControllerSendAsynchronousMessageToMainThread(audioController, notifyPlaybackStopped, &THIS, sizeof(AEAudioFilePlayer*));
-                THIS->_channelIsPlaying = NO;
-                break;
-            }
-        }
-        else if (THIS->_progressBlock)
-        {
-            AEAudioControllerSendAsynchronousMessageToMainThread(audioController, notifyPlaybackProgress, &THIS, sizeof(AEAudioFilePlayer*));
-        }
+    THIS.channelIsPlaying = NO;
+    if ( THIS.completionBlock ) {
+        THIS.completionBlock();
     }
-    
-    OSAtomicCompareAndSwap32(originalPlayhead, playhead, &THIS->_playhead);
-    
-    return noErr;
-}
-
--(AEAudioControllerRenderCallback)renderCallback {
-    return &renderCallback;
 }
 
 @end

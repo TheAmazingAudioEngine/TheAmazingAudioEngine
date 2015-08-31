@@ -1,8 +1,12 @@
 //
-//  AEAudioFilePlayer.h
+//  AEAudioFilePlayer.m
 //  The Amazing Audio Engine
 //
 //  Created by Michael Tyson on 13/02/2012.
+//
+//  Contributions by Ryan King and Jeremy Huff of Hello World Engineering, Inc on 7/15/15.
+//      Copyright (c) 2015 Hello World Engineering, Inc. All rights reserved.
+//  Contributions by Ryan Holmes
 //
 //  This software is provided 'as-is', without any express or implied
 //  warranty.  In no event will the authors be held liable for any damages
@@ -26,9 +30,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-    
-#import <Foundation/Foundation.h>
-#import "AEAudioController.h"
+
+#import "AEAudioUnitChannel.h"
 
 /*!
  * Audio file player
@@ -38,26 +41,39 @@ extern "C" {
  *
  *  To use, create an instance, then add it to the audio controller.
  */
-@interface AEAudioFilePlayer : NSObject <AEAudioPlayable>
+
+@interface AEAudioFilePlayer : AEAudioUnitChannel
 
 /*!
  * Create a new player instance
  *
  * @param url               URL to the file to load
- * @param audioController   The audio controller
  * @param error             If not NULL, the error on output
  * @return The audio player, ready to be @link AEAudioController::addChannels: added @endlink to the audio controller.
  */
-+ (id)audioFilePlayerWithURL:(NSURL*)url audioController:(AEAudioController*)audioController error:(NSError**)error;
++ (instancetype)audioFilePlayerWithURL:(NSURL *)url error:(NSError **)error;
+
+/*!
+ * Default initialiser
+ *
+ * @param url               URL to the file to load
+ * @param error             If not NULL, the error on output
+ */
+- (instancetype)initWithURL:(NSURL *)url error:(NSError **)error;
+
+/*!
+ * Get playhead position, in frames
+ *
+ *  For use on the realtime thread.
+ *
+ * @param The player
+ */
+UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * filePlayer);
 
 @property (nonatomic, strong, readonly) NSURL *url;         //!< Original media URL
 @property (nonatomic, readonly) NSTimeInterval duration;    //!< Length of audio, in seconds
 @property (nonatomic, assign) NSTimeInterval currentTime;   //!< Current playback position, in seconds
 @property (nonatomic, readwrite) BOOL loop;                 //!< Whether to loop this track
-@property (nonatomic, readwrite) float volume;              //!< Track volume
-@property (nonatomic, readwrite) float pan;                 //!< Track pan
-@property (nonatomic, readwrite) BOOL channelIsPlaying;     //!< Whether the track is playing
-@property (nonatomic, readwrite) BOOL channelIsMuted;       //!< Whether the track is muted
 @property (nonatomic, readwrite) BOOL removeUponFinish;     //!< Whether the track automatically removes itself from the audio controller after playback completes
 @property (nonatomic, copy) void(^completionBlock)();       //!< A block to be called when playback finishes
 @property (nonatomic, copy) void(^startLoopBlock)();        //!< A block to be called when the loop restarts in loop mode

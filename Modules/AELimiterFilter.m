@@ -39,12 +39,19 @@ const int kScratchBufferLength = 8192;
 @end
 
 @implementation AELimiterFilter
-@synthesize floatConverter = _floatConverter, limiter = _limiter, clientFormat = _clientFormat, audioController = _audioController;
 @dynamic hold, attack, decay, level;
 
-- (id)initWithAudioController:(AEAudioController *)audioController {
+- (id)init {
     if ( !(self = [super init]) ) return nil;
     
+    return self;
+}
+
+-(void)dealloc {
+    
+}
+
+- (void)setupWithAudioController:(AEAudioController *)audioController {
     self.audioController = audioController;
     _clientFormat = audioController.audioDescription;
     self.floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:_clientFormat];
@@ -56,11 +63,9 @@ const int kScratchBufferLength = 8192;
         _scratchBuffer[i] = malloc(sizeof(float) * kScratchBufferLength);
         assert(_scratchBuffer[i]);
     }
-    
-    return self;
 }
 
--(void)dealloc {
+- (void)teardown {
     for ( int i=0; i<_clientFormat.mChannelsPerFrame; i++ ) {
         free(_scratchBuffer[i]);
     }

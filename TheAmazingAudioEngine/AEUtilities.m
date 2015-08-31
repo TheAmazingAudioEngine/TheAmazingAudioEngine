@@ -23,7 +23,7 @@
 //  3. This notice may not be removed or altered from any source distribution.
 //
 
-#include "AEUtilities.h"
+#import "AEUtilities.h"
 #import <mach/mach_time.h>
 
 static double __hostTicksToSeconds = 0.0;
@@ -148,3 +148,21 @@ double AESecondsFromHostTicks(uint64_t ticks) {
     if ( !__hostTicksToSeconds ) AETimeInit();
     return ticks * __hostTicksToSeconds;
 }
+
+BOOL AERateLimit(void) {
+    static double lastMessage = 0;
+    static int messageCount=0;
+    double now = AECurrentTimeInSeconds();
+    if ( now-lastMessage > 1 ) {
+        messageCount = 0;
+        lastMessage = now;
+    }
+    if ( ++messageCount >= 10 ) {
+        if ( messageCount == 10 ) {
+            NSLog(@"TAAE: Suppressing some messages");
+        }
+        return NO;
+    }
+    return YES;
+}
+

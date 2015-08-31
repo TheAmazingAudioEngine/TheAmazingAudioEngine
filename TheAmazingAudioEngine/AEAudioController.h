@@ -29,6 +29,7 @@ extern "C" {
 
 #import <AudioToolbox/AudioToolbox.h>
 #import <AudioUnit/AudioUnit.h>
+#import <Foundation/Foundation.h>
 
 @class AEAudioController;
 
@@ -1001,9 +1002,19 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
 /*!
  * Remove an input receiver
  *
+ *  If receiver is registered for multiple channels, it will be removed for all of them.
+ *
  * @param receiver Receiver to remove
  */
 - (void)removeInputReceiver:(id<AEAudioReceiver>)receiver;
+
+/*!
+ * Remove an input receiver
+ *
+ * @param receiver Receiver to remove
+ * @param channels Specific channels to remove receiver from
+ */
+- (void)removeInputReceiver:(id<AEAudioReceiver>)receiver fromChannels:(NSArray*)channels;
 
 /*!
  * Obtain a list of all input receivers
@@ -1225,6 +1236,17 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
  * Default: NO
  */
 @property (nonatomic, assign) BOOL useMeasurementMode;
+
+/*!
+ * Whether to avoid using Measurement Mode with the built-in speaker
+ *
+ *  When used with the built-in speaker, Measurement Mode results in quite low audio
+ *  output levels. Setting this property to YES causes TAAE to avoid using Measurement Mode
+ *  with the built-in speaker, avoiding this problem.
+ *
+ *  Default is YES.
+ */
+@property (nonatomic, assign) BOOL avoidMeasurementModeForBuiltInSpeaker;
 
 /*!
  * Whether to boost the input volume while using Measurement Mode with the built-in mic
