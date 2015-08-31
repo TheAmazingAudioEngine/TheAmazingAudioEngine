@@ -1343,6 +1343,11 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     return group->channel->playing;
 }
 
+Boolean AEChannelGroupIsMuted(AEChannelGroupRef group)
+{
+    return group->channel->muted;
+}
+
 - (void)setMuted:(BOOL)muted forChannelGroup:(AEChannelGroupRef)group {
     int index;
     AEChannelGroupRef parentGroup = [self searchForGroupContainingChannelMatchingPtr:group userInfo:NULL index:&index];
