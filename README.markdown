@@ -17,7 +17,7 @@ See http://theamazingaudioengine.com for details and http://theamazingaudioengin
 License
 -------
 
-Copyright (C) 2012-2013 A Tasty Pixel
+Copyright (C) 2012-2015 A Tasty Pixel
 
 This software is provided 'as-is', without any express or implied
 warranty.  In no event will the authors be held liable for any damages
