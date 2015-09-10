@@ -129,7 +129,6 @@ typedef struct __input_callback_table_t {
     AudioStreamBasicDescription audioDescription;
     AudioBufferList    *audioBufferList;
     AudioConverterRef   audioConverter;
-    Float64             inputSampleRate;
 } input_callback_table_t;
 
 
@@ -490,7 +489,11 @@ static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt3
         assert(THIS->_inputAudioBufferList->mBuffers[0].mData && THIS->_inputAudioBufferList->mBuffers[0].mDataByteSize > 0);
         assert(audio->mBuffers[0].mData && audio->mBuffers[0].mDataByteSize > 0);
         
-        UInt32 targetFrames = (UInt32)(arg->table->audioDescription.mSampleRate / arg->table->inputSampleRate * *frames);
+#if TARGET_OS_IPHONE
+        UInt32 targetFrames = (UInt32)(arg->table->audioDescription.mSampleRate / THIS->_rawInputAudioDescription.mSampleRate * *frames);
+#else
+        UInt32 targetFrames = *frames;
+#endif
         
         OSStatus result = AudioConverterFillComplexBuffer(arg->table->audioConverter,
                                                           fillComplexBufferInputProc,
@@ -689,21 +692,15 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
             
             for ( int i=0; i<table->audioBufferList->mNumberBuffers; i++ ) {
                 table->audioBufferList->mBuffers[i].mDataByteSize = inNumberFrames * table->audioDescription.mBytesPerFrame;
-                printf("in number frame1: %d\n", (unsigned int)table->audioBufferList->mBuffers[i].mDataByteSize);
             }
             
-            printf("in number frames: %d\n", (unsigned int)inNumberFrames);
-            
             result = inputAudioProducer((void*)&arg, table->audioBufferList, &inNumberFrames);
-            
-            printf("in number frame2: %d\n", (unsigned int)inNumberFrames);
             
             // Pass audio to callbacks
             for ( int i=0; i<table->callbacks.count; i++ ) {
                 callback_t *callback = &table->callbacks.callbacks[i];
                 if ( !(callback->flags & kReceiverFlag) ) continue;
                 
-                printf("in number frame3: %d\n", (unsigned int)table->audioBufferList->mBuffers[0].mDataByteSize);
                 ((AEAudioControllerAudioCallback)callback->callback)((__bridge id)callback->userInfo, THIS, AEAudioSourceInput, &timestamp, inNumberFrames, table->audioBufferList);
             }
         }
@@ -3264,7 +3261,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
                                 "AudioConverterGetProperty(kAudioConverterCurrentInputStreamDescription)");
                     AECheckOSStatus(AudioConverterGetProperty(entry->audioConverter, kAudioConverterCurrentOutputStreamDescription, &formatSize, &converterOutputFormat),
                                 "AudioConverterGetProperty(kAudioConverterCurrentOutputStreamDescription)");
-                    entry->inputSampleRate = converterInputFormat.mSampleRate;
+
                     if ( currentMapping ) {
                         AECheckOSStatus(AudioConverterGetProperty(entry->audioConverter, kAudioConverterChannelMap, &currentMappingSize, currentMapping),
                                     "AudioConverterGetProperty(kAudioConverterChannelMap)");
@@ -3290,8 +3287,6 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
                         UInt32 complexity = kAudioConverterSampleRateConverterComplexity_Mastering;
                         AECheckOSStatus(AudioConverterSetProperty(entry->audioConverter, kAudioConverterSampleRateConverterComplexity, sizeof(complexity), &complexity), "AudioConverterSetProperty(kAudioConverterSampleRateConverterComplexity)");
                     }
-                    
-                    entry->inputSampleRate = rawAudioDescription.mSampleRate;
                 }
                 
                 if ( currentMapping ) free(currentMapping);
@@ -3300,7 +3295,6 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
             } else {
                 // No converter/channel map required
                 entry->audioConverter = NULL;
-                entry->inputSampleRate = _rawInputAudioDescription.mSampleRate;
             }
         }
         
