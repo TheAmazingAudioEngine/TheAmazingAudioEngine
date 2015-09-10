@@ -3227,7 +3227,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
                     inputLevelMonitorData.scratchBuffer = AEAllocateAndInitAudioBufferList(((__bridge AEFloatConverter*)inputLevelMonitorData.floatConverter).floatingPointAudioDescription, kLevelMonitorScratchBufferSize);
                 }
             }
-
+            
             if ( converterRequired ) {
                 // Set up conversion
                 
@@ -3261,7 +3261,6 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
                                 "AudioConverterGetProperty(kAudioConverterCurrentInputStreamDescription)");
                     AECheckOSStatus(AudioConverterGetProperty(entry->audioConverter, kAudioConverterCurrentOutputStreamDescription, &formatSize, &converterOutputFormat),
                                 "AudioConverterGetProperty(kAudioConverterCurrentOutputStreamDescription)");
-
                     if ( currentMapping ) {
                         AECheckOSStatus(AudioConverterGetProperty(entry->audioConverter, kAudioConverterChannelMap, &currentMappingSize, currentMapping),
                                     "AudioConverterGetProperty(kAudioConverterChannelMap)");
