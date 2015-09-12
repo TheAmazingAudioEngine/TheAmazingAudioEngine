@@ -608,13 +608,28 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
     
     // Render audio into buffer
     if ( !useAudiobusReceiverPort ) {
+        UInt32 bytesPerBuffer = MIN(inNumberFrames, kInputAudioBufferFrames) * THIS->_rawInputAudioDescription.mBytesPerFrame;
         for ( int i=0; i<THIS->_inputAudioBufferList->mNumberBuffers; i++ ) {
-            THIS->_inputAudioBufferList->mBuffers[i].mDataByteSize = MIN(inNumberFrames, kInputAudioBufferFrames) * THIS->_rawInputAudioDescription.mBytesPerFrame;
+            THIS->_inputAudioBufferList->mBuffers[i].mDataByteSize = bytesPerBuffer;
         }
         AudioUnitRenderActionFlags flags = 0;
         OSStatus err = AudioUnitRender(THIS->_ioAudioUnit, &flags, &timestamp, 1, inNumberFrames, THIS->_inputAudioBufferList);
         if ( !AECheckOSStatus(err, "AudioUnitRender") ) {
             result = err;
+        }
+        
+        if ( THIS->_inputAudioBufferList->mBuffers[0].mDataByteSize != bytesPerBuffer ) {
+            UInt32 actualFrameCount = THIS->_inputAudioBufferList->mBuffers[0].mDataByteSize / THIS->_rawInputAudioDescription.mBytesPerFrame;
+#ifdef DEBUG
+            static BOOL reportedBufferMismatch = NO;
+            if ( !reportedBufferMismatch ) {
+                reportedBufferMismatch = YES;
+                NSLog(@"TAAE: Mismatch between received input buffer size (%d frames) and reported frame count (%d).",
+                      (int)actualFrameCount,
+                      (int)inNumberFrames);
+            }
+#endif
+            inNumberFrames = actualFrameCount;
         }
         
         if ( THIS->_recordingThroughDeviceMicrophone && THIS->_useMeasurementMode && THIS->_boostBuiltInMicGainInMeasurementMode && THIS->_inputAudioFloatConverter ) {
