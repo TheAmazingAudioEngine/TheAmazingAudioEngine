@@ -489,11 +489,7 @@ static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt3
         assert(THIS->_inputAudioBufferList->mBuffers[0].mData && THIS->_inputAudioBufferList->mBuffers[0].mDataByteSize > 0);
         assert(audio->mBuffers[0].mData && audio->mBuffers[0].mDataByteSize > 0);
         
-#if TARGET_OS_IPHONE
         UInt32 targetFrames = (UInt32)(arg->table->audioDescription.mSampleRate / THIS->_rawInputAudioDescription.mSampleRate * *frames);
-#else
-        UInt32 targetFrames = *frames;
-#endif
         
         OSStatus result = AudioConverterFillComplexBuffer(arg->table->audioConverter,
                                                           fillComplexBufferInputProc,
