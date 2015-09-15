@@ -1212,7 +1212,9 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
  *  The default value is AVAudioSessionCategoryPlayAndRecord if audio input is enabled, or
  *  AVAudioSessionCategoryPlayback otherwise, with mixing with other apps enabled.
  */
+#if TARGET_OS_IPHONE
 @property (nonatomic, assign) NSString * audioSessionCategory;
+#endif
 
 /*!
  * Whether to allow mixing audio with other apps
@@ -1225,7 +1227,9 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
  *
  *  Default: YES
  */
+#if TARGET_OS_IPHONE
 @property (nonatomic, assign) BOOL allowMixingWithOtherApps;
+#endif
 
 /*!
  * Whether to use the "Measurement" Audio Session Mode for improved audio quality and bass response.
@@ -1235,7 +1239,9 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
  *
  * Default: NO
  */
+#if TARGET_OS_IPHONE
 @property (nonatomic, assign) BOOL useMeasurementMode;
+#endif
 
 /*!
  * Whether to avoid using Measurement Mode with the built-in speaker
@@ -1246,7 +1252,9 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
  *
  *  Default is YES.
  */
+#if TARGET_OS_IPHONE
 @property (nonatomic, assign) BOOL avoidMeasurementModeForBuiltInSpeaker;
+#endif
 
 /*!
  * Whether to boost the input volume while using Measurement Mode with the built-in mic
@@ -1258,7 +1266,9 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
  *
  *  Default is YES.
  */
+#if TARGET_OS_IPHONE
 @property (nonatomic, assign) BOOL boostBuiltInMicGainInMeasurementMode;
+#endif
 
 /*! 
  * Mute output
@@ -1383,7 +1393,9 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
  *  The currently-reported hardware input latency.
  *  See AEAudioControllerInputLatency.
  */
+#if TARGET_OS_IPHONE
 @property (nonatomic, readonly) NSTimeInterval inputLatency;
+#endif
 
 /*!
  * Output latency (in seconds)
@@ -1391,7 +1403,9 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
  *  The currently-reported hardware output latency.
  *  See AEAudioControllerOutputLatency
  */
+#if TARGET_OS_IPHONE
 @property (nonatomic, readonly) NSTimeInterval outputLatency;
+#endif
 
 /*!
  * Whether to automatically account for input/output latency
@@ -1405,7 +1419,9 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
  *
  *  Default is NO.
  */
+#if TARGET_OS_IPHONE
 @property (nonatomic, assign) BOOL automaticLatencyManagement;
+#endif
 
 /*!
  * Determine whether the audio engine is running
@@ -1487,7 +1503,9 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
  * @param controller The audio controller
  * @returns The currently-reported hardware input latency
  */
+#if TARGET_OS_IPHONE
 NSTimeInterval AEAudioControllerInputLatency(__unsafe_unretained AEAudioController *controller);
+#endif
 
 /*!
  * Output latency (in seconds)
@@ -1503,7 +1521,9 @@ NSTimeInterval AEAudioControllerInputLatency(__unsafe_unretained AEAudioControll
  * @param controller The audio controller
  * @returns The currently-reported hardware output latency
  */
+#if TARGET_OS_IPHONE
 NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioController *controller);
+#endif
 
 /*!
  * Get the current audio system timestamp

@@ -1133,6 +1133,11 @@ static OSStatus sourceInputCallback(void *inRefCon, AudioUnitRenderActionFlags *
     if ( !AECheckOSStatus(AudioUnitSetProperty(_mixerUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &busCount, sizeof(busCount)),
                       "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) return;
     
+    // The default volume for the MultiChannelMixer is 0 on OSX and 1 on iOS. ¯\_(ツ)_/¯
+    AudioUnitParameterValue defaultOutputVolume = 1.0;
+    if ( !AECheckOSStatus(AudioUnitSetParameter(_mixerUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Output, 0, defaultOutputVolume, 0),
+                      "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)") ) return;
+    
     // Configure each bus
     for ( int busNumber=0; busNumber<busCount; busNumber++ ) {
         source_t *source = &_table[busNumber];

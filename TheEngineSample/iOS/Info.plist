@@ -8,14 +8,8 @@
 	<string>TheEngine</string>
 	<key>CFBundleExecutable</key>
 	<string>${EXECUTABLE_NAME}</string>
-	<key>CFBundleIconFiles</key>
-	<array>
-		<string>Icon.png</string>
-		<string>Icon@2x.png</string>
-		<string>Icon-72.png</string>
-	</array>
 	<key>CFBundleIdentifier</key>
-	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<string>com.atastypixel.$(PRODUCT_NAME:rfc1034identifier)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -34,6 +28,8 @@
 	<array>
 		<string>audio</string>
 	</array>
+	<key>UILaunchStoryboardName</key>
+	<string>Launch Screen</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>armv7</string>

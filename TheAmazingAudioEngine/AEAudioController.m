@@ -25,7 +25,9 @@
 
 #import "AEAudioController.h"
 #import "AEUtilities.h"
+#if TARGET_OS_IPHONE
 #import <UIKit/UIKit.h>
+#endif
 #import <AVFoundation/AVFoundation.h>
 #import <libkern/OSAtomic.h>
 #import "TPCircularBuffer.h"
@@ -50,15 +52,19 @@ static const int kScratchBufferFrames                  = kMaxFramesPerSlice;
 static const int kInputAudioBufferFrames               = kMaxFramesPerSlice;
 static const int kLevelMonitorScratchBufferSize        = kMaxFramesPerSlice;
 static const int kMaximumMonitoringChannels            = 16;
+#if TARGET_OS_IPHONE
 static const NSTimeInterval kMaxBufferDurationWithVPIO = 0.01;
 static const float kBoostForBuiltInMicInMeasurementMode= 4.0;
 static const Float32 kNoValue                          = -1.0;
+#endif
 #define kNoAudioErr                            -2222
 
 static void * kChannelPropertyChanged = &kChannelPropertyChanged;
 
+#if TARGET_OS_IPHONE
 static Float32 __cachedInputLatency = kNoValue;
 static Float32 __cachedOutputLatency = kNoValue;
+#endif
 
 NSString * const AEAudioControllerSessionInterruptionBeganNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionBeganNotification";
 NSString * const AEAudioControllerSessionInterruptionEndedNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionEndedNotification";
@@ -230,6 +236,9 @@ typedef struct {
     BOOL                _outputEnabled;
     BOOL                _hardwareInputAvailable;
     BOOL                _hasSystemError;
+#if !TARGET_OS_IPHONE
+    AudioUnit           _iAudioUnit;
+#endif
     
     AEChannelGroupRef   _topGroup;
     AEChannelRef        _topChannel;
@@ -240,8 +249,10 @@ typedef struct {
     int                 _inputCallbackCount;
     AudioStreamBasicDescription _rawInputAudioDescription;
     AudioBufferList    *_inputAudioBufferList;
+#if TARGET_OS_IPHONE
     AudioBufferList    *_inputAudioScratchBufferList;
     AEFloatConverter   *_inputAudioFloatConverter;
+#endif
     AudioTimeStamp      _lastInputBusTimeStamp;
     AudioTimeStamp      _lastInputOrOutputBusTimeStamp;
     
@@ -269,7 +280,9 @@ typedef struct {
 
 @property (nonatomic, assign, readwrite) NSTimeInterval currentBufferDuration;
 @property (nonatomic, strong) NSError *lastError;
+#if TARGET_OS_IPHONE
 @property (nonatomic, strong) NSTimer *housekeepingTimer;
+#endif
 @property (nonatomic, strong) ABReceiverPort *audiobusReceiverPort;
 @property (nonatomic, strong) ABFilterPort *audiobusFilterPort;
 @property (nonatomic, strong) ABSenderPort *audiobusSenderPort;
@@ -277,24 +290,29 @@ typedef struct {
 @end
 
 @implementation AEAudioController
+#if TARGET_OS_IPHONE
 @synthesize audioSessionCategory = _audioSessionCategory, audioUnit = _ioAudioUnit;
+#endif
 @dynamic running, inputGainAvailable, inputGain, audiobusSenderPort, inputAudioDescription, inputChannelSelection;
 
 #pragma mark -
 #pragma mark Input and render callbacks
 
-struct fillComplexBufferInputProc_t { AudioBufferList *bufferList; UInt32 frames;  };
+struct fillComplexBufferInputProc_t { AudioBufferList *bufferList; UInt32 frames; UInt32 bytesPerFrame; };
 static OSStatus fillComplexBufferInputProc(AudioConverterRef             inAudioConverter,
                                            UInt32                        *ioNumberDataPackets,
                                            AudioBufferList               *ioData,
                                            AudioStreamPacketDescription  **outDataPacketDescription,
                                            void                          *inUserData) {
+
     struct fillComplexBufferInputProc_t *arg = inUserData;
+    
+    UInt32 bytesToWrite = MIN(*ioNumberDataPackets * arg->bytesPerFrame, arg->bufferList->mBuffers[0].mDataByteSize);
     for ( int i=0; i<ioData->mNumberBuffers; i++ ) {
         ioData->mBuffers[i].mData = arg->bufferList->mBuffers[i].mData;
-        ioData->mBuffers[i].mDataByteSize = arg->bufferList->mBuffers[i].mDataByteSize;
+        ioData->mBuffers[i].mDataByteSize = bytesToWrite;
     }
-    *ioNumberDataPackets = arg->frames;
+    *ioNumberDataPackets = bytesToWrite / arg->bytesPerFrame;
     return noErr;
 }
 
@@ -368,11 +386,12 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
     }
     
     AudioTimeStamp timestamp = *inTimeStamp;
-    
+#if TARGET_OS_IPHONE
     if ( THIS->_automaticLatencyManagement ) {
         // Adjust timestamp to factor in hardware output latency
         timestamp.mHostTime += AEHostTicksFromSeconds(AEAudioControllerOutputLatency(THIS));
     }
+#endif
     
     if ( channel->timeStamp.mFlags == 0 ) {
         channel->timeStamp = timestamp;
@@ -470,13 +489,16 @@ static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt3
         assert(THIS->_inputAudioBufferList->mBuffers[0].mData && THIS->_inputAudioBufferList->mBuffers[0].mDataByteSize > 0);
         assert(audio->mBuffers[0].mData && audio->mBuffers[0].mDataByteSize > 0);
         
+        UInt32 targetFrames = (UInt32)(arg->table->audioDescription.mSampleRate / THIS->_rawInputAudioDescription.mSampleRate * *frames);
+        
         OSStatus result = AudioConverterFillComplexBuffer(arg->table->audioConverter,
                                                           fillComplexBufferInputProc,
-                                                          &(struct fillComplexBufferInputProc_t) { .bufferList = THIS->_inputAudioBufferList, .frames = *frames },
-                                                          frames,
+                                                          &(struct fillComplexBufferInputProc_t) { .bufferList = THIS->_inputAudioBufferList, .frames = *frames, .bytesPerFrame = arg->table->audioDescription.mBytesPerFrame },
+                                                          &targetFrames,
                                                           audio,
                                                           NULL);
-        AECheckOSStatus(result, "AudioConverterConvertComplexBuffer");
+        *frames = targetFrames;
+        AECheckOSStatus(result, "AudioConverterFillComplexBuffer");
     } else {
         for ( int i=0; i<audio->mNumberBuffers && i<THIS->_inputAudioBufferList->mNumberBuffers; i++ ) {
             audio->mBuffers[i].mDataByteSize = MIN(audio->mBuffers[i].mDataByteSize, THIS->_inputAudioBufferList->mBuffers[i].mDataByteSize);
@@ -493,10 +515,14 @@ static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlag
     // Take note of timestamp, for use when we actually service the input
     THIS->_lastInputBusTimeStamp = *inTimeStamp;
     
+#if TARGET_OS_IPHONE
     if ( !THIS->_outputEnabled ) {
         // If output isn't enabled, service the input from here
         serviceAudioInput(THIS, NULL, inTimeStamp, inNumberFrames);
     }
+#else
+    serviceAudioInput(THIS, NULL, inTimeStamp, inNumberFrames);
+#endif
     
     return noErr;
 }
@@ -535,16 +561,20 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         processPendingMessagesOnRealtimeThread(THIS);
         
         // Service input
+#if TARGET_OS_IPHONE
         if ( THIS->_inputEnabled ) {
             serviceAudioInput(THIS, inTimeStamp, &THIS->_lastInputBusTimeStamp, inNumberFrames);
         }
+#endif
         
         // Perform timing callbacks
         AudioTimeStamp timestamp = *inTimeStamp;
+#if TARGET_OS_IPHONE
         if ( THIS->_automaticLatencyManagement ) {
             // Adjust timestamp to factor in hardware output latency
             timestamp.mHostTime += AEHostTicksFromSeconds(AEAudioControllerOutputLatency(THIS));
         }
+#endif
         
         THIS->_lastInputOrOutputBusTimeStamp = timestamp;
         
@@ -581,20 +611,24 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
     if ( useAudiobusReceiverPort ) {
         // If Audiobus is connected, then serve Audiobus queue rather than serving system input queue
         timestamp = outputBusTimeStamp ? *outputBusTimeStamp : *inputBusTimeStamp;
+#if TARGET_OS_IPHONE
         if ( outputBusTimeStamp && THIS->_automaticLatencyManagement ) {
             // Adjust timestamp to factor in hardware output latency
             timestamp.mHostTime += AEHostTicksFromSeconds(AEAudioControllerOutputLatency(THIS));
         }
+#endif
         static Float64 __sampleTime = 0;
         ABReceiverPortReceive(THIS->_audiobusReceiverPort, nil, THIS->_inputAudioBufferList, inNumberFrames, &timestamp);
         timestamp.mSampleTime = __sampleTime;
         __sampleTime += inNumberFrames;
     } else {
         timestamp = *inputBusTimeStamp;
+#if TARGET_OS_IPHONE
         if ( THIS->_automaticLatencyManagement ) {
             // Adjust timestamp to factor in hardware input latency
             timestamp.mHostTime -= AEHostTicksFromSeconds(AEAudioControllerInputLatency(THIS));
         }
+#endif
     }
     
     THIS->_lastInputOrOutputBusTimeStamp = timestamp;
@@ -613,7 +647,12 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
             THIS->_inputAudioBufferList->mBuffers[i].mDataByteSize = bytesPerBuffer;
         }
         AudioUnitRenderActionFlags flags = 0;
-        OSStatus err = AudioUnitRender(THIS->_ioAudioUnit, &flags, &timestamp, 1, inNumberFrames, THIS->_inputAudioBufferList);
+#if TARGET_OS_IPHONE
+        AudioUnit inputAudioUnit = THIS->_ioAudioUnit;
+#else
+        AudioUnit inputAudioUnit = THIS->_iAudioUnit;
+#endif
+        OSStatus err = AudioUnitRender(inputAudioUnit, &flags, &timestamp, 1, inNumberFrames, THIS->_inputAudioBufferList);
         if ( !AECheckOSStatus(err, "AudioUnitRender") ) {
             result = err;
         }
@@ -632,6 +671,7 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
             inNumberFrames = actualFrameCount;
         }
         
+#if TARGET_OS_IPHONE
         if ( THIS->_recordingThroughDeviceMicrophone && THIS->_useMeasurementMode && THIS->_boostBuiltInMicGainInMeasurementMode
                 && THIS->_inputAudioFloatConverter && THIS->_inputAudioScratchBufferList->mNumberBuffers == THIS->_rawInputAudioDescription.mChannelsPerFrame ) {
             // Boost input volume
@@ -641,6 +681,7 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
             }
             AEFloatConverterFromFloatBufferList(THIS->_inputAudioFloatConverter, THIS->_inputAudioScratchBufferList, THIS->_inputAudioBufferList, inNumberFrames);
         }
+#endif
     }
     
     if ( result == noErr && inNumberFrames == 0 ) {
@@ -828,8 +869,12 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     
     NSAssert(audioDescription.mFormatID == kAudioFormatLinearPCM, @"Only linear PCM supported");
 
+#if TARGET_OS_IPHONE
     _audioSessionCategory = enableInput ? (enableOutput ? AVAudioSessionCategoryPlayAndRecord : AVAudioSessionCategoryRecord) : AVAudioSessionCategoryPlayback;
     _allowMixingWithOtherApps = enableOutput ? YES : NO;
+    _avoidMeasurementModeForBuiltInSpeaker = YES;
+    _boostBuiltInMicGainInMeasurementMode = YES;
+#endif
     _audioDescription = audioDescription;
     _inputEnabled = enableInput;
     _outputEnabled = enableOutput;
@@ -837,12 +882,12 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     _voiceProcessingEnabled = useVoiceProcessing;
     _inputMode = AEInputModeFixedAudioFormat;
     _voiceProcessingOnlyForSpeakerAndMicrophone = YES;
-    _avoidMeasurementModeForBuiltInSpeaker = YES;
-    _boostBuiltInMicGainInMeasurementMode = YES;
     _inputCallbacks = (input_callback_table_t*)calloc(sizeof(input_callback_table_t), 1);
     _inputCallbackCount = 1;
     
+#if TARGET_OS_IPHONE
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationWillEnterForeground:) name:UIApplicationWillEnterForegroundNotification object:nil];
+#endif
     
     if ( ABConnectionsChangedNotification ) {
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(audiobusConnectionsChanged:) name:ABConnectionsChangedNotification object:nil];
@@ -851,17 +896,24 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     TPCircularBufferInit(&_realtimeThreadMessageBuffer, kMessageBufferLength);
     TPCircularBufferInit(&_mainThreadMessageBuffer, kMessageBufferLength);
 
+#if TARGET_OS_IPHONE
     // Register for notifications
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(interruptionNotification:) name:AVAudioSessionInterruptionNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(audioRouteChangeNotification:) name:AVAudioSessionRouteChangeNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(mediaServiceResetNotification:) name:AVAudioSessionMediaServicesWereResetNotification object:nil];
 
+    
     if ( ![self initAudioSession] || ![self setup] ) {
         _audioGraph = NULL;
     }
     
     self.housekeepingTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:[[AEAudioControllerProxy alloc] initWithAudioController:self] selector:@selector(housekeeping) userInfo:nil repeats:YES];
-    
+#else
+    if ( ![self setup] ) {
+        _audioGraph = NULL;
+    }
+#endif
+
     return self;
 }
 
@@ -878,8 +930,12 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 
     [NSThread sleepForTimeInterval:0.5];
 
+#if TARGET_OS_IPHONE
     _audioSessionCategory = enableInput ? (enableOutput ? AVAudioSessionCategoryPlayAndRecord : AVAudioSessionCategoryRecord) : AVAudioSessionCategoryPlayback;
     _allowMixingWithOtherApps = enableOutput ? YES : NO;
+    _avoidMeasurementModeForBuiltInSpeaker = YES;
+    _boostBuiltInMicGainInMeasurementMode = YES;
+#endif
     _audioDescription = audioDescription;
     _inputEnabled = enableInput;
     _outputEnabled = enableOutput;
@@ -887,15 +943,20 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     _voiceProcessingEnabled = useVoiceProcessing;
     _inputMode = AEInputModeFixedAudioFormat;
     _voiceProcessingOnlyForSpeakerAndMicrophone = YES;
-    _avoidMeasurementModeForBuiltInSpeaker = YES;
-    _boostBuiltInMicGainInMeasurementMode = YES;
 
-
+#if TARGET_OS_IPHONE
     if ( ![self initAudioSession] || ![self setup] ) {
         NSLog(@"TAAE: error setting up audio session");
         _audioGraph = NULL;
         return NO;
     }
+#else
+    if ( ![self setup] ) {
+        NSLog(@"TAAE: error with setup");
+        _audioGraph = NULL;
+        return NO;
+    }
+#endif
 
     if (wasStarted) {
         if( ![self start:nil] ) {
@@ -913,9 +974,10 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 - (void)dealloc {
     __AEAllocated = NO;
     
+#if TARGET_OS_IPHONE
     [_housekeepingTimer invalidate];
     self.housekeepingTimer = nil;
-    
+#endif
     
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     
@@ -939,9 +1001,11 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
         AEFreeAudioBufferList(_inputAudioBufferList);
     }
     
+#if TARGET_OS_IPHONE
     if ( _inputAudioScratchBufferList ) {
         AEFreeAudioBufferList(_inputAudioScratchBufferList);
     }
+#endif
     
     for ( int i=0; i<_inputCallbackCount; i++ ) {
         if ( _inputCallbacks[i].channelMap ) {
@@ -968,6 +1032,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
         return NO;
     }
     
+#if TARGET_OS_IPHONE
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     
     if ( ![audioSession setActive:YES error:error] ) {
@@ -983,6 +1048,13 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     if ( _outputEnabled ) {
         __cachedOutputLatency = audioSession.outputLatency;
     }
+#else
+    UInt32 bufferFrameSize;
+    UInt32 sizeParam = sizeof(UInt32);
+    AudioUnitGetProperty(_ioAudioUnit, kAudioDevicePropertyBufferFrameSize, kAudioUnitScope_Global, 0, &bufferFrameSize, &sizeParam);
+    NSTimeInterval bufferDuration = (double)bufferFrameSize / (double)self.audioDescription.mSampleRate;
+    if ( _currentBufferDuration != bufferDuration ) self.currentBufferDuration = bufferDuration;
+#endif
     
     _interrupted = NO;
     
@@ -998,6 +1070,11 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     
     @synchronized ( self ) {
         status = AUGraphStart(_audioGraph);
+#if !TARGET_OS_IPHONE
+        if (_inputEnabled) {
+            AECheckOSStatus(AudioOutputUnitStart(_iAudioUnit), "AudioOutputUnitStart (OSX input)");
+        }
+#endif
     }
     
     // Start things up
@@ -1016,7 +1093,8 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
             AECheckOSStatus(AudioOutputUnitStart(_ioAudioUnit), "AudioOutputUnitStart");
         }
     }
-    
+
+#if TARGET_OS_IPHONE
     if ( _inputEnabled ) {
         if ( [audioSession respondsToSelector:@selector(requestRecordPermission:)] ) {
             [audioSession requestRecordPermission:^(BOOL granted) {
@@ -1036,6 +1114,8 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
             [self updateInputDeviceStatus];
         }
     }
+#endif
+
     
     _started = YES;
     
@@ -1051,18 +1131,25 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     NSLog(@"TAAE: Stopping Engine");
     
     AECheckOSStatus(AUGraphStop(_audioGraph), "AUGraphStop");
+#if !TARGET_OS_IPHONE
+    if ( _inputEnabled ) {
+        AECheckOSStatus(AudioOutputUnitStop(_iAudioUnit), "AudioOutputUnitStop (OSX input)");
+    }
+#endif
     
     if ( self.running ) {
         // Ensure top IO unit is stopped (AUGraphStop may fail to stop it)
         AECheckOSStatus(AudioOutputUnitStop(_ioAudioUnit), "AudioOutputUnitStop");
     }
     
+#if TARGET_OS_IPHONE
     if ( !_interrupted ) {
         NSError *error = nil;
         if ( ![((AVAudioSession*)[AVAudioSession sharedInstance]) setActive:NO error:&error] ) {
             NSLog(@"TAAE: Couldn't deactivate audio session: %@", error);
         }
     }
+#endif
     
     processPendingMessagesOnRealtimeThread(self);
     
@@ -1937,6 +2024,7 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
 
 #pragma mark - Setters, getters
 
+#if TARGET_OS_IPHONE
 -(void)setAudioSessionCategory:(NSString *)audioSessionCategory {
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     
@@ -2008,6 +2096,7 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
         [self updateInputDeviceStatus];
     }
 }
+#endif
 
 -(void)setMasterOutputVolume:(float)masterOutputVolume {
     _masterOutputVolume = masterOutputVolume;
@@ -2027,6 +2116,7 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
     }
 }
 
+#if TARGET_OS_IPHONE
 -(void)setEnableBluetoothInput:(BOOL)enableBluetoothInput {
     _enableBluetoothInput = enableBluetoothInput;
 
@@ -2040,17 +2130,20 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
 -(float)inputGain {
     return [((AVAudioSession*)[AVAudioSession sharedInstance]) inputGain];
 }
+#endif
 
 -(AudioStreamBasicDescription)inputAudioDescription {
     return _inputCallbacks[0].audioDescription;
 }
 
+#if TARGET_OS_IPHONE
 -(void)setInputGain:(float)inputGain {
     NSError *error = NULL;
     if ( ![((AVAudioSession*)[AVAudioSession sharedInstance]) setInputGain:inputGain error:&error] ) {
         NSLog(@"TAAE: Couldn't set input gain: %@", error);
     }
 }
+#endif
 
 -(void)setInputMode:(AEInputMode)inputMode {
     _inputMode = inputMode;
@@ -2079,6 +2172,7 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
     }
 }
 
+#if TARGET_OS_IPHONE
 -(void)setPreferredBufferDuration:(NSTimeInterval)preferredBufferDuration {
     if ( _preferredBufferDuration == preferredBufferDuration ) return;
     
@@ -2143,6 +2237,7 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
     }
     return __cachedOutputLatency;
 }
+#endif
 
 AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudioController *THIS) {
     return THIS->_lastInputOrOutputBusTimeStamp;
@@ -2332,6 +2427,7 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
     }
 }
 
+#if TARGET_OS_IPHONE
 - (void)applicationWillEnterForeground:(NSNotification*)notification {
     NSError *error = nil;
     if ( ![((AVAudioSession*)[AVAudioSession sharedInstance]) setActive:YES error:&error] ) {
@@ -2350,6 +2446,7 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
     
     if ( _hasSystemError ) [self attemptRecoveryFromSystemError:NULL thenStart:YES];
 }
+#endif
 
 -(void)audiobusConnectionsChanged:(NSNotification*)notification {
     if ( _inputEnabled ) {
@@ -2360,6 +2457,7 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
     }
 }
 
+#if TARGET_OS_IPHONE
 - (void)interruptionNotification:(NSNotification*)notification {
     dispatch_async(dispatch_get_main_queue(), ^{
         if ( [notification.userInfo[AVAudioSessionInterruptionTypeKey] intValue] == AVAudioSessionInterruptionTypeEnded ) {
@@ -2476,6 +2574,7 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
                                                           userInfo:notification.userInfo];
     });
 }
+#endif
 
 - (void)mediaServiceResetNotification:(NSNotification*)notification {
     NSError * error = nil;
@@ -2485,6 +2584,7 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
     }
 }
 
+#if TARGET_OS_IPHONE
 static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, AudioUnitPropertyID inID, AudioUnitScope inScope, AudioUnitElement inElement) {
     @autoreleasepool {
         AEAudioController *THIS = (__bridge AEAudioController*)inRefCon;
@@ -2505,10 +2605,11 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         }
     }
 }
+#endif
 
 #pragma mark - Graph and audio session configuration
 
-
+#if TARGET_OS_IPHONE
 - (BOOL)initAudioSession {
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     NSMutableString *extraInfo = [NSMutableString string];
@@ -2566,6 +2667,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     NSLog(@"TAAE: Audio session initialized (%@) HW samplerate: %g", [extraInfo stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@", "]], achievedSampleRate);
     return YES;
 }
+#endif
 
 - (BOOL)setup {
     // Create a new AUGraph
@@ -2574,10 +2676,21 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     
     BOOL useVoiceProcessing = [self usingVPIO];
     
+    OSType componentSubType;
+    if ( useVoiceProcessing ) {
+        componentSubType = kAudioUnitSubType_VoiceProcessingIO;
+    } else {
+#if TARGET_OS_IPHONE
+        componentSubType = kAudioUnitSubType_RemoteIO;
+#else
+        componentSubType = kAudioUnitSubType_DefaultOutput;
+#endif
+    }
+    
     // Input/output unit description
     AudioComponentDescription io_desc = {
         .componentType = kAudioUnitType_Output,
-        .componentSubType = useVoiceProcessing ? kAudioUnitSubType_VoiceProcessingIO : kAudioUnitSubType_RemoteIO,
+        .componentSubType = componentSubType,
         .componentManufacturer = kAudioUnitManufacturer_Apple,
         .componentFlags = 0,
         .componentFlagsMask = 0
@@ -2598,6 +2711,22 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 #ifdef DEBUG
     // Add a render notify to the top audio unit, for the purposes of performance profiling
     AECheckOSStatus(AudioUnitAddRenderNotify(_ioAudioUnit, &ioUnitRenderNotifyCallback, (__bridge void*)self), "AudioUnitAddRenderNotify");
+#endif
+    
+#if !TARGET_OS_IPHONE
+    if ( _inputEnabled ) {
+        // Initialize the audio unit for OSX input
+        AudioComponentDescription i_desc = {
+            .componentType = kAudioUnitType_Output,
+            .componentSubType = kAudioUnitSubType_HALOutput,
+            .componentManufacturer = kAudioUnitManufacturer_Apple,
+            .componentFlags = 0,
+            .componentFlagsMask = 0
+        };
+        
+        AudioComponent inputComponent = AudioComponentFindNext(NULL, &i_desc);
+        AECheckOSStatus(AudioComponentInstanceNew(inputComponent, &_iAudioUnit), "AudioComponentInstanceNew");
+    }
 #endif
     
     [self configureAudioUnit];
@@ -2652,10 +2781,21 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 - (void)replaceIONode {
     if ( !_topChannel ) return;
     BOOL useVoiceProcessing = [self usingVPIO];
+
+    OSType componentSubType;
+    if ( useVoiceProcessing ) {
+        componentSubType = kAudioUnitSubType_VoiceProcessingIO;
+    } else {
+#if TARGET_OS_IPHONE
+        componentSubType = kAudioUnitSubType_RemoteIO;
+#else
+        componentSubType = kAudioUnitSubType_DefaultOutput;
+#endif
+    }
     
     AudioComponentDescription io_desc = {
         .componentType = kAudioUnitType_Output,
-        .componentSubType = useVoiceProcessing ? kAudioUnitSubType_VoiceProcessingIO : kAudioUnitSubType_RemoteIO,
+        .componentSubType = componentSubType,
         .componentManufacturer = kAudioUnitManufacturer_Apple,
         .componentFlags = 0,
         .componentFlagsMask = 0
@@ -2698,8 +2838,8 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 }
 
 - (void)configureAudioUnit {
+#if TARGET_OS_IPHONE
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
-    
     if ( _inputEnabled ) {
         // Enable input
         UInt32 enableInputFlag = 1;
@@ -2718,6 +2858,83 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         OSStatus result = AudioUnitSetProperty(_ioAudioUnit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &enableInputFlag, sizeof(enableInputFlag));
         AECheckOSStatus(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_EnableIO)");
     }
+#else
+    if ( _inputEnabled ) {
+        // Enable input for OSX
+        UInt32 enableFlag = 1;
+        UInt32 disableFlag = 0;
+        AudioUnitScope outputBus = 0;
+        AudioUnitScope inputBus = 1;
+        
+        OSStatus result;
+        
+        // Enable input and disable output on the audio unit
+        result = AudioUnitSetProperty(_iAudioUnit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, inputBus, &enableFlag, sizeof(enableFlag));
+        AECheckOSStatus(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_EnableIO)");
+        
+        result = AudioUnitSetProperty(_iAudioUnit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Output, outputBus, &disableFlag, sizeof(disableFlag));
+        AECheckOSStatus(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_EnableIO)");
+        
+        // Get the system's default input device
+        AudioDeviceID defaultDevice = kAudioDeviceUnknown;
+        UInt32 propertySize = sizeof(defaultDevice);
+        AudioObjectPropertyAddress defaultDeviceProperty = {
+            .mSelector = kAudioHardwarePropertyDefaultInputDevice,
+            .mScope = kAudioObjectPropertyScopeGlobal,
+            .mElement = kAudioObjectPropertyElementMaster
+        };
+        result = AudioObjectGetPropertyData(kAudioObjectSystemObject, &defaultDeviceProperty, 0, NULL, &propertySize, &defaultDevice);
+        AECheckOSStatus(result, "AudioObjectGetPropertyData(kAudioObjectSystemObject)");
+        
+        // Set the sample rate of the input device to the output samplerate (if possible)
+        AudioValueRange inputSampleRate;
+        inputSampleRate.mMinimum = _audioDescription.mSampleRate;
+        inputSampleRate.mMaximum = _audioDescription.mSampleRate;
+        defaultDeviceProperty.mSelector = kAudioDevicePropertyNominalSampleRate;
+        result = AudioObjectSetPropertyData(defaultDevice, &defaultDeviceProperty, 0, NULL, sizeof(inputSampleRate), &inputSampleRate);
+        
+        BOOL matchingSampleRates = ( result != kAudioCodecUnsupportedFormatError );
+        AECheckOSStatus(result, "AudioObjectSetPropertyData(kAudioDevicePropertyNominalSampleRate)");
+        
+        // Set the input device to the system's default input device
+        result = AudioUnitSetProperty(_iAudioUnit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, outputBus, &defaultDevice, sizeof(defaultDevice));
+        AECheckOSStatus(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_CurrentDevice)");
+    
+        // Set input unit ASBD output to match the hardware input ASBD
+        propertySize = sizeof(AudioStreamBasicDescription);
+        result = AudioUnitGetProperty(_iAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, inputBus, &_rawInputAudioDescription, &propertySize);
+        AECheckOSStatus(result, "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)");
+        
+        if ( matchingSampleRates ) {
+            _rawInputAudioDescription.mSampleRate = _audioDescription.mSampleRate;
+        } else {
+            defaultDeviceProperty.mSelector = kAudioDevicePropertyNominalSampleRate;
+            UInt32 deviceSampleRateSize = sizeof(Float64);
+            Float64 deviceSampleRate;
+            result = AudioObjectGetPropertyData(defaultDevice, &defaultDeviceProperty, 0, NULL, &deviceSampleRateSize, &deviceSampleRate);
+            AECheckOSStatus(result, "AudioObjectGetPropertyData(kAudioDevicePropertyNominalSampleRate)");
+            
+            _rawInputAudioDescription.mSampleRate = deviceSampleRate;
+            
+            NSLog(@"TAAE: Warning: could not set hardware input sample rate (%.f Hz) to same sample rate as output (%.f Hz). Performing on-the-fly sample rate conversion.", deviceSampleRate, _audioDescription.mSampleRate);
+        }
+        
+        propertySize = sizeof(AudioStreamBasicDescription);
+        result = AudioUnitSetProperty(_iAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, inputBus, &_rawInputAudioDescription, propertySize);
+        AECheckOSStatus(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
+        
+        // Register a callback to receive audio
+        AURenderCallbackStruct inRenderProc;
+        inRenderProc.inputProc = &inputAvailableCallback;
+        inRenderProc.inputProcRefCon = (__bridge void *)self;
+        result = AudioUnitSetProperty(_iAudioUnit, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 0, &inRenderProc, sizeof(inRenderProc));
+        AECheckOSStatus(result, "AudioUnitSetProperty(kAudioOutputUnitProperty_SetInputCallback)");
+        
+        // Initialize the input audio unit
+        result = AudioUnitInitialize(_iAudioUnit);
+        AECheckOSStatus(result, "AudioUnitInitialize");
+    }
+#endif
 
     if (!_outputEnabled) {
         // disable output
@@ -2731,7 +2948,8 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         UInt32 quality = 127;
         OSStatus result = AudioUnitSetProperty(_ioAudioUnit, kAUVoiceIOProperty_VoiceProcessingQuality, kAudioUnitScope_Global, 0, &quality, sizeof(quality));
         AECheckOSStatus(result, "AudioUnitSetProperty(kAUVoiceIOProperty_VoiceProcessingQuality)");
-        
+
+#if TARGET_OS_IPHONE
         if ( _preferredBufferDuration ) {
             // If we're using voice processing, clamp the buffer duration
             Float32 preferredBufferSize = MAX(kMaxBufferDurationWithVPIO, _preferredBufferDuration);
@@ -2740,7 +2958,9 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
                 NSLog(@"TAAE: Couldn't set preferred IO buffer duration: %@", error);
             }
         }
+#endif
     } else {
+#if TARGET_OS_IPHONE
         if ( _preferredBufferDuration ) {
             // Set the buffer duration
             NSError *error = nil;
@@ -2748,14 +2968,24 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
                 NSLog(@"TAAE: Couldn't set preferred IO buffer duration: %@", error);
             }
         }
+#endif
     }
     
     // Set the audio unit to handle up to 4096 frames per slice to keep rendering during screen lock
     AECheckOSStatus(AudioUnitSetProperty(_ioAudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &kMaxFramesPerSlice, sizeof(kMaxFramesPerSlice)),
                 "AudioUnitSetProperty(kAudioUnitProperty_MaximumFramesPerSlice)");
 
+#if !TARGET_OS_IPHONE
+    if ( _inputEnabled ) {
+        AECheckOSStatus(AudioUnitSetProperty(_iAudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &kMaxFramesPerSlice, sizeof(kMaxFramesPerSlice)),
+                    "AudioUnitSetProperty(kAudioUnitProperty_MaximumFramesPerSlice)");
+    }
+#endif
+    
+#if TARGET_OS_IPHONE
     AECheckOSStatus(AudioUnitAddPropertyListener(_ioAudioUnit, kAudioUnitProperty_IsInterAppConnected, interAppConnectedChangeCallback, (__bridge void*)self),
                 "AudioUnitAddPropertyListener(kAudioUnitProperty_IsInterAppConnected)");
+#endif
 }
 
 - (void)teardown {
@@ -2763,6 +2993,13 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     AECheckOSStatus(DisposeAUGraph(_audioGraph), "DisposeAUGraph");
     _audioGraph = NULL;
     _ioAudioUnit = NULL;
+#if !TARGET_OS_IPHONE
+    if ( _inputEnabled ) {
+        AECheckOSStatus(AudioUnitUninitialize(_iAudioUnit), "AudioUnitUninitialize");
+        AECheckOSStatus(AudioComponentInstanceDispose(_iAudioUnit), "AudioComponentInstanceDispose");
+        _iAudioUnit = NULL;
+    }
+#endif
     
     for ( int i=0; i<_inputCallbackCount; i++ ) {
         if ( _inputCallbacks[i].audioConverter ) {
@@ -2783,7 +3020,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 
 - (OSStatus)updateGraph {
     // Retry a few times (as sometimes the graph will be in the wrong state to update)
-    OSStatus err;
+    OSStatus err = 0;
     for ( int retry=0; retry<6; retry++ ) {
         err = AUGraphUpdate(_audioGraph, NULL);
         if ( err != kAUGraphErr_CannotDoInCurrentContext ) break;
@@ -2797,9 +3034,20 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     if ( !_audioGraph ) return NO;
     BOOL useVoiceProcessing = [self usingVPIO];
 
+    OSType componentSubType;
+    if ( useVoiceProcessing ) {
+        componentSubType = kAudioUnitSubType_VoiceProcessingIO;
+    } else {
+#if TARGET_OS_IPHONE
+        componentSubType = kAudioUnitSubType_RemoteIO;
+#else
+        componentSubType = kAudioUnitSubType_DefaultOutput;
+#endif
+    }
+    
     AudioComponentDescription target_io_desc = {
         .componentType = kAudioUnitType_Output,
-        .componentSubType = useVoiceProcessing ? kAudioUnitSubType_VoiceProcessingIO : kAudioUnitSubType_RemoteIO,
+        .componentSubType = componentSubType,
         .componentManufacturer = kAudioUnitManufacturer_Apple,
         .componentFlags = 0,
         .componentFlagsMask = 0
@@ -2828,14 +3076,18 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     NSAssert(_inputEnabled, @"Input must be enabled");
     
     BOOL success = YES;
+    BOOL inputAvailable = YES;
+    BOOL hardwareInputAvailable = NO;
+#if TARGET_OS_IPHONE
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
-    
-    BOOL inputAvailable          = audioSession.inputAvailable;
-    BOOL hardwareInputAvailable  = inputAvailable;
+    inputAvailable          = audioSession.inputAvailable;
+    hardwareInputAvailable  = inputAvailable;
+    UInt32 usingIAA              = NO;
+#endif
     int numberOfInputChannels    = _audioDescription.mChannelsPerFrame;
     BOOL usingAudiobus           = NO;
-    UInt32 usingIAA              = NO;
-    
+
+#if TARGET_OS_IPHONE
     UInt32 size = sizeof(usingIAA);
     AudioUnitGetProperty(_ioAudioUnit, kAudioUnitProperty_IsInterAppConnected, kAudioUnitScope_Global, 0, &usingIAA, &size);
 
@@ -2889,12 +3141,15 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
             }
         }
     }
+#endif
     
     AudioStreamBasicDescription rawAudioDescription = _rawInputAudioDescription;
     AudioBufferList *inputAudioBufferList           = _inputAudioBufferList;
+    audio_level_monitor_t inputLevelMonitorData     = _inputLevelMonitorData;
+#if TARGET_OS_IPHONE
     AudioBufferList *inputAudioScratchBufferList    = _inputAudioScratchBufferList;
     AEFloatConverter *inputAudioFloatConverter      = _inputAudioFloatConverter;
-    audio_level_monitor_t inputLevelMonitorData     = _inputLevelMonitorData;
+#endif
     
     BOOL inputChannelsChanged = _numberOfInputChannels != numberOfInputChannels;
     BOOL inputDescriptionChanged = inputChannelsChanged;
@@ -2905,7 +3160,11 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     memcpy(inputCallbacks, _inputCallbacks, sizeof(input_callback_table_t) * inputCallbackCount);
 
     if ( inputAvailable ) {
+#if TARGET_OS_IPHONE
         rawAudioDescription = _audioDescription;
+#else
+        rawAudioDescription = _rawInputAudioDescription;
+#endif
         AEAudioStreamBasicDescriptionSetChannelsPerFrame(&rawAudioDescription, numberOfInputChannels);
         
         BOOL iOS4ConversionRequired = NO;
@@ -2934,7 +3193,15 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
             }
             
             // Determine if conversion is required
+            
+#if TARGET_OS_IPHONE
+            BOOL sampleRateConverterRequired = NO;
+#else
+            BOOL sampleRateConverterRequired = entry->audioDescription.mSampleRate != _rawInputAudioDescription.mSampleRate;
+#endif
+            
             BOOL converterRequired = iOS4ConversionRequired
+                                            || sampleRateConverterRequired
                                             || entry->audioDescription.mChannelsPerFrame != numberOfInputChannels
                                             || (entry->channelMap && [(__bridge NSArray*)entry->channelMap count] != entry->audioDescription.mChannelsPerFrame);
             if ( !converterRequired && entry->channelMap ) {
@@ -2954,6 +3221,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
                     rawAudioDescription = entry->audioDescription;
                 }
                 
+#if TARGET_OS_IPHONE
                 BOOL useVoiceProcessing = [self usingVPIO];
                 if ( useVoiceProcessing && (_audioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved) && [[[UIDevice currentDevice] systemVersion] floatValue] < 5.0 ) {
                     // iOS 4 cannot handle non-interleaved audio and voice processing. Use interleaved audio and a converter.
@@ -2963,6 +3231,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
                     rawAudioDescription.mBytesPerFrame *= rawAudioDescription.mChannelsPerFrame;
                     rawAudioDescription.mBytesPerPacket *= rawAudioDescription.mChannelsPerFrame;
                 }
+#endif
                 
                 if ( inputLevelMonitorData.monitoringEnabled && memcmp(&_rawInputAudioDescription, &rawAudioDescription, sizeof(_rawInputAudioDescription)) != 0 ) {
                     inputLevelMonitorData.channels = rawAudioDescription.mChannelsPerFrame;
@@ -3017,6 +3286,18 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
                     
                     AECheckOSStatus(AudioConverterNew(&rawAudioDescription, &entry->audioDescription, &entry->audioConverter), "AudioConverterNew");
                     AECheckOSStatus(AudioConverterSetProperty(entry->audioConverter, kAudioConverterChannelMap, channelMapSize, channelMap), "AudioConverterSetProperty(kAudioConverterChannelMap");
+                    
+                    if ( sampleRateConverterRequired ) {
+                        UInt32 primeMethod;
+                        primeMethod = kConverterPrimeMethod_None;
+                        AECheckOSStatus(AudioConverterSetProperty(entry->audioConverter, kAudioConverterPrimeMethod, sizeof(primeMethod), &primeMethod), "AudioConverterSetProperty(kAudioConverterPrimeMethod)");
+
+                        UInt32 quality = kAudioConverterQuality_Max;
+                        AECheckOSStatus(AudioConverterSetProperty(entry->audioConverter, kAudioConverterSampleRateConverterQuality, sizeof(quality), &quality), "AudioConverterSetProperty(kAudioConverterSampleRateConverterQuality)");
+
+                        UInt32 complexity = kAudioConverterSampleRateConverterComplexity_Mastering;
+                        AECheckOSStatus(AudioConverterSetProperty(entry->audioConverter, kAudioConverterSampleRateConverterComplexity, sizeof(complexity), &complexity), "AudioConverterSetProperty(kAudioConverterSampleRateConverterComplexity)");
+                    }
                 }
                 
                 if ( currentMapping ) free(currentMapping);
@@ -3033,6 +3314,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
             inputAudioBufferList = AEAllocateAndInitAudioBufferList(rawAudioDescription, kInputAudioBufferFrames);
         }
         
+#if TARGET_OS_IPHONE
         if ( _useMeasurementMode && _boostBuiltInMicGainInMeasurementMode ) {
             if ( !inputAudioScratchBufferList || rawInputAudioDescriptionChanged ) {
                 inputAudioScratchBufferList = AEAllocateAndInitAudioBufferList(rawAudioDescription, kInputAudioBufferFrames);
@@ -3044,12 +3326,15 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
             inputAudioScratchBufferList = NULL;
             inputAudioFloatConverter = nil;
         }
+#endif
         
     } else if ( !inputAvailable ) {
+#if TARGET_OS_IPHONE
         if ( [_audioSessionCategory isEqualToString:AVAudioSessionCategoryPlayAndRecord] || [_audioSessionCategory isEqualToString:AVAudioSessionCategoryRecord] ) {
             // Update audio session as appropriate (will select a non-recording category for us)
             self.audioSessionCategory = _audioSessionCategory;
         }
+#endif
         
         inputAudioBufferList = NULL;
         
@@ -3074,7 +3359,10 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     }
     
     AudioBufferList *oldInputBuffer     = _inputAudioBufferList;
+    
+#if TARGET_OS_IPHONE
     AudioBufferList *oldInputScratchBuffer = _inputAudioScratchBufferList;
+#endif
     
     input_callback_table_t *oldInputCallbacks = _inputCallbacks;
     int oldInputCallbackCount = _inputCallbackCount;
@@ -3092,8 +3380,10 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         _numberOfInputChannels    = numberOfInputChannels;
         _rawInputAudioDescription = rawAudioDescription;
         _inputAudioBufferList     = inputAudioBufferList;
+#if TARGET_OS_IPHONE
         _inputAudioScratchBufferList = inputAudioScratchBufferList;
         _inputAudioFloatConverter = inputAudioFloatConverter;
+#endif
         _audioInputAvailable      = inputAvailable;
         _hardwareInputAvailable   = hardwareInputAvailable;
         _inputCallbacks           = inputCallbacks;
@@ -3102,6 +3392,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         _inputLevelMonitorData    = inputLevelMonitorData;
     }];
     
+#if TARGET_OS_IPHONE
     if ( inputAvailable && (!_audiobusReceiverPort || !ABReceiverPortIsConnected(_audiobusReceiverPort)) ) {
         AudioStreamBasicDescription currentAudioDescription;
         UInt32 size = sizeof(currentAudioDescription);
@@ -3113,14 +3404,17 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
             AECheckOSStatus(result, "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
         }
     }
+#endif
     
     if ( oldInputBuffer && oldInputBuffer != inputAudioBufferList ) {
         AEFreeAudioBufferList(oldInputBuffer);
     }
     
+#if TARGET_OS_IPHONE
     if ( oldInputScratchBuffer && oldInputScratchBuffer != inputAudioScratchBufferList ) {
         AEFreeAudioBufferList(oldInputScratchBuffer);
     }
+#endif
     
     if ( oldInputCallbacks != inputCallbacks ) {
         for ( int entryIndex = 0; entryIndex < oldInputCallbackCount; entryIndex++ ) {
@@ -3252,6 +3546,13 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
                 
                 // Set the mixer unit to handle up to 4096 frames per slice to keep rendering during screen lock
                 AudioUnitSetProperty(subgroup->mixerAudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &kMaxFramesPerSlice, sizeof(kMaxFramesPerSlice));
+
+#if !TARGET_OS_IPHONE
+                // Set output volume
+                // see http://stackoverflow.com/questions/9904369/silence-when-adding-kaudiounitsubtype-multichannelmixer-to-augraph
+                AECheckOSStatus(AudioUnitSetParameter(subgroup->mixerAudioUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Output, 0, 1, 0),
+                    "AudioUnitSetParameter(kMultiChannelMixerParam_Volume)");
+#endif
             }
             
             // Set bus count
@@ -3631,8 +3932,12 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
         [self teardown];
         
         [NSThread sleepForTimeInterval:0.5];
-        
+
+#if TARGET_OS_IPHONE
         if ( [self initAudioSession] && [self setup] ) {
+#else
+        if ( [self setup] ) {
+#endif
             [self sendSetupToChannelsAndFilters];
             [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerDidRecreateGraphNotification object:self];
             
@@ -3931,6 +4236,7 @@ static BOOL upstreamChannelsConnectedToAudiobus(AEChannelRef channel) {
     return upstreamChannelsConnectedToAudiobus(parentGroupChannel);
 }
 
+#if TARGET_OS_IPHONE
 static void * firstUpstreamAudiobusSenderPort(AEChannelRef channel) {
     if ( channel->audiobusSenderPort ) {
         return channel->audiobusSenderPort;
@@ -3940,7 +4246,9 @@ static void * firstUpstreamAudiobusSenderPort(AEChannelRef channel) {
     
     return firstUpstreamAudiobusSenderPort(channel->parentGroup->channel);
 }
+#endif
 
+#if TARGET_OS_IPHONE
 - (void)housekeeping {
     Float32 bufferDuration = [((AVAudioSession*)[AVAudioSession sharedInstance]) IOBufferDuration];
     if ( _currentBufferDuration != bufferDuration ) self.currentBufferDuration = bufferDuration;
@@ -3959,6 +4267,7 @@ static void * firstUpstreamAudiobusSenderPort(AEChannelRef channel) {
     
     return [NSString stringWithFormat:@"%@%@%@", inputsString, inputsString.length > 0 && outputsString.length > 0 ? @" and " : @"", outputsString];
 }
+#endif
 
 @end
 

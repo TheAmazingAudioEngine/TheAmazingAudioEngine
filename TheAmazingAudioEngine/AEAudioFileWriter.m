@@ -41,7 +41,7 @@ NSString * const AEAudioFileWriterErrorDomain = @"com.theamazingaudioengine.AEAu
 @synthesize path = _path;
 
 + (BOOL)AACEncodingAvailable {
-#if TARGET_IPHONE_SIMULATOR
+#if !TARGET_OS_IPHONE
     return YES;
 #else
     static BOOL available;
@@ -150,7 +150,8 @@ NSString * const AEAudioFileWriterErrorDomain = @"com.theamazingaudioengine.AEAu
                                                   userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Couldn't open the output file (error %d/%4.4s)", @""), status, (char*)&fourCC]}];
             return NO;
         }
-        
+
+#if TARGET_OS_IPHONE
         UInt32 codecManfacturer = kAppleSoftwareAudioCodecManufacturer;
         status = ExtAudioFileSetProperty(_audioFile, kExtAudioFileProperty_CodecManufacturer, sizeof(UInt32), &codecManfacturer);
         
@@ -162,6 +163,7 @@ NSString * const AEAudioFileWriterErrorDomain = @"com.theamazingaudioengine.AEAu
             ExtAudioFileDispose(_audioFile);
             return NO;
         }
+#endif
     } else {
         
         // Derive the output audio description from the client format, but with interleaved, big endian (if AIFF) signed integers.
