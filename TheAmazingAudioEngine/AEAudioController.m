@@ -632,7 +632,8 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
             inNumberFrames = actualFrameCount;
         }
         
-        if ( THIS->_recordingThroughDeviceMicrophone && THIS->_useMeasurementMode && THIS->_boostBuiltInMicGainInMeasurementMode && THIS->_inputAudioFloatConverter ) {
+        if ( THIS->_recordingThroughDeviceMicrophone && THIS->_useMeasurementMode && THIS->_boostBuiltInMicGainInMeasurementMode
+                && THIS->_inputAudioFloatConverter && THIS->_inputAudioScratchBufferList->mNumberBuffers == THIS->_rawInputAudioDescription.mChannelsPerFrame ) {
             // Boost input volume
             AEFloatConverterToFloatBufferList(THIS->_inputAudioFloatConverter, THIS->_inputAudioBufferList, THIS->_inputAudioScratchBufferList, inNumberFrames);
             for ( int i=0; i<THIS->_inputAudioScratchBufferList->mNumberBuffers; i++ ) {
