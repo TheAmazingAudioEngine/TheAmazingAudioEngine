@@ -41,7 +41,7 @@
 		7A5687151B54617200243427 /* AEAudioController+Audiobus.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C2886511557DB800074175A /* AEAudioController+Audiobus.m */; };
 		7A5687161B54617200243427 /* AEAudioFilePlayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CAD56AA15163488003CE861 /* AEAudioFilePlayer.m */; };
 		7A5687171B54617200243427 /* AEAudioFileWriter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C38DC5415458AB1009F4454 /* AEAudioFileWriter.m */; };
-		7A5687181B54617200243427 /* AEUtilities.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C12CC99151D1EDA00562E2A /* AEUtilities.c */; };
+		7A5687181B54617200243427 /* AEUtilities.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C12CC99151D1EDA00562E2A /* AEUtilities.m */; };
 		7A5687191B54617200243427 /* AEBlockChannel.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C4B11F316833FDD00A3BA2E /* AEBlockChannel.m */; };
 		7A56871A1B54617200243427 /* AEAudioUnitFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C99588C16C0825F0011FB01 /* AEAudioUnitFilter.m */; };
 		7A56871B1B54617200243427 /* AEAudioUnitChannel.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C99588416BB74720011FB01 /* AEAudioUnitChannel.m */; };
@@ -67,6 +67,10 @@
 		7A5687311B5461BE00243427 /* AEFloatConverter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C8AED0216B3644500958034 /* AEFloatConverter.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		7A5687321B5461BE00243427 /* AEAudioFileLoaderOperation.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C49FE30153DC21A008725E0 /* AEAudioFileLoaderOperation.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		7A5687341B5461BE00243427 /* AEBlockScheduler.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C0944FF16FBD7460054608E /* AEBlockScheduler.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		F9C23C1E1BA979050060718F /* AEAsyncMessageQueue.h in Headers */ = {isa = PBXBuildFile; fileRef = F9C23C1C1BA979050060718F /* AEAsyncMessageQueue.h */; };
+		F9C23C1F1BA979050060718F /* AEAsyncMessageQueue.h in Headers */ = {isa = PBXBuildFile; fileRef = F9C23C1C1BA979050060718F /* AEAsyncMessageQueue.h */; };
+		F9C23C201BA979050060718F /* AEAsyncMessageQueue.m in Sources */ = {isa = PBXBuildFile; fileRef = F9C23C1D1BA979050060718F /* AEAsyncMessageQueue.m */; };
+		F9C23C211BA979050060718F /* AEAsyncMessageQueue.m in Sources */ = {isa = PBXBuildFile; fileRef = F9C23C1D1BA979050060718F /* AEAsyncMessageQueue.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -133,6 +137,8 @@
 		B0EE36FF1AD4270400D7AB17 /* AESequencerChannel.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AESequencerChannel.m; sourceTree = "<group>"; };
 		B0EE37001AD4270400D7AB17 /* AESequencerChannelSequence.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AESequencerChannelSequence.h; sourceTree = "<group>"; };
 		B0EE37011AD4270400D7AB17 /* AESequencerChannelSequence.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AESequencerChannelSequence.m; sourceTree = "<group>"; };
+		F9C23C1C1BA979050060718F /* AEAsyncMessageQueue.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEAsyncMessageQueue.h; sourceTree = "<group>"; };
+		F9C23C1D1BA979050060718F /* AEAsyncMessageQueue.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEAsyncMessageQueue.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -235,6 +241,8 @@
 				4CAD56AA15163488003CE861 /* AEAudioFilePlayer.m */,
 				4C38DC5315458AB1009F4454 /* AEAudioFileWriter.h */,
 				4C38DC5415458AB1009F4454 /* AEAudioFileWriter.m */,
+				F9C23C1C1BA979050060718F /* AEAsyncMessageQueue.h */,
+				F9C23C1D1BA979050060718F /* AEAsyncMessageQueue.m */,
 				4C12CC98151D1EDA00562E2A /* AEUtilities.h */,
 				4C12CC99151D1EDA00562E2A /* AEUtilities.m */,
 				4C4B11F216833FDD00A3BA2E /* AEBlockChannel.h */,
@@ -282,6 +290,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4C215D121523A94200D36CAD /* TheAmazingAudioEngine.h in Headers */,
+				F9C23C1E1BA979050060718F /* AEAsyncMessageQueue.h in Headers */,
 				4C2886381556FC620074175A /* AEAudioController+Audiobus.h in Headers */,
 				4C215D131523A94200D36CAD /* AEAudioController.h in Headers */,
 				4C49FE32153DC21A008725E0 /* AEAudioFileLoaderOperation.h in Headers */,
@@ -303,6 +312,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7A5687251B5461BE00243427 /* TheAmazingAudioEngine.h in Headers */,
+				F9C23C1F1BA979050060718F /* AEAsyncMessageQueue.h in Headers */,
 				7A5687261B5461BE00243427 /* AEAudioController.h in Headers */,
 				7A5687271B5461BE00243427 /* AEAudioController+Audiobus.h in Headers */,
 				7A5687291B5461BE00243427 /* AEAudioFilePlayer.h in Headers */,
@@ -407,6 +417,7 @@
 				4C99588616BB74720011FB01 /* AEAudioUnitChannel.m in Sources */,
 				4C99588E16C0825F0011FB01 /* AEAudioUnitFilter.m in Sources */,
 				4C456B8E16D59365008ED99D /* AEBlockAudioReceiver.m in Sources */,
+				F9C23C201BA979050060718F /* AEAsyncMessageQueue.m in Sources */,
 				4C09450216FBD7460054608E /* AEBlockScheduler.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -419,7 +430,7 @@
 				7A5687151B54617200243427 /* AEAudioController+Audiobus.m in Sources */,
 				7A5687161B54617200243427 /* AEAudioFilePlayer.m in Sources */,
 				7A5687171B54617200243427 /* AEAudioFileWriter.m in Sources */,
-				7A5687181B54617200243427 /* AEUtilities.c in Sources */,
+				7A5687181B54617200243427 /* AEUtilities.m in Sources */,
 				7A5687191B54617200243427 /* AEBlockChannel.m in Sources */,
 				7A56871A1B54617200243427 /* AEAudioUnitFilter.m in Sources */,
 				7A56871B1B54617200243427 /* AEAudioUnitChannel.m in Sources */,
@@ -429,6 +440,7 @@
 				7A56871F1B54617200243427 /* AEAudioFileLoaderOperation.m in Sources */,
 				7A5687201B54617200243427 /* TPCircularBuffer.c in Sources */,
 				7A5687221B54618B00243427 /* TPCircularBuffer+AudioBufferList.c in Sources */,
+				F9C23C211BA979050060718F /* AEAsyncMessageQueue.m in Sources */,
 				7A5687211B54617200243427 /* AEBlockScheduler.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
