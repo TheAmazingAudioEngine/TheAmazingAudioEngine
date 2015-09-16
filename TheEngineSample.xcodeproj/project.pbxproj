@@ -40,7 +40,7 @@
 		4C7C680F16F1609800721E60 /* README.markdown in Resources */ = {isa = PBXBuildFile; fileRef = 4C7C680416F1609800721E60 /* README.markdown */; };
 		4C7C681016F1609800721E60 /* TPCircularBuffer+AudioBufferList.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C7C680516F1609800721E60 /* TPCircularBuffer+AudioBufferList.c */; };
 		4C7C681116F1609800721E60 /* TPCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C7C680716F1609800721E60 /* TPCircularBuffer.c */; };
-		4CEC739B1BA7C78000C90FC7 /* Launch Screen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 4CEC739A1BA7C78000C90FC7 /* Launch Screen.storyboard */; settings = {ASSET_TAGS = (); }; };
+		4CCF896B1BA96D880045E575 /* Launch Screen.xib in Resources */ = {isa = PBXBuildFile; fileRef = 4CCF896A1BA96D880045E575 /* Launch Screen.xib */; };
 		7A532D2B1B7C6FA8006056DB /* AEPlaythroughChannel.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C7C680016F1609800721E60 /* AEPlaythroughChannel.m */; };
 		7A8D23151B72AF9E0054D2B2 /* libTheAmazingAudioEngine OS X.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 7A8D22F01B72AF250054D2B2 /* libTheAmazingAudioEngine OS X.a */; };
 		7A8D23321B72B4DD0054D2B2 /* AELimiter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C7C67FA16F1609800721E60 /* AELimiter.m */; };
@@ -130,7 +130,7 @@
 		4C7C680616F1609800721E60 /* TPCircularBuffer+AudioBufferList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "TPCircularBuffer+AudioBufferList.h"; sourceTree = "<group>"; };
 		4C7C680716F1609800721E60 /* TPCircularBuffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = TPCircularBuffer.c; sourceTree = "<group>"; };
 		4C7C680816F1609800721E60 /* TPCircularBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TPCircularBuffer.h; sourceTree = "<group>"; };
-		4CEC739A1BA7C78000C90FC7 /* Launch Screen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = "Launch Screen.storyboard"; path = "iOS/Launch Screen.storyboard"; sourceTree = "<group>"; };
+		4CCF896A1BA96D880045E575 /* Launch Screen.xib */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.xib; name = "Launch Screen.xib"; path = "iOS/Launch Screen.xib"; sourceTree = "<group>"; };
 		7A8D22F51B72AF5C0054D2B2 /* TheEngineSampleOSX.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TheEngineSampleOSX.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -200,7 +200,7 @@
 				4C50FEF81B75883D00E56620 /* main.m */,
 				4C50FEFA1B75883D00E56620 /* TheEngineSample-Prefix.pch */,
 				4C50FF071B7588BC00E56620 /* Images.xcassets */,
-				4CEC739A1BA7C78000C90FC7 /* Launch Screen.storyboard */,
+				4CCF896A1BA96D880045E575 /* Launch Screen.xib */,
 			);
 			name = "Supporting Files";
 			sourceTree = "<group>";
@@ -414,11 +414,11 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				4CEC739B1BA7C78000C90FC7 /* Launch Screen.storyboard in Resources */,
 				4C7C680F16F1609800721E60 /* README.markdown in Resources */,
 				4C50FF111B758B5B00E56620 /* Organ Run.m4a in Resources */,
 				4C50FF081B7588BC00E56620 /* Images.xcassets in Resources */,
 				4C50FF151B758B5B00E56620 /* Southern Rock Organ.m4a in Resources */,
+				4CCF896B1BA96D880045E575 /* Launch Screen.xib in Resources */,
 				4C50FF131B758B5B00E56620 /* Southern Rock Drums.m4a in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
