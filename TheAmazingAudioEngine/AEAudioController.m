@@ -232,8 +232,6 @@ typedef struct {
     AudioUnit           _ioAudioUnit;
     BOOL                _started;
     BOOL                _interrupted;
-    BOOL                _inputEnabled;
-    BOOL                _outputEnabled;
     BOOL                _hardwareInputAvailable;
     BOOL                _hasSystemError;
 #if !TARGET_OS_IPHONE
@@ -279,6 +277,8 @@ typedef struct {
 - (BOOL)updateInputDeviceStatus;
 
 @property (nonatomic, assign, readwrite) NSTimeInterval currentBufferDuration;
+@property (nonatomic, readwrite) BOOL inputEnabled;
+@property (nonatomic, readwrite) BOOL outputEnabled;
 @property (nonatomic, strong) NSError *lastError;
 #if TARGET_OS_IPHONE
 @property (nonatomic, strong) NSTimer *housekeepingTimer;
@@ -901,75 +901,63 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(interruptionNotification:) name:AVAudioSessionInterruptionNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(audioRouteChangeNotification:) name:AVAudioSessionRouteChangeNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(mediaServiceResetNotification:) name:AVAudioSessionMediaServicesWereResetNotification object:nil];
-
+    
+    // Start housekeeping timer
+    self.housekeepingTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:[[AEAudioControllerProxy alloc] initWithAudioController:self] selector:@selector(housekeeping) userInfo:nil repeats:YES];
+#endif
     
     if ( ![self initAudioSession] || ![self setup] ) {
         _audioGraph = NULL;
     }
     
-    self.housekeepingTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:[[AEAudioControllerProxy alloc] initWithAudioController:self] selector:@selector(housekeeping) userInfo:nil repeats:YES];
-#else
-    if ( ![self setup] ) {
-        _audioGraph = NULL;
-    }
-#endif
-
     return self;
 }
 
-
-- (BOOL)updateWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing outputEnabled:(BOOL)enableOutput {
-
+- (BOOL)setAudioDescription:(AudioStreamBasicDescription)audioDescription error:(NSError**)error {
+    if ( !memcmp(&_audioDescription, &audioDescription, sizeof(audioDescription)) ) return YES;
+    
     NSAssert([NSThread isMainThread], @"Should be executed on the main thread");
-
-    BOOL wasStarted = _started;
-    if ( _started ) {
-        [self stopInternal];
-    }
-    [self teardown];
-
-    [NSThread sleepForTimeInterval:0.5];
-
-#if TARGET_OS_IPHONE
-    _audioSessionCategory = enableInput ? (enableOutput ? AVAudioSessionCategoryPlayAndRecord : AVAudioSessionCategoryRecord) : AVAudioSessionCategoryPlayback;
-    _allowMixingWithOtherApps = enableOutput ? YES : NO;
-    _avoidMeasurementModeForBuiltInSpeaker = YES;
-    _boostBuiltInMicGainInMeasurementMode = YES;
-#endif
-    _audioDescription = audioDescription;
-    _inputEnabled = enableInput;
-    _outputEnabled = enableOutput;
-    _masterOutputVolume = 1.0;
-    _voiceProcessingEnabled = useVoiceProcessing;
-    _inputMode = AEInputModeFixedAudioFormat;
-    _voiceProcessingOnlyForSpeakerAndMicrophone = YES;
-
-#if TARGET_OS_IPHONE
-    if ( ![self initAudioSession] || ![self setup] ) {
-        NSLog(@"TAAE: error setting up audio session");
-        _audioGraph = NULL;
-        return NO;
-    }
-#else
-    if ( ![self setup] ) {
-        NSLog(@"TAAE: error with setup");
-        _audioGraph = NULL;
-        return NO;
-    }
-#endif
-
-    if (wasStarted) {
-        if( ![self start:nil] ) {
-            NSLog(@"TAEE: error restarting controller");
-            return NO;
-        }
-    }
-
-    return YES;
+    
+    return [self reinitializeWithChanges:^{
+        [self willChangeValueForKey:@"audioDescription"];
+        _audioDescription = audioDescription;
+        [self didChangeValueForKey:@"audioDescription"];
+    } error:error];
 }
 
+- (BOOL)setInputEnabled:(BOOL)inputEnabled error:(NSError**)error {
+    if ( _inputEnabled == inputEnabled ) return YES;
+    
+    NSAssert([NSThread isMainThread], @"Should be executed on the main thread");
+    
+    return [self reinitializeWithChanges:^{
+        self.inputEnabled = inputEnabled;
+        
+#if TARGET_OS_IPHONE
+        [self setAudioSessionCategory:_inputEnabled
+            ? (_outputEnabled ? AVAudioSessionCategoryPlayAndRecord : AVAudioSessionCategoryRecord)
+            : AVAudioSessionCategoryPlayback];
+#endif
+        
+    } error:error];
+}
 
-
+- (BOOL)setOutputEnabled:(BOOL)outputEnabled error:(NSError**)error {
+    if ( _outputEnabled == outputEnabled ) return YES;
+    
+    NSAssert([NSThread isMainThread], @"Should be executed on the main thread");
+    
+    return [self reinitializeWithChanges:^{
+        self.outputEnabled = outputEnabled;
+        
+#if TARGET_OS_IPHONE
+        [self setAudioSessionCategory:_inputEnabled
+            ? (_outputEnabled ? AVAudioSessionCategoryPlayAndRecord : AVAudioSessionCategoryRecord)
+            : AVAudioSessionCategoryPlayback];
+#endif
+        
+    } error:error];
+}
 
 - (void)dealloc {
     __AEAllocated = NO;
@@ -1196,7 +1184,9 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
         channelElement->volume      = [channel respondsToSelector:@selector(volume)] ? channel.volume : 1.0;
         channelElement->pan         = [channel respondsToSelector:@selector(pan)] ? channel.pan : 0.0;
         channelElement->muted       = [channel respondsToSelector:@selector(channelIsMuted)] ? channel.channelIsMuted : NO;
-        channelElement->audioDescription = [channel respondsToSelector:@selector(audioDescription)] && channel.audioDescription.mSampleRate ? channel.audioDescription : _audioDescription;
+        if ( [channel respondsToSelector:@selector(audioDescription)] && channel.audioDescription.mSampleRate ) {
+            channelElement->audioDescription = channel.audioDescription;
+        }
         memset(&channelElement->timeStamp, 0, sizeof(channelElement->timeStamp));
         channelElement->audioController = (__bridge void*)self;
         
@@ -2327,7 +2317,7 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
     } else {
         channelElement->audiobusSenderPort = (__bridge_retained void*)audiobusSenderPort;
         if ( !channelElement->audiobusFloatConverter ) {
-            channelElement->audiobusFloatConverter = (__bridge_retained void*)[[AEFloatConverter alloc] initWithSourceFormat:channelElement->audioDescription];
+            channelElement->audiobusFloatConverter = (__bridge_retained void*)[[AEFloatConverter alloc] initWithSourceFormat:channelElement->audioDescription.mSampleRate ? channelElement->audioDescription : _audioDescription];
         }
         if ( !channelElement->audiobusScratchBuffer ) {
             channelElement->audiobusScratchBuffer = AEAllocateAndInitAudioBufferList(((__bridge AEFloatConverter*)channelElement->audiobusFloatConverter).floatingPointAudioDescription, kScratchBufferFrames);
@@ -2610,18 +2600,16 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 
 #pragma mark - Graph and audio session configuration
 
-#if TARGET_OS_IPHONE
 - (BOOL)initAudioSession {
+#if TARGET_OS_IPHONE
+
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     NSMutableString *extraInfo = [NSMutableString string];
     NSError *error = nil;
     
-    UInt32 inputAvailable = NO;
-    if ( _inputEnabled ) {
-        // See if input's available
-        inputAvailable = audioSession.inputAvailable;
-        if ( inputAvailable ) [extraInfo appendFormat:@", input available"];
-    }
+    // See if input's available
+    BOOL inputAvailable = audioSession.inputAvailable;
+    if ( inputAvailable ) [extraInfo appendFormat:@", input available"];
     _audioInputAvailable = _hardwareInputAvailable = inputAvailable;
     
     // Set category
@@ -2666,9 +2654,10 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     if ( _currentBufferDuration != bufferDuration ) self.currentBufferDuration = bufferDuration;
     
     NSLog(@"TAAE: Audio session initialized (%@) HW samplerate: %g", [extraInfo stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@", "]], achievedSampleRate);
+#endif
+    
     return YES;
 }
-#endif
 
 - (BOOL)setup {
     // Create a new AUGraph
@@ -2775,6 +2764,34 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     }
     
     NSLog(@"TAAE: Engine setup");
+    
+    return YES;
+}
+
+- (BOOL)reinitializeWithChanges:(void(^)())block error:(NSError**)error {
+    BOOL wasStarted = _started;
+    if ( _started ) {
+        [self stopInternal];
+    }
+    [self teardown];
+    
+    block();
+    
+    if ( ![self initAudioSession] || ![self setup] ) {
+        NSLog(@"TAAE: error setting up audio session");
+        _audioGraph = NULL;
+        return NO;
+    }
+    
+    [self sendSetupToChannelsAndFilters];
+    [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerDidRecreateGraphNotification object:self];
+    
+    if ( wasStarted ) {
+        if ( ![self start:error] ) {
+            NSLog(@"TAAE: Error restarting controller");
+            return NO;
+        }
+    }
     
     return YES;
 }
@@ -3015,6 +3032,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     }
     
     if ( _topGroup ) {
+        _topChannel->setRenderNotification = NO;
         [self markGroupTorndown:_topGroup];
     }
 }
@@ -3719,7 +3737,8 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
             
             if ( upstreamInteraction.nodeInteractionType == kAUNodeInteraction_InputCallback ) {
                 // Set audio description
-                AECheckOSStatus(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, i, &channel->audioDescription, sizeof(channel->audioDescription)),
+                AudioStreamBasicDescription audioDescription = channel->audioDescription.mSampleRate ? channel->audioDescription : _audioDescription;
+                AECheckOSStatus(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, i, &audioDescription, sizeof(audioDescription)),
                             "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)");
             }
         }
@@ -3912,6 +3931,7 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
     for ( int i=0; i<group->channelCount; i++ ) {
         AEChannelRef channel = group->channels[i];
         if ( !channel ) continue;
+        channel->setRenderNotification = NO;
         if ( channel->type == kChannelTypeGroup ) {
             [self markGroupTorndown:(AEChannelGroupRef)channel->ptr];
         }
@@ -3934,11 +3954,7 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
         
         [NSThread sleepForTimeInterval:0.5];
 
-#if TARGET_OS_IPHONE
         if ( [self initAudioSession] && [self setup] ) {
-#else
-        if ( [self setup] ) {
-#endif
             [self sendSetupToChannelsAndFilters];
             [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerDidRecreateGraphNotification object:self];
             

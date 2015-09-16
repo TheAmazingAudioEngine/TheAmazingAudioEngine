@@ -229,7 +229,7 @@ static const int kInputChannelsChangedContext;
             return 3;
             
         case 3:
-            return 3 + (_audioController.numberOfInputChannels > 1 ? 1 : 0);
+            return 4 + (_audioController.numberOfInputChannels > 1 ? 1 : 0);
             
         default:
             return 0;
@@ -386,6 +386,12 @@ static const int kInputChannelsChangedContext;
                     break;
                 }
                 case 3: {
+                    cell.textLabel.text = @"Use 48K Audio";
+                    ((UISwitch*)cell.accessoryView).on = fabs(_audioController.audioDescription.mSampleRate - 48000) < 1.0;
+                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(sampleRateSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                    break;
+                }
+                case 4: {
                     cell.textLabel.text = @"Channels";
                     
                     int channelCount = _audioController.numberOfInputChannels;
@@ -539,6 +545,19 @@ static const int kInputChannelsChangedContext;
 
 - (void)measurementModeSwitchChanged:(UISwitch*)sender {
     _audioController.useMeasurementMode = sender.on;
+}
+
+- (void)sampleRateSwitchChanged:(UISwitch*)sender {
+    AudioStreamBasicDescription audioDescription = _audioController.audioDescription;
+    audioDescription.mSampleRate = sender.on ? 48000 : 44100;
+    NSError * error;
+    if ( ![_audioController setAudioDescription:audioDescription error:&error] ) {
+        [[[UIAlertView alloc] initWithTitle:@"Sample rate change failed"
+                                    message:error.localizedDescription
+                                   delegate:nil
+                          cancelButtonTitle:nil
+                          otherButtonTitles:@"OK", nil] show];
+    }
 }
 
 -(void)inputGainSliderChanged:(UISlider*)slider {

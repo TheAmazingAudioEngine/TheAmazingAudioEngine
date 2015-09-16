@@ -569,9 +569,6 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
  */
 - (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing outputEnabled:(BOOL)enableOutput;
 
-
-- (BOOL)updateWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing outputEnabled:(BOOL)enableOutput;
-
 /*!
  * Start audio engine
  *
@@ -584,6 +581,42 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
  * Stop audio engine
  */
 - (void)stop;
+
+/*!
+ * Set a new audio description
+ *
+ *  This will cause the audio controller to stop, teardown and recreate its rendering resources,
+ *  then start again (if it was previously running).
+ *
+ * @param audioDescription The new audio description
+ * @param error On output, the error, if one occurred
+ * @result YES on success, NO on failure
+ */
+- (BOOL)setAudioDescription:(AudioStreamBasicDescription)audioDescription error:(NSError**)error;
+
+/*!
+ * Enable or disable input
+ *
+ *  This will cause the audio controller to stop, teardown and recreate its rendering resources,
+ *  then start again (if it was previously running).
+ *
+ * @param inputEnabled Whether to enable input
+ * @param error On output, the error, if one occurred
+ * @result YES on success, NO on failure
+ */
+- (BOOL)setInputEnabled:(BOOL)inputEnabled error:(NSError**)error;
+
+/*!
+ * Enable or disable output
+ *
+ *  This will cause the audio controller to stop, teardown and recreate its rendering resources,
+ *  then start again (if it was previously running).
+ *
+ * @param outputEnabled Whether to enable output
+ * @param error On output, the error, if one occurred
+ * @result YES on success, NO on failure
+ */
+- (BOOL)setOutputEnabled:(BOOL)outputEnabled error:(NSError**)error;
 
 ///@}
 #pragma mark - Channel and channel group management
@@ -1450,6 +1483,20 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
  *  Note: This property is observable
  */
 @property (nonatomic, readonly) BOOL audioInputAvailable;
+
+/*!
+ * Whether audio input is currently enabled
+ *
+ *  Note: This property is observable
+ */
+@property (nonatomic, readonly) BOOL inputEnabled;
+
+/*!
+ * Whether audio output is currently available
+ *
+ *  Note: This property is observable
+ */
+@property (nonatomic, readonly) BOOL outputEnabled;
 
 /*!
  * The number of audio channels that the current audio input device provides
