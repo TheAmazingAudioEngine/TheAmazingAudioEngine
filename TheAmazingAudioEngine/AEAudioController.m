@@ -1720,6 +1720,7 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
 
 -(void)pollForMessageResponses {
     pthread_t thread = pthread_self();
+    BOOL isMainThread = [NSThread isMainThread];
     while ( 1 ) {
         message_t *message = NULL;
         @synchronized ( self ) {
@@ -1740,7 +1741,7 @@ static void processPendingMessagesOnRealtimeThread(__unsafe_unretained AEAudioCo
                 if ( !buffer->replyServiced ) {
                     // This is a message that hasn't yet been serviced
                     
-                    if ( buffer->sourceThread && buffer->sourceThread != thread ) {
+                    if ( (buffer->sourceThread && buffer->sourceThread != thread) && (buffer->sourceThread == NULL && !isMainThread) ) {
                         // Skip this message, it's for a different thread
                         hasUnservicedMessages = YES;
                     } else {
