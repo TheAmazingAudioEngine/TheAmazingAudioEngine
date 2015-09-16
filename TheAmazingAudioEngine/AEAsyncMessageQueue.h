@@ -119,8 +119,9 @@ void AEAsyncMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEAs
  *  You may pass information from the realtime thread to the calling thread via the use of __block variables.
  *
  * @param block         A block to be performed on the realtime thread.
+ * @return              YES if the block could be performed, NO otherwise.
  */
-- (void)performSynchronousMessageExchangeWithBlock:(void (^)())block;
+- (BOOL)performSynchronousMessageExchangeWithBlock:(void (^)())block;
 
 /*!
  * Send a message to the main thread asynchronously

@@ -152,6 +152,7 @@ void AEAsyncMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEAs
 -(void)pollForMessageResponses {
     pthread_t thread = pthread_self();
     BOOL isMainThread = [NSThread isMainThread];
+
     while ( 1 ) {
         message_t *message = NULL;
         @synchronized ( self ) {
@@ -168,7 +169,7 @@ void AEAsyncMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEAs
             // Look through pending messages
             while ( buffer < bufferEnd && !message ) {
                 int messageLength = sizeof(message_t) + (buffer->userInfoLength && !buffer->userInfoByReference ? buffer->userInfoLength : 0);
-                
+
                 if ( !buffer->replyServiced ) {
                     // This is a message that hasn't yet been serviced
                     
@@ -258,7 +259,7 @@ void AEAsyncMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEAs
     [self performAsynchronousMessageExchangeWithBlock:block responseBlock:responseBlock sourceThread:NULL];
 }
 
-- (void)performSynchronousMessageExchangeWithBlock:(void (^)())block {
+- (BOOL)performSynchronousMessageExchangeWithBlock:(void (^)())block {
     __block BOOL finished = NO;
     [self performAsynchronousMessageExchangeWithBlock:block
                                         responseBlock:^{ finished = YES; }
@@ -275,6 +276,7 @@ void AEAsyncMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEAs
     if ( !finished ) {
         NSLog(@"AEAsyncMessageQueue: Timed out while performing synchronous message exchange");
     }
+    return finished;
 }
 
 void AEAsyncMessageQueueSendMessageToMainThread(__unsafe_unretained AEAsyncMessageQueue *THIS,
