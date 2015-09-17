@@ -30,9 +30,9 @@ extern "C" {
 #import <AudioToolbox/AudioToolbox.h>
 #import <AudioUnit/AudioUnit.h>
 #import <Foundation/Foundation.h>
+#import "AEMessageQueue.h"
 
 @class AEAudioController;
-@class AEMessageQueue;
 
 #pragma mark - Notifications and constants
 
@@ -464,15 +464,6 @@ typedef void (*AEAudioControllerTimingCallback) (__unsafe_unretained id    recei
 typedef struct _channel_group_t* AEChannelGroupRef;
 
 @class AEAudioController;
-
-/*!
- * Message handler function
- *
- * @param audioController   The audio controller
- * @param userInfo          Pointer to your data
- * @param userInfoLength    Length of userInfo in bytes
- */
-typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AEAudioController *audioController, void *userInfo, int userInfoLength);
 
 #pragma mark -
 
@@ -1154,11 +1145,34 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
  * Send a message to the main thread asynchronously
  *
  *  This is a synchronization mechanism that allows you to schedule actions to be performed 
- *  on the main thread, without any locking or memory allocation.  Pass in a function pointer
+ *  on the main thread, without any locking or memory allocation.  Pass in a function pointer and
  *  optionally a pointer to data to be copied and passed to the handler, and the function will 
  *  be called on the realtime thread at the next polling interval.
  *
- *  This function forwards to the AEMessageQueue object available in the messageQueue property.
+ *  Tip: To pass a pointer (including pointers to __unsafe_unretained Objective-C objects) through the
+ *  userInfo parameter, be sure to pass the address to the pointer, using the "&" prefix:
+ *
+ *  <code>
+ *  AEMessageQueueSendMessageToMainThread(queue, myMainThreadFunction, &pointer, sizeof(void*));
+ *  </code>
+ *
+ *  or
+ *
+ *  <code>
+ *  AEMessageQueueSendMessageToMainThread(queue, myMainThreadFunction, &object, sizeof(MyObject*));
+ *  </code>
+ *
+ *  You can then retrieve the pointer value via a void** dereference from your function:
+ *
+ *  <code>
+ *  void * myPointerValue = *(void**)userInfo;
+ *  </code>
+ *
+ *  To access an Objective-C object pointer, you also need to bridge the pointer value:
+ *
+ *  <code>
+ *  MyObject *object = (__bridge MyObject*)*(void**)userInfo;
+ *  </code>
  *
  * @param audioController The audio controller.
  * @param handler         A pointer to a function to call on the main thread.
@@ -1166,10 +1180,9 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
  * @param userInfoLength  Length of userInfo in bytes.
  */
 void AEAudioControllerSendAsynchronousMessageToMainThread(__unsafe_unretained AEAudioController *audioController,
-                                                          AEAudioControllerMainThreadMessageHandler    handler, 
-                                                          void                              *userInfo,
-                                                          int                                userInfoLength);
-
+                                                          AEMessageQueueMessageHandler           handler,
+                                                          void                                  *userInfo,
+                                                          int                                    userInfoLength);
 
 ///@}
 #pragma mark - Metering

@@ -178,7 +178,7 @@ typedef void (^AECalibrateCompletionBlock)(void);
     return _hysteresis_db;
 }
 
-static void completeCalibration(AEAudioController *audioController, void *userInfo, int len) {
+static void completeCalibration(void *userInfo, int len) {
     AEExpanderFilter *THIS = (__bridge AEExpanderFilter*)*(void**)userInfo;
     THIS->_threshold = min((THIS->_calibrationMaxValue + ratio_from_db(kCalibrationThresholdOffset)),
                            ratio_from_db(kMaxAutoThreshold)) * THIS->_thresholdOffset;

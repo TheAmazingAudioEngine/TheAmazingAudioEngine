@@ -37,7 +37,6 @@ typedef struct {
     void                           *block;
     void                           *responseBlock;
     AEMessageQueueMessageHandler    handler;
-    void                           *userInfoByReference;
     int                             userInfoLength;
     pthread_t                       sourceThread;
     BOOL                            replyServiced;
@@ -158,7 +157,7 @@ void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessage
             
             // Look through pending messages
             while ( buffer < bufferEnd && !message ) {
-                int messageLength = sizeof(message_t) + (buffer->userInfoLength && !buffer->userInfoByReference ? buffer->userInfoLength : 0);
+                int messageLength = sizeof(message_t) + buffer->userInfoLength;
 
                 if ( !buffer->replyServiced ) {
                     // This is a message that hasn't yet been serviced
@@ -197,10 +196,7 @@ void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessage
                 _pollThread.pollInterval = kIdleMessagingPollDuration;
             }
         } else if ( message->handler ) {
-            message->handler(self, 
-                             message->userInfoLength > 0
-                             ? (message->userInfoByReference ? message->userInfoByReference : message+1) 
-                             : NULL, 
+            message->handler(message->userInfoLength > 0 ? message+1 : NULL,
                              message->userInfoLength);
         }
         

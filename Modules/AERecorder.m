@@ -112,7 +112,7 @@ void AERecorderStopRecording(__unsafe_unretained AERecorder* THIS) {
 }
 
 struct reportError_t { void *THIS; OSStatus result; };
-static void reportError(AEAudioController *audioController, void *userInfo, int length) {
+static void reportError(void *userInfo, int length) {
     struct reportError_t *arg = userInfo;
     [((__bridge AERecorder*)arg->THIS) finishRecording];
     NSError *error = [NSError errorWithDomain:NSOSStatusErrorDomain 

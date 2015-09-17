@@ -279,7 +279,7 @@ static OSStatus AEAudioFilePlayerRenderNotify(void * inRefCon,
     return noErr;
 }
 
-static void AEAudioFilePlayerNotifyCompletion(__unsafe_unretained AEAudioController *audioController, void *userInfo, int userInfoLength) {
+static void AEAudioFilePlayerNotifyCompletion(void *userInfo, int userInfoLength) {
     AEAudioFilePlayer *THIS = (__bridge AEAudioFilePlayer*)*(void**)userInfo;
     if ( !OSAtomicCompareAndSwap32(YES, NO, &THIS->_playbackStoppedCallbackScheduled) ) {
         // We've been pre-empted by another scheduled callback: bail for now

@@ -1641,11 +1641,10 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 }
 
 void AEAudioControllerSendAsynchronousMessageToMainThread(__unsafe_unretained AEAudioController *THIS,
-                                                          AEAudioControllerMainThreadMessageHandler handler,
-                                                          void                              *userInfo,
-                                                          int                                userInfoLength) {
-    AEMessageQueueSendMessageToMainThread(THIS->_messageQueue,
-                                          (AEMessageQueueMessageHandler)handler, userInfo, userInfoLength);
+                                                          AEMessageQueueMessageHandler           handler,
+                                                          void                                  *userInfo,
+                                                          int                                    userInfoLength) {
+    AEMessageQueueSendMessageToMainThread(THIS->_messageQueue, handler, userInfo, userInfoLength);
 }
 
 #pragma mark - Metering

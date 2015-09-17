@@ -187,7 +187,7 @@ struct _schedule_t {
 }
 
 struct _timingReceiverFinishSchedule_t { struct _schedule_t schedule; void *THIS; };
-static void timingReceiverFinishSchedule(AEAudioController *audioController, void *userInfo, int len) {
+static void timingReceiverFinishSchedule(void *userInfo, int len) {
     struct _timingReceiverFinishSchedule_t *arg = (struct _timingReceiverFinishSchedule_t*)userInfo;
     __unsafe_unretained AEBlockScheduler *THIS = (__bridge AEBlockScheduler*)arg->THIS;
     

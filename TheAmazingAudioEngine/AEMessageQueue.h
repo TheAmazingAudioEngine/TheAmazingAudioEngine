@@ -36,11 +36,12 @@
  *  @link AEMessageQueueSendMessageToMainThread @endlink on the realtime thread,
  *  along with data to pass through via the userInfo parameter.
  *
- * @param messageQueue      The message queue
+ *  See @link AEMessageQueueSendMessageToMainThread @endlink for further discussion.
+ *
  * @param userInfo          Pointer to your data
  * @param userInfoLength    Length of userInfo in bytes
  */
-typedef void (*AEMessageQueueMessageHandler)(AEMessageQueue *messageQueue, void *userInfo, int userInfoLength);
+typedef void (*AEMessageQueueMessageHandler)(void *userInfo, int userInfoLength);
 
 /*!
  * Message Queue
@@ -137,6 +138,31 @@ typedef void (*AEMessageQueueMessageHandler)(AEMessageQueue *messageQueue, void 
  *  optionally a pointer to data to be copied and passed to the handler, and the function will 
  *  be called on the main thread at the next polling interval.
  *
+ *  Tip: To pass a pointer (including pointers to __unsafe_unretained Objective-C objects) through the 
+ *  userInfo parameter, be sure to pass the address to the pointer, using the "&" prefix:
+ *
+ *  <code>
+ *  AEMessageQueueSendMessageToMainThread(queue, myMainThreadFunction, &pointer, sizeof(void*));
+ *  </code>
+ *
+ *  or
+ *
+ *  <code>
+ *  AEMessageQueueSendMessageToMainThread(queue, myMainThreadFunction, &object, sizeof(MyObject*));
+ *  </code>
+ *
+ *  You can then retrieve the pointer value via a void** dereference from your function:
+ *
+ *  <code>
+ *  void * myPointerValue = *(void**)userInfo;
+ *  </code>
+ *
+ *  To access an Objective-C object pointer, you also need to bridge the pointer value:
+ *
+ *  <code>
+ *  MyObject *object = (__bridge MyObject*)*(void**)userInfo;
+ *  </code>
+ *
  * @param audioController The audio controller.
  * @param handler         A pointer to a function to call on the main thread.
  * @param userInfo        Pointer to user info data to pass to handler - this will be copied.
@@ -144,8 +170,8 @@ typedef void (*AEMessageQueueMessageHandler)(AEMessageQueue *messageQueue, void 
  */
 void AEMessageQueueSendMessageToMainThread(AEMessageQueue               *messageQueue,
                                            AEMessageQueueMessageHandler  handler,
-                                           void                              *userInfo,
-                                           int                                userInfoLength);
+                                           void                         *userInfo,
+                                           int                           userInfoLength);
 
 /*!
  * Timeout for when realtime message blocks should be executed automatically
