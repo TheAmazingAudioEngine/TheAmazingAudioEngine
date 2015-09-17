@@ -57,7 +57,7 @@ extern "C" {
  * @return The initialised filter
  */
 - (id)initWithComponentDescription:(AudioComponentDescription)audioComponentDescription
-                preInitializeBlock:(void(^)(AudioUnit audioUnit))block;
+                preInitializeBlock:(void(^)(AudioUnit audioUnit))preInitializeBlock;
 
 /*!
  * Retrieve audio unit reference

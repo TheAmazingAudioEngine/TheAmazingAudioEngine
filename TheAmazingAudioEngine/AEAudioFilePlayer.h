@@ -66,7 +66,7 @@ extern "C" {
  *
  *  For use on the realtime thread.
  *
- * @param The player
+ * @param filePlayer The player
  */
 UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * filePlayer);
 

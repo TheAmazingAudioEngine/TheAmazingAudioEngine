@@ -33,10 +33,11 @@
  *
  *  Create functions of this type in order to handle messages from the realtime thread
  *  on the main thread. You then pass a pointer to these functions when using
- *  @link AEMessageQueueSendMessageToMainThread @endlink on the realtime thread,
- *  along with data to pass through via the userInfo parameter.
+ *  @link AEMessageQueue::AEMessageQueueSendMessageToMainThread AEMessageQueueSendMessageToMainThread @endlink 
+ *  on the realtime thread, along with data to pass through via the userInfo parameter.
  *
- *  See @link AEMessageQueueSendMessageToMainThread @endlink for further discussion.
+ *  See @link AEMessageQueue::AEMessageQueueSendMessageToMainThread AEMessageQueueSendMessageToMainThread @endlink
+ *  for further discussion.
  *
  * @param userInfo          Pointer to your data
  * @param userInfoLength    Length of userInfo in bytes
@@ -74,9 +75,9 @@ typedef void (*AEMessageQueueMessageHandler)(void *userInfo, int userInfoLength)
  * Start polling for messages from realtime thread to main thread
  *
  *  Call this after or right before starting the realtime thread that calls 
- *  @link AEMessageQueueProcessMessagesOnRealtimeThread @endlink periodically.
+ *  AEMessageQueueProcessMessagesOnRealtimeThread periodically.
  *  The polling must be active for freeing up message resources, even if you don't
- *  explicitly use any responseBlocks or @link AEMessageQueueSendMessageToMainThread @endlink.
+ *  explicitly use any responseBlocks or AEMessageQueueSendMessageToMainThread.
  */
 - (void)startPolling;
 
@@ -91,7 +92,7 @@ typedef void (*AEMessageQueueMessageHandler)(void *userInfo, int userInfoLength)
  *  This is a synchronization mechanism that allows you to schedule actions to be performed 
  *  on the realtime thread without any locking mechanism required. Pass in a block, and
  *  the block will be performed on the realtime thread at the next call to 
- *  @link AEMessageQueueProcessMessagesOnRealtimeThread @endlink.
+ *  AEMessageQueueProcessMessagesOnRealtimeThread.
  *
  *  Important: Do not interact with any Objective-C objects inside your block, or hold locks, allocate
  *  memory or interact with the BSD subsystem, as all of these may result in audio glitches due
@@ -114,7 +115,7 @@ typedef void (*AEMessageQueueMessageHandler)(void *userInfo, int userInfoLength)
  *  This is a synchronization mechanism that allows you to schedule actions to be performed 
  *  on the realtime thread without any locking mechanism required. Pass in a block, and
  *  the block will be performed on the realtime thread at the next call to 
- *  @link AEMessageQueueProcessMessagesOnRealtimeThread @endlink.
+ *  AEMessageQueueProcessMessagesOnRealtimeThread.
  *
  *  Important: Do not interact with any Objective-C objects inside your block, or hold locks, allocate
  *  memory or interact with the BSD subsystem, as all of these may result in audio glitches due
@@ -141,29 +142,29 @@ typedef void (*AEMessageQueueMessageHandler)(void *userInfo, int userInfoLength)
  *  Tip: To pass a pointer (including pointers to __unsafe_unretained Objective-C objects) through the 
  *  userInfo parameter, be sure to pass the address to the pointer, using the "&" prefix:
  *
- *  <code>
+ *  @code
  *  AEMessageQueueSendMessageToMainThread(queue, myMainThreadFunction, &pointer, sizeof(void*));
- *  </code>
+ *  @endcode
  *
  *  or
  *
- *  <code>
+ *  @code
  *  AEMessageQueueSendMessageToMainThread(queue, myMainThreadFunction, &object, sizeof(MyObject*));
- *  </code>
+ *  @endcode
  *
  *  You can then retrieve the pointer value via a void** dereference from your function:
  *
- *  <code>
+ *  @code
  *  void * myPointerValue = *(void**)userInfo;
- *  </code>
+ *  @endcode
  *
  *  To access an Objective-C object pointer, you also need to bridge the pointer value:
  *
- *  <code>
+ *  @code
  *  MyObject *object = (__bridge MyObject*)*(void**)userInfo;
- *  </code>
+ *  @endcode
  *
- * @param audioController The audio controller.
+ * @param messageQueue    The message queue instance.
  * @param handler         A pointer to a function to call on the main thread.
  * @param userInfo        Pointer to user info data to pass to handler - this will be copied.
  * @param userInfoLength  Length of userInfo in bytes.

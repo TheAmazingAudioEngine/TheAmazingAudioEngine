@@ -187,13 +187,12 @@ extern "C" {
  - One-shot playback with a block to call upon completion
  - Pan, volume, mute
  
- To use it, call @link AEAudioFilePlayer::audioFilePlayerWithURL:audioController:error: audioFilePlayerWithURL:audioController:error: @endlink,
+ To use it, call @link AEAudioFilePlayer::audioFilePlayerWithURL:error: audioFilePlayerWithURL:error: @endlink,
  like so:
  
  @code
  NSURL *file = [[NSBundle mainBundle] URLForResource:@"Loop" withExtension:@"m4a"];
  self.loop = [AEAudioFilePlayer audioFilePlayerWithURL:file
-                                       audioController:_audioController
                                                  error:NULL];
  @endcode
  
@@ -862,13 +861,13 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  @endcode
  
  To send messages from the Core Audio thread back to the main thread, you need to
- define a C callback, which takes the form defined by @link AEAudioControllerMainThreadMessageHandler @endlink,
+ define a C callback, which takes the form defined by @link AEMessageQueueMessageHandler @endlink,
  then call @link AEAudioController::AEAudioControllerSendAsynchronousMessageToMainThread AEAudioControllerSendAsynchronousMessageToMainThread @endlink, passing a reference to
  any parameters, with the length of the parameters in bytes.
  
  @code
  struct _myHandler_arg_t { int arg1; int arg2; };
- static void myHandler(AEAudioController *audioController, void *userInfo, int userInfoLength) {
+ static void myHandler(void *userInfo, int userInfoLength) {
     struct _myHandler_arg_t *arg = (struct _myHandler_arg_t*)userInfo;
     NSLog(@"On main thread; args are %d and %d", arg->arg1, arg->arg2);
  }
@@ -890,14 +889,14 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  callback you provide.
  
  **Note: This is an important distinction.** The bytes pointed to by the 'userInfo' parameter value are passed by *value*, not by reference.
- To pass a pointer to an instance of an Objective-C class, you need to pass a reference to the pointer.
+ To pass a pointer to an instance of an Objective-C class, you need to pass the address to the pointer to copy using the "&" operator.
  
  This:
  
  @code
  AEAudioControllerSendAsynchronousMessageToMainThread(THIS->_audioController,
                                                       myHandler,
-                                                      &THIS,
+                                                      &object,
                                                       sizeof(id) },
  @endcode
  
@@ -906,8 +905,15 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  @code
  AEAudioControllerSendAsynchronousMessageToMainThread(THIS->_audioController,
                                                       myHandler,
-                                                      THIS,
+                                                      object,
                                                       sizeof(id) },
+ @endcode
+ 
+ To access an Objective-C object pointer from the main thread handler function, you can bridge a 
+ dereferenced `void**` to your object type, like this:
+
+ @code
+ MyObject *object = (__bridge MyObject*)*(void**)userInfo;
  @endcode
   
  @section Timing-Receivers Receiving Time Cues

@@ -224,15 +224,8 @@ typedef OSStatus (*AEAudioControllerRenderCallback) (__unsafe_unretained id    c
 
 @end
 
-/*!
- * @var AEAudioSourceInput
- *  Main audio input
- *
- * @var AEAudioSourceMainOutput
- *  Main audio output
- */
-#define AEAudioSourceInput           ((void*)0x01)
-#define AEAudioSourceMainOutput      ((void*)0x02)
+static void * const AEAudioSourceInput         = ((void*)0x01); //!< Main audio input
+static void * const AEAudioSourceMainOutput    = ((void*)0x02); //!< Main audio output
 
 /*!
  * Audio callback
@@ -1105,7 +1098,7 @@ typedef struct _channel_group_t* AEChannelGroupRef;
  *  been sent. You may exchange information from the realtime thread to the main thread via a
  *  shared data structure (such as a struct, allocated on the heap in advance), or __block variables.
  *
- *  If @link running @endlink is NO, then message blocks will be performed on the main thread instead
+ *  If [running](@ref running) is NO, then message blocks will be performed on the main thread instead
  *  of the realtime thread.
  *
  * @param block         A block to be performed on the realtime thread.
@@ -1131,7 +1124,7 @@ typedef struct _channel_group_t* AEChannelGroupRef;
  *  If all you need is a checkpoint to make sure the Core Audio thread is not mid-render, etc, then
  *  you may pass nil for the block.
  *
- *  If @link running @endlink is NO, then message blocks will be performed on the main thread instead
+ *  If [running](@ref running) is NO, then message blocks will be performed on the main thread instead
  *  of the realtime thread.
  *
  *  If the block is not processed within a timeout interval, this method will return NO.
@@ -1152,27 +1145,27 @@ typedef struct _channel_group_t* AEChannelGroupRef;
  *  Tip: To pass a pointer (including pointers to __unsafe_unretained Objective-C objects) through the
  *  userInfo parameter, be sure to pass the address to the pointer, using the "&" prefix:
  *
- *  <code>
+ *  @code
  *  AEMessageQueueSendMessageToMainThread(queue, myMainThreadFunction, &pointer, sizeof(void*));
- *  </code>
+ *  @endcode
  *
  *  or
  *
- *  <code>
+ *  @code
  *  AEMessageQueueSendMessageToMainThread(queue, myMainThreadFunction, &object, sizeof(MyObject*));
- *  </code>
+ *  @endcode
  *
  *  You can then retrieve the pointer value via a void** dereference from your function:
  *
- *  <code>
+ *  @code
  *  void * myPointerValue = *(void**)userInfo;
- *  </code>
+ *  @endcode
  *
  *  To access an Objective-C object pointer, you also need to bridge the pointer value:
  *
- *  <code>
+ *  @code
  *  MyObject *object = (__bridge MyObject*)*(void**)userInfo;
- *  </code>
+ *  @endcode
  *
  * @param audioController The audio controller.
  * @param handler         A pointer to a function to call on the main thread.
