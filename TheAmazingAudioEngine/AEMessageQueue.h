@@ -1,9 +1,9 @@
 //
-//  AEAsyncMessageQueue.h
+//  AEMessageQueue.h
 //  Extracted and modified from AEAudioController of Michael Tysons 'TheAmazingAudioEngine'
 //
 //  Created by Jonatan Liljedahl on 8/26/15.
-//  Copyright (c) 2015 Jonatan Liljedahl.
+//  Copyright (c) 2015 Jonatan Liljedahl & Michael Tyson.
 //
 //  This software is provided 'as-is', without any express or implied
 //  warranty.  In no event will the authors be held liable for any damages
@@ -26,35 +26,39 @@
 
 #import <Foundation/Foundation.h>
 
-@class AEAsyncMessageQueue;
+@class AEMessageQueue;
 
 /*!
  * Main thread message handler function
+ *
+ *  Create functions of this type in order to handle messages from the realtime thread
+ *  on the main thread. You then pass a pointer to these functions when using
+ *  @link AEMessageQueueSendMessageToMainThread @endlink on the realtime thread,
+ *  along with data to pass through via the userInfo parameter.
  *
  * @param messageQueue      The message queue
  * @param userInfo          Pointer to your data
  * @param userInfoLength    Length of userInfo in bytes
  */
-typedef void (*AEAsyncMessageQueueMessageHandler)(AEAsyncMessageQueue *messageQueue, void *userInfo, int userInfoLength);
-
-@interface AEAsyncMessageQueue : NSObject
+typedef void (*AEMessageQueueMessageHandler)(AEMessageQueue *messageQueue, void *userInfo, int userInfoLength);
 
 /*!
- * Timeout for when realtime message blocks should be executed automatically
+ * Message Queue
  *
- *  If greater than zero and AEAsyncMessageQueueProcessMessagesOnRealtimeThread hasn't been called
- *  in this many seconds, process the messages anyway on an internal thread. Default is zero.
+ *  This class manages a two-way message queue which is used to pass messages back and
+ *  forth between the realtime thread and other threads in your app. This provides for
+ *  an easy lock-free synchronization method, which is important when working with audio.
  *
+ *  @link AEAudioController @endlink contains its own instance of this class, and it's
+ *  best to simply use that. However, you can create your own instance and use it to
+ *  perform actions at particular intervals, such as on beat boundaries.
  */
-@property (nonatomic, assign) NSTimeInterval autoProcessTimeout;
+@interface AEMessageQueue : NSObject
 
 /*!
- * Process pending messages on realtime thread
- *
- *  Call this periodically from the realtime thread to process pending message blocks.
- *
+ * Default initializer
  */
-void AEAsyncMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEAsyncMessageQueue *THIS);
+- (instancetype)init;
 
 /*!
  * Initialize with specified message buffer length
@@ -68,16 +72,15 @@ void AEAsyncMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEAs
 /*!
  * Start polling for messages from realtime thread to main thread
  *
- *  Call this after or right before starting the realtime thread that calls AEAsyncMessageQueueProcessMessagesOnRealtimeThread() periodically.
+ *  Call this after or right before starting the realtime thread that calls 
+ *  @link AEMessageQueueProcessMessagesOnRealtimeThread @endlink periodically.
  *  The polling must be active for freeing up message resources, even if you don't
- *  explicitly use any responseBlocks or AEAsyncMessageQueueSendMessageToMainThread().
- *
+ *  explicitly use any responseBlocks or @link AEMessageQueueSendMessageToMainThread @endlink.
  */
 - (void)startPolling;
 
 /*!
  * Stop polling for messages from realtime thread to main thread
- *
  */
 - (void)stopPolling;
 
@@ -87,15 +90,16 @@ void AEAsyncMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEAs
  *  This is a synchronization mechanism that allows you to schedule actions to be performed 
  *  on the realtime thread without any locking mechanism required. Pass in a block, and
  *  the block will be performed on the realtime thread at the next call to 
- *  AEAsyncMessageQueueProcessMessagesOnRealtimeThread().
+ *  @link AEMessageQueueProcessMessagesOnRealtimeThread @endlink.
  *
  *  Important: Do not interact with any Objective-C objects inside your block, or hold locks, allocate
  *  memory or interact with the BSD subsystem, as all of these may result in audio glitches due
- *  to priority inversion. Also beware of not copying or capturing ARC managed objects inside the block.
+ *  to priority inversion.
  *
  *  If provided, the response block will be called on the main thread after the message has
- *  been processed on the realtime thread. You may exchange information from the realtime thread to the main thread via a
- *  shared data structure (such as a struct, allocated on the heap in advance), or a __block variable.
+ *  been processed on the realtime thread. You may exchange information from the realtime thread to 
+ *  the main thread via a shared data structure (such as a struct, allocated on the heap in advance), 
+ *  or a __block variable.
  *
  * @param block         A block to be performed on the realtime thread.
  * @param responseBlock A block to be performed on the main thread after the handler has been run, or nil.
@@ -109,14 +113,16 @@ void AEAsyncMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEAs
  *  This is a synchronization mechanism that allows you to schedule actions to be performed 
  *  on the realtime thread without any locking mechanism required. Pass in a block, and
  *  the block will be performed on the realtime thread at the next call to 
- *  AEAsyncMessageQueueProcessMessagesOnRealtimeThread().
+ *  @link AEMessageQueueProcessMessagesOnRealtimeThread @endlink.
  *
  *  Important: Do not interact with any Objective-C objects inside your block, or hold locks, allocate
  *  memory or interact with the BSD subsystem, as all of these may result in audio glitches due
- *  to priority inversion. Also beware of not copying or capturing ARC managed objects inside the block.
+ *  to priority inversion.
  *
  *  This method will block the current thread until the block has been processed on the realtime thread.
  *  You may pass information from the realtime thread to the calling thread via the use of __block variables.
+ *
+ *  If the block is not processed within a timeout interval, this method will return NO.
  *
  * @param block         A block to be performed on the realtime thread.
  * @return              YES if the block could be performed, NO otherwise.
@@ -136,9 +142,26 @@ void AEAsyncMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEAs
  * @param userInfo        Pointer to user info data to pass to handler - this will be copied.
  * @param userInfoLength  Length of userInfo in bytes.
  */
-void AEAsyncMessageQueueSendMessageToMainThread(AEAsyncMessageQueue               *messageQueue,
-                                                AEAsyncMessageQueueMessageHandler  handler,
-                                                void                              *userInfo,
-                                                int                                userInfoLength);
+void AEMessageQueueSendMessageToMainThread(AEMessageQueue               *messageQueue,
+                                           AEMessageQueueMessageHandler  handler,
+                                           void                              *userInfo,
+                                           int                                userInfoLength);
+
+/*!
+ * Timeout for when realtime message blocks should be executed automatically
+ *
+ *  If greater than zero and @link AEMessageQueueProcessMessagesOnRealtimeThread @endlink 
+ *  hasn't been called in this many seconds, process the messages anyway on an internal thread. 
+ *
+ *  Default is zero (disabled).
+ */
+@property (nonatomic, assign) NSTimeInterval autoProcessTimeout;
+
+/*!
+ * Process pending messages on realtime thread
+ *
+ *  Call this periodically from the realtime thread to process pending message blocks.
+ */
+void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessageQueue *THIS);
 
 @end

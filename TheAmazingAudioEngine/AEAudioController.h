@@ -32,7 +32,7 @@ extern "C" {
 #import <Foundation/Foundation.h>
 
 @class AEAudioController;
-@class AEAsyncMessageQueue;
+@class AEMessageQueue;
 
 #pragma mark - Notifications and constants
 
@@ -1094,8 +1094,10 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
 /*!
  * The asynchronous message queue used for safe communication between main and realtime thread
  *
+ *  If @link running @endlink is NO, then message blocks passed to this instance will be performed 
+ *  on the main thread instead of the realtime thread.
  */
-@property (nonatomic, readonly, strong) AEAsyncMessageQueue *messageQueue;
+@property (nonatomic, readonly, strong) AEMessageQueue *messageQueue;
 
 /*!
  * Send a message to the realtime thread asynchronously, if running, optionally receiving a response via a block.
@@ -1110,10 +1112,10 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
  *
  *  If provided, the response block will be called on the main thread after the message has
  *  been sent. You may exchange information from the realtime thread to the main thread via a
- *  shared data structure (such as a struct, allocated on the heap in advance).
+ *  shared data structure (such as a struct, allocated on the heap in advance), or __block variables.
  *
- *  If self.running is true, this method forwards to the AEAsyncMessageQueue object available in the messageQueue property,
- *  else it perform the block directly on the calling thread.
+ *  If @link running @endlink is NO, then message blocks will be performed on the main thread instead
+ *  of the realtime thread.
  *
  * @param block         A block to be performed on the realtime thread.
  * @param responseBlock A block to be performed on the main thread after the handler has been run, or nil.
@@ -1138,12 +1140,15 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
  *  If all you need is a checkpoint to make sure the Core Audio thread is not mid-render, etc, then
  *  you may pass nil for the block.
  *
- *  If self.running is true, this method forwards to the AEAsyncMessageQueue object available in the messageQueue property,
- *  else it perform the block directly on the calling thread.
+ *  If @link running @endlink is NO, then message blocks will be performed on the main thread instead
+ *  of the realtime thread.
+ *
+ *  If the block is not processed within a timeout interval, this method will return NO.
  *
  * @param block         A block to be performed on the realtime thread.
+ * @return              YES if the block could be performed, NO otherwise.
  */
-- (void)performSynchronousMessageExchangeWithBlock:(void (^)())block;
+- (BOOL)performSynchronousMessageExchangeWithBlock:(void (^)())block;
 
 /*!
  * Send a message to the main thread asynchronously
@@ -1153,7 +1158,7 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
  *  optionally a pointer to data to be copied and passed to the handler, and the function will 
  *  be called on the realtime thread at the next polling interval.
  *
- *  This function forwards to the AEAsyncMessageQueue object available in the messageQueue property.
+ *  This function forwards to the AEMessageQueue object available in the messageQueue property.
  *
  * @param audioController The audio controller.
  * @param handler         A pointer to a function to call on the main thread.

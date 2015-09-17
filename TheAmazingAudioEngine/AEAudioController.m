@@ -196,6 +196,12 @@ typedef struct _channel_group_t {
     audio_level_monitor_t level_monitor_data;
 } channel_group_t;
 
+/*!
+ * Message queue
+ */
+@interface AEAudioControllerMessageQueue : AEMessageQueue
+@property (nonatomic, weak) AEAudioController * audioController;
+@end
 
 #pragma mark -
 
@@ -531,7 +537,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     if ( *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
         // Before main render: First process messages
-        AEAsyncMessageQueueProcessMessagesOnRealtimeThread(THIS->_messageQueue);
+        AEMessageQueueProcessMessagesOnRealtimeThread(THIS->_messageQueue);
         
         // Service input
 #if TARGET_OS_IPHONE
@@ -698,7 +704,7 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
     
     // Only do the pending messages here if our output isn't enabled
     if ( !THIS->_outputEnabled ) {
-        AEAsyncMessageQueueProcessMessagesOnRealtimeThread(THIS->_messageQueue);
+        AEMessageQueueProcessMessagesOnRealtimeThread(THIS->_messageQueue);
     }
     
 #ifdef DEBUG
@@ -866,7 +872,8 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(audiobusConnectionsChanged:) name:ABConnectionsChangedNotification object:nil];
     }
 
-    _messageQueue = [[AEAsyncMessageQueue alloc] initWithMessageBufferLength:kMessageBufferLength];
+    _messageQueue = [[AEAudioControllerMessageQueue alloc] initWithMessageBufferLength:kMessageBufferLength];
+    ((AEAudioControllerMessageQueue*)_messageQueue).audioController = self;
 
 #if TARGET_OS_IPHONE
     // Register for notifications
@@ -1102,7 +1109,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     }
 #endif
     
-    AEAsyncMessageQueueProcessMessagesOnRealtimeThread(_messageQueue);
+    AEMessageQueueProcessMessagesOnRealtimeThread(_messageQueue);
     [_messageQueue stopPolling];
 }
 
@@ -1626,28 +1633,20 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 #pragma mark - Main thread-realtime thread message sending
 
 - (void)performAsynchronousMessageExchangeWithBlock:(void (^)())block responseBlock:(void (^)())responseBlock {
-    if ( self.running ) {
-        [_messageQueue performAsynchronousMessageExchangeWithBlock:block responseBlock:responseBlock];
-    } else {
-        if ( block ) block();
-        if ( responseBlock ) responseBlock();
-    }
+    [_messageQueue performAsynchronousMessageExchangeWithBlock:block responseBlock:responseBlock];
 }
 
-- (void)performSynchronousMessageExchangeWithBlock:(void (^)())block {
-    if ( self.running )
-        [_messageQueue performSynchronousMessageExchangeWithBlock:block];
-    else if ( block )
-        block();
+- (BOOL)performSynchronousMessageExchangeWithBlock:(void (^)())block {
+    return [_messageQueue performSynchronousMessageExchangeWithBlock:block];
 }
 
-void AEAudioControllerSendAsynchronousMessageToMainThread(__unsafe_unretained AEAudioController *audioController,
-                                                          AEAudioControllerMainThreadMessageHandler    handler, 
+void AEAudioControllerSendAsynchronousMessageToMainThread(__unsafe_unretained AEAudioController *THIS,
+                                                          AEAudioControllerMainThreadMessageHandler handler,
                                                           void                              *userInfo,
                                                           int                                userInfoLength) {
-    AEAsyncMessageQueueSendMessageToMainThread(audioController->_messageQueue, (AEAsyncMessageQueueMessageHandler)handler, userInfo, userInfoLength);
+    AEMessageQueueSendMessageToMainThread(THIS->_messageQueue,
+                                          (AEMessageQueueMessageHandler)handler, userInfo, userInfoLength);
 }
-
 
 #pragma mark - Metering
 
@@ -2259,8 +2258,6 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
             }
             
             [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerSessionInterruptionBeganNotification object:self];
-            
-            AEAsyncMessageQueueProcessMessagesOnRealtimeThread(_messageQueue);
         }
     });
 }
@@ -4075,4 +4072,26 @@ static void * firstUpstreamAudiobusSenderPort(AEChannelRef channel) {
     [invocation setTarget:_audioController];
     [invocation invoke];
 }
+@end
+
+@implementation AEAudioControllerMessageQueue
+
+- (void)performAsynchronousMessageExchangeWithBlock:(void (^)())block responseBlock:(void (^)())responseBlock {
+    if ( _audioController.running ) {
+        [super performAsynchronousMessageExchangeWithBlock:block responseBlock:responseBlock];
+    } else {
+        if ( block ) block();
+        if ( responseBlock ) responseBlock();
+    }
+}
+
+- (BOOL)performSynchronousMessageExchangeWithBlock:(void (^)())block {
+    if ( _audioController.running ) {
+        return [super performSynchronousMessageExchangeWithBlock:block];
+    } else if ( block ) {
+        block();
+    }
+    return YES;
+}
+
 @end

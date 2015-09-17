@@ -3,7 +3,7 @@
 //  Extracted and modified from AEAudioController of Michael Tysons 'TheAmazingAudioEngine'
 //
 //  Created by Jonatan Liljedahl on 8/26/15.
-//  Copyright (c) 2015 Jonatan Liljedahl.
+//  Copyright (c) 2015 Jonatan Liljedahl & Michael Tyson.
 //
 //  This software is provided 'as-is', without any express or implied
 //  warranty.  In no event will the authors be held liable for any damages
@@ -25,13 +25,10 @@
 //
 
 
-#import "AEAsyncMessageQueue.h"
+#import "AEMessageQueue.h"
 #import "TPCircularBuffer.h"
-#import <mach/mach_time.h>
+#import "AEUtilities.h"
 #import <pthread.h>
-
-static double __hostTicksToSeconds = 0.0;
-static double __secondsToHostTicks = 0.0;
 
 /*!
  * Message
@@ -39,7 +36,7 @@ static double __secondsToHostTicks = 0.0;
 typedef struct {
     void                           *block;
     void                           *responseBlock;
-    AEAsyncMessageQueueMessageHandler handler;
+    AEMessageQueueMessageHandler    handler;
     void                           *userInfoByReference;
     int                             userInfoLength;
     pthread_t                       sourceThread;
@@ -49,42 +46,35 @@ typedef struct {
 static const int kDefaultMessageBufferLength             = 8192;
 static const NSTimeInterval kIdleMessagingPollDuration   = 0.1;
 static const NSTimeInterval kActiveMessagingPollDuration = 0.01;
+static const NSTimeInterval kSynchronousTimeoutInterval  = 1.0;
 
-@interface AEAsyncMessageQueuePollThread : NSThread
+@interface AEMessageQueuePollThread : NSThread
 
-- (id)initWithMessageQueue:(AEAsyncMessageQueue*)messageQueue;
+- (id)initWithMessageQueue:(AEMessageQueue*)messageQueue;
 
 @property (nonatomic, assign) NSTimeInterval pollInterval;
 
 @end
 
-@interface AEAsyncMessageQueue ()
+@interface AEMessageQueue ()
 
 @property (nonatomic, readonly) uint64_t lastProcessTime;
 
 @end
 
-@implementation AEAsyncMessageQueue
-{
+@implementation AEMessageQueue {
     TPCircularBuffer    _realtimeThreadMessageBuffer;
     TPCircularBuffer    _mainThreadMessageBuffer;
-    AEAsyncMessageQueuePollThread *_pollThread;
+    AEMessageQueuePollThread *_pollThread;
     int                 _pendingResponses;
 }
 
-+ (void)initialize {
-    mach_timebase_info_data_t tinfo;
-    mach_timebase_info(&tinfo);
-    __hostTicksToSeconds = ((double)tinfo.numer / tinfo.denom) * 1.0e-9;
-    __secondsToHostTicks = 1.0 / __hostTicksToSeconds;
-}
-
 - (instancetype)initWithMessageBufferLength:(int32_t)numBytes {
-    self = [super init];
-    if(self) {
-        TPCircularBufferInit(&_realtimeThreadMessageBuffer, numBytes);
-        TPCircularBufferInit(&_mainThreadMessageBuffer, numBytes);
-    }
+    if ( !(self = [super init]) ) return nil;
+    
+    TPCircularBufferInit(&_realtimeThreadMessageBuffer, numBytes);
+    TPCircularBufferInit(&_mainThreadMessageBuffer, numBytes);
+    
     return self;
 }
 
@@ -101,8 +91,8 @@ static const NSTimeInterval kActiveMessagingPollDuration = 0.01;
 - (void)startPolling {
     if ( !_pollThread ) {
         // Start messaging poll thread
-        _lastProcessTime = mach_absolute_time();
-        _pollThread = [[AEAsyncMessageQueuePollThread alloc] initWithMessageQueue:self];
+        _lastProcessTime = AECurrentTimeInHostTicks();
+        _pollThread = [[AEMessageQueuePollThread alloc] initWithMessageQueue:self];
         _pollThread.pollInterval = kIdleMessagingPollDuration;
         OSMemoryBarrier();
         [_pollThread start];
@@ -119,10 +109,10 @@ static const NSTimeInterval kActiveMessagingPollDuration = 0.01;
     }
 }
 
-void AEAsyncMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEAsyncMessageQueue *THIS) {
-    // Only call this from the Realtime thread, or the main thread if audio system is not yet running
+void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessageQueue *THIS) {
+    // Only call this from the realtime thread, or the main thread if realtime thread not yet running
 
-    THIS->_lastProcessTime = mach_absolute_time();
+    THIS->_lastProcessTime = AECurrentTimeInHostTicks();
 
     int32_t availableBytes;
     message_t *buffer = TPCircularBufferTail(&THIS->_realtimeThreadMessageBuffer, &availableBytes);
@@ -231,7 +221,7 @@ void AEAsyncMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEAs
         message_t *message = TPCircularBufferHead(&_realtimeThreadMessageBuffer, &availableBytes);
         
         if ( availableBytes < sizeof(message_t) ) {
-            NSLog(@"AEAsyncMessageQueue: Unable to perform message exchange - queue is full.");
+            NSLog(@"AEMessageQueue: Unable to perform message exchange - queue is full.");
             return;
         }
         
@@ -266,23 +256,24 @@ void AEAsyncMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEAs
                                          sourceThread:pthread_self()];
 
     // Wait for response
-    uint64_t giveUpTime = mach_absolute_time() + (1.0 * __secondsToHostTicks);
-    while ( !finished && mach_absolute_time() < giveUpTime ) {
+    uint64_t giveUpTime = AECurrentTimeInHostTicks() + AEHostTicksFromSeconds(kSynchronousTimeoutInterval);
+    while ( !finished && AECurrentTimeInHostTicks() < giveUpTime ) {
         [self pollForMessageResponses];
         if ( finished ) break;
         [NSThread sleepForTimeInterval: kActiveMessagingPollDuration];
     }
     
     if ( !finished ) {
-        NSLog(@"AEAsyncMessageQueue: Timed out while performing synchronous message exchange");
+        NSLog(@"AEMessageQueue: Timed out while performing synchronous message exchange");
     }
+    
     return finished;
 }
 
-void AEAsyncMessageQueueSendMessageToMainThread(__unsafe_unretained AEAsyncMessageQueue *THIS,
-                                                          AEAsyncMessageQueueMessageHandler        handler,
-                                                          void                                    *userInfo,
-                                                          int                                      userInfoLength) {
+void AEMessageQueueSendMessageToMainThread(__unsafe_unretained AEMessageQueue *THIS,
+                                           AEMessageQueueMessageHandler        handler,
+                                           void                               *userInfo,
+                                           int                                 userInfoLength) {
     
     int32_t availableBytes;
     message_t *message = TPCircularBufferHead(&THIS->_mainThreadMessageBuffer, &availableBytes);
@@ -298,7 +289,7 @@ void AEAsyncMessageQueueSendMessageToMainThread(__unsafe_unretained AEAsyncMessa
     TPCircularBufferProduce(&THIS->_mainThreadMessageBuffer, sizeof(message_t) + userInfoLength);
 }
 
-static BOOL AEAsyncMessageQueueHasPendingMainThreadMessages(__unsafe_unretained AEAsyncMessageQueue *THIS) {
+static BOOL AEMessageQueueHasPendingMainThreadMessages(__unsafe_unretained AEMessageQueue *THIS) {
     int32_t ignore;
     return TPCircularBufferTail(&THIS->_mainThreadMessageBuffer, &ignore) != NULL;
 }
@@ -306,25 +297,23 @@ static BOOL AEAsyncMessageQueueHasPendingMainThreadMessages(__unsafe_unretained 
 @end
 
 
-@implementation AEAsyncMessageQueuePollThread
-{
-    __weak AEAsyncMessageQueue *_messageQueue;
-
+@implementation AEMessageQueuePollThread {
+    __weak AEMessageQueue *_messageQueue;
 }
-- (id)initWithMessageQueue:(AEAsyncMessageQueue *)messageQueue {
+- (id)initWithMessageQueue:(AEMessageQueue *)messageQueue {
     if ( !(self = [super init]) ) return nil;
     _messageQueue = messageQueue;
     return self;
 }
 - (void)main {
     @autoreleasepool {
-        pthread_setname_np("com.kymatica.AEAsyncMessageQueuePollThread");
-        while ( ![self isCancelled] ) {
+        pthread_setname_np("com.theamazingaudioengine.AEMessageQueuePollThread");
+        while ( !self.isCancelled ) {
             @autoreleasepool {
-                if ( _messageQueue.autoProcessTimeout > 0 && (mach_absolute_time() - _messageQueue.lastProcessTime) * __hostTicksToSeconds > _messageQueue.autoProcessTimeout ) {
-                    AEAsyncMessageQueueProcessMessagesOnRealtimeThread(_messageQueue);
+                if ( _messageQueue.autoProcessTimeout > 0 && AESecondsFromHostTicks(AECurrentTimeInHostTicks() - _messageQueue.lastProcessTime) > _messageQueue.autoProcessTimeout ) {
+                    AEMessageQueueProcessMessagesOnRealtimeThread(_messageQueue);
                 }
-                if ( AEAsyncMessageQueueHasPendingMainThreadMessages(_messageQueue) ) {
+                if ( AEMessageQueueHasPendingMainThreadMessages(_messageQueue) ) {
                     [_messageQueue performSelectorOnMainThread:@selector(pollForMessageResponses) withObject:nil waitUntilDone:NO];
                 }
                 usleep(_pollInterval*1.0e6);

@@ -42,7 +42,7 @@ extern "C" {
 #import "AEFloatConverter.h"
 #import "AEBlockScheduler.h"
 #import "AEUtilities.h"
-#import "AEAsyncMessageQueue.h"
+#import "AEMessageQueue.h"
 
 /*!
 @mainpage
