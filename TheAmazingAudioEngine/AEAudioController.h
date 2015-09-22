@@ -1264,7 +1264,7 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
 /*!
  * Determine if the current thread is the audio thread
  */
-BOOL AECurrentThreadIsAudioThread();
+BOOL AECurrentThreadIsAudioThread(void);
 
 ///@}
 #pragma mark - Properties

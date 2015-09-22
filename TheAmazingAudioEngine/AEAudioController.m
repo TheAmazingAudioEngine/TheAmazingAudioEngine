@@ -1785,7 +1785,7 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
     return (double)frames / THIS->_audioDescription.mSampleRate;
 }
 
-BOOL AECurrentThreadIsAudioThread() {
+BOOL AECurrentThreadIsAudioThread(void) {
     return __audioThread == pthread_self();
 }
 
