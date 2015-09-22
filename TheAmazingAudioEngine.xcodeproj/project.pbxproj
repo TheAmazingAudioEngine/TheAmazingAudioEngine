@@ -9,6 +9,10 @@
 /* Begin PBXBuildFile section */
 		4C09450116FBD7460054608E /* AEBlockScheduler.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C0944FF16FBD7460054608E /* AEBlockScheduler.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4C09450216FBD7460054608E /* AEBlockScheduler.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C09450016FBD7460054608E /* AEBlockScheduler.m */; };
+		4C13AA9B1BB0FC9900DE05E0 /* AEMemoryBufferPlayer.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C13AA991BB0FC9900DE05E0 /* AEMemoryBufferPlayer.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4C13AA9C1BB0FC9900DE05E0 /* AEMemoryBufferPlayer.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C13AA991BB0FC9900DE05E0 /* AEMemoryBufferPlayer.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4C13AA9D1BB0FC9900DE05E0 /* AEMemoryBufferPlayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C13AA9A1BB0FC9900DE05E0 /* AEMemoryBufferPlayer.m */; settings = {ASSET_TAGS = (); }; };
+		4C13AA9E1BB0FC9900DE05E0 /* AEMemoryBufferPlayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C13AA9A1BB0FC9900DE05E0 /* AEMemoryBufferPlayer.m */; settings = {ASSET_TAGS = (); }; };
 		4C215CEF1523A7D500D36CAD /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C215CEE1523A7D500D36CAD /* Foundation.framework */; };
 		4C215D081523A8E500D36CAD /* AEAudioController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CAD56811516281D003CE861 /* AEAudioController.m */; };
 		4C215D091523A8E500D36CAD /* AEAudioFilePlayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CAD56AA15163488003CE861 /* AEAudioFilePlayer.m */; };
@@ -78,6 +82,8 @@
 		4C09450016FBD7460054608E /* AEBlockScheduler.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEBlockScheduler.m; sourceTree = "<group>"; };
 		4C12CC98151D1EDA00562E2A /* AEUtilities.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEUtilities.h; sourceTree = "<group>"; };
 		4C12CC99151D1EDA00562E2A /* AEUtilities.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEUtilities.m; sourceTree = "<group>"; };
+		4C13AA991BB0FC9900DE05E0 /* AEMemoryBufferPlayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEMemoryBufferPlayer.h; sourceTree = "<group>"; };
+		4C13AA9A1BB0FC9900DE05E0 /* AEMemoryBufferPlayer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEMemoryBufferPlayer.m; sourceTree = "<group>"; };
 		4C215CEC1523A7D500D36CAD /* libTheAmazingAudioEngine.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libTheAmazingAudioEngine.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C215CEE1523A7D500D36CAD /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		4C23241F15AC5E2600038EC0 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
@@ -241,6 +247,8 @@
 				4CAD56AA15163488003CE861 /* AEAudioFilePlayer.m */,
 				4C38DC5315458AB1009F4454 /* AEAudioFileWriter.h */,
 				4C38DC5415458AB1009F4454 /* AEAudioFileWriter.m */,
+				4C13AA991BB0FC9900DE05E0 /* AEMemoryBufferPlayer.h */,
+				4C13AA9A1BB0FC9900DE05E0 /* AEMemoryBufferPlayer.m */,
 				F9C23C1C1BA979050060718F /* AEMessageQueue.h */,
 				F9C23C1D1BA979050060718F /* AEMessageQueue.m */,
 				4C12CC98151D1EDA00562E2A /* AEUtilities.h */,
@@ -291,6 +299,7 @@
 			files = (
 				4C215D121523A94200D36CAD /* TheAmazingAudioEngine.h in Headers */,
 				F9C23C1E1BA979050060718F /* AEMessageQueue.h in Headers */,
+				4C13AA9B1BB0FC9900DE05E0 /* AEMemoryBufferPlayer.h in Headers */,
 				4C2886381556FC620074175A /* AEAudioController+Audiobus.h in Headers */,
 				4C215D131523A94200D36CAD /* AEAudioController.h in Headers */,
 				4C49FE32153DC21A008725E0 /* AEAudioFileLoaderOperation.h in Headers */,
@@ -313,6 +322,7 @@
 			files = (
 				7A5687251B5461BE00243427 /* TheAmazingAudioEngine.h in Headers */,
 				F9C23C1F1BA979050060718F /* AEMessageQueue.h in Headers */,
+				4C13AA9C1BB0FC9900DE05E0 /* AEMemoryBufferPlayer.h in Headers */,
 				7A5687261B5461BE00243427 /* AEAudioController.h in Headers */,
 				7A5687271B5461BE00243427 /* AEAudioController+Audiobus.h in Headers */,
 				7A5687291B5461BE00243427 /* AEAudioFilePlayer.h in Headers */,
@@ -407,6 +417,7 @@
 				4C215D091523A8E500D36CAD /* AEAudioFilePlayer.m in Sources */,
 				4C215D0A1523A8E500D36CAD /* AEUtilities.m in Sources */,
 				4C49FE34153DC21A008725E0 /* AEAudioFileLoaderOperation.m in Sources */,
+				4C13AA9D1BB0FC9900DE05E0 /* AEMemoryBufferPlayer.m in Sources */,
 				4C38DC5715458AB1009F4454 /* AEAudioFileWriter.m in Sources */,
 				4C2886521557DB800074175A /* AEAudioController+Audiobus.m in Sources */,
 				4C25747415F0D8E100D232E8 /* TPCircularBuffer.c in Sources */,
@@ -430,6 +441,7 @@
 				7A5687151B54617200243427 /* AEAudioController+Audiobus.m in Sources */,
 				7A5687161B54617200243427 /* AEAudioFilePlayer.m in Sources */,
 				7A5687171B54617200243427 /* AEAudioFileWriter.m in Sources */,
+				4C13AA9E1BB0FC9900DE05E0 /* AEMemoryBufferPlayer.m in Sources */,
 				7A5687181B54617200243427 /* AEUtilities.m in Sources */,
 				7A5687191B54617200243427 /* AEBlockChannel.m in Sources */,
 				7A56871A1B54617200243427 /* AEAudioUnitFilter.m in Sources */,

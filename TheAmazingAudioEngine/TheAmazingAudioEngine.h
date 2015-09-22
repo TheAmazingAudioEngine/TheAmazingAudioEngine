@@ -34,6 +34,7 @@ extern "C" {
 #import "AEAudioFileLoaderOperation.h"
 #import "AEAudioFilePlayer.h"
 #import "AEAudioFileWriter.h"
+#import "AEMemoryBufferPlayer.h"
 #import "AEBlockChannel.h"
 #import "AEBlockFilter.h"
 #import "AEBlockAudioReceiver.h"
