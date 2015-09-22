@@ -17,10 +17,6 @@
 
 static const int kInputChannelsChangedContext;
 
-
-#define kAuxiliaryViewTag 251
-
-
 @interface ViewController () {
     AudioFileID _audioUnitFile;
     AEChannelGroupRef _group;
@@ -248,48 +244,58 @@ static const int kInputChannelsChangedContext;
     
     cell.accessoryView = nil;
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
-    [[cell viewWithTag:kAuxiliaryViewTag] removeFromSuperview];
     
     switch ( indexPath.section ) {
         case 0: {
-            cell.accessoryView = [[UISwitch alloc] initWithFrame:CGRectZero];
-            UISlider *slider = [[UISlider alloc] initWithFrame:CGRectMake(cell.bounds.size.width - (isiPad ? 250 : 210), 0, 100, cell.bounds.size.height)];
-            slider.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
-            slider.tag = kAuxiliaryViewTag;
+            UIView *view = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 200, 40)];
+            
+            UISlider *slider = [[UISlider alloc] initWithFrame:CGRectZero];
+            slider.translatesAutoresizingMaskIntoConstraints = NO;
             slider.maximumValue = 1.0;
             slider.minimumValue = 0.0;
-            [cell addSubview:slider];
+            
+            UISwitch * onSwitch = [[UISwitch alloc] initWithFrame:CGRectZero];
+            onSwitch.translatesAutoresizingMaskIntoConstraints = NO;
+            onSwitch.on = _expander != nil;
+            [onSwitch addTarget:self action:@selector(expanderSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+            [view addSubview:slider];
+            [view addSubview:onSwitch];
+            [view addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|[slider]-20-[onSwitch]|" options:0 metrics:nil views:NSDictionaryOfVariableBindings(slider, onSwitch)]];
+            [view addConstraint:[NSLayoutConstraint constraintWithItem:slider attribute:NSLayoutAttributeCenterY relatedBy:NSLayoutRelationEqual toItem:view attribute:NSLayoutAttributeCenterY multiplier:1 constant:0]];
+            [view addConstraint:[NSLayoutConstraint constraintWithItem:onSwitch attribute:NSLayoutAttributeCenterY relatedBy:NSLayoutRelationEqual toItem:view attribute:NSLayoutAttributeCenterY multiplier:1 constant:0]];
+            
+            cell.accessoryView = view;
             
             switch ( indexPath.row ) {
                 case 0: {
                     cell.textLabel.text = @"Drums";
-                    ((UISwitch*)cell.accessoryView).on = !_loop1.channelIsMuted;
+                    onSwitch.on = !_loop1.channelIsMuted;
                     slider.value = _loop1.volume;
-                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(loop1SwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                    [onSwitch addTarget:self action:@selector(loop1SwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     [slider addTarget:self action:@selector(loop1VolumeChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
                 }
                 case 1: {
                     cell.textLabel.text = @"Organ";
-                    ((UISwitch*)cell.accessoryView).on = !_loop2.channelIsMuted;
+                    onSwitch.on = !_loop2.channelIsMuted;
                     slider.value = _loop2.volume;
-                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(loop2SwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                    [onSwitch addTarget:self action:@selector(loop2SwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     [slider addTarget:self action:@selector(loop2VolumeChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
                 }
                 case 2: {
                     cell.textLabel.text = @"Oscillator";
-                    ((UISwitch*)cell.accessoryView).on = !_oscillator.channelIsMuted;
+                    onSwitch.on = !_oscillator.channelIsMuted;
                     slider.value = _oscillator.volume;
-                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(oscillatorSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                    [onSwitch addTarget:self action:@selector(oscillatorSwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     [slider addTarget:self action:@selector(oscillatorVolumeChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
                 }
                 case 3: {
                     cell.textLabel.text = @"Group";
-                    ((UISwitch*)cell.accessoryView).on = ![_audioController channelGroupIsMuted:_group];
+                    onSwitch.on = ![_audioController channelGroupIsMuted:_group];
                     slider.value = [_audioController volumeForChannelGroup:_group];
-                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(channelGroupSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                    [onSwitch addTarget:self action:@selector(channelGroupSwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     [slider addTarget:self action:@selector(channelGroupVolumeChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
                 }
