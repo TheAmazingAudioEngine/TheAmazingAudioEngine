@@ -282,11 +282,11 @@ static OSStatus AEAudioFilePlayerRenderNotify(void * inRefCon,
         }
 
     }
-    else if (THIS->_progressBlock)
+    // Update the playhead
+    playhead = (playhead + inNumberFrames) % lengthInFrames;
+    OSAtomicCompareAndSwap32(originalPlayhead, playhead, &THIS->_playhead);
+    if (THIS->_progressBlock)
     {
-        // Update the playhead
-        playhead = (playhead + inNumberFrames) % lengthInFrames;
-        OSAtomicCompareAndSwap32(originalPlayhead, playhead, &THIS->_playhead);
         AEAudioControllerSendAsynchronousMessageToMainThread(THIS->_audioController, AEAudioFilePlayerNotifyProgress, &THIS, sizeof(AEAudioFilePlayer*));
     }
     return noErr;
