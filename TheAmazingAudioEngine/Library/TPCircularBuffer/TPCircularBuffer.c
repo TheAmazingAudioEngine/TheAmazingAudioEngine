@@ -117,6 +117,7 @@ bool TPCircularBufferInit(TPCircularBuffer *buffer, int32_t length) {
         buffer->buffer = (void*)bufferAddress;
         buffer->fillCount = 0;
         buffer->head = buffer->tail = 0;
+        buffer->atomic = true;
         
         return true;
     }
@@ -133,4 +134,8 @@ void TPCircularBufferClear(TPCircularBuffer *buffer) {
     if ( TPCircularBufferTail(buffer, &fillCount) ) {
         TPCircularBufferConsume(buffer, fillCount);
     }
+}
+
+void  TPCircularBufferSetAtomic(TPCircularBuffer *buffer, bool atomic) {
+    buffer->atomic = atomic;
 }
