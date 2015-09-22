@@ -71,6 +71,22 @@ extern "C" {
 AudioUnit AEAudioUnitFilterGetAudioUnit(__unsafe_unretained AEAudioUnitFilter * filter);
 
 /*!
+ * Get an audio unit parameter
+ *
+ * @param parameterId The audio unit parameter identifier
+ * @return The value of the parameter
+ */
+- (double)getParameterValueForId:(AudioUnitParameterID)parameterId;
+
+/*!
+ * Set an audio unit parameter
+ *
+ * @param value The value of the parameter to set
+ * @param parameterId The audio unit parameter identifier
+ */
+- (void)setParameterValue:(double)value forId:(AudioUnitParameterID)parameterId;
+
+/*!
  * The audio unit
  */
 @property (nonatomic, readonly) AudioUnit audioUnit;

@@ -155,6 +155,18 @@ AudioUnit AEAudioUnitChannelGetAudioUnit(__unsafe_unretained AEAudioUnitChannel 
     return _audioUnit;
 }
 
+- (double)getParameterValueForId:(AudioUnitParameterID)parameterId {
+    AudioUnitParameterValue value = 0;
+    AECheckOSStatus(AudioUnitGetParameter(_audioUnit, parameterId, kAudioUnitScope_Global, 0, &value),
+                    "AudioUnitGetParameter");
+    return value;
+}
+
+- (void)setParameterValue:(double)value forId:(AudioUnitParameterID)parameterId {
+    AECheckOSStatus(AudioUnitSetParameter(_audioUnit, parameterId, kAudioUnitScope_Global, 0, value, 0),
+                    "AudioUnitSetParameter");
+}
+
 static OSStatus renderCallback(__unsafe_unretained AEAudioUnitChannel *THIS,
                                __unsafe_unretained AEAudioController *audioController,
                                const AudioTimeStamp     *time,

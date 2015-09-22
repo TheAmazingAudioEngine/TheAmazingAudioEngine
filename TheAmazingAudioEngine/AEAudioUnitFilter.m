@@ -241,6 +241,18 @@ AudioUnit AEAudioUnitFilterGetAudioUnit(__unsafe_unretained AEAudioUnitFilter * 
     return _audioUnit;
 }
 
+- (double)getParameterValueForId:(AudioUnitParameterID)parameterId {
+    AudioUnitParameterValue value = 0;
+    AECheckOSStatus(AudioUnitGetParameter(_audioUnit, parameterId, kAudioUnitScope_Global, 0, &value),
+                    "AudioUnitGetParameter");
+    return value;
+}
+
+- (void)setParameterValue:(double)value forId:(AudioUnitParameterID)parameterId {
+    AECheckOSStatus(AudioUnitSetParameter(_audioUnit, parameterId, kAudioUnitScope_Global, 0, value, 0),
+                    "AudioUnitSetParameter");
+}
+
 static OSStatus filterCallback(__unsafe_unretained AEAudioUnitFilter *THIS,
                                __unsafe_unretained AEAudioController *audioController,
                                AEAudioControllerFilterProducer producer,

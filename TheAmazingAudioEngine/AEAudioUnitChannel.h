@@ -71,6 +71,23 @@ extern "C" {
 AudioUnit AEAudioUnitChannelGetAudioUnit(__unsafe_unretained AEAudioUnitChannel * channel);
 
 /*!
+ * Get an audio unit parameter
+ *
+ * @param parameterId The audio unit parameter identifier
+ * @return The value of the parameter
+ */
+- (double)getParameterValueForId:(AudioUnitParameterID)parameterId;
+
+/*!
+ * Set an audio unit parameter
+ *
+ * @param value The value of the parameter to set
+ * @param parameterId The audio unit parameter identifier
+ */
+- (void)setParameterValue:(double)value forId:(AudioUnitParameterID)parameterId;
+
+
+/*!
  * Track volume
  *
  * Range: 0.0 to 1.0
