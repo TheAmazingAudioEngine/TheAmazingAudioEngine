@@ -1261,6 +1261,11 @@ long AEConvertSecondsToFrames(__unsafe_unretained AEAudioController *audioContro
  */
 NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *audioController, long frames);
 
+/*!
+ * Determine if the current thread is the audio thread
+ */
+BOOL AECurrentThreadIsAudioThread();
+
 ///@}
 #pragma mark - Properties
 

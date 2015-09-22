@@ -65,6 +65,8 @@ static Float32 __cachedInputLatency = kNoValue;
 static Float32 __cachedOutputLatency = kNoValue;
 #endif
 
+static pthread_t __audioThread = NULL;
+
 NSString * const AEAudioControllerSessionInterruptionBeganNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionBeganNotification";
 NSString * const AEAudioControllerSessionInterruptionEndedNotification = @"com.theamazingaudioengine.AEAudioControllerSessionInterruptionEndedNotification";
 NSString * const AEAudioControllerSessionRouteChangeNotification = @"com.theamazingaudioengine.AEAudioControllerRouteChangeNotification";
@@ -243,7 +245,6 @@ typedef struct _channel_group_t {
     AEChannelRef        _channelBeingRendered;
     
     AudioBufferList    *_audiobusMonitorBuffer;
-    pthread_t           _renderThread;
 
 #ifdef DEBUG
     uint64_t            _renderStartTime[2];
@@ -531,8 +532,8 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
     
     __unsafe_unretained AEAudioController *THIS = (__bridge AEAudioController *)inRefCon;
 
-    if ( !THIS->_renderThread ) {
-        THIS->_renderThread = pthread_self();
+    if ( !__audioThread ) {
+        __audioThread = pthread_self();
     }
     
     if ( *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
@@ -1024,7 +1025,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     
     [_messageQueue startPolling];
     
-    _renderThread = NULL;
+    __audioThread = NULL;
     
     @synchronized ( self ) {
         status = AUGraphStart(_audioGraph);
@@ -1784,6 +1785,10 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *T
     return (double)frames / THIS->_audioDescription.mSampleRate;
 }
 
+BOOL AECurrentThreadIsAudioThread() {
+    return __audioThread == pthread_self();
+}
+
 #pragma mark - Setters, getters
 
 #if TARGET_OS_IPHONE
@@ -1978,7 +1983,7 @@ NSTimeInterval AEAudioControllerInputLatency(__unsafe_unretained AEAudioControll
 }
 
 NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioController *THIS) {
-    if ( THIS->_renderThread == pthread_self() ) {
+    if ( AECurrentThreadIsAudioThread() ) {
         AEChannelRef channelBeingRendered = THIS->_channelBeingRendered;
         if ( !channelBeingRendered ) channelBeingRendered = THIS->_topChannel;
         
@@ -2615,7 +2620,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     
     AECheckOSStatus([self updateGraph], "Update graph");
     
-    _renderThread = NULL;
+    __audioThread = NULL;
     
     if ( wasRunning ) {
         @synchronized ( self ) {
