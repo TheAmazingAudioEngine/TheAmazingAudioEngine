@@ -111,7 +111,7 @@ int AEGetNumberOfFramesInAudioBufferList(AudioBufferList *list,
  * @param list          Pointer to an AudioBufferList
  * @return Size of the AudioBufferList structure
  */
-size_t AEGetAudioBufferListSize(AudioBufferList *list) {
+static inline size_t AEGetAudioBufferListSize(AudioBufferList *list) {
     return sizeof(AudioBufferList) + (list->mNumberBuffers-1) * sizeof(AudioBuffer);
 }
 
