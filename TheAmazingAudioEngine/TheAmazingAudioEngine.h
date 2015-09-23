@@ -771,6 +771,7 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  - @link AEFreeAudioBufferList @endlink will free the memory pointed to by an audio buffer list.
  - @link AEGetNumberOfFramesInAudioBufferList @endlink will take an `AudioStreamBasicDescription` and return the number
    of frames contained within the audio buffer list given the `mDataByteSize` values within.
+ - @link AEGetAudioBufferListSize @endlink returns the size of an AudioBufferList structure, for use when memcpy-ing buffer list structures.
  
  Note: Do not use those functions above that perform memory allocation or deallocation from within the Core Audio thread,
  as this may cause performance problems.

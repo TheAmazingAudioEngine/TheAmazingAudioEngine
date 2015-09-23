@@ -96,7 +96,24 @@ void AEFreeAudioBufferList(AudioBufferList *bufferList);
  * @param oNumberOfChannels If not NULL, will be set to the number of channels of audio in 'list'
  * @return Number of frames in the buffer list
  */
-int AEGetNumberOfFramesInAudioBufferList(AudioBufferList *list, AudioStreamBasicDescription audioFormat, int *oNumberOfChannels);
+int AEGetNumberOfFramesInAudioBufferList(AudioBufferList *list,
+                                         AudioStreamBasicDescription audioFormat,
+                                         int *oNumberOfChannels);
+
+/*!
+ * Get the size of an AudioBufferList structure
+ *
+ *  Use this method when doing a memcpy of AudioBufferLists, for example.
+ *
+ *  Note: This method returns the size of the AudioBufferList structure itself, not the
+ *  audio bytes it points to.
+ *
+ * @param list          Pointer to an AudioBufferList
+ * @return Size of the AudioBufferList structure
+ */
+size_t AEGetAudioBufferListSize(AudioBufferList *list) {
+    return sizeof(AudioBufferList) + (list->mNumberBuffers-1) * sizeof(AudioBuffer);
+}
 
 /*!
  * Create an AudioComponentDescription structure
