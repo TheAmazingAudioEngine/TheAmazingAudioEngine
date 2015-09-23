@@ -766,6 +766,7 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  
  - @link AEAllocateAndInitAudioBufferList @endlink will take an `AudioStreamBasicDescription` and a number of frames to
    allocate, and will allocate and initialise an audio buffer list and the corresponding memory buffers appropriately.
+ - @link AECreateStackCopyOfAudioBufferList @endlink will make a copy of an existing buffer on the stack (without any memory allocation), and optionally offset its mData pointers; useful for doing offset buffer fills with utilities that write to AudioBufferLists.
  - @link AECopyAudioBufferList @endlink will copy an existing audio buffer list into a new one, allocating memory as needed.
  - @link AEFreeAudioBufferList @endlink will free the memory pointed to by an audio buffer list.
  - @link AEGetNumberOfFramesInAudioBufferList @endlink will take an `AudioStreamBasicDescription` and return the number

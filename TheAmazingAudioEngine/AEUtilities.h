@@ -41,6 +41,30 @@ extern "C" {
  * @return The allocated and initialised audio buffer list
  */
 AudioBufferList *AEAllocateAndInitAudioBufferList(AudioStreamBasicDescription audioFormat, int frameCount);
+    
+/*!
+ * Create a stack copy of the given audio buffer list and offset mData pointers
+ *
+ *  This is useful for creating buffers that point to an offset into the original buffer,
+ *  to fill later regions of the buffer. It will create a local AudioBufferList* variable 
+ *  on the stack, with a name given by the first argument, copy the original AudioBufferList 
+ *  structure values, and offset the mData and mDataByteSize variables.
+ *
+ *  Note that only the AudioBufferList structure itself will be copied, not the data to
+ *  which it points.
+ *
+ * @param name Name of the variable to create on the stack
+ * @param sourceBufferList The original buffer list to copy
+ * @param offsetBytes Number of bytes to offset mData/mDataByteSize members
+ */
+#define AECreateStackCopyOfAudioBufferList(name, sourceBufferList, offsetBytes) \
+    char name_bytes[sizeof(AudioBufferList)+(sizeof(AudioBuffer)*(sourceBufferList->mNumberBuffers-1))]; \
+    memcpy(name_bytes, sourceBufferList, sizeof(name_bytes)); \
+    AudioBufferList * name = (AudioBufferList*)name_bytes; \
+    for ( int i=0; i<name->mNumberBuffers; i++ ) { \
+        name->mBuffers[i].mData = (char*)name->mBuffers[i].mData + offsetBytes; \
+        name->mBuffers[i].mDataByteSize -= offsetBytes; \
+    }
 
 /*!
  * Create a copy of an audio buffer list
@@ -73,7 +97,6 @@ void AEFreeAudioBufferList(AudioBufferList *bufferList);
  * @return Number of frames in the buffer list
  */
 int AEGetNumberOfFramesInAudioBufferList(AudioBufferList *list, AudioStreamBasicDescription audioFormat, int *oNumberOfChannels);
-
 
 /*!
  * Create an AudioComponentDescription structure
