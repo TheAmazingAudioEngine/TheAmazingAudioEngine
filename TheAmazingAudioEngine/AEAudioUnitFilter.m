@@ -39,6 +39,7 @@
     BOOL _wasBypassed;
 }
 @property (nonatomic, copy) void (^preInitializeBlock)(AudioUnit audioUnit);
+@property (nonatomic, strong) NSMutableDictionary * savedParameters;
 @end
 
 @implementation AEAudioUnitFilter
@@ -199,6 +200,19 @@ AudioUnit AEAudioUnitFilterGetAudioUnit(__unsafe_unretained AEAudioUnitFilter * 
     AECheckOSStatus(AudioUnitSetProperty(_inConverterUnit ? _inConverterUnit : _audioUnit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &rcbs, sizeof(rcbs)),
                 "AudioUnitSetProperty(kAudioUnitProperty_SetRenderCallback)");
     
+    if ( _savedParameters ) {
+        // Restore parameters
+        for ( NSNumber * key in _savedParameters.allKeys ) {
+            NSNumber * value = _savedParameters[key];
+            AECheckOSStatus(AudioUnitSetParameter(_audioUnit,
+                                                  (AudioUnitParameterID)[key unsignedIntValue],
+                                                  kAudioUnitScope_Global,
+                                                  0,
+                                                  (AudioUnitParameterValue)[value doubleValue],
+                                                  0), "AudioUnitSetParameter");
+        }
+    }
+    
     if ( _preInitializeBlock ) _preInitializeBlock(_audioUnit);
 
     AECheckOSStatus(AudioUnitInitialize(_audioUnit), "AudioUnitInitialize");
@@ -242,6 +256,10 @@ AudioUnit AEAudioUnitFilterGetAudioUnit(__unsafe_unretained AEAudioUnitFilter * 
 }
 
 - (double)getParameterValueForId:(AudioUnitParameterID)parameterId {
+    if ( !_audioUnit ) {
+        return [_savedParameters[@(parameterId)] doubleValue];
+    }
+    
     AudioUnitParameterValue value = 0;
     AECheckOSStatus(AudioUnitGetParameter(_audioUnit, parameterId, kAudioUnitScope_Global, 0, &value),
                     "AudioUnitGetParameter");
@@ -249,8 +267,14 @@ AudioUnit AEAudioUnitFilterGetAudioUnit(__unsafe_unretained AEAudioUnitFilter * 
 }
 
 - (void)setParameterValue:(double)value forId:(AudioUnitParameterID)parameterId {
-    AECheckOSStatus(AudioUnitSetParameter(_audioUnit, parameterId, kAudioUnitScope_Global, 0, value, 0),
-                    "AudioUnitSetParameter");
+    if ( !_savedParameters ) {
+        self.savedParameters = [[NSMutableDictionary alloc] init];
+    }
+    _savedParameters[@(parameterId)] = @(value);
+    if ( _audioUnit ) {
+        AECheckOSStatus(AudioUnitSetParameter(_audioUnit, parameterId, kAudioUnitScope_Global, 0, value, 0),
+                        "AudioUnitSetParameter");
+    }
 }
 
 static OSStatus filterCallback(__unsafe_unretained AEAudioUnitFilter *THIS,

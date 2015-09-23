@@ -81,11 +81,14 @@ AudioUnit AEAudioUnitChannelGetAudioUnit(__unsafe_unretained AEAudioUnitChannel 
 /*!
  * Set an audio unit parameter
  *
+ *  Note: Parameters set via this method will be automatically assigned again if the
+ *  audio unit is recreated due to removal from the audio controller, an audio controller 
+ *  reload, or a media server error.
+ *
  * @param value The value of the parameter to set
  * @param parameterId The audio unit parameter identifier
  */
 - (void)setParameterValue:(double)value forId:(AudioUnitParameterID)parameterId;
-
 
 /*!
  * Track volume
