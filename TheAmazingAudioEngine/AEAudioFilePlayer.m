@@ -257,23 +257,20 @@ static OSStatus renderCallback(__unsafe_unretained AEAudioFilePlayer *THIS,
         return noErr;
     }
     
-    char scratchAudioBufferListBytes[sizeof(AudioBufferList) + (audio->mNumberBuffers-1)*sizeof(AudioBuffer)];
-    if ( THIS->_startTime && THIS->_startTime > time->mHostTime ) {
+    uint32_t silentFrames = THIS->_startTime && THIS->_startTime > time->mHostTime
+        ? AESecondsFromHostTicks(THIS->_startTime - time->mHostTime) * THIS->_unitOutputDescription.mSampleRate : 0;
+    AECreateStackCopyOfAudioBufferList(scratchAudioBufferList, audio, silentFrames * THIS->_unitOutputDescription.mBytesPerFrame);
+    if ( silentFrames > 0 ) {
         // Start time is offset into this buffer - silence beginning of buffer
-        UInt32 silentFrames = AESecondsFromHostTicks(THIS->_startTime - time->mHostTime) * THIS->_unitOutputDescription.mSampleRate;
         for ( int i=0; i<audio->mNumberBuffers; i++) {
             memset(audio->mBuffers[i].mData, 0, silentFrames * THIS->_unitOutputDescription.mBytesPerFrame);
         }
         
         // Point buffer list to remaining frames
-        memcpy(scratchAudioBufferListBytes, audio, sizeof(scratchAudioBufferListBytes));
-        audio = (AudioBufferList*)&scratchAudioBufferListBytes;
-        for ( int i=0; i<audio->mNumberBuffers; i++) {
-            audio->mBuffers[i].mData = (char*)audio->mBuffers[i].mData + (silentFrames * THIS->_unitOutputDescription.mBytesPerFrame);
-            audio->mBuffers[i].mDataByteSize -= silentFrames * THIS->_unitOutputDescription.mBytesPerFrame;
-        }
+        audio = scratchAudioBufferList;
         frames -= silentFrames;
     }
+    
     THIS->_startTime = 0;
     
     // Render
