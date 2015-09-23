@@ -13,6 +13,7 @@
 #import "AEExpanderFilter.h"
 #import "AELimiterFilter.h"
 #import "AERecorder.h"
+#import "AEReverbFilter.h"
 #import <QuartzCore/QuartzCore.h>
 
 static const int kInputChannelsChangedContext;
@@ -30,7 +31,7 @@ static const int kInputChannelsChangedContext;
 @property (nonatomic, strong) AEPlaythroughChannel *playthrough;
 @property (nonatomic, strong) AELimiterFilter *limiter;
 @property (nonatomic, strong) AEExpanderFilter *expander;
-@property (nonatomic, strong) AEAudioUnitFilter *reverb;
+@property (nonatomic, strong) AEReverbFilter *reverb;
 @property (nonatomic, strong) TPOscilloscopeLayer *outputOscilloscope;
 @property (nonatomic, strong) TPOscilloscopeLayer *inputOscilloscope;
 @property (nonatomic, strong) CALayer *inputLevelLayer;
@@ -601,10 +602,8 @@ static const int kInputChannelsChangedContext;
 
 - (void)reverbSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
-        self.reverb = [[AEAudioUnitFilter alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Effect, kAudioUnitSubType_Reverb2) preInitializeBlock:^(AudioUnit audioUnit) {
-            AudioUnitSetParameter(audioUnit, kReverb2Param_DryWetMix, kAudioUnitScope_Global, 0, 100.f, 0);
-        }];
-        
+        self.reverb = [[AEReverbFilter alloc] init];
+        _reverb.dryWetMix = 80;
         [_audioController addFilter:_reverb];
     } else {
         [_audioController removeFilter:_reverb];
