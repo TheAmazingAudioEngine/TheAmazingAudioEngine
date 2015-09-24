@@ -178,7 +178,11 @@ static inline BOOL _AECheckOSStatus(OSStatus result, const char *operation, cons
     if ( result != noErr ) {
         if ( AERateLimit() ) {
             int fourCC = CFSwapInt32HostToBig(result);
-            NSLog(@"TAAE: %s:%d: %s result %d %08X %4.4s", file, line, operation, (int)result, (int)result, (char*)&fourCC);
+            if ( isascii(((char*)&fourCC)[0]) && isascii(((char*)&fourCC)[1]) && isascii(((char*)&fourCC)[2]) ) {
+                NSLog(@"%s:%d: %s: '%4.4s' (%d)", file, line, operation, (char*)&fourCC, (int)result);
+            } else {
+                NSLog(@"%s:%d: %s: %d", file, line, operation, (int)result);
+            }
         }
         return NO;
     }
