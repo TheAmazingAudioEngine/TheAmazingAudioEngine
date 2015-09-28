@@ -91,15 +91,56 @@ void AEFreeAudioBufferList(AudioBufferList *bufferList);
  *  Calculates the frame count in the buffer list based on the given
  *  audio format. Optionally also provides the channel count.
  *
- * @param list          Pointer to an AudioBufferList containing audio
+ * @param bufferList    Pointer to an AudioBufferList containing audio
  * @param audioFormat   Audio format describing the audio in the buffer list
  * @param oNumberOfChannels If not NULL, will be set to the number of channels of audio in 'list'
  * @return Number of frames in the buffer list
  */
-int AEGetNumberOfFramesInAudioBufferList(AudioBufferList *list,
+int AEGetNumberOfFramesInAudioBufferList(AudioBufferList *bufferList,
                                          AudioStreamBasicDescription audioFormat,
                                          int *oNumberOfChannels);
+    
+/*!
+ * Set the number of frames in a buffer list
+ *
+ *  Calculates the frame count in the buffer list based on the given
+ *  audio format, and assigns it to the buffer list members.
+ *
+ * @param bufferList    Pointer to an AudioBufferList containing audio
+ * @param audioFormat   Audio format describing the audio in the buffer list
+ * @param frames        The number of frames to set
+ */
+void AESetNumberOfFramesInAudioBufferList(AudioBufferList *bufferList,
+                                          AudioStreamBasicDescription audioFormat,
+                                          UInt32 frames);
 
+/*!
+ * Offset the pointers in a buffer list
+ *
+ *  Increments the mData pointers in the buffer list by the given number
+ *  of frames. This is useful for filling a buffer in incremental stages.
+ *
+ * @param bufferList    Pointer to an AudioBufferList containing audio
+ * @param audioFormat   Audio format describing the audio in the buffer list
+ * @param frames        The number of frames to offset the mData pointers by
+ */
+void AEOffsetAudioBufferList(AudioBufferList *bufferList,
+                             AudioStreamBasicDescription audioFormat,
+                             UInt32 frames);
+
+/*!
+ * Silence an audio buffer list (zero out frames)
+ *
+ * @param bufferList    Pointer to an AudioBufferList containing audio
+ * @param audioFormat   Audio format describing the audio in the buffer list
+ * @param offset        Offset into buffer
+ * @param length        Number of frames to silence (0 for whole buffer)
+ */
+void AESilenceAudioBufferList(AudioBufferList *bufferList,
+                              AudioStreamBasicDescription audioFormat,
+                              UInt32 offset,
+                              UInt32 length);
+    
 /*!
  * Get the size of an AudioBufferList structure
  *
@@ -108,11 +149,11 @@ int AEGetNumberOfFramesInAudioBufferList(AudioBufferList *list,
  *  Note: This method returns the size of the AudioBufferList structure itself, not the
  *  audio bytes it points to.
  *
- * @param list          Pointer to an AudioBufferList
+ * @param bufferList    Pointer to an AudioBufferList
  * @return Size of the AudioBufferList structure
  */
-static inline size_t AEGetAudioBufferListSize(AudioBufferList *list) {
-    return sizeof(AudioBufferList) + (list->mNumberBuffers-1) * sizeof(AudioBuffer);
+static inline size_t AEGetAudioBufferListSize(AudioBufferList *bufferList) {
+    return sizeof(AudioBufferList) + (bufferList->mNumberBuffers-1) * sizeof(AudioBuffer);
 }
 
 /*!
