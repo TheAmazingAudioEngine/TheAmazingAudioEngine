@@ -769,45 +769,15 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 #pragma mark - Setup and start/stop
 
 + (AudioStreamBasicDescription)interleaved16BitStereoAudioDescription {
-    AudioStreamBasicDescription audioDescription;
-    memset(&audioDescription, 0, sizeof(audioDescription));
-    audioDescription.mFormatID          = kAudioFormatLinearPCM;
-    audioDescription.mFormatFlags       = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked | kAudioFormatFlagsNativeEndian;
-    audioDescription.mChannelsPerFrame  = 2;
-    audioDescription.mBytesPerPacket    = sizeof(SInt16)*audioDescription.mChannelsPerFrame;
-    audioDescription.mFramesPerPacket   = 1;
-    audioDescription.mBytesPerFrame     = sizeof(SInt16)*audioDescription.mChannelsPerFrame;
-    audioDescription.mBitsPerChannel    = 8 * sizeof(SInt16);
-    audioDescription.mSampleRate        = 44100.0;
-    return audioDescription;
+    return ABAudioStreamBasicDescriptionInterleaved16BitStereo;
 }
 
 + (AudioStreamBasicDescription)nonInterleaved16BitStereoAudioDescription {
-    AudioStreamBasicDescription audioDescription;
-    memset(&audioDescription, 0, sizeof(audioDescription));
-    audioDescription.mFormatID          = kAudioFormatLinearPCM;
-    audioDescription.mFormatFlags       = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked | kAudioFormatFlagsNativeEndian | kAudioFormatFlagIsNonInterleaved;
-    audioDescription.mChannelsPerFrame  = 2;
-    audioDescription.mBytesPerPacket    = sizeof(SInt16);
-    audioDescription.mFramesPerPacket   = 1;
-    audioDescription.mBytesPerFrame     = sizeof(SInt16);
-    audioDescription.mBitsPerChannel    = 8 * sizeof(SInt16);
-    audioDescription.mSampleRate        = 44100.0;
-    return audioDescription;
+    return ABAudioStreamBasicDescriptionNonInterleaved16BitStereo;
 }
 
 + (AudioStreamBasicDescription)nonInterleavedFloatStereoAudioDescription {
-    AudioStreamBasicDescription audioDescription;
-    memset(&audioDescription, 0, sizeof(audioDescription));
-    audioDescription.mFormatID          = kAudioFormatLinearPCM;
-    audioDescription.mFormatFlags       = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved;
-    audioDescription.mChannelsPerFrame  = 2;
-    audioDescription.mBytesPerPacket    = sizeof(float);
-    audioDescription.mFramesPerPacket   = 1;
-    audioDescription.mBytesPerFrame     = sizeof(float);
-    audioDescription.mBitsPerChannel    = 8 * sizeof(float);
-    audioDescription.mSampleRate        = 44100.0;
-    return audioDescription;
+    return ABAudioStreamBasicDescriptionNonInterleavedFloatStereo;
 }
 
 + (BOOL)voiceProcessingAvailable {
@@ -2070,7 +2040,7 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
     }
     
     if ( [self hasAudiobusSenderForUpstreamChannels:channelElement] && !_audiobusMonitorChannel ) {
-        _audiobusMonitorBuffer = AEAudioBufferListCreate([AEAudioController nonInterleavedFloatStereoAudioDescription], kMaxFramesPerSlice);
+        _audiobusMonitorBuffer = AEAudioBufferListCreate(ABAudioStreamBasicDescriptionNonInterleavedFloatStereo, kMaxFramesPerSlice);
         AudioBufferList *monitorBuffer = _audiobusMonitorBuffer;
         _audiobusMonitorChannel = [AEBlockChannel channelWithBlock:^(const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
             for ( int i=0; i<MIN(audio->mNumberBuffers, monitorBuffer->mNumberBuffers); i++ ) {
@@ -2078,7 +2048,7 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
                 memset(monitorBuffer->mBuffers[i].mData, 0, monitorBuffer->mBuffers[i].mDataByteSize);
             }
         }];
-        _audiobusMonitorChannel.audioDescription = [AEAudioController nonInterleavedFloatStereoAudioDescription];
+        _audiobusMonitorChannel.audioDescription = ABAudioStreamBasicDescriptionNonInterleavedFloatStereo;
         [self addChannels:@[_audiobusMonitorChannel]];
     }
     

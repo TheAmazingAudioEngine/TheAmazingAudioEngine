@@ -83,7 +83,7 @@ static const int kInputChannelsChangedContext;
             ((SInt16*)audio->mBuffers[1].mData)[i] = x;
         }
     }];
-    _oscillator.audioDescription = [AEAudioController nonInterleaved16BitStereoAudioDescription];
+    _oscillator.audioDescription = ABAudioStreamBasicDescriptionNonInterleaved16BitStereo;
     
     _oscillator.channelIsMuted = YES;
     

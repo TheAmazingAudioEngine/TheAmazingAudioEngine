@@ -144,7 +144,7 @@ extern "C" {
  ...
  
  self.audioController = [[AEAudioController alloc]
-                            initWithAudioDescription:[AEAudioController nonInterleaved16BitStereoAudioDescription]
+                            initWithAudioDescription:ABAudioStreamBasicDescriptionNonInterleaved16BitStereo
                                 inputEnabled:YES]; // don't forget to autorelease if you don't use ARC!
  @endcode
  
@@ -785,6 +785,18 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  Note: Do not use those functions above that perform memory allocation or deallocation from within the Core Audio thread,
  as this may cause performance problems.
  
+ @section Audio-Formats Defining Audio Formats
+ 
+ Core Audio uses the `AudioStreamBasicDescription` type for describing kinds of audio samples. The Amazing Audio Engine
+ provides a number of utilities for working with these types:
+ 
+ - A number of pre-defined common types: 
+    @link ABAudioStreamBasicDescriptionNonInterleavedFloatStereo @endlink,
+    @link ABAudioStreamBasicDescriptionNonInterleaved16BitStereo @endlink and
+    @link ABAudioStreamBasicDescriptionInterleaved16BitStereo @endlink.
+ - @link ABAudioStreamBasicDescriptionMake @endlink, a method for creating custom types.
+ - @link AEAudioStreamBasicDescriptionSetChannelsPerFrame @endlink, a method for easily modifying the number of channels of audio represented.
+ 
  @section Vector-Processing Improving Efficiency using Vector Operations
  
  Vector operations offer orders of magnitude improvements in processing efficiency over performing the same operation
@@ -820,8 +832,7 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  static const int kScratchBufferSize[4096];
  
  AudioBufferList *scratchBufferList
-    = AEAudioBufferListCreate([AEAudioController nonInterleavedFloatStereoAudioDescription], 
-                                       kScratchBufferSize);
+    = AEAudioBufferListCreate(ABAudioStreamBasicDescriptionNonInterleavedFloatStereo, kScratchBufferSize);
 
  
  ...

@@ -480,26 +480,26 @@ typedef struct _channel_group_t* AEChannelGroupRef;
 /*!
  * 16-bit stereo audio description, interleaved
  *
- *  This is a 16-bit signed PCM, stereo, interleaved format at 44.1kHz that can be used
- *  with @link initWithAudioDescription: @endlink.
+ *  Deprecated. Use ABAudioStreamBasicDescriptionInterleaved16BitStereo instead.
  */
 + (AudioStreamBasicDescription)interleaved16BitStereoAudioDescription;
+// Soon:    __deprecated_msg("use ABAudioStreamBasicDescriptionInterleaved16BitStereo instead");
 
 /*!
  * 16-bit stereo audio description, non-interleaved
  *
- *  This is a 16-bit signed PCM, stereo, non-interleaved format at 44.1kHz that can be used
- *  with @link initWithAudioDescription: @endlink.
+ *  Deprecated. Use ABAudioStreamBasicDescriptionNonInterleaved16BitStereo instead.
  */
 + (AudioStreamBasicDescription)nonInterleaved16BitStereoAudioDescription;
+// Soon:    __deprecated_msg("use ABAudioStreamBasicDescriptionNonInterleaved16BitStereo instead");
 
 /*!
  * Floating-point stereo audio description, non-interleaved
  *
- *  This is a floating-point PCM, stereo, non-interleaved format at 44.1kHz that can be used
- *  with @link initWithAudioDescription: @endlink.
+ *  Deprecated. Use ABAudioStreamBasicDescriptionNonInterleavedFloatStereo instead.
  */
 + (AudioStreamBasicDescription)nonInterleavedFloatStereoAudioDescription;
+// Soon:    __deprecated_msg("use ABAudioStreamBasicDescriptionNonInterleavedFloatStereo instead");
 
 /*!
  * Determine whether voice processing is available on this device

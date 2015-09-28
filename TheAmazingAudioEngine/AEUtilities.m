@@ -123,13 +123,61 @@ void AEAudioBufferListSilence(AudioBufferList *bufferList,
     }
 }
 
-AudioComponentDescription AEAudioComponentDescriptionMake(OSType manufacturer, OSType type, OSType subtype) {
-    AudioComponentDescription description;
-    memset(&description, 0, sizeof(description));
-    description.componentManufacturer = manufacturer;
-    description.componentType = type;
-    description.componentSubType = subtype;
-    return description;
+AudioStreamBasicDescription ABAudioStreamBasicDescriptionNonInterleavedFloatStereo = {
+    .mFormatID          = kAudioFormatLinearPCM,
+    .mFormatFlags       = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved,
+    .mChannelsPerFrame  = 2,
+    .mBytesPerPacket    = sizeof(float),
+    .mFramesPerPacket   = 1,
+    .mBytesPerFrame     = sizeof(float),
+    .mBitsPerChannel    = 8 * sizeof(float),
+    .mSampleRate        = 44100.0,
+};
+
+AudioStreamBasicDescription ABAudioStreamBasicDescriptionNonInterleaved16BitStereo = {
+    .mFormatID          = kAudioFormatLinearPCM,
+    .mFormatFlags       = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked | kAudioFormatFlagsNativeEndian | kAudioFormatFlagIsNonInterleaved,
+    .mChannelsPerFrame  = 2,
+    .mBytesPerPacket    = sizeof(SInt16),
+    .mFramesPerPacket   = 1,
+    .mBytesPerFrame     = sizeof(SInt16),
+    .mBitsPerChannel    = 8 * sizeof(SInt16),
+    .mSampleRate        = 44100.0,
+};
+
+AudioStreamBasicDescription ABAudioStreamBasicDescriptionInterleaved16BitStereo = {
+    .mFormatID          = kAudioFormatLinearPCM,
+    .mFormatFlags       = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked | kAudioFormatFlagsNativeEndian,
+    .mChannelsPerFrame  = 2,
+    .mBytesPerPacket    = sizeof(SInt16)*2,
+    .mFramesPerPacket   = 1,
+    .mBytesPerFrame     = sizeof(SInt16)*2,
+    .mBitsPerChannel    = 8 * sizeof(SInt16),
+    .mSampleRate        = 44100.0,
+};
+
+AudioStreamBasicDescription ABAudioStreamBasicDescriptionMake(ABAudioStreamBasicDescriptionSampleType sampleType,
+                                                              BOOL interleaved,
+                                                              int numberOfChannels,
+                                                              double sampleRate) {
+    int sampleSize = sampleType == ABAudioStreamBasicDescriptionSampleTypeFloat32 ? 4 :
+                     sampleType == ABAudioStreamBasicDescriptionSampleTypeInt16 ? 2 :
+                     sampleType == ABAudioStreamBasicDescriptionSampleTypeInt32 ? 4 : 0;
+    NSCAssert(sampleSize, @"Unrecognized sample type");
+    
+    return (AudioStreamBasicDescription) {
+        .mFormatID = kAudioFormatLinearPCM,
+        .mFormatFlags = (sampleType == ABAudioStreamBasicDescriptionSampleTypeFloat32
+                          ? kAudioFormatFlagIsFloat : kAudioFormatFlagIsSignedInteger | kAudioFormatFlagsNativeEndian)
+                        | kAudioFormatFlagIsPacked
+                        | (interleaved ? 0 : kAudioFormatFlagIsNonInterleaved),
+        .mChannelsPerFrame  = numberOfChannels,
+        .mBytesPerPacket    = sampleSize * (interleaved ? numberOfChannels : 1),
+        .mFramesPerPacket   = 1,
+        .mBytesPerFrame     = sampleSize * (interleaved ? numberOfChannels : 1),
+        .mBitsPerChannel    = 8 * sampleSize,
+        .mSampleRate        = sampleRate,
+    };
 }
 
 void AEAudioStreamBasicDescriptionSetChannelsPerFrame(AudioStreamBasicDescription *audioDescription, int numberOfChannels) {
@@ -138,6 +186,15 @@ void AEAudioStreamBasicDescriptionSetChannelsPerFrame(AudioStreamBasicDescriptio
         audioDescription->mBytesPerPacket *= (float)numberOfChannels / (float)audioDescription->mChannelsPerFrame;
     }
     audioDescription->mChannelsPerFrame = numberOfChannels;
+}
+
+AudioComponentDescription AEAudioComponentDescriptionMake(OSType manufacturer, OSType type, OSType subtype) {
+    AudioComponentDescription description;
+    memset(&description, 0, sizeof(description));
+    description.componentManufacturer = manufacturer;
+    description.componentType = type;
+    description.componentSubType = subtype;
+    return description;
 }
 
 static void AETimeInit() {

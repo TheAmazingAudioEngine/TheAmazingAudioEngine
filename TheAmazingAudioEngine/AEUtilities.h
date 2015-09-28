@@ -30,6 +30,10 @@
 extern "C" {
 #endif
 
+#pragma mark - AudioBufferList Utilities
+/** @name AudioBufferList Utilities */
+///@{
+
 /*!
  * Allocate an audio buffer list and the associated mData pointers.
  *
@@ -160,23 +164,61 @@ static inline size_t AEAudioBufferListGetStructSize(AudioBufferList *bufferList)
     return sizeof(AudioBufferList) + (bufferList->mNumberBuffers-1) * sizeof(AudioBuffer);
 }
 
+///@}
+#pragma mark - AudioStreamBasicDescription Utilities
+/** @name AudioStreamBasicDescription Utilities */
+///@{
+
 /*!
- * Create an AudioComponentDescription structure
- *
- * @param manufacturer  The audio component manufacturer (e.g. kAudioUnitManufacturer_Apple)
- * @param type          The type (e.g. kAudioUnitType_Generator)
- * @param subtype       The subtype (e.g. kAudioUnitSubType_AudioFilePlayer)
- * @returns An AudioComponentDescription structure with the given attributes
+ * 32-bit floating-point PCM audio description, non-interleaved, 44.1kHz
  */
-AudioComponentDescription AEAudioComponentDescriptionMake(OSType manufacturer, OSType type, OSType subtype);
+extern AudioStreamBasicDescription ABAudioStreamBasicDescriptionNonInterleavedFloatStereo;
+
+/*!
+ * 16-bit stereo PCM audio description, non-interleaved, 44.1kHz
+ */
+extern AudioStreamBasicDescription ABAudioStreamBasicDescriptionNonInterleaved16BitStereo;
+
+/*!
+ * 16-bit stereo PCM audio description, interleaved, 44.1kHz
+ */
+extern AudioStreamBasicDescription ABAudioStreamBasicDescriptionInterleaved16BitStereo;
+    
+/*!
+ * Types of samples, for use with ABAudioStreamBasicDescriptionMake
+ */
+typedef enum {
+    ABAudioStreamBasicDescriptionSampleTypeFloat32, //!< 32-bit floating point
+    ABAudioStreamBasicDescriptionSampleTypeInt16,   //!< Signed 16-bit integer
+    ABAudioStreamBasicDescriptionSampleTypeInt32    //!< Signed 32-bit integer
+} ABAudioStreamBasicDescriptionSampleType;
+
+/*!
+ * Create a custom AudioStreamBasicDescription
+ *
+ * @param sampleType Kind of samples
+ * @param interleaved Whether samples are interleaved within the same buffer, or in separate buffers for each channel
+ * @param numberOfChannels Channel count
+ * @param sampleRate The sample rate, in Hz (e.g. 44100)
+ * @return A new AudioStreamBasicDescription describing the audio format
+ */
+AudioStreamBasicDescription ABAudioStreamBasicDescriptionMake(ABAudioStreamBasicDescriptionSampleType sampleType,
+                                                              BOOL interleaved,
+                                                              int numberOfChannels,
+                                                              double sampleRate);
     
 /*!
  * Assign a channel count to an AudioStreamBasicDescription
  *
  *  This method ensures that the mBytesPerFrame/mBytesPerPacket value is updated
- *  correctly for interleaved audio.
+ *  correctly for both interleaved and non-interleaved audio.
  */
 void AEAudioStreamBasicDescriptionSetChannelsPerFrame(AudioStreamBasicDescription *audioDescription, int numberOfChannels);
+
+///@}
+#pragma mark - Time Utilities
+/** @name Time Utilities */
+///@{
 
 /*!
  * Get current global timestamp, in host ticks
@@ -203,7 +245,22 @@ uint64_t AEHostTicksFromSeconds(double seconds);
  * @return The time in seconds
  */
 double AESecondsFromHostTicks(uint64_t ticks);
-    
+
+///@}
+#pragma mark - Other Utilities
+/** @name Other Utilities */
+///@{
+
+/*!
+ * Create an AudioComponentDescription structure
+ *
+ * @param manufacturer  The audio component manufacturer (e.g. kAudioUnitManufacturer_Apple)
+ * @param type          The type (e.g. kAudioUnitType_Generator)
+ * @param subtype       The subtype (e.g. kAudioUnitSubType_AudioFilePlayer)
+ * @returns An AudioComponentDescription structure with the given attributes
+ */
+AudioComponentDescription AEAudioComponentDescriptionMake(OSType manufacturer, OSType type, OSType subtype);
+
 /*!
  * Rate limit an operation
  *
@@ -233,6 +290,8 @@ static inline BOOL _AECheckOSStatus(OSStatus result, const char *operation, cons
     }
     return YES;
 }
+    
+///@}
     
 #ifdef __cplusplus
 }
