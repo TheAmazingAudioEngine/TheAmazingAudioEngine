@@ -259,7 +259,7 @@ static OSStatus renderCallback(__unsafe_unretained AEAudioFilePlayer *THIS,
     
     uint32_t silentFrames = THIS->_startTime && THIS->_startTime > time->mHostTime
         ? AESecondsFromHostTicks(THIS->_startTime - time->mHostTime) * THIS->_unitOutputDescription.mSampleRate : 0;
-    AECreateStackCopyOfAudioBufferList(scratchAudioBufferList, audio, silentFrames * THIS->_unitOutputDescription.mBytesPerFrame);
+    AEAudioBufferListCopyOnStack(scratchAudioBufferList, audio, silentFrames * THIS->_unitOutputDescription.mBytesPerFrame);
     if ( silentFrames > 0 ) {
         // Start time is offset into this buffer - silence beginning of buffer
         for ( int i=0; i<audio->mNumberBuffers; i++) {

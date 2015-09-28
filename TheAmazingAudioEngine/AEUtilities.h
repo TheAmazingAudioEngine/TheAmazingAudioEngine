@@ -40,8 +40,9 @@ extern "C" {
  * @param frameCount        The number of frames to allocate space for (or 0 to just allocate the list structure itself)
  * @return The allocated and initialised audio buffer list
  */
-AudioBufferList *AEAllocateAndInitAudioBufferList(AudioStreamBasicDescription audioFormat, int frameCount);
-    
+AudioBufferList *AEAudioBufferListCreate(AudioStreamBasicDescription audioFormat, int frameCount);
+#define AEAllocateAndInitAudioBufferList AEAudioBufferListCreate // Legacy alias
+
 /*!
  * Create a stack copy of the given audio buffer list and offset mData pointers
  *
@@ -57,7 +58,7 @@ AudioBufferList *AEAllocateAndInitAudioBufferList(AudioStreamBasicDescription au
  * @param sourceBufferList The original buffer list to copy
  * @param offsetBytes Number of bytes to offset mData/mDataByteSize members
  */
-#define AECreateStackCopyOfAudioBufferList(name, sourceBufferList, offsetBytes) \
+#define AEAudioBufferListCopyOnStack(name, sourceBufferList, offsetBytes) \
     char name_bytes[sizeof(AudioBufferList)+(sizeof(AudioBuffer)*(sourceBufferList->mNumberBuffers-1))]; \
     memcpy(name_bytes, sourceBufferList, sizeof(name_bytes)); \
     AudioBufferList * name = (AudioBufferList*)name_bytes; \
@@ -75,15 +76,17 @@ AudioBufferList *AEAllocateAndInitAudioBufferList(AudioStreamBasicDescription au
  * @param original          The original AudioBufferList to copy
  * @return The new, copied audio buffer list
  */
-AudioBufferList *AECopyAudioBufferList(AudioBufferList *original);
-    
+AudioBufferList *AEAudioBufferListCopy(AudioBufferList *original);
+#define AECopyAudioBufferList AEAudioBufferListCopy // Legacy alias
+
 /*!
  * Free a buffer list and associated mData buffers
  *
  *  Note: Do not use this utility from within the Core Audio thread (such as inside a render
  *  callback). It may cause the thread to block, inducing audio stutters.
  */
-void AEFreeAudioBufferList(AudioBufferList *bufferList);
+void AEAudioBufferListFree(AudioBufferList *bufferList);
+#define AEFreeAudioBufferList AEAudioBufferListFree // Legacy alias
 
 /*!
  * Get the number of frames in a buffer list
@@ -96,10 +99,11 @@ void AEFreeAudioBufferList(AudioBufferList *bufferList);
  * @param oNumberOfChannels If not NULL, will be set to the number of channels of audio in 'list'
  * @return Number of frames in the buffer list
  */
-int AEGetNumberOfFramesInAudioBufferList(AudioBufferList *bufferList,
-                                         AudioStreamBasicDescription audioFormat,
-                                         int *oNumberOfChannels);
-    
+UInt32 AEAudioBufferListGetLength(AudioBufferList *bufferList,
+                                  AudioStreamBasicDescription audioFormat,
+                                  int *oNumberOfChannels);
+#define AEGetNumberOfFramesInAudioBufferList AEAudioBufferListGetLength // Legacy alias
+
 /*!
  * Set the number of frames in a buffer list
  *
@@ -110,9 +114,9 @@ int AEGetNumberOfFramesInAudioBufferList(AudioBufferList *bufferList,
  * @param audioFormat   Audio format describing the audio in the buffer list
  * @param frames        The number of frames to set
  */
-void AESetNumberOfFramesInAudioBufferList(AudioBufferList *bufferList,
-                                          AudioStreamBasicDescription audioFormat,
-                                          UInt32 frames);
+void AEAudioBufferListSetLength(AudioBufferList *bufferList,
+                                AudioStreamBasicDescription audioFormat,
+                                UInt32 frames);
 
 /*!
  * Offset the pointers in a buffer list
@@ -124,7 +128,7 @@ void AESetNumberOfFramesInAudioBufferList(AudioBufferList *bufferList,
  * @param audioFormat   Audio format describing the audio in the buffer list
  * @param frames        The number of frames to offset the mData pointers by
  */
-void AEOffsetAudioBufferList(AudioBufferList *bufferList,
+void AEAudioBufferListOffset(AudioBufferList *bufferList,
                              AudioStreamBasicDescription audioFormat,
                              UInt32 frames);
 
@@ -136,7 +140,7 @@ void AEOffsetAudioBufferList(AudioBufferList *bufferList,
  * @param offset        Offset into buffer
  * @param length        Number of frames to silence (0 for whole buffer)
  */
-void AESilenceAudioBufferList(AudioBufferList *bufferList,
+void AEAudioBufferListSilence(AudioBufferList *bufferList,
                               AudioStreamBasicDescription audioFormat,
                               UInt32 offset,
                               UInt32 length);
@@ -152,7 +156,7 @@ void AESilenceAudioBufferList(AudioBufferList *bufferList,
  * @param bufferList    Pointer to an AudioBufferList
  * @return Size of the AudioBufferList structure
  */
-static inline size_t AEGetAudioBufferListSize(AudioBufferList *bufferList) {
+static inline size_t AEAudioBufferListGetStructSize(AudioBufferList *bufferList) {
     return sizeof(AudioBufferList) + (bufferList->mNumberBuffers-1) * sizeof(AudioBuffer);
 }
 

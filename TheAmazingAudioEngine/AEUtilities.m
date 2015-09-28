@@ -29,7 +29,7 @@
 static double __hostTicksToSeconds = 0.0;
 static double __secondsToHostTicks = 0.0;
 
-AudioBufferList *AEAllocateAndInitAudioBufferList(AudioStreamBasicDescription audioFormat, int frameCount) {
+AudioBufferList *AEAudioBufferListCreate(AudioStreamBasicDescription audioFormat, int frameCount) {
     int numberOfBuffers = audioFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? audioFormat.mChannelsPerFrame : 1;
     int channelsPerBuffer = audioFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? 1 : audioFormat.mChannelsPerFrame;
     int bytesPerBuffer = audioFormat.mBytesPerFrame * frameCount;
@@ -56,7 +56,7 @@ AudioBufferList *AEAllocateAndInitAudioBufferList(AudioStreamBasicDescription au
     return audio;
 }
 
-AudioBufferList *AECopyAudioBufferList(AudioBufferList *original) {
+AudioBufferList *AEAudioBufferListCopy(AudioBufferList *original) {
     AudioBufferList *audio = malloc(sizeof(AudioBufferList) + (original->mNumberBuffers-1)*sizeof(AudioBuffer));
     if ( !audio ) {
         return NULL;
@@ -76,16 +76,16 @@ AudioBufferList *AECopyAudioBufferList(AudioBufferList *original) {
     return audio;
 }
 
-void AEFreeAudioBufferList(AudioBufferList *bufferList ) {
+void AEAudioBufferListFree(AudioBufferList *bufferList ) {
     for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
         if ( bufferList->mBuffers[i].mData ) free(bufferList->mBuffers[i].mData);
     }
     free(bufferList);
 }
 
-int AEGetNumberOfFramesInAudioBufferList(AudioBufferList *bufferList,
-                                         AudioStreamBasicDescription audioFormat,
-                                         int *oNumberOfChannels) {
+UInt32 AEAudioBufferListGetLength(AudioBufferList *bufferList,
+                                  AudioStreamBasicDescription audioFormat,
+                                  int *oNumberOfChannels) {
     int channelCount = audioFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved
         ? bufferList->mNumberBuffers : bufferList->mBuffers[0].mNumberChannels;
     if ( oNumberOfChannels ) {
@@ -94,7 +94,7 @@ int AEGetNumberOfFramesInAudioBufferList(AudioBufferList *bufferList,
     return bufferList->mBuffers[0].mDataByteSize / ((audioFormat.mBitsPerChannel/8) * channelCount);
 }
 
-void AESetNumberOfFramesInAudioBufferList(AudioBufferList *bufferList,
+void AEAudioBufferListSetLength(AudioBufferList *bufferList,
                                           AudioStreamBasicDescription audioFormat,
                                           UInt32 frames) {
     for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
@@ -102,7 +102,7 @@ void AESetNumberOfFramesInAudioBufferList(AudioBufferList *bufferList,
     }
 }
 
-void AEOffsetAudioBufferList(AudioBufferList *bufferList,
+void AEAudioBufferListOffset(AudioBufferList *bufferList,
                              AudioStreamBasicDescription audioFormat,
                              UInt32 frames) {
     for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
@@ -111,7 +111,7 @@ void AEOffsetAudioBufferList(AudioBufferList *bufferList,
     }
 }
 
-void AESilenceAudioBufferList(AudioBufferList *bufferList,
+void AEAudioBufferListSilence(AudioBufferList *bufferList,
                               AudioStreamBasicDescription audioFormat,
                               UInt32 offset,
                               UInt32 length) {

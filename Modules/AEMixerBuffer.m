@@ -384,7 +384,7 @@ void AEMixerBufferDequeue(__unsafe_unretained AEMixerBuffer *THIS, AudioBufferLi
     }
     
     // We'll advance the buffer list pointers as we add audio - save the original buffer list to restore later
-    AECreateStackCopyOfAudioBufferList(savedBufferList, bufferList, 0);
+    AEAudioBufferListCopyOnStack(savedBufferList, bufferList, 0);
     
     THIS->_automaticSingleSourceDequeueing = YES;
     int framesToGo = MIN(*ioLengthInFrames, bufferList->mBuffers[0].mDataByteSize / THIS->_clientFormat.mBytesPerFrame);
@@ -463,7 +463,7 @@ void AEMixerBufferDequeue(__unsafe_unretained AEMixerBuffer *THIS, AudioBufferLi
     }
     
     // Restore buffers
-    memcpy(bufferList, savedBufferList, AEGetAudioBufferListSize(bufferList));
+    memcpy(bufferList, savedBufferList, AEAudioBufferListGetStructSize(bufferList));
 }
 
 

@@ -764,23 +764,23 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  
  The Amazing Audio Engine provides a number of utility functions for dealing with audio buffer lists:
  
- - @link AEAllocateAndInitAudioBufferList @endlink will take an `AudioStreamBasicDescription` and a number of frames to
+ - @link AEAudioBufferListCreate @endlink will take an `AudioStreamBasicDescription` and a number of frames to
    allocate, and will allocate and initialise an audio buffer list and the corresponding memory buffers appropriately.
- - @link AECopyAudioBufferList @endlink will copy an existing audio buffer list into a new one, allocating memory as
+ - @link AEAudioBufferListCopy @endlink will copy an existing audio buffer list into a new one, allocating memory as
    needed.
- - @link AEFreeAudioBufferList @endlink will free the memory pointed to by an audio buffer list, and the buffer list
+ - @link AEAudioBufferListFree @endlink will free the memory pointed to by an audio buffer list, and the buffer list
    itself.
- - @link AECreateStackCopyOfAudioBufferList @endlink will make a copy of an existing buffer on the stack (without any
+ - @link AEAudioBufferListCopyOnStack @endlink will make a copy of an existing buffer on the stack (without any
    memory allocation), and optionally offset its mData pointers; useful for doing offset buffer fills with utilities 
    that write to AudioBufferLists.
- - @link AEGetNumberOfFramesInAudioBufferList @endlink will take an `AudioStreamBasicDescription` and return the number
+ - @link AEAudioBufferListGetLength @endlink will take an `AudioStreamBasicDescription` and return the number
    of frames contained within the audio buffer list given the `mDataByteSize` values within.
- - @link AESetNumberOfFramesInAudioBufferList @endlink sets a buffer list's `mDataByteSize` values to correspond to
+ - @link AEAudioBufferListSetLength @endlink sets a buffer list's `mDataByteSize` values to correspond to
    the given number of frames.
- - @link AEOffsetAudioBufferList @endlink increments a buffer list's `mData` pointers by the given number of frames,
+ - @link AEAudioBufferListOffset @endlink increments a buffer list's `mData` pointers by the given number of frames,
    and decrements the `mDataByteSize` values accordingly.
- - @link AESilenceAudioBufferList @endlink clears the values in a buffer list (sets them to zero).
- - @link AEGetAudioBufferListSize @endlink returns the size of an AudioBufferList structure, for use when memcpy-ing buffer list structures.
+ - @link AEAudioBufferListSilence @endlink clears the values in a buffer list (sets them to zero).
+ - @link AEAudioBufferListGetStructSize @endlink returns the size of an AudioBufferList structure, for use when memcpy-ing buffer list structures.
  
  Note: Do not use those functions above that perform memory allocation or deallocation from within the Core Audio thread,
  as this may cause performance problems.
@@ -820,7 +820,7 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  static const int kScratchBufferSize[4096];
  
  AudioBufferList *scratchBufferList
-    = AEAllocateAndInitAudioBufferList([AEAudioController nonInterleavedFloatStereoAudioDescription], 
+    = AEAudioBufferListCreate([AEAudioController nonInterleavedFloatStereoAudioDescription], 
                                        kScratchBufferSize);
 
  

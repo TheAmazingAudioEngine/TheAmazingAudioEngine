@@ -89,13 +89,13 @@ typedef void (^AECalibrateCompletionBlock)(void);
     _clientFormat = audioController.audioDescription;
     
     self.floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:_clientFormat];
-    _scratchBuffer = AEAllocateAndInitAudioBufferList(_floatConverter.floatingPointAudioDescription, kScratchBufferLength);
+    _scratchBuffer = AEAudioBufferListCreate(_floatConverter.floatingPointAudioDescription, kScratchBufferLength);
 }
 
 - (void)teardown {
     self.audioController = nil;
     self.floatConverter = nil;
-    AEFreeAudioBufferList(_scratchBuffer);
+    AEAudioBufferListFree(_scratchBuffer);
 }
 
 - (void)assignPreset:(AEExpanderFilterPreset)preset {

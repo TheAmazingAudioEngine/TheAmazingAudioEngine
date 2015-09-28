@@ -955,7 +955,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     [self releaseResourcesForChannel:_topChannel];
 
     if ( _inputLevelMonitorData.scratchBuffer ) {
-        AEFreeAudioBufferList(_inputLevelMonitorData.scratchBuffer);
+        AEAudioBufferListFree(_inputLevelMonitorData.scratchBuffer);
     }
     
     if ( _inputLevelMonitorData.floatConverter ) {
@@ -963,12 +963,12 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     }
     
     if ( _inputAudioBufferList ) {
-        AEFreeAudioBufferList(_inputAudioBufferList);
+        AEAudioBufferListFree(_inputAudioBufferList);
     }
     
 #if TARGET_OS_IPHONE
     if ( _inputAudioScratchBufferList ) {
-        AEFreeAudioBufferList(_inputAudioScratchBufferList);
+        AEAudioBufferListFree(_inputAudioScratchBufferList);
     }
 #endif
     
@@ -979,7 +979,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     }
     free(_inputCallbacks);
     
-    if ( _audiobusMonitorBuffer ) AEFreeAudioBufferList(_audiobusMonitorBuffer);
+    if ( _audiobusMonitorBuffer ) AEAudioBufferListFree(_audiobusMonitorBuffer);
 }
 
 -(BOOL)start:(NSError **)error {
@@ -1666,7 +1666,7 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(__unsafe_unretained AE
             AEFloatConverter *floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:group->channel->audioDescription];
             group->level_monitor_data.channels = group->channel->audioDescription.mChannelsPerFrame;
             group->level_monitor_data.floatConverter = (__bridge_retained void*)floatConverter;
-            group->level_monitor_data.scratchBuffer = AEAllocateAndInitAudioBufferList(floatConverter.floatingPointAudioDescription, kLevelMonitorScratchBufferSize);
+            group->level_monitor_data.scratchBuffer = AEAudioBufferListCreate(floatConverter.floatingPointAudioDescription, kLevelMonitorScratchBufferSize);
             OSMemoryBarrier();
             group->level_monitor_data.monitoringEnabled = YES;
             
@@ -1696,7 +1696,7 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(__unsafe_unretained AE
             AEFloatConverter *floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:group->channel->audioDescription];
             group->level_monitor_data.channels = group->channel->audioDescription.mChannelsPerFrame;
             group->level_monitor_data.floatConverter = (__bridge_retained void*)floatConverter;
-            group->level_monitor_data.scratchBuffer = AEAllocateAndInitAudioBufferList(floatConverter.floatingPointAudioDescription, kLevelMonitorScratchBufferSize);
+            group->level_monitor_data.scratchBuffer = AEAudioBufferListCreate(floatConverter.floatingPointAudioDescription, kLevelMonitorScratchBufferSize);
             OSMemoryBarrier();
             group->level_monitor_data.monitoringEnabled = YES;
 
@@ -1731,7 +1731,7 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(__unsafe_unretained AE
         AEFloatConverter *floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:_rawInputAudioDescription];
         _inputLevelMonitorData.channels = _rawInputAudioDescription.mChannelsPerFrame;
         _inputLevelMonitorData.floatConverter = (__bridge_retained void*)floatConverter;
-        _inputLevelMonitorData.scratchBuffer = AEAllocateAndInitAudioBufferList(floatConverter.floatingPointAudioDescription, kLevelMonitorScratchBufferSize);
+        _inputLevelMonitorData.scratchBuffer = AEAudioBufferListCreate(floatConverter.floatingPointAudioDescription, kLevelMonitorScratchBufferSize);
         OSMemoryBarrier();
         _inputLevelMonitorData.monitoringEnabled = YES;
     }
@@ -1756,7 +1756,7 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(__unsafe_unretained AE
         AEFloatConverter *floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:_rawInputAudioDescription];
         _inputLevelMonitorData.channels = _rawInputAudioDescription.mChannelsPerFrame;
         _inputLevelMonitorData.floatConverter = (__bridge_retained void*)floatConverter;
-        _inputLevelMonitorData.scratchBuffer = AEAllocateAndInitAudioBufferList(floatConverter.floatingPointAudioDescription, kLevelMonitorScratchBufferSize);
+        _inputLevelMonitorData.scratchBuffer = AEAudioBufferListCreate(floatConverter.floatingPointAudioDescription, kLevelMonitorScratchBufferSize);
         OSMemoryBarrier();
         _inputLevelMonitorData.monitoringEnabled = YES;
     }
@@ -2070,7 +2070,7 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
     }
     
     if ( [self hasAudiobusSenderForUpstreamChannels:channelElement] && !_audiobusMonitorChannel ) {
-        _audiobusMonitorBuffer = AEAllocateAndInitAudioBufferList([AEAudioController nonInterleavedFloatStereoAudioDescription], kMaxFramesPerSlice);
+        _audiobusMonitorBuffer = AEAudioBufferListCreate([AEAudioController nonInterleavedFloatStereoAudioDescription], kMaxFramesPerSlice);
         AudioBufferList *monitorBuffer = _audiobusMonitorBuffer;
         _audiobusMonitorChannel = [AEBlockChannel channelWithBlock:^(const AudioTimeStamp *time, UInt32 frames, AudioBufferList *audio) {
             for ( int i=0; i<MIN(audio->mNumberBuffers, monitorBuffer->mNumberBuffers); i++ ) {
@@ -2086,7 +2086,7 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
         [self performSynchronousMessageExchangeWithBlock:^{
             channelElement->audiobusSenderPort = nil;
         }];
-        AEFreeAudioBufferList(channelElement->audiobusScratchBuffer);
+        AEAudioBufferListFree(channelElement->audiobusScratchBuffer);
         channelElement->audiobusScratchBuffer = NULL;
         CFBridgingRelease(channelElement->audiobusFloatConverter);
         channelElement->audiobusFloatConverter = nil;
@@ -2096,7 +2096,7 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
             channelElement->audiobusFloatConverter = (__bridge_retained void*)[[AEFloatConverter alloc] initWithSourceFormat:channelElement->audioDescription.mSampleRate ? channelElement->audioDescription : _audioDescription];
         }
         if ( !channelElement->audiobusScratchBuffer ) {
-            channelElement->audiobusScratchBuffer = AEAllocateAndInitAudioBufferList(((__bridge AEFloatConverter*)channelElement->audiobusFloatConverter).floatingPointAudioDescription, kScratchBufferFrames);
+            channelElement->audiobusScratchBuffer = AEAudioBufferListCreate(((__bridge AEFloatConverter*)channelElement->audiobusFloatConverter).floatingPointAudioDescription, kScratchBufferFrames);
         }
         [(id<AEAudiobusForwardDeclarationsProtocol>)audiobusSenderPort setClientFormat:((__bridge AEFloatConverter*)channelElement->audiobusFloatConverter).floatingPointAudioDescription];
         if ( channelElement->type == kChannelTypeGroup ) {
@@ -2799,7 +2799,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         }
         
         if ( _inputCallbacks[i].audioBufferList ) {
-            AEFreeAudioBufferList(_inputCallbacks[i].audioBufferList);
+            AEAudioBufferListFree(_inputCallbacks[i].audioBufferList);
             _inputCallbacks[i].audioBufferList = NULL;
         }
     }
@@ -2981,7 +2981,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
                     inputDescriptionChanged = YES;
                 }
                 entry->audioDescription = audioDescription;
-                entry->audioBufferList = AEAllocateAndInitAudioBufferList(entry->audioDescription, kInputAudioBufferFrames);
+                entry->audioBufferList = AEAudioBufferListCreate(entry->audioDescription, kInputAudioBufferFrames);
             }
             
             // Determine if conversion is required
@@ -3028,7 +3028,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
                 if ( inputLevelMonitorData.monitoringEnabled && memcmp(&_rawInputAudioDescription, &rawAudioDescription, sizeof(_rawInputAudioDescription)) != 0 ) {
                     inputLevelMonitorData.channels = rawAudioDescription.mChannelsPerFrame;
                     inputLevelMonitorData.floatConverter = (__bridge_retained void*)[[AEFloatConverter alloc] initWithSourceFormat:rawAudioDescription];
-                    inputLevelMonitorData.scratchBuffer = AEAllocateAndInitAudioBufferList(((__bridge AEFloatConverter*)inputLevelMonitorData.floatConverter).floatingPointAudioDescription, kLevelMonitorScratchBufferSize);
+                    inputLevelMonitorData.scratchBuffer = AEAudioBufferListCreate(((__bridge AEFloatConverter*)inputLevelMonitorData.floatConverter).floatingPointAudioDescription, kLevelMonitorScratchBufferSize);
                 }
             }
             
@@ -3103,13 +3103,13 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         
         BOOL rawInputAudioDescriptionChanged = memcmp(&_rawInputAudioDescription, &rawAudioDescription, sizeof(_rawInputAudioDescription)) != 0;
         if ( !inputAudioBufferList || rawInputAudioDescriptionChanged ) {
-            inputAudioBufferList = AEAllocateAndInitAudioBufferList(rawAudioDescription, kInputAudioBufferFrames);
+            inputAudioBufferList = AEAudioBufferListCreate(rawAudioDescription, kInputAudioBufferFrames);
         }
         
 #if TARGET_OS_IPHONE
         if ( _useMeasurementMode && _boostBuiltInMicGainInMeasurementMode ) {
             if ( !inputAudioScratchBufferList || rawInputAudioDescriptionChanged ) {
-                inputAudioScratchBufferList = AEAllocateAndInitAudioBufferList(rawAudioDescription, kInputAudioBufferFrames);
+                inputAudioScratchBufferList = AEAudioBufferListCreate(rawAudioDescription, kInputAudioBufferFrames);
             }
             if ( !inputAudioFloatConverter || rawInputAudioDescriptionChanged ) {
                 inputAudioFloatConverter = [[AEFloatConverter alloc] initWithSourceFormat:rawAudioDescription];
@@ -3199,12 +3199,12 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 #endif
     
     if ( oldInputBuffer && oldInputBuffer != inputAudioBufferList ) {
-        AEFreeAudioBufferList(oldInputBuffer);
+        AEAudioBufferListFree(oldInputBuffer);
     }
     
 #if TARGET_OS_IPHONE
     if ( oldInputScratchBuffer && oldInputScratchBuffer != inputAudioScratchBufferList ) {
-        AEFreeAudioBufferList(oldInputScratchBuffer);
+        AEAudioBufferListFree(oldInputScratchBuffer);
     }
 #endif
     
@@ -3217,7 +3217,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
                 AudioConverterDispose(oldEntry->audioConverter);
             }
             if ( oldEntry->audioBufferList && (!entry || oldEntry->audioBufferList != entry->audioBufferList) ) {
-                AEFreeAudioBufferList(oldEntry->audioBufferList);
+                AEAudioBufferListFree(oldEntry->audioBufferList);
             }
         }
         free(oldInputCallbacks);
@@ -3227,7 +3227,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         CFBridgingRelease(oldInputLevelMonitorData.floatConverter);
     }
     if ( oldInputLevelMonitorData.scratchBuffer != inputLevelMonitorData.scratchBuffer ) {
-        AEFreeAudioBufferList(oldInputLevelMonitorData.scratchBuffer);
+        AEAudioBufferListFree(oldInputLevelMonitorData.scratchBuffer);
     }
     
     if ( inputChannelsChanged ) {
@@ -3643,7 +3643,7 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
     if ( channel->audiobusSenderPort ) {
         CFBridgingRelease(channel->audiobusSenderPort);
         channel->audiobusSenderPort = NULL;
-        AEFreeAudioBufferList(channel->audiobusScratchBuffer);
+        AEAudioBufferListFree(channel->audiobusScratchBuffer);
         channel->audiobusScratchBuffer = NULL;
         CFBridgingRelease(channel->audiobusFloatConverter);
         channel->audiobusFloatConverter = NULL;
@@ -3694,7 +3694,7 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
     group->converterNode = 0;
     memset(&group->channel->audioDescription, 0, sizeof(AudioStreamBasicDescription));
     if ( group->level_monitor_data.scratchBuffer ) {
-        AEFreeAudioBufferList(group->level_monitor_data.scratchBuffer);
+        AEAudioBufferListFree(group->level_monitor_data.scratchBuffer);
     }
     if ( group->level_monitor_data.floatConverter ) {
         CFBridgingRelease(group->level_monitor_data.floatConverter);
