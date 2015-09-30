@@ -68,6 +68,7 @@ extern "C" {
 @property (nonatomic, readonly) AudioBufferList * buffer;   //!< The audio buffer
 @property (nonatomic, readonly) NSTimeInterval duration;    //!< Length of audio, in seconds
 @property (nonatomic, assign) NSTimeInterval currentTime;   //!< Current playback position, in seconds
+@property (nonatomic, readonly) AudioStreamBasicDescription audioDescription; //!< The client audio format
 @property (nonatomic, readwrite) BOOL loop;                 //!< Whether to loop this track
 @property (nonatomic, readwrite) float volume;              //!< Track volume
 @property (nonatomic, readwrite) float pan;                 //!< Track pan

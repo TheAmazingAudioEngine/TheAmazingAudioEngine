@@ -31,7 +31,6 @@
     AudioBufferList              *_audio;
     BOOL                          _freeWhenDone;
     UInt32                        _lengthInFrames;
-    AudioStreamBasicDescription   _audioDescription;
     volatile int32_t              _playhead;
 }
 @property (nonatomic, strong) NSURL *url;
