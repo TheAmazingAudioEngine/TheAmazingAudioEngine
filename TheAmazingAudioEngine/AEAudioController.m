@@ -237,6 +237,7 @@ typedef struct _channel_group_t {
     AudioBufferList    *_inputAudioScratchBufferList;
     AEFloatConverter   *_inputAudioFloatConverter;
 #endif
+    UInt32              _lastAvailableInputFrames;
     AudioTimeStamp      _lastInputBusTimeStamp;
     AudioTimeStamp      _lastInputOrOutputBusTimeStamp;
 
@@ -492,16 +493,17 @@ static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt3
 static OSStatus inputAvailableCallback(void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags, const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList *ioData) {
     __unsafe_unretained AEAudioController *THIS = (__bridge AEAudioController *)inRefCon;
     
-    // Take note of timestamp, for use when we actually service the input
+    // Take note of frame count and timestamp, for use when we actually service the input
+    THIS->_lastAvailableInputFrames = inNumberFrames;
     THIS->_lastInputBusTimeStamp = *inTimeStamp;
     
 #if TARGET_OS_IPHONE
     if ( !THIS->_outputEnabled ) {
         // If output isn't enabled, service the input from here
-        serviceAudioInput(THIS, NULL, inTimeStamp, inNumberFrames);
+        serviceAudioInput(THIS, NULL, inTimeStamp, THIS->_lastAvailableInputFrames);
     }
 #else
-    serviceAudioInput(THIS, NULL, inTimeStamp, inNumberFrames);
+    serviceAudioInput(THIS, NULL, inTimeStamp, THIS->_lastAvailableInputFrames);
 #endif
     
     return noErr;
@@ -543,7 +545,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         // Service input
 #if TARGET_OS_IPHONE
         if ( THIS->_inputEnabled ) {
-            serviceAudioInput(THIS, inTimeStamp, &THIS->_lastInputBusTimeStamp, inNumberFrames);
+            serviceAudioInput(THIS, inTimeStamp, &THIS->_lastInputBusTimeStamp, THIS->_lastAvailableInputFrames);
         }
 #endif
         
