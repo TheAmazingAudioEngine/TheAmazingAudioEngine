@@ -63,9 +63,9 @@ AudioBufferList *AEAudioBufferListCreate(AudioStreamBasicDescription audioFormat
  * @param offsetBytes Number of bytes to offset mData/mDataByteSize members
  */
 #define AEAudioBufferListCopyOnStack(name, sourceBufferList, offsetBytes) \
-    char name_bytes[sizeof(AudioBufferList)+(sizeof(AudioBuffer)*(sourceBufferList->mNumberBuffers-1))]; \
-    memcpy(name_bytes, sourceBufferList, sizeof(name_bytes)); \
-    AudioBufferList * name = (AudioBufferList*)name_bytes; \
+    char name ## _bytes[sizeof(AudioBufferList)+(sizeof(AudioBuffer)*(sourceBufferList->mNumberBuffers-1))]; \
+    memcpy(name ## _bytes, sourceBufferList, sizeof(name ## _bytes)); \
+    AudioBufferList * name = (AudioBufferList*)name ## _bytes; \
     for ( int i=0; i<name->mNumberBuffers; i++ ) { \
         name->mBuffers[i].mData = (char*)name->mBuffers[i].mData + offsetBytes; \
         name->mBuffers[i].mDataByteSize -= offsetBytes; \
