@@ -51,6 +51,6 @@ Changelog
 
 ### 1.5
 
-- OS X support!
+- OS X support! Many, many thanks to Steve Rubin!
 - Replaced in-memory version of AEAudioFilePlayer with an audio unit version which streams from disk (thanks to Ryan King and Jeremy Huff of Hello World Engineering, and Ryan Holmes for their contributions to this great enhancement).
 - Bunch of other little improvements; see git log for details.
