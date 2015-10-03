@@ -480,26 +480,26 @@ typedef struct _channel_group_t* AEChannelGroupRef;
 /*!
  * 16-bit stereo audio description, interleaved
  *
- *  Deprecated. Use ABAudioStreamBasicDescriptionInterleaved16BitStereo instead.
+ *  Deprecated. Use AEAudioStreamBasicDescriptionInterleaved16BitStereo instead.
  */
 + (AudioStreamBasicDescription)interleaved16BitStereoAudioDescription;
-// Soon:    __deprecated_msg("use ABAudioStreamBasicDescriptionInterleaved16BitStereo instead");
+// Soon:    __deprecated_msg("use AEAudioStreamBasicDescriptionInterleaved16BitStereo instead");
 
 /*!
  * 16-bit stereo audio description, non-interleaved
  *
- *  Deprecated. Use ABAudioStreamBasicDescriptionNonInterleaved16BitStereo instead.
+ *  Deprecated. Use AEAudioStreamBasicDescriptionNonInterleaved16BitStereo instead.
  */
 + (AudioStreamBasicDescription)nonInterleaved16BitStereoAudioDescription;
-// Soon:    __deprecated_msg("use ABAudioStreamBasicDescriptionNonInterleaved16BitStereo instead");
+// Soon:    __deprecated_msg("use AEAudioStreamBasicDescriptionNonInterleaved16BitStereo instead");
 
 /*!
  * Floating-point stereo audio description, non-interleaved
  *
- *  Deprecated. Use ABAudioStreamBasicDescriptionNonInterleavedFloatStereo instead.
+ *  Deprecated. Use AEAudioStreamBasicDescriptionNonInterleavedFloatStereo instead.
  */
 + (AudioStreamBasicDescription)nonInterleavedFloatStereoAudioDescription;
-// Soon:    __deprecated_msg("use ABAudioStreamBasicDescriptionNonInterleavedFloatStereo instead");
+// Soon:    __deprecated_msg("use AEAudioStreamBasicDescriptionNonInterleavedFloatStereo instead");
 
 /*!
  * Determine whether voice processing is available on this device

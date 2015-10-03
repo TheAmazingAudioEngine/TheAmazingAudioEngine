@@ -21,7 +21,7 @@
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {    
     // Create an instance of the audio controller, set it up and start it running
-    AudioStreamBasicDescription asbd = ABAudioStreamBasicDescriptionNonInterleavedFloatStereo;
+    AudioStreamBasicDescription asbd = AEAudioStreamBasicDescriptionNonInterleavedFloatStereo;
     
     self.audioController = [[AEAudioController alloc] initWithAudioDescription:asbd inputEnabled:YES];
     self.audioController.preferredBufferDuration = 0.005;

@@ -172,26 +172,26 @@ static inline size_t AEAudioBufferListGetStructSize(AudioBufferList *bufferList)
 /*!
  * 32-bit floating-point PCM audio description, non-interleaved, 44.1kHz
  */
-extern AudioStreamBasicDescription ABAudioStreamBasicDescriptionNonInterleavedFloatStereo;
+extern AudioStreamBasicDescription AEAudioStreamBasicDescriptionNonInterleavedFloatStereo;
 
 /*!
  * 16-bit stereo PCM audio description, non-interleaved, 44.1kHz
  */
-extern AudioStreamBasicDescription ABAudioStreamBasicDescriptionNonInterleaved16BitStereo;
+extern AudioStreamBasicDescription AEAudioStreamBasicDescriptionNonInterleaved16BitStereo;
 
 /*!
  * 16-bit stereo PCM audio description, interleaved, 44.1kHz
  */
-extern AudioStreamBasicDescription ABAudioStreamBasicDescriptionInterleaved16BitStereo;
+extern AudioStreamBasicDescription AEAudioStreamBasicDescriptionInterleaved16BitStereo;
     
 /*!
- * Types of samples, for use with ABAudioStreamBasicDescriptionMake
+ * Types of samples, for use with AEAudioStreamBasicDescriptionMake
  */
 typedef enum {
-    ABAudioStreamBasicDescriptionSampleTypeFloat32, //!< 32-bit floating point
-    ABAudioStreamBasicDescriptionSampleTypeInt16,   //!< Signed 16-bit integer
-    ABAudioStreamBasicDescriptionSampleTypeInt32    //!< Signed 32-bit integer
-} ABAudioStreamBasicDescriptionSampleType;
+    AEAudioStreamBasicDescriptionSampleTypeFloat32, //!< 32-bit floating point
+    AEAudioStreamBasicDescriptionSampleTypeInt16,   //!< Signed 16-bit integer
+    AEAudioStreamBasicDescriptionSampleTypeInt32    //!< Signed 32-bit integer
+} AEAudioStreamBasicDescriptionSampleType;
 
 /*!
  * Create a custom AudioStreamBasicDescription
@@ -202,7 +202,7 @@ typedef enum {
  * @param sampleRate The sample rate, in Hz (e.g. 44100)
  * @return A new AudioStreamBasicDescription describing the audio format
  */
-AudioStreamBasicDescription ABAudioStreamBasicDescriptionMake(ABAudioStreamBasicDescriptionSampleType sampleType,
+AudioStreamBasicDescription AEAudioStreamBasicDescriptionMake(AEAudioStreamBasicDescriptionSampleType sampleType,
                                                               BOOL interleaved,
                                                               int numberOfChannels,
                                                               double sampleRate);

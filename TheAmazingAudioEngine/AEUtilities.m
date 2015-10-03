@@ -123,7 +123,7 @@ void AEAudioBufferListSilence(AudioBufferList *bufferList,
     }
 }
 
-AudioStreamBasicDescription ABAudioStreamBasicDescriptionNonInterleavedFloatStereo = {
+AudioStreamBasicDescription AEAudioStreamBasicDescriptionNonInterleavedFloatStereo = {
     .mFormatID          = kAudioFormatLinearPCM,
     .mFormatFlags       = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved,
     .mChannelsPerFrame  = 2,
@@ -134,7 +134,7 @@ AudioStreamBasicDescription ABAudioStreamBasicDescriptionNonInterleavedFloatSter
     .mSampleRate        = 44100.0,
 };
 
-AudioStreamBasicDescription ABAudioStreamBasicDescriptionNonInterleaved16BitStereo = {
+AudioStreamBasicDescription AEAudioStreamBasicDescriptionNonInterleaved16BitStereo = {
     .mFormatID          = kAudioFormatLinearPCM,
     .mFormatFlags       = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked | kAudioFormatFlagsNativeEndian | kAudioFormatFlagIsNonInterleaved,
     .mChannelsPerFrame  = 2,
@@ -145,7 +145,7 @@ AudioStreamBasicDescription ABAudioStreamBasicDescriptionNonInterleaved16BitSter
     .mSampleRate        = 44100.0,
 };
 
-AudioStreamBasicDescription ABAudioStreamBasicDescriptionInterleaved16BitStereo = {
+AudioStreamBasicDescription AEAudioStreamBasicDescriptionInterleaved16BitStereo = {
     .mFormatID          = kAudioFormatLinearPCM,
     .mFormatFlags       = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked | kAudioFormatFlagsNativeEndian,
     .mChannelsPerFrame  = 2,
@@ -156,18 +156,18 @@ AudioStreamBasicDescription ABAudioStreamBasicDescriptionInterleaved16BitStereo 
     .mSampleRate        = 44100.0,
 };
 
-AudioStreamBasicDescription ABAudioStreamBasicDescriptionMake(ABAudioStreamBasicDescriptionSampleType sampleType,
+AudioStreamBasicDescription AEAudioStreamBasicDescriptionMake(AEAudioStreamBasicDescriptionSampleType sampleType,
                                                               BOOL interleaved,
                                                               int numberOfChannels,
                                                               double sampleRate) {
-    int sampleSize = sampleType == ABAudioStreamBasicDescriptionSampleTypeFloat32 ? 4 :
-                     sampleType == ABAudioStreamBasicDescriptionSampleTypeInt16 ? 2 :
-                     sampleType == ABAudioStreamBasicDescriptionSampleTypeInt32 ? 4 : 0;
+    int sampleSize = sampleType == AEAudioStreamBasicDescriptionSampleTypeFloat32 ? 4 :
+                     sampleType == AEAudioStreamBasicDescriptionSampleTypeInt16 ? 2 :
+                     sampleType == AEAudioStreamBasicDescriptionSampleTypeInt32 ? 4 : 0;
     NSCAssert(sampleSize, @"Unrecognized sample type");
     
     return (AudioStreamBasicDescription) {
         .mFormatID = kAudioFormatLinearPCM,
-        .mFormatFlags = (sampleType == ABAudioStreamBasicDescriptionSampleTypeFloat32
+        .mFormatFlags = (sampleType == AEAudioStreamBasicDescriptionSampleTypeFloat32
                           ? kAudioFormatFlagIsFloat : kAudioFormatFlagIsSignedInteger | kAudioFormatFlagsNativeEndian)
                         | kAudioFormatFlagIsPacked
                         | (interleaved ? 0 : kAudioFormatFlagIsNonInterleaved),

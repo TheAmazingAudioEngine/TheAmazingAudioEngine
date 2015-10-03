@@ -144,7 +144,7 @@ extern "C" {
  ...
  
  self.audioController = [[AEAudioController alloc]
-                            initWithAudioDescription:ABAudioStreamBasicDescriptionNonInterleaved16BitStereo
+                            initWithAudioDescription:AEAudioStreamBasicDescriptionNonInterleaved16BitStereo
                                 inputEnabled:YES]; // don't forget to autorelease if you don't use ARC!
  @endcode
  
@@ -791,10 +791,10 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  provides a number of utilities for working with these types:
  
  - A number of pre-defined common types: 
-    @link ABAudioStreamBasicDescriptionNonInterleavedFloatStereo @endlink,
-    @link ABAudioStreamBasicDescriptionNonInterleaved16BitStereo @endlink and
-    @link ABAudioStreamBasicDescriptionInterleaved16BitStereo @endlink.
- - @link ABAudioStreamBasicDescriptionMake @endlink, a method for creating custom types.
+    @link AEAudioStreamBasicDescriptionNonInterleavedFloatStereo @endlink,
+    @link AEAudioStreamBasicDescriptionNonInterleaved16BitStereo @endlink and
+    @link AEAudioStreamBasicDescriptionInterleaved16BitStereo @endlink.
+ - @link AEAudioStreamBasicDescriptionMake @endlink, a method for creating custom types.
  - @link AEAudioStreamBasicDescriptionSetChannelsPerFrame @endlink, a method for easily modifying the number of channels of audio represented.
  
  @section Vector-Processing Improving Efficiency using Vector Operations
@@ -832,7 +832,7 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  static const int kScratchBufferSize[4096];
  
  AudioBufferList *scratchBufferList
-    = AEAudioBufferListCreate(ABAudioStreamBasicDescriptionNonInterleavedFloatStereo, kScratchBufferSize);
+    = AEAudioBufferListCreate(AEAudioStreamBasicDescriptionNonInterleavedFloatStereo, kScratchBufferSize);
 
  
  ...
