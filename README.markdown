@@ -36,3 +36,26 @@ freely, subject to the following restrictions:
    misrepresented as being the original software.
    
 3. This notice may not be removed or altered from any source distribution.
+
+
+Changelog
+---------
+
+### 1.5.1
+
+- Important fixes for the iPhone 6S
+- Added some AudioStreamBasicDescription utilities
+- Added extra AudioBufferList utilities and renamed existing ones for consistent naming
+- Added wrapper classes for Apple's effect audio units (thanks to Dream Engine's Jeremy Flores!)
+- Added Audio Unit parameter facilities (setParameterValue:forId: and getParameterValue:forId:)
+- Added AEMemoryBufferPlayer (a reincarnation of the previous in-memory AEAudioFilePlayer class)
+- Implemented 'playAtTime:' synchronisation method on AEAudioFilePlayer
+- Refactored out cross-thread messaging system into AEMessageQueue (thanks Jonatan Liljedahl!)
+- Replaced 'updateWithAudioDescription:...' mechanism with separate 'setAudioDescription', 'setInputEnabled' and 'setOutputEnabled' methods
+- Bunch of other little improvements; see git log for details.
+
+### 1.5
+
+- OS X support!
+- Replaced in-memory version of AEAudioFilePlayer with an audio unit version which streams from disk (thanks to Ryan King and Jeremy Huff of Hello World Engineering, and Ryan Holmes for their contributions to this great enhancement).
+- Bunch of other little improvements; see git log for details.
