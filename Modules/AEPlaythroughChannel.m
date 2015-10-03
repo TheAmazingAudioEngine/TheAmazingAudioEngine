@@ -30,6 +30,7 @@
 #import "AEAudioController+AudiobusStub.h"
 
 static const int kAudioBufferLength = 16384;
+static const int kSkipThreshold = 2;
 static const int kAudiobusReceiverPortConnectedToSelfChanged;
 
 @interface AEPlaythroughChannel () {
@@ -101,7 +102,7 @@ static OSStatus renderCallback(__unsafe_unretained AEPlaythroughChannel *THIS,
     }
     
     UInt32 fillCount = TPCircularBufferPeek(&THIS->_buffer, NULL, AEAudioControllerAudioDescription(audioController));
-    if ( fillCount > frames ) {
+    if ( fillCount > frames+kSkipThreshold ) {
         UInt32 skip = fillCount - frames;
         TPCircularBufferDequeueBufferListFrames(&THIS->_buffer,
                                                 &skip,
