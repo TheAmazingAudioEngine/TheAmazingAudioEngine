@@ -84,6 +84,7 @@ static const UInt32 kMaxMicrofadeDuration                   = 512;
     AUGraph                     _graph;
     AUNode                      _mixerNode;
     AudioUnit                   _mixerUnit;
+    pthread_mutex_t             _graphMutex;
     AudioConverterRef           _audioConverter;
     TPCircularBuffer            _audioConverterBuffer;
     BOOL                        _audioConverterHasBuffer;
@@ -130,11 +131,15 @@ static void prepareSkipFadeBufferForSource(AEMixerBuffer *THIS, source_t* source
                                                                 selector:@selector(pollActionBuffer) 
                                                                 userInfo:nil
                                                                  repeats:YES];
+    
+    pthread_mutex_init(&_graphMutex, NULL);
         
     return self;
 }
 
 - (void)dealloc {
+    pthread_mutex_destroy(&_graphMutex);
+    
     [_mainThreadActionPollTimer invalidate];
     TPCircularBufferCleanup(&_mainThreadActionBuffer);
     
@@ -214,7 +219,16 @@ static void prepareSkipFadeBufferForSource(AEMixerBuffer *THIS, source_t* source
         // Try to set mixer's output stream format to our client format
         OSStatus result = AudioUnitSetProperty(_mixerUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &_clientFormat, sizeof(_clientFormat));
         
-        if ( result == kAudioUnitErr_FormatNotSupported ) {
+        if ( result == kAudioUnitErr_PropertyNotWritable ) {
+            pthread_mutex_lock(&_graphMutex);
+            // Need to recreate the mixer. Dispose it here, it'll be recreated when we refresh below
+            AECheckOSStatus(AUGraphClose(_graph), "AUGraphClose");
+            AECheckOSStatus(DisposeAUGraph(_graph), "AUGraphClose");
+            _graph = NULL;
+            _graphReady = NO;
+            pthread_mutex_unlock(&_graphMutex);
+            
+        } else if ( result == kAudioUnitErr_FormatNotSupported ) {
             // The mixer only supports a subset of formats. If it doesn't support this one, then we'll convert manually
             
             // Get the existing format, and apply just the sample rate
@@ -312,6 +326,11 @@ void AEMixerBufferDequeue(__unsafe_unretained AEMixerBuffer *THIS, AudioBufferLi
         return;
     }
     
+    if ( pthread_mutex_trylock(&THIS->_graphMutex) != 0 ) {
+        *ioLengthInFrames = 0;
+        return;
+    }
+    
     // If buffer list is provided with NULL mData pointers, use our own scratch buffer
     if ( bufferList && !bufferList->mBuffers[0].mData ) {
         *ioLengthInFrames = MIN(*ioLengthInFrames, kScratchBufferBytesPerChannel / (THIS->_clientFormat.mBitsPerChannel/8));
@@ -350,6 +369,8 @@ void AEMixerBufferDequeue(__unsafe_unretained AEMixerBuffer *THIS, AudioBufferLi
         for ( int i=0; i<kMaxSources; i++ ) {
             if ( THIS->_table[i].source ) THIS->_table[i].consumedFramesInCurrentTimeSlice = 0;
         }
+        
+        pthread_mutex_unlock(&THIS->_graphMutex);
         return;
     }
     
@@ -380,6 +401,7 @@ void AEMixerBufferDequeue(__unsafe_unretained AEMixerBuffer *THIS, AudioBufferLi
         for ( int i=0; i<kMaxSources; i++ ) {
             if ( THIS->_table[i].source ) THIS->_table[i].consumedFramesInCurrentTimeSlice = 0;
         }
+        pthread_mutex_unlock(&THIS->_graphMutex);
         return;
     }
     
@@ -464,6 +486,8 @@ void AEMixerBufferDequeue(__unsafe_unretained AEMixerBuffer *THIS, AudioBufferLi
     
     // Restore buffers
     memcpy(bufferList, savedBufferList, AEAudioBufferListGetStructSize(bufferList));
+    
+    pthread_mutex_unlock(&THIS->_graphMutex);
 }
 
 
