@@ -603,6 +603,23 @@ typedef struct _channel_group_t* AEChannelGroupRef;
  */
 - (BOOL)setOutputEnabled:(BOOL)outputEnabled error:(NSError**)error;
 
+/*!
+ * Composite update method
+ *
+ *  This convenience method updates the audio description, and the input and output enabled status.
+ *
+ * @param audioDescription The new audio description
+ * @param inputEnabled Whether to enable input
+ * @param outputEnabled Whether to enable output
+ * @param error On output, the error, if one occurred
+ * @result YES on success, NO on failure
+ */
+- (BOOL)setAudioDescription:(AudioStreamBasicDescription)audioDescription
+               inputEnabled:(BOOL)inputEnabled
+              outputEnabled:(BOOL)outputEnabled
+                      error:(NSError**)error;
+
+
 ///@}
 #pragma mark - Channel and channel group management
 /** @name Channel and channel group management */
