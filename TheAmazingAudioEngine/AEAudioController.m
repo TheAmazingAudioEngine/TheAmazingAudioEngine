@@ -2797,6 +2797,8 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     }
 #endif
     
+    [self sendTeardownToChannelsAndFilters];
+    
     for ( int i=0; i<_inputCallbackCount; i++ ) {
         if ( _inputCallbacks[i].audioConverter ) {
             AudioConverterDispose(_inputCallbacks[i].audioConverter);
