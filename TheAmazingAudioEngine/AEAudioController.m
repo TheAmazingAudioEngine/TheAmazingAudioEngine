@@ -247,6 +247,8 @@ typedef struct _channel_group_t {
     
     AudioBufferList    *_audiobusMonitorBuffer;
 
+    BOOL                _useHardwareSampleRate;
+
 #ifdef DEBUG
     uint64_t            _renderStartTime[2];
     uint64_t            _renderDuration[2];
@@ -812,7 +814,15 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 }
 
 - (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing outputEnabled:(BOOL)enableOutput {
+    return [self initWithAudioDescription:audioDescription options:
+        enableInput?           AEAudioControllerOptionEnableInput:0|
+        useVoiceProcessing?    AEAudioControllerOptionUseVoiceProcessing:0|
+        enableOutput?          AEAudioControllerOptionEnableOutput:0|
+        enableOutput?          AEAudioControllerOptionAllowMixingWithOtherApps:0
+    ];
+}
 
+- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription options:(AEAudioControllerOptions)options {
     if ( !(self = [super init]) ) return nil;
 
     NSAssert([NSThread isMainThread], @"Should be initialized on the main thread");
@@ -821,9 +831,16 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     
     NSAssert(audioDescription.mFormatID == kAudioFormatLinearPCM, @"Only linear PCM supported");
 
+    BOOL enableInput            = options & AEAudioControllerOptionEnableInput;
+    BOOL enableOutput           = options & AEAudioControllerOptionEnableOutput;
+    BOOL useVoiceProcessing     = options & AEAudioControllerOptionUseVoiceProcessing;
+    BOOL useHardwareSampleRate  = options & AEAudioControllerOptionUseHardwareSampleRate;
+    BOOL allowMixingWithOtherApps = options & AEAudioControllerOptionAllowMixingWithOtherApps;
+    BOOL enableBluetoothInput   = options & AEAudioControllerOptionEnableBluetoothInput;
+
 #if TARGET_OS_IPHONE
     _audioSessionCategory = enableInput ? (enableOutput ? AVAudioSessionCategoryPlayAndRecord : AVAudioSessionCategoryRecord) : AVAudioSessionCategoryPlayback;
-    _allowMixingWithOtherApps = enableOutput ? YES : NO;
+    _allowMixingWithOtherApps = allowMixingWithOtherApps;
     _avoidMeasurementModeForBuiltInSpeaker = YES;
     _boostBuiltInMicGainInMeasurementMode = YES;
 #endif
@@ -832,6 +849,8 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     _outputEnabled = enableOutput;
     _masterOutputVolume = 1.0;
     _voiceProcessingEnabled = useVoiceProcessing;
+    _enableBluetoothInput = enableBluetoothInput;
+    _useHardwareSampleRate = useHardwareSampleRate;
     _inputMode = AEInputModeFixedAudioFormat;
     _voiceProcessingOnlyForSpeakerAndMicrophone = YES;
     _inputCallbacks = (input_callback_table_t*)calloc(sizeof(input_callback_table_t), 1);
@@ -866,7 +885,11 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 }
 
 - (BOOL)setAudioDescription:(AudioStreamBasicDescription)audioDescription error:(NSError**)error {
-    if ( !memcmp(&_audioDescription, &audioDescription, sizeof(audioDescription)) ) return YES;
+    if (
+        // if we only want to change preferredSampleRate, go through even if _audioDescription actually didn't change
+        (!_useHardwareSampleRate || audioDescription.mSampleRate == [AVAudioSession sharedInstance].preferredSampleRate)
+        && !memcmp(&_audioDescription, &audioDescription, sizeof(audioDescription))
+    ) return YES;
     
     NSAssert([NSThread isMainThread], @"Should be executed on the main thread");
     
@@ -2279,6 +2302,19 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
         AVAudioSessionRouteDescription *currentRoute = audioSession.currentRoute;
         NSLog(@"TAAE: Changed audio route to %@", [self stringFromRouteDescription:currentRoute]);
         
+        Float64 currentSampleRate = audioSession.sampleRate;
+        if ( _useHardwareSampleRate && currentSampleRate != _audioDescription.mSampleRate ) {
+            NSError *error = nil;
+            NSLog(@"TAAE: Changing sample rate to %g", currentSampleRate);
+            if ( ![self reinitializeWithChanges:^{
+                [self willChangeValueForKey:@"audioDescription"];
+                _audioDescription.mSampleRate = currentSampleRate;
+                [self didChangeValueForKey:@"audioDescription"];
+            } error:&error] ) {
+                NSLog(@"TAAE: Couldn't change sample rate: %@", error);
+            }
+        }
+
         BOOL playingThroughSpeaker;
         if ( [currentRoute.outputs filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"portType = %@", AVAudioSessionPortBuiltInSpeaker]].count > 0 ) {
             playingThroughSpeaker = YES;
@@ -2404,12 +2440,19 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     
     if ( ![audioSession setPreferredSampleRate:sampleRate error:&error] ) {
         NSLog(@"TAAE: Couldn't set preferred sample rate: %@", error);
+    } else {
+        NSLog(@"TAAE: Asked for sample rate: %g", sampleRate);
     }
     
     // Fetch sample rate, in case we didn't get quite what we requested
     Float64 achievedSampleRate = audioSession.sampleRate;
     if ( achievedSampleRate != sampleRate ) {
-        NSLog(@"TAAE: Hardware sample rate is %f", achievedSampleRate);
+        if ( _useHardwareSampleRate ) {
+            _audioDescription.mSampleRate = achievedSampleRate;
+            NSLog(@"TAAE: Using hardware sample rate instead: %g", achievedSampleRate);
+        } else {
+            NSLog(@"TAAE: Hardware sample rate is %g, converting.", achievedSampleRate);
+        }
     }
 
     // Determine audio route

@@ -461,6 +461,25 @@ typedef struct _channel_group_t* AEChannelGroupRef;
 #pragma mark -
 
 /*!
+ @typedef AEAudioControllerOptions
+ @brief Options for initializing.
+ */
+typedef NS_OPTIONS(NSUInteger, AEAudioControllerOptions) {
+    /// Whether to enable audio input from the microphone or another input device.
+    AEAudioControllerOptionEnableInput              = 1 << 0,
+    /// Whether to enable audio output.
+    AEAudioControllerOptionEnableOutput             = 1 << 1,
+    /// Whether to use the voice processing unit (see @link voiceProcessingEnabled @endlink and @link voiceProcessingAvailable @endlink).
+    AEAudioControllerOptionUseVoiceProcessing       = 1 << 2,
+    /// Whether to use the the actual hardware sample rate instead of converting.
+    AEAudioControllerOptionUseHardwareSampleRate    = 1 << 3,
+    /// Enable audio input from Bluetooth devices.
+    AEAudioControllerOptionEnableBluetoothInput     = 1 << 4,
+    /// Whether to allow mixing audio with other apps.
+    AEAudioControllerOptionAllowMixingWithOtherApps = 1 << 5,
+};
+
+/*!
  * Main controller class
  *
  *  Use:
@@ -520,6 +539,16 @@ typedef struct _channel_group_t* AEChannelGroupRef;
  * @param audioDescription  Audio description to use for all audio
  */
 - (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription;
+
+/*!
+ * Initialize the audio controller system, with the audio description you provide.
+ *
+ *  Creates and configures the audio unit and initial mixer audio unit.
+ *
+ * @param audioDescription  Audio description to use for all audio
+ * @param options           Options to enable input, voice processing, etc. (See @link AEAudioControllerOptions @endlink).
+ */
+- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription options:(AEAudioControllerOptions)options;
 
 /*!
  * Initialize the audio controller system, with the audio description you provide.
