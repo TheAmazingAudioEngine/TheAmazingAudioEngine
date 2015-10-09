@@ -96,6 +96,11 @@ AudioUnit AEAudioUnitFilterGetAudioUnit(__unsafe_unretained AEAudioUnitFilter * 
 @property (nonatomic, readonly) AudioUnit audioUnit;
 
 /*!
+ * The audio graph node
+ */
+@property (nonatomic, readonly) AUNode audioGraphNode;
+
+/*!
  * Audio Unit effect bypass. Default is false.
  *
  * Toggle this state at any time and it will begin taking effect on the next

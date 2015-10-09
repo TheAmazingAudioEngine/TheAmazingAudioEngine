@@ -124,6 +124,11 @@ AudioUnit AEAudioUnitChannelGetAudioUnit(__unsafe_unretained AEAudioUnitChannel 
  */
 @property (nonatomic, readonly) AudioUnit audioUnit;
 
+/*!
+ * The audio graph node
+ */
+@property (nonatomic, readonly) AUNode audioGraphNode;
+
 @end
 
 #ifdef __cplusplus

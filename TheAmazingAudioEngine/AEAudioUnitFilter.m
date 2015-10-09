@@ -43,6 +43,7 @@
 @end
 
 @implementation AEAudioUnitFilter
+@synthesize audioGraphNode = _node;
 
 - (id)initWithComponentDescription:(AudioComponentDescription)audioComponentDescription {
     return [self initWithComponentDescription:audioComponentDescription preInitializeBlock:nil];
