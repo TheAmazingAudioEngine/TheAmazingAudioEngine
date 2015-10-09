@@ -30,7 +30,6 @@
 		4C2933AB1BB2814400AAED25 /* AEPeakLimiterFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C2933911BB2814400AAED25 /* AEPeakLimiterFilter.m */; };
 		4C2933AC1BB2814400AAED25 /* AEPeakLimiterFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C2933911BB2814400AAED25 /* AEPeakLimiterFilter.m */; };
 		4C2933AD1BB2814400AAED25 /* AEReverbFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C2933931BB2814400AAED25 /* AEReverbFilter.m */; };
-		4C2933AE1BB2814400AAED25 /* AEReverbFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C2933931BB2814400AAED25 /* AEReverbFilter.m */; };
 		4C2933AF1BB2814400AAED25 /* AEVarispeedFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C2933951BB2814400AAED25 /* AEVarispeedFilter.m */; };
 		4C2933B01BB2814400AAED25 /* AEVarispeedFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C2933951BB2814400AAED25 /* AEVarispeedFilter.m */; };
 		4C50FEE71B75877800E56620 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C50FEE61B75877800E56620 /* AVFoundation.framework */; };
@@ -582,7 +581,6 @@
 				4C2933AA1BB2814400AAED25 /* AEParametricEqFilter.m in Sources */,
 				4C2933A01BB2814400AAED25 /* AEHighPassFilter.m in Sources */,
 				4C29339C1BB2814400AAED25 /* AEDistortionFilter.m in Sources */,
-				4C2933AE1BB2814400AAED25 /* AEReverbFilter.m in Sources */,
 				4C2933981BB2814400AAED25 /* AEBandpassFilter.m in Sources */,
 				4C2933A81BB2814400AAED25 /* AENewTimePitchFilter.m in Sources */,
 			);
