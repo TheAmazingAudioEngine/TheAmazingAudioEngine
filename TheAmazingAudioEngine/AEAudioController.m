@@ -474,7 +474,7 @@ static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt3
         
         OSStatus result = AudioConverterFillComplexBuffer(arg->table->audioConverter,
                                                           fillComplexBufferInputProc,
-                                                          &(struct fillComplexBufferInputProc_t) { .bufferList = THIS->_inputAudioBufferList, .frames = *frames, .bytesPerFrame = arg->table->audioDescription.mBytesPerFrame },
+                                                          &(struct fillComplexBufferInputProc_t) { .bufferList = THIS->_inputAudioBufferList, .frames = *frames, .bytesPerFrame = THIS->_rawInputAudioDescription.mBytesPerFrame },
                                                           &targetFrames,
                                                           audio,
                                                           NULL);
