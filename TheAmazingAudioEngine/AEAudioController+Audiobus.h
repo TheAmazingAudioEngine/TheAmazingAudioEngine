@@ -43,9 +43,6 @@ extern "C" {
  *  When assigned to a channel and connected via Audiobus, audio for the given channel
  *  will be sent out the Audiobus sender port.
  *
- *  Make sure you have added the sender port to the ABAudiobusController before
- *  using this method.
- *
  * @param senderPort The Audiobus sender port, or nil to remove the port
  * @param channel    Channel for the sender port
  */
@@ -57,9 +54,6 @@ extern "C" {
  *  When assigned to a channel and connected via Audiobus, audio for the given group
  *  will be sent out the Audiobus sender port.
  *
- *  Make sure you have added the sender port to the ABAudiobusController before
- *  using this method.
- *
  * @param senderPort The Audiobus sender port, or nil to remove the port
  * @param channelGroup Channel group for the sender port
  */
@@ -70,9 +64,6 @@ extern "C" {
  *
  *  Set this property to an Audiobus receiver port to receive audio
  *  from this port instead of the system audio input.
- *
- *  Make sure you have added the receiver port to the ABAudiobusController before
- *  using this method.
  */
 @property (nonatomic, retain) ABReceiverPort *audiobusReceiverPort;
 
@@ -81,9 +72,6 @@ extern "C" {
  *
  *  Set this property to an Audiobus filter port to let TAAE correctly update the
  *  number of input channels when connected.
- *
- *  Make sure you have added the filter port to the ABAudiobusController before
- *  using this method.
  */
 @property (nonatomic, retain) ABFilterPort *audiobusFilterPort;
 
@@ -92,9 +80,6 @@ extern "C" {
  *
  *  Set this property to an Audiobus sender port to send system
  *  output out this port.
- *
- *  Make sure you have added the sender port to the ABAudiobusController before
- *  using this method.
  *
  *  Generally speaking, it's more efficient to not use this property, and
  *  instead use ABSenderPort's audio unit initializer (using 
