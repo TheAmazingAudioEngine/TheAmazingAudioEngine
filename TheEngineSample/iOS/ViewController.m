@@ -22,7 +22,6 @@ static const int kInputChannelsChangedContext;
     AudioFileID _audioUnitFile;
     AEChannelGroupRef _group;
 }
-@property (nonatomic, strong) AEAudioController *audioController;
 @property (nonatomic, strong) AEAudioFilePlayer *loop1;
 @property (nonatomic, strong) AEAudioFilePlayer *loop2;
 @property (nonatomic, strong) AEBlockChannel *oscillator;
@@ -52,93 +51,117 @@ static const int kInputChannelsChangedContext;
     
     self.audioController = audioController;
     
-    // Create the first loop player
-    self.loop1 = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Drums" withExtension:@"m4a"] error:NULL];
-    _loop1.volume = 1.0;
-    _loop1.channelIsMuted = YES;
-    _loop1.loop = YES;
-    
-    // Create the second loop player
-    self.loop2 = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Organ" withExtension:@"m4a"] error:NULL];
-    _loop2.volume = 1.0;
-    _loop2.channelIsMuted = YES;
-    _loop2.loop = YES;
-    
-    // Create a block-based channel, with an implementation of an oscillator
-    __block float oscillatorPosition = 0;
-    __block float oscillatorRate = 622.0/44100.0;
-    self.oscillator = [AEBlockChannel channelWithBlock:^(const AudioTimeStamp  *time,
-                                                               UInt32           frames,
-                                                               AudioBufferList *audio) {
-        for ( int i=0; i<frames; i++ ) {
-            // Quick sin-esque oscillator
-            float x = oscillatorPosition;
-            x *= x; x -= 1.0; x *= x;       // x now in the range 0...1
-            x *= INT16_MAX;
-            x -= INT16_MAX / 2;
-            oscillatorPosition += oscillatorRate;
-            if ( oscillatorPosition > 1.0 ) oscillatorPosition -= 2.0;
-            
-            ((SInt16*)audio->mBuffers[0].mData)[i] = x;
-            ((SInt16*)audio->mBuffers[1].mData)[i] = x;
-        }
-    }];
-    _oscillator.audioDescription = AEAudioStreamBasicDescriptionNonInterleaved16BitStereo;
-    
-    _oscillator.channelIsMuted = YES;
-    
-    // Create an audio unit channel (a file player)
-    self.audioUnitPlayer = [[AEAudioUnitChannel alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Generator, kAudioUnitSubType_AudioFilePlayer)];
-    
-    // Create a group for loop1, loop2 and oscillator
-    _group = [_audioController createChannelGroup];
-    [_audioController addChannels:@[_loop1, _loop2, _oscillator] toChannelGroup:_group];
-    
-    // Finally, add the audio unit player
-    [_audioController addChannels:@[_audioUnitPlayer]];
-    
-    [_audioController addObserver:self forKeyPath:@"numberOfInputChannels" options:0 context:(void*)&kInputChannelsChangedContext];
-    
     return self;
 }
 
--(void)dealloc {
-    [_audioController removeObserver:self forKeyPath:@"numberOfInputChannels"];
+- (void)setAudioController:(AEAudioController *)audioController {
+    if ( _audioController ) {
+        [_audioController removeObserver:self forKeyPath:@"numberOfInputChannels"];
+        
+        NSMutableArray *channelsToRemove = [NSMutableArray arrayWithObjects:_loop1, _loop2, _oscillator, _audioUnitPlayer, nil];
+        
+        self.loop1 = nil;
+        self.loop2 = nil;
+        self.oscillator = nil;
+        self.audioUnitPlayer = nil;
+        
+        if ( _player ) {
+            [channelsToRemove addObject:_player];
+            self.player = nil;
+        }
+        
+        if ( _oneshot ) {
+            [channelsToRemove addObject:_oneshot];
+            self.oneshot = nil;
+        }
+        
+        if ( _playthrough ) {
+            [channelsToRemove addObject:_playthrough];
+            [_audioController removeInputReceiver:_playthrough];
+            self.playthrough = nil;
+        }
+        
+        [_audioController removeChannels:channelsToRemove];
+        
+        if ( _limiter ) {
+            [_audioController removeFilter:_limiter];
+            self.limiter = nil;
+        }
+        
+        if ( _expander ) {
+            [_audioController removeFilter:_expander];
+            self.expander = nil;
+        }
+        
+        if ( _reverb ) {
+            [_audioController removeFilter:_reverb];
+            self.reverb = nil;
+        }
+        
+        [_audioController removeChannelGroup:_group];
+        _group = NULL;
+        
+        if ( _audioUnitFile ) {
+            AudioFileClose(_audioUnitFile);
+            _audioUnitFile = NULL;
+        }
+    }
     
-    if ( _levelsTimer ) [_levelsTimer invalidate];
+    _audioController = audioController;
+    
+    if ( _audioController ) {
+        // Create the first loop player
+        self.loop1 = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Drums" withExtension:@"m4a"] error:NULL];
+        _loop1.volume = 1.0;
+        _loop1.channelIsMuted = YES;
+        _loop1.loop = YES;
+        
+        // Create the second loop player
+        self.loop2 = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Organ" withExtension:@"m4a"] error:NULL];
+        _loop2.volume = 1.0;
+        _loop2.channelIsMuted = YES;
+        _loop2.loop = YES;
+        
+        // Create a block-based channel, with an implementation of an oscillator
+        __block float oscillatorPosition = 0;
+        __block float oscillatorRate = 622.0/44100.0;
+        self.oscillator = [AEBlockChannel channelWithBlock:^(const AudioTimeStamp  *time,
+                                                             UInt32           frames,
+                                                             AudioBufferList *audio) {
+            for ( int i=0; i<frames; i++ ) {
+                // Quick sin-esque oscillator
+                float x = oscillatorPosition;
+                x *= x; x -= 1.0; x *= x;       // x now in the range 0...1
+                x *= INT16_MAX;
+                x -= INT16_MAX / 2;
+                oscillatorPosition += oscillatorRate;
+                if ( oscillatorPosition > 1.0 ) oscillatorPosition -= 2.0;
+                
+                ((SInt16*)audio->mBuffers[0].mData)[i] = x;
+                ((SInt16*)audio->mBuffers[1].mData)[i] = x;
+            }
+        }];
+        _oscillator.audioDescription = AEAudioStreamBasicDescriptionNonInterleaved16BitStereo;
+        _oscillator.channelIsMuted = YES;
+        
+        // Create an audio unit channel (a file player)
+        self.audioUnitPlayer = [[AEAudioUnitChannel alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Generator, kAudioUnitSubType_AudioFilePlayer)];
+        
+        // Create a group for loop1, loop2 and oscillator
+        _group = [_audioController createChannelGroup];
+        [_audioController addChannels:@[_loop1, _loop2, _oscillator] toChannelGroup:_group];
+        
+        // Finally, add the audio unit player
+        [_audioController addChannels:@[_audioUnitPlayer]];
+        
+        [_audioController addObserver:self forKeyPath:@"numberOfInputChannels" options:0 context:(void*)&kInputChannelsChangedContext];
+    }
+}
 
-    NSMutableArray *channelsToRemove = [NSMutableArray arrayWithObjects:_loop1, _loop2, nil];
+-(void)dealloc {
+    self.audioController = nil;
     
-    if ( _player ) {
-        [channelsToRemove addObject:_player];
-    }
-    
-    if ( _oneshot ) {
-        [channelsToRemove addObject:_oneshot];
-    }
-    
-    if ( _playthrough ) {
-        [channelsToRemove addObject:_playthrough];
-        [_audioController removeInputReceiver:_playthrough];
-    }
-    
-    [_audioController removeChannels:channelsToRemove];
-    
-    if ( _limiter ) {
-        [_audioController removeFilter:_limiter];
-    }
-    
-    if ( _expander ) {
-        [_audioController removeFilter:_expander];
-    }
-    
-    if ( _reverb ) {
-        [_audioController removeFilter:_reverb];
-    }
-    
-    if ( _audioUnitFile ) {
-        AudioFileClose(_audioUnitFile);
-    }
+    if ( _levelsTimer ) [_levelsTimer invalidate];    
 }
 
 -(void)viewDidLoad {
@@ -147,13 +170,13 @@ static const int kInputChannelsChangedContext;
     UIView *headerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 100)];
     headerView.backgroundColor = [UIColor groupTableViewBackgroundColor];
     
-    self.outputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioController:_audioController];
+    self.outputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioDescription:_audioController.audioDescription];
     _outputOscilloscope.frame = CGRectMake(0, 0, headerView.bounds.size.width, 80);
     [headerView.layer addSublayer:_outputOscilloscope];
     [_audioController addOutputReceiver:_outputOscilloscope];
     [_outputOscilloscope start];
     
-    self.inputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioController:_audioController];
+    self.inputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioDescription:_audioController.audioDescription];
     _inputOscilloscope.frame = CGRectMake(0, 0, headerView.bounds.size.width, 80);
     _inputOscilloscope.lineColor = [UIColor colorWithWhite:0.0 alpha:0.3];
     [headerView.layer addSublayer:_inputOscilloscope];

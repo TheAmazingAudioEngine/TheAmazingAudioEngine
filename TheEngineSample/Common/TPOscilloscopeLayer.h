@@ -19,7 +19,7 @@
 /*!
  * Initialize
  */
-- (id)initWithAudioController:(AEAudioController*)audioController;
+- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription;
 
 /*!
  * Begin rendering
