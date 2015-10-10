@@ -71,13 +71,13 @@ static const int kInputChannelsChangedContext;
     _headerView.wantsLayer = YES;
     [self.view addSubview:_headerView];
 
-    self.outputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioController:_audioController];
+    self.outputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioDescription:_audioController.audioDescription];
     _outputOscilloscope.frame = NSMakeRect(0, 10, _headerView.bounds.size.width, 80);
     [_headerView.layer addSublayer:_outputOscilloscope];
     [_audioController addOutputReceiver:_outputOscilloscope];
     [_outputOscilloscope start];
     
-    self.inputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioController:_audioController];
+    self.inputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioDescription:_audioController.audioDescription];
     _inputOscilloscope.frame = NSMakeRect(0, 10, _headerView.bounds.size.width, 80);
     _inputOscilloscope.lineColor = [NSColor colorWithWhite:0.0 alpha:0.3];
     [_headerView.layer addSublayer:_inputOscilloscope];

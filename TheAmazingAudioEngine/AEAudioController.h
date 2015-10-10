@@ -473,12 +473,12 @@ typedef struct _channel_group_t* AEChannelGroupRef;
  @typedef AEAudioControllerOptions
  @brief Options for initializing.
  */
-typedef NS_OPTIONS(NSUInteger, AEAudioControllerOptions) {
+typedef enum {
     /// Whether to enable audio input from the microphone or another input device.
     AEAudioControllerOptionEnableInput              = 1 << 0,
     /// Whether to enable audio output.
     AEAudioControllerOptionEnableOutput             = 1 << 1,
-    /// Whether to use the voice processing unit (see @link voiceProcessingEnabled @endlink and @link voiceProcessingAvailable @endlink).
+    /// Whether to use the voice processing unit (see @link AEAudioController::voiceProcessingEnabled voiceProcessingEnabled @endlink and @link AEAudioController::voiceProcessingAvailable voiceProcessingAvailable @endlink).
     AEAudioControllerOptionUseVoiceProcessing       = 1 << 2,
     /// Whether to use the the actual hardware sample rate instead of converting.
     AEAudioControllerOptionUseHardwareSampleRate    = 1 << 3,
@@ -489,7 +489,7 @@ typedef NS_OPTIONS(NSUInteger, AEAudioControllerOptions) {
     /// Default options
     AEAudioControllerOptionDefaults =
         AEAudioControllerOptionEnableOutput | AEAudioControllerOptionAllowMixingWithOtherApps,
-};
+} AEAudioControllerOptions;
 
 /*!
  * Main controller class
@@ -1417,7 +1417,9 @@ BOOL AECurrentThreadIsAudioThread(void);
  *
  *  Default is NO.
  */
+#if TARGET_OS_IPHONE
 @property (nonatomic, assign) BOOL enableBluetoothInput;
+#endif
 
 /*!
  * Determine whether input gain is available

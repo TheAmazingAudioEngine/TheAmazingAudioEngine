@@ -886,11 +886,15 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 }
 
 - (BOOL)setAudioDescription:(AudioStreamBasicDescription)audioDescription error:(NSError**)error {
-    if (
+    
+    if ( !memcmp(&_audioDescription, &audioDescription, sizeof(audioDescription))
+#if TARGET_OS_IPHONE
         // if we only want to change preferredSampleRate, go through even if _audioDescription actually didn't change
-        (!_useHardwareSampleRate || audioDescription.mSampleRate == [AVAudioSession sharedInstance].preferredSampleRate)
-        && !memcmp(&_audioDescription, &audioDescription, sizeof(audioDescription))
-    ) return YES;
+        && (!_useHardwareSampleRate || audioDescription.mSampleRate == [AVAudioSession sharedInstance].preferredSampleRate)
+#endif
+        ) {
+        return YES;
+    }
     
     NSAssert([NSThread isMainThread], @"Should be executed on the main thread");
     
