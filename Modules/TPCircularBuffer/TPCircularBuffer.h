@@ -69,7 +69,9 @@ typedef struct {
  * @param buffer Circular buffer
  * @param length Length of buffer
  */
-bool  TPCircularBufferInit(TPCircularBuffer *buffer, int32_t length);
+#define TPCircularBufferInit(buffer, length) \
+    _TPCircularBufferInit(buffer, length, sizeof(*buffer))
+bool _TPCircularBufferInit(TPCircularBuffer *buffer, int32_t length, size_t structSize);
 
 /*!
  * Cleanup buffer

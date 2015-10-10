@@ -558,7 +558,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 6.1;
 				OTHER_CFLAGS = (
 					"-DTPCircularBuffer=AECB",
-					"-DTPCircularBufferInit=AECBInit",
+					"-D_TPCircularBufferInit=_AECBInit",
 					"-DTPCircularBufferCleanup=AECBClean",
 					"-DTPCircularBufferClear=AECBClear",
 					"-DTPCircularBufferSetAtomic=AECBSetAtomic",
@@ -596,7 +596,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 6.1;
 				OTHER_CFLAGS = (
 					"-DTPCircularBuffer=AECB",
-					"-DTPCircularBufferInit=AECBInit",
+					"-D_TPCircularBufferInit=_AECBInit",
 					"-DTPCircularBufferCleanup=AECBClean",
 					"-DTPCircularBufferClear=AECBClear",
 					"-DTPCircularBufferSetAtomic=AECBSetAtomic",
@@ -694,7 +694,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_CFLAGS = (
 					"-DTPCircularBuffer=AECB",
-					"-DTPCircularBufferInit=AECBInit",
+					"-D_TPCircularBufferInit=_AECBInit",
 					"-DTPCircularBufferCleanup=AECBClean",
 					"-DTPCircularBufferClear=AECBClear",
 					"-DTPCircularBufferSetAtomic=AECBSetAtomic",
@@ -746,7 +746,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				OTHER_CFLAGS = (
 					"-DTPCircularBuffer=AECB",
-					"-DTPCircularBufferInit=AECBInit",
+					"-D_TPCircularBufferInit=_AECBInit",
 					"-DTPCircularBufferCleanup=AECBClean",
 					"-DTPCircularBufferClear=AECBClear",
 					"-DTPCircularBufferSetAtomic=AECBSetAtomic",
