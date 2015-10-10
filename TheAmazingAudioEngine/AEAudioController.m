@@ -802,15 +802,20 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 }
 
 - (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription {
-    return [self initWithAudioDescription:audioDescription inputEnabled:NO useVoiceProcessing:NO];
+    return [self initWithAudioDescription:audioDescription options:AEAudioControllerOptionDefaults];
 }
 
 - (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput {
-    return [self initWithAudioDescription:audioDescription inputEnabled:enableInput useVoiceProcessing:NO];
+    return [self initWithAudioDescription:audioDescription
+                                  options:AEAudioControllerOptionDefaults
+                                            | (enableInput ? AEAudioControllerOptionEnableInput : 0)];
 }
 
 - (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing {
-    return [self initWithAudioDescription:audioDescription inputEnabled:enableInput useVoiceProcessing:useVoiceProcessing outputEnabled:YES];
+    return [self initWithAudioDescription:audioDescription
+                                  options:AEAudioControllerOptionDefaults
+                                            | (enableInput ? AEAudioControllerOptionEnableInput : 0)
+                                            | (useVoiceProcessing ? AEAudioControllerOptionUseVoiceProcessing : 0)];
 }
 
 - (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing outputEnabled:(BOOL)enableOutput {
@@ -833,14 +838,12 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 
     BOOL enableInput            = options & AEAudioControllerOptionEnableInput;
     BOOL enableOutput           = options & AEAudioControllerOptionEnableOutput;
-    BOOL useVoiceProcessing     = options & AEAudioControllerOptionUseVoiceProcessing;
-    BOOL useHardwareSampleRate  = options & AEAudioControllerOptionUseHardwareSampleRate;
-    BOOL allowMixingWithOtherApps = options & AEAudioControllerOptionAllowMixingWithOtherApps;
-    BOOL enableBluetoothInput   = options & AEAudioControllerOptionEnableBluetoothInput;
-
+    
 #if TARGET_OS_IPHONE
     _audioSessionCategory = enableInput ? (enableOutput ? AVAudioSessionCategoryPlayAndRecord : AVAudioSessionCategoryRecord) : AVAudioSessionCategoryPlayback;
-    _allowMixingWithOtherApps = allowMixingWithOtherApps;
+    _allowMixingWithOtherApps = options & AEAudioControllerOptionAllowMixingWithOtherApps;
+    _enableBluetoothInput = options & AEAudioControllerOptionEnableBluetoothInput;
+    _voiceProcessingEnabled = options & AEAudioControllerOptionUseVoiceProcessing;
     _avoidMeasurementModeForBuiltInSpeaker = YES;
     _boostBuiltInMicGainInMeasurementMode = YES;
 #endif
@@ -848,9 +851,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     _inputEnabled = enableInput;
     _outputEnabled = enableOutput;
     _masterOutputVolume = 1.0;
-    _voiceProcessingEnabled = useVoiceProcessing;
-    _enableBluetoothInput = enableBluetoothInput;
-    _useHardwareSampleRate = useHardwareSampleRate;
+    _useHardwareSampleRate = options & AEAudioControllerOptionUseHardwareSampleRate;
     _inputMode = AEInputModeFixedAudioFormat;
     _voiceProcessingOnlyForSpeakerAndMicrophone = YES;
     _inputCallbacks = (input_callback_table_t*)calloc(sizeof(input_callback_table_t), 1);
@@ -2440,8 +2441,6 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     
     if ( ![audioSession setPreferredSampleRate:sampleRate error:&error] ) {
         NSLog(@"TAAE: Couldn't set preferred sample rate: %@", error);
-    } else {
-        NSLog(@"TAAE: Asked for sample rate: %g", sampleRate);
     }
     
     // Fetch sample rate, in case we didn't get quite what we requested

@@ -486,6 +486,9 @@ typedef NS_OPTIONS(NSUInteger, AEAudioControllerOptions) {
     AEAudioControllerOptionEnableBluetoothInput     = 1 << 4,
     /// Whether to allow mixing audio with other apps.
     AEAudioControllerOptionAllowMixingWithOtherApps = 1 << 5,
+    /// Default options
+    AEAudioControllerOptionDefaults =
+        AEAudioControllerOptionEnableOutput | AEAudioControllerOptionAllowMixingWithOtherApps,
 };
 
 /*!
@@ -552,6 +555,17 @@ typedef NS_OPTIONS(NSUInteger, AEAudioControllerOptions) {
 /*!
  * Initialize the audio controller system, with the audio description you provide.
  *
+ *  Creates and configures the input/output audio unit and initial mixer audio unit.
+ *
+ * @param audioDescription    Audio description to use for all audio
+ * @param enableInput         Whether to enable audio input from the microphone or another input device
+ */
+- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput;
+
+
+/*!
+ * Initialize the audio controller system, with the audio description you provide.
+ *
  *  Creates and configures the audio unit and initial mixer audio unit.
  *
  * @param audioDescription  Audio description to use for all audio
@@ -566,19 +580,9 @@ typedef NS_OPTIONS(NSUInteger, AEAudioControllerOptions) {
  *
  * @param audioDescription    Audio description to use for all audio
  * @param enableInput         Whether to enable audio input from the microphone or another input device
- */
-- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput;
-
-/*!
- * Initialize the audio controller system, with the audio description you provide.
- *
- *  Creates and configures the input/output audio unit and initial mixer audio unit.
- *
- * @param audioDescription    Audio description to use for all audio
- * @param enableInput         Whether to enable audio input from the microphone or another input device
  * @param useVoiceProcessing  Whether to use the voice processing unit (see @link voiceProcessingEnabled @endlink and @link voiceProcessingAvailable @endlink).
  */
-- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing;
+- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing __deprecated_msg("use initWithAudioDescription:options: instead");
 
 /*!
  * Initialize the audio controller system, with the audio description you provide.
@@ -590,7 +594,7 @@ typedef NS_OPTIONS(NSUInteger, AEAudioControllerOptions) {
  * @param useVoiceProcessing  Whether to use the voice processing unit (see @link voiceProcessingEnabled @endlink and @link voiceProcessingAvailable @endlink).
  * @param enableOutput        Whether to enable audio output.  Sometimes when recording from external input-only devices at high sample rates (96k) you may need to disable output for the sample rate to be actually used.
  */
-- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing outputEnabled:(BOOL)enableOutput;
+- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing outputEnabled:(BOOL)enableOutput __deprecated_msg("use initWithAudioDescription:options: instead");
 
 /*!
  * Start audio engine
