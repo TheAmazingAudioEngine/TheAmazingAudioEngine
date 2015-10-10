@@ -2885,6 +2885,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 #endif
     int numberOfInputChannels    = _audioDescription.mChannelsPerFrame;
     BOOL usingAudiobus           = NO;
+    BOOL usingAudiobusReceiver   = NO;
 
 #if TARGET_OS_IPHONE
     UInt32 size = sizeof(usingIAA);
@@ -2895,6 +2896,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         inputAvailable          = YES;
         numberOfInputChannels   = 2;
         usingAudiobus           = YES;
+        usingAudiobusReceiver   = _audiobusReceiverPort && ABReceiverPortIsConnected(_audiobusReceiverPort);
     } else if ( usingIAA ) {
         AudioStreamBasicDescription inputDescription;
         UInt32 size = sizeof(inputDescription);
@@ -3167,7 +3169,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     int oldInputCallbackCount = _inputCallbackCount;
     audio_level_monitor_t oldInputLevelMonitorData = _inputLevelMonitorData;
     
-    if ( _audiobusReceiverPort && usingAudiobus ) {
+    if ( usingAudiobusReceiver) {
         AudioStreamBasicDescription clientFormat = [(id<AEAudiobusForwardDeclarationsProtocol>)_audiobusReceiverPort clientFormat];
         if ( memcmp(&clientFormat, &rawAudioDescription, sizeof(AudioStreamBasicDescription)) != 0 ) {
             [(id<AEAudiobusForwardDeclarationsProtocol>)_audiobusReceiverPort setClientFormat:rawAudioDescription];
@@ -3187,7 +3189,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         _hardwareInputAvailable   = hardwareInputAvailable;
         _inputCallbacks           = inputCallbacks;
         _inputCallbackCount       = inputCallbackCount;
-        _usingAudiobusInput       = usingAudiobus;
+        _usingAudiobusInput       = usingAudiobusReceiver;
         _inputLevelMonitorData    = inputLevelMonitorData;
     }];
 
