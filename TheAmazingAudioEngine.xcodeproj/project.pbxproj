@@ -574,10 +574,12 @@
 					"-DTPCircularBufferNextBufferList=AECBNextBL",
 					"-DTPCircularBufferNextBufferListAfter=AECBNextBLAfter",
 					"-DTPCircularBufferConsumeNextBufferList=AECBConsumeBL",
+					"-DTPCircularBufferGetAvailableSpace=AECBGetAvailableSpace",
 					"-DTPCircularBufferConsumeNextBufferListPartial=AECBConsumeBLPartial",
 					"-DTPCircularBufferDequeueBufferListFrames=AECBDequeueBLFrames",
 					"-DTPCircularBufferPeek=AECBPeek",
 					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
+					"-D_TPCircularBufferPeek=_AECBPeek",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PUBLIC_HEADERS_FOLDER_PATH = "$(TARGET_NAME)";
@@ -612,10 +614,12 @@
 					"-DTPCircularBufferNextBufferList=AECBNextBL",
 					"-DTPCircularBufferNextBufferListAfter=AECBNextBLAfter",
 					"-DTPCircularBufferConsumeNextBufferList=AECBConsumeBL",
+					"-DTPCircularBufferGetAvailableSpace=AECBGetAvailableSpace",
 					"-DTPCircularBufferConsumeNextBufferListPartial=AECBConsumeBLPartial",
 					"-DTPCircularBufferDequeueBufferListFrames=AECBDequeueBLFrames",
 					"-DTPCircularBufferPeek=AECBPeek",
 					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
+					"-D_TPCircularBufferPeek=_AECBPeek",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PUBLIC_HEADERS_FOLDER_PATH = "$(TARGET_NAME)";
@@ -712,7 +716,9 @@
 					"-DTPCircularBufferConsumeNextBufferList=AECBConsumeBL",
 					"-DTPCircularBufferConsumeNextBufferListPartial=AECBConsumeBLPartial",
 					"-DTPCircularBufferDequeueBufferListFrames=AECBDequeueBLFrames",
+					"-DTPCircularBufferGetAvailableSpace=AECBGetAvailableSpace",
 					"-DTPCircularBufferPeek=AECBPeek",
+					"-D_TPCircularBufferPeek=_AECBPeek",
 					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -764,7 +770,9 @@
 					"-DTPCircularBufferConsumeNextBufferList=AECBConsumeBL",
 					"-DTPCircularBufferConsumeNextBufferListPartial=AECBConsumeBLPartial",
 					"-DTPCircularBufferDequeueBufferListFrames=AECBDequeueBLFrames",
+					"-DTPCircularBufferGetAvailableSpace=AECBGetAvailableSpace",
 					"-DTPCircularBufferPeek=AECBPeek",
+					"-D_TPCircularBufferPeek=_AECBPeek",
 					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
