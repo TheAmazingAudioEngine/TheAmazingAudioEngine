@@ -84,7 +84,7 @@ static void inputCallback(__unsafe_unretained AEPlaythroughChannel *THIS,
     TPCircularBufferCopyAudioBufferList(&THIS->_buffer, audio, time, kTPCircularBufferCopyAll, NULL);
 }
 
--(AEAudioControllerAudioCallback)receiverCallback {
+-(AEAudioReceiverCallback)receiverCallback {
     return inputCallback;
 }
 
@@ -120,7 +120,7 @@ static OSStatus renderCallback(__unsafe_unretained AEPlaythroughChannel *THIS,
     return noErr;
 }
 
--(AEAudioControllerRenderCallback)renderCallback {
+-(AEAudioRenderCallback)renderCallback {
     return renderCallback;
 }
 

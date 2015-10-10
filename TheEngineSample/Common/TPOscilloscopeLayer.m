@@ -115,7 +115,7 @@ static void VRAMPMUL(const SAMPLETYPE *__vDSP_I, vDSP_Stride __vDSP_IS, SAMPLETY
 #endif
 }
 
--(AEAudioControllerAudioCallback)receiverCallback {
+-(AEAudioReceiverCallback)receiverCallback {
     return &audioCallback;
 }
 

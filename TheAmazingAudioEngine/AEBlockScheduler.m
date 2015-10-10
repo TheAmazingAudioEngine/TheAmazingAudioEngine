@@ -226,7 +226,7 @@ static void timingReceiver(__unsafe_unretained AEBlockScheduler *THIS,
     }
 }
 
--(AEAudioControllerTimingCallback)timingReceiverCallback {
+-(AEAudioTimingCallback)timingReceiverCallback {
     return timingReceiver;
 }
 

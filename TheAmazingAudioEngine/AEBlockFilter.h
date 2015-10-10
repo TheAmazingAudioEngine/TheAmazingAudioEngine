@@ -48,7 +48,7 @@ extern "C" {
  * @param frames    The length of the required audio, in frames
  * @param audio     The audio buffer list to write output audio to
  */
-typedef void (^AEBlockFilterBlock)(AEAudioControllerFilterProducer producer,
+typedef void (^AEBlockFilterBlock)(AEAudioFilterProducer producer,
                                    void                     *producerToken,
                                    const AudioTimeStamp     *time,
                                    UInt32                    frames,

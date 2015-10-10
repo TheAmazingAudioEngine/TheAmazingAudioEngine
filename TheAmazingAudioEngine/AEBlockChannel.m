@@ -56,7 +56,7 @@ static OSStatus renderCallback(__unsafe_unretained AEBlockChannel *THIS,
     return noErr;
 }
 
--(AEAudioControllerRenderCallback)renderCallback {
+-(AEAudioRenderCallback)renderCallback {
     return renderCallback;
 }
 

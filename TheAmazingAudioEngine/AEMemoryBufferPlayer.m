@@ -176,7 +176,7 @@ static OSStatus renderCallback(__unsafe_unretained AEMemoryBufferPlayer *THIS, _
     return noErr;
 }
 
--(AEAudioControllerRenderCallback)renderCallback {
+-(AEAudioRenderCallback)renderCallback {
     return renderCallback;
 }
 

@@ -40,7 +40,7 @@
     volatile int32_t _playbackStoppedCallbackScheduled;
     BOOL _running;
     uint64_t _startTime;
-    AEAudioControllerRenderCallback _superRenderCallback;
+    AEAudioRenderCallback _superRenderCallback;
 }
 @property (nonatomic, strong, readwrite) NSURL * url;
 @property (nonatomic, weak) AEAudioController * audioController;
@@ -310,7 +310,7 @@ static OSStatus renderCallback(__unsafe_unretained AEAudioFilePlayer *THIS,
     return noErr;
 }
 
--(AEAudioControllerRenderCallback)renderCallback {
+-(AEAudioRenderCallback)renderCallback {
     return renderCallback;
 }
 

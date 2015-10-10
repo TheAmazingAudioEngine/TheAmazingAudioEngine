@@ -34,7 +34,7 @@
     AudioUnit _inConverterUnit;
     AUNode _outConverterNode;
     AudioUnit _outConverterUnit;
-    AEAudioControllerFilterProducer _currentProducer;
+    AEAudioFilterProducer _currentProducer;
     void *_currentProducerToken;
     BOOL _wasBypassed;
 }
@@ -281,7 +281,7 @@ AudioUnit AEAudioUnitFilterGetAudioUnit(__unsafe_unretained AEAudioUnitFilter * 
 
 static OSStatus filterCallback(__unsafe_unretained AEAudioUnitFilter *THIS,
                                __unsafe_unretained AEAudioController *audioController,
-                               AEAudioControllerFilterProducer producer,
+                               AEAudioFilterProducer producer,
                                void                     *producerToken,
                                const AudioTimeStamp     *time,
                                UInt32                    frames,
@@ -313,7 +313,7 @@ static OSStatus filterCallback(__unsafe_unretained AEAudioUnitFilter *THIS,
     return noErr;
 }
 
--(AEAudioControllerFilterCallback)filterCallback {
+-(AEAudioFilterCallback)filterCallback {
     return filterCallback;
 }
 

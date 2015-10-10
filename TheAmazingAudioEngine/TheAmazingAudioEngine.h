@@ -230,7 +230,7 @@ extern "C" {
  classes that can act as channels.
  
  The protocol requires that you define a method that returns a pointer to a C function that takes the form
- defined by AEAudioControllerRenderCallback. This C function will be called when audio is required.
+ defined by AEAudioRenderCallback. This C function will be called when audio is required.
  
  <blockquote class="tip">
  If you put this C function within the \@implementation block, you will be able to access instance
@@ -256,7 +256,7 @@ extern "C" {
      return noErr;
  }
  
- -(AEAudioControllerRenderCallback)renderCallback {
+ -(AEAudioRenderCallback)renderCallback {
      return &renderCallback;
  }
  
@@ -351,7 +351,7 @@ extern "C" {
  opaque `producerToken` pointer also passed to the block.
  
 @code
-self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer producer,
+self.filter = [AEBlockFilter filterWithBlock:^(AEAudioFilterProducer producer,
                                                void                     *producerToken,
                                                const AudioTimeStamp     *time,
                                                UInt32                    frames,
@@ -370,7 +370,7 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  classes that can filter audio.
  
  The protocol requires that you define a method that returns a pointer to a C function that takes the form
- defined by AEAudioControllerFilterCallback. This C function will be called when audio is to be filtered.
+ defined by AEAudioFilterCallback. This C function will be called when audio is to be filtered.
  
  <blockquote class="tip">
  If you put this C function within the \@implementation block, you will be able to access instance
@@ -393,7 +393,7 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
  
  static OSStatus filterCallback(__unsafe_unretained MyFilterClass *THIS,
                                 __unsafe_unretained AEAudioController *audioController,
-                                AEAudioControllerFilterProducer producer,
+                                AEAudioFilterProducer producer,
                                 void                     *producerToken,
                                 const AudioTimeStamp     *time,
                                 UInt32                    frames,
@@ -408,7 +408,7 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
      return noErr;
  }
 
- -(AEAudioControllerFilterCallback)filterCallback {
+ -(AEAudioFilterCallback)filterCallback {
      return filterCallback;
  }
  
@@ -494,7 +494,7 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioControllerFilterProducer p
      // Do something with 'audio'
  }
  
- -(AEAudioControllerAudioCallback)receiverCallback {
+ -(AEAudioReceiverCallback)receiverCallback {
      return receiverCallback;
  }
  @end

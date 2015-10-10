@@ -319,7 +319,7 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
                 // Run this filter
                 channel_producer_arg_t filterArg = *arg;
                 filterArg.nextFilterIndex = filterIndex+1;
-                return ((AEAudioControllerFilterCallback)callback->callback)((__bridge id)callback->userInfo, (__bridge AEAudioController *)channel->audioController, &channelAudioProducer, (void*)&filterArg, &arg->timeStamp, *frames, audio);
+                return ((AEAudioFilterCallback)callback->callback)((__bridge id)callback->userInfo, (__bridge AEAudioController *)channel->audioController, &channelAudioProducer, (void*)&filterArg, &arg->timeStamp, *frames, audio);
             }
             filterIndex++;
         }
@@ -330,7 +330,7 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
     }
     
     if ( channel->type == kChannelTypeChannel ) {
-        AEAudioControllerRenderCallback callback = (AEAudioControllerRenderCallback) channel->ptr;
+        AEAudioRenderCallback callback = (AEAudioRenderCallback) channel->ptr;
         __unsafe_unretained id<AEAudioPlayable> channelObj = (__bridge id<AEAudioPlayable>) channel->object;
         
         status = callback(channelObj, (__bridge AEAudioController*)channel->audioController, &channel->timeStamp, *frames, audio);
@@ -455,7 +455,7 @@ static OSStatus inputAudioProducer(void *userInfo, AudioBufferList *audio, UInt3
                 // Run this filter
                 input_producer_arg_t filterArg = *arg;
                 filterArg.nextFilterIndex = filterIndex+1;
-                return ((AEAudioControllerFilterCallback)callback->callback)((__bridge id)callback->userInfo, THIS, &inputAudioProducer, (void*)&filterArg, &arg->inTimeStamp, *frames, audio);
+                return ((AEAudioFilterCallback)callback->callback)((__bridge id)callback->userInfo, THIS, &inputAudioProducer, (void*)&filterArg, &arg->inTimeStamp, *frames, audio);
             }
             filterIndex++;
         }
@@ -562,7 +562,7 @@ static OSStatus topRenderNotifyCallback(void *inRefCon, AudioUnitRenderActionFla
         
         for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
             callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
-            ((AEAudioControllerTimingCallback)callback->callback)((__bridge id)callback->userInfo, THIS, &timestamp, inNumberFrames, AEAudioTimingContextOutput);
+            ((AEAudioTimingCallback)callback->callback)((__bridge id)callback->userInfo, THIS, &timestamp, inNumberFrames, AEAudioTimingContextOutput);
         }
     } else {
         // After render
@@ -617,7 +617,7 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
     
     for ( int i=0; i<THIS->_timingCallbacks.count; i++ ) {
         callback_t *callback = &THIS->_timingCallbacks.callbacks[i];
-        ((AEAudioControllerTimingCallback)callback->callback)((__bridge id)callback->userInfo, THIS, &timestamp, inNumberFrames, AEAudioTimingContextInput);
+        ((AEAudioTimingCallback)callback->callback)((__bridge id)callback->userInfo, THIS, &timestamp, inNumberFrames, AEAudioTimingContextInput);
     }
     
     OSStatus result = noErr;
@@ -695,7 +695,7 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
                 callback_t *callback = &table->callbacks.callbacks[i];
                 if ( !(callback->flags & kReceiverFlag) ) continue;
                 
-                ((AEAudioControllerAudioCallback)callback->callback)((__bridge id)callback->userInfo, THIS, AEAudioSourceInput, &timestamp, inNumberFrames, table->audioBufferList);
+                ((AEAudioReceiverCallback)callback->callback)((__bridge id)callback->userInfo, THIS, AEAudioSourceInput, &timestamp, inNumberFrames, table->audioBufferList);
             }
         }
         
@@ -3957,7 +3957,7 @@ static void handleCallbacksForChannel(AEChannelRef channel, const AudioTimeStamp
     for ( int i=0; i<channel->callbacks.count; i++ ) {
         callback_t *callback = &channel->callbacks.callbacks[i];
         if ( callback->flags & kReceiverFlag ) {
-            ((AEAudioControllerAudioCallback)callback->callback)((__bridge id)callback->userInfo, (__bridge AEAudioController*)channel->audioController, channel->ptr, inTimeStamp, inNumberFrames, ioData);
+            ((AEAudioReceiverCallback)callback->callback)((__bridge id)callback->userInfo, (__bridge AEAudioController*)channel->audioController, channel->ptr, inTimeStamp, inNumberFrames, ioData);
         }
     }
 }

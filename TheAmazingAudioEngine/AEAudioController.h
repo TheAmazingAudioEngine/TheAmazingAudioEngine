@@ -125,17 +125,19 @@ typedef enum {
  * @param audio             The audio buffer list - audio should be copied into the provided buffers
  * @return A status code
  */
-typedef OSStatus (*AEAudioControllerRenderCallback) (__unsafe_unretained id    channel,
-                                                     __unsafe_unretained AEAudioController *audioController,
-                                                     const AudioTimeStamp     *time,
-                                                     UInt32                    frames,
-                                                     AudioBufferList          *audio);
+typedef OSStatus (*AEAudioRenderCallback) (__unsafe_unretained id    channel,
+                                           __unsafe_unretained AEAudioController *audioController,
+                                           const AudioTimeStamp     *time,
+                                           UInt32                    frames,
+                                           AudioBufferList          *audio);
+
+typedef AEAudioRenderCallback AEAudioControllerRenderCallback; // Temporary alias
 
 /*!
  * AEAudioPlayable protocol
  *
  *  The interface that a channel object must implement - this includes 'renderCallback',
- *  which is a @link AEAudioControllerRenderCallback C callback @endlink to be called when 
+ *  which is a @link AEAudioRenderCallback C callback @endlink to be called when 
  *  audio is required.  The callback will be passed a reference to this object, so you should
  *  implement it from within the \@implementation block to gain access to your
  *  instance variables.
@@ -150,7 +152,7 @@ typedef OSStatus (*AEAudioControllerRenderCallback) (__unsafe_unretained id    c
  *
  * @return Pointer to a render callback function
  */
-@property (nonatomic, readonly) AEAudioControllerRenderCallback renderCallback;
+@property (nonatomic, readonly) AEAudioRenderCallback renderCallback;
 
 @optional
 
@@ -228,7 +230,7 @@ static void * const AEAudioSourceInput         = ((void*)0x01); //!< Main audio 
 static void * const AEAudioSourceMainOutput    = ((void*)0x02); //!< Main audio output
 
 /*!
- * Audio callback
+ * Audio receiver callback
  *
  *  This callback is used for notifying you of incoming audio (either from 
  *  the built-in microphone, or another input device), and outgoing audio that
@@ -247,19 +249,21 @@ static void * const AEAudioSourceMainOutput    = ((void*)0x02); //!< Main audio 
  * @param frames     The length of the audio, in frames
  * @param audio      The audio buffer list
  */
-typedef void (*AEAudioControllerAudioCallback) (__unsafe_unretained id    receiver,
-                                                __unsafe_unretained AEAudioController *audioController,
-                                                void                     *source,
-                                                const AudioTimeStamp     *time,
-                                                UInt32                    frames,
-                                                AudioBufferList          *audio);
+typedef void (*AEAudioReceiverCallback) (__unsafe_unretained id    receiver,
+                                         __unsafe_unretained AEAudioController *audioController,
+                                         void                     *source,
+                                         const AudioTimeStamp     *time,
+                                         UInt32                    frames,
+                                         AudioBufferList          *audio);
 
+typedef AEAudioReceiverCallback AEAudioControllerAudioCallback; // Temporary alias
+    
 
 /*!
  * AEAudioReceiver protocol
  *
  *  The interface that a object must implement to receive incoming or outgoing output audio.
- *  This includes 'receiverCallback', which is a @link AEAudioControllerAudioCallback C callback @endlink 
+ *  This includes 'receiverCallback', which is a @link AEAudioReceiverCallback C callback @endlink 
  *  to be called when audio is available.  The callback will be passed a reference to this object, so you 
  *  should implement it from within the \@implementation block to gain access to your instance variables.
  */
@@ -273,14 +277,14 @@ typedef void (*AEAudioControllerAudioCallback) (__unsafe_unretained id    receiv
  *
  * @return Pointer to an audio callback
  */
-@property (nonatomic, readonly) AEAudioControllerAudioCallback receiverCallback;
+@property (nonatomic, readonly) AEAudioReceiverCallback receiverCallback;
 
 @end
 
 /*!
  * Filter audio producer
  *
- *  This defines the function passed to a AEAudioControllerFilterCallback,
+ *  This defines the function passed to a AEAudioFilterCallback,
  *  which is used to produce input audio to be processed by the filter.
  *
  * @param producerToken    An opaque pointer to be passed to the function
@@ -288,10 +292,11 @@ typedef void (*AEAudioControllerAudioCallback) (__unsafe_unretained id    receiv
  * @param frames           Number of frames to produce on input, number of frames produced on output
  * @return A status code
  */
-typedef OSStatus (*AEAudioControllerFilterProducer)(void            *producerToken, 
-                                                    AudioBufferList *audio, 
-                                                    UInt32          *frames);
+typedef OSStatus (*AEAudioFilterProducer)(void            *producerToken,
+                                          AudioBufferList *audio,
+                                          UInt32          *frames);
 
+typedef AEAudioFilterProducer AEAudioControllerFilterProducer; // Temporary alias
 
 /*!
  * Filter callback
@@ -322,19 +327,21 @@ typedef OSStatus (*AEAudioControllerFilterProducer)(void            *producerTok
  * @param audio     The audio buffer list to write output audio to
  * @return A status code
  */
-typedef OSStatus (*AEAudioControllerFilterCallback)(__unsafe_unretained id    filter,
-                                                    __unsafe_unretained AEAudioController *audioController,
-                                                    AEAudioControllerFilterProducer producer,
-                                                    void                     *producerToken,
-                                                    const AudioTimeStamp     *time,
-                                                    UInt32                    frames,
-                                                    AudioBufferList          *audio);
+typedef OSStatus (*AEAudioFilterCallback)(__unsafe_unretained id    filter,
+                                          __unsafe_unretained AEAudioController *audioController,
+                                          AEAudioFilterProducer producer,
+                                          void                     *producerToken,
+                                          const AudioTimeStamp     *time,
+                                          UInt32                    frames,
+                                          AudioBufferList          *audio);
+    
+typedef AEAudioFilterCallback AEAudioControllerFilterCallback; // Temporary alias
 
 /*!
  * AEAudioFilter protocol
  *
  *  The interface that a filter must implement - this includes 'filterCallback', which is a 
- *  @link AEAudioControllerFilterCallback C callback @endlink to be called when
+ *  @link AEAudioFilterCallback C callback @endlink to be called when
  *  audio is to be filtered.  The callback will be passed a reference to this object, so you should
  *  implement it from within the \@implementation block to gain access to your
  *  instance variables.
@@ -352,7 +359,7 @@ typedef OSStatus (*AEAudioControllerFilterCallback)(__unsafe_unretained id    fi
  *
  * @return Pointer to a variable speed filter callback
  */
-@property (nonatomic, readonly) AEAudioControllerFilterCallback filterCallback;
+@property (nonatomic, readonly) AEAudioFilterCallback filterCallback;
     
 @optional
     
@@ -420,17 +427,19 @@ typedef enum {
  * @param frames    The number of frames for the current block
  * @param context   The timing context - either input, or output
  */
-typedef void (*AEAudioControllerTimingCallback) (__unsafe_unretained id    receiver,
-                                                 __unsafe_unretained AEAudioController *audioController,
-                                                 const AudioTimeStamp     *time,
-                                                 UInt32                    frames,
-                                                 AEAudioTimingContext      context);
+typedef void (*AEAudioTimingCallback) (__unsafe_unretained id    receiver,
+                                       __unsafe_unretained AEAudioController *audioController,
+                                       const AudioTimeStamp     *time,
+                                       UInt32                    frames,
+                                       AEAudioTimingContext      context);
+    
+typedef AEAudioTimingCallback AEAudioControllerTimingCallback; // Temporary alias
 
 /*!
  * AEAudioTimingReceiver protocol
  *
  *  The interface that a object must implement to receive system time advance notices.
- *  This includes 'timingReceiver', which is a @link AEAudioControllerTimingCallback C callback @endlink 
+ *  This includes 'timingReceiver', which is a @link AEAudioTimingCallback C callback @endlink 
  *  to be called when the system time advances.  The callback will be passed a reference to this object, so you 
  *  should implement it from within the \@implementation block to gain access to your instance variables.
  */
@@ -444,7 +453,7 @@ typedef void (*AEAudioControllerTimingCallback) (__unsafe_unretained id    recei
  *
  * @return Pointer to an audio callback
  */
-@property (nonatomic, readonly) AEAudioControllerTimingCallback timingReceiverCallback;
+@property (nonatomic, readonly) AEAudioTimingCallback timingReceiverCallback;
 
 @end
 

@@ -43,6 +43,6 @@
 @property (nonatomic, strong) NSColor *lineColor;
 #endif
 
-- (AEAudioControllerAudioCallback)receiverCallback;
+- (AEAudioReceiverCallback)receiverCallback;
 
 @end

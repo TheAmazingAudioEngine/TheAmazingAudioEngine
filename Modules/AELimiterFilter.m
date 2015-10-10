@@ -136,7 +136,7 @@ const int kScratchBufferLength = 8192;
 
 static OSStatus filterCallback(__unsafe_unretained AELimiterFilter *THIS,
                                __unsafe_unretained AEAudioController *audioController,
-                               AEAudioControllerFilterProducer producer,
+                               AEAudioFilterProducer producer,
                                void                     *producerToken,
                                const AudioTimeStamp     *time,
                                UInt32                    frames,
@@ -161,7 +161,7 @@ static OSStatus filterCallback(__unsafe_unretained AELimiterFilter *THIS,
     return noErr;
 }
 
--(AEAudioControllerFilterCallback)filterCallback {
+-(AEAudioFilterCallback)filterCallback {
     return filterCallback;
 }
 

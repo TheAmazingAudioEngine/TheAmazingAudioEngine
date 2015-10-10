@@ -156,7 +156,7 @@ static void audioCallback(__unsafe_unretained AERecorder *THIS,
     }
 }
 
--(AEAudioControllerAudioCallback)receiverCallback {
+-(AEAudioReceiverCallback)receiverCallback {
     return audioCallback;
 }
 
