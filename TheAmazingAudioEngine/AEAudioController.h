@@ -511,7 +511,7 @@ typedef enum {
 /*!
  * 16-bit stereo audio description, interleaved
  *
- *  Deprecated. Use AEAudioStreamBasicDescriptionInterleaved16BitStereo instead.
+ * @deprecated Use AEAudioStreamBasicDescriptionInterleaved16BitStereo instead.
  */
 + (AudioStreamBasicDescription)interleaved16BitStereoAudioDescription;
 // Soon:    __deprecated_msg("use AEAudioStreamBasicDescriptionInterleaved16BitStereo instead");
@@ -519,7 +519,7 @@ typedef enum {
 /*!
  * 16-bit stereo audio description, non-interleaved
  *
- *  Deprecated. Use AEAudioStreamBasicDescriptionNonInterleaved16BitStereo instead.
+ * @deprecated Use AEAudioStreamBasicDescriptionNonInterleaved16BitStereo instead.
  */
 + (AudioStreamBasicDescription)nonInterleaved16BitStereoAudioDescription;
 // Soon:    __deprecated_msg("use AEAudioStreamBasicDescriptionNonInterleaved16BitStereo instead");
@@ -527,7 +527,7 @@ typedef enum {
 /*!
  * Floating-point stereo audio description, non-interleaved
  *
- *  Deprecated. Use AEAudioStreamBasicDescriptionNonInterleavedFloatStereo instead.
+ * @deprecated Use AEAudioStreamBasicDescriptionNonInterleavedFloatStereo instead.
  */
 + (AudioStreamBasicDescription)nonInterleavedFloatStereoAudioDescription;
 // Soon:    __deprecated_msg("use AEAudioStreamBasicDescriptionNonInterleavedFloatStereo instead");
@@ -581,6 +581,7 @@ typedef enum {
  * @param audioDescription    Audio description to use for all audio
  * @param enableInput         Whether to enable audio input from the microphone or another input device
  * @param useVoiceProcessing  Whether to use the voice processing unit (see @link voiceProcessingEnabled @endlink and @link voiceProcessingAvailable @endlink).
+ * @deprecated Use initWithAudioDescription:options: instead
  */
 - (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing __deprecated_msg("use initWithAudioDescription:options: instead");
 
@@ -593,6 +594,7 @@ typedef enum {
  * @param enableInput         Whether to enable audio input from the microphone or another input device
  * @param useVoiceProcessing  Whether to use the voice processing unit (see @link voiceProcessingEnabled @endlink and @link voiceProcessingAvailable @endlink).
  * @param enableOutput        Whether to enable audio output.  Sometimes when recording from external input-only devices at high sample rates (96k) you may need to disable output for the sample rate to be actually used.
+ * @deprecated Use initWithAudioDescription:options: instead
  */
 - (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing outputEnabled:(BOOL)enableOutput __deprecated_msg("use initWithAudioDescription:options: instead");
 
