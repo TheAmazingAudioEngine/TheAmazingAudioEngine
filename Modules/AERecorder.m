@@ -51,7 +51,7 @@ NSString * kAERecorderErrorKey = @"error";
     if ( !(self = [super init]) ) return nil;
     self.mixer = [[AEMixerBuffer alloc] initWithClientFormat:audioController.audioDescription];
     self.writer = [[AEAudioFileWriter alloc] initWithAudioDescription:audioController.audioDescription];
-    if ( audioController.audioInputAvailable && audioController.inputAudioDescription.mChannelsPerFrame != audioController.audioDescription.mChannelsPerFrame ) {
+    if ( audioController.inputEnabled && audioController.audioInputAvailable && audioController.inputAudioDescription.mChannelsPerFrame != audioController.audioDescription.mChannelsPerFrame ) {
         [_mixer setAudioDescription:*AEAudioControllerInputAudioDescription(audioController) forSource:AEAudioSourceInput];
     }
     _buffer = AEAudioBufferListCreate(audioController.audioDescription, 0);
