@@ -39,8 +39,9 @@ Changelog
 ### 1.5.2
 
 - Added composite setAudioDescription:inputEnabled:outputEnabled: update method
-- Added missing teardown procedure for channels and filters
 - Added new initializer with AEAudioControllerOptions bitmask (thanks to Jonatan Liljedahl)
+- Added setting to always use the hardware sample rate (thanks to Jonatan Liljedahl)
+- Added missing teardown procedure for channels and filters
 - Fixed incorrect audio input conversion for interleaved formats
 - Fixed conversion issue with AEAudioUnitFilter
 - Fixed OS X build issue by removing AEReverbFilter for OS X (not supported on that platform)
