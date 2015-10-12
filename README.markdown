@@ -36,6 +36,18 @@ freely, subject to the following restrictions:
 Changelog
 ---------
 
+### 1.5.2
+
+- Added composite setAudioDescription:inputEnabled:outputEnabled: update method
+- Added missing teardown procedure for channels and filters
+- Added new initializer with AEAudioControllerOptions bitmask (thanks to Jonatan Liljedahl)
+- Fixed incorrect audio input conversion for interleaved formats
+- Fixed conversion issue with AEAudioUnitFilter
+- Fixed OS X build issue by removing AEReverbFilter for OS X (not supported on that platform)
+- Added 'audioGraphNode' properties to ABAudioUnitFilter/Channel
+- Updated TPCircularBuffer with added safety measures that will refuse to compile or crash early when a version mismatch is detected with other instances in your project
+- Address Audiobus issues for apps with both receiver and filter ports
+
 ### 1.5.1
 
 - Important fixes for the iPhone 6S
