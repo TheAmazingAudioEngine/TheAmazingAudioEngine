@@ -48,6 +48,28 @@ AudioBufferList *AEAudioBufferListCreate(AudioStreamBasicDescription audioFormat
 #define AEAllocateAndInitAudioBufferList AEAudioBufferListCreate // Legacy alias
 
 /*!
+ * Create an audio buffer list on the stack
+ *
+ *  This is useful for creating buffers for temporary use, without needing to perform any
+ *  memory allocations. It will create a local AudioBufferList* variable on the stack, with 
+ *  a name given by the first argument, and initialise the buffer according to the given
+ *  audio format.
+ *
+ *  The created buffer will have NULL mData pointers and 0 mDataByteSize: you will need to 
+ *  assign these to point to a memory buffer.
+ *
+ * @param name Name of the variable to create on the stack
+ * @param audioFormat The audio format to use
+ */
+#define AEAudioBufferListCreateOnStack(name, audioFormat) \
+    int name ## _numberBuffers = audioFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved \
+                                    ? audioFormat.mChannelsPerFrame : 1; \
+    char name ## _bytes[sizeof(AudioBufferList)+(sizeof(AudioBuffer)*(name ## _numberBuffers-1))]; \
+    memset(&name ## _bytes, 0, sizeof(name ## _bytes)); \
+    AudioBufferList * name = (AudioBufferList*)name ## _bytes; \
+    name->mNumberBuffers = name ## _numberBuffers;
+
+/*!
  * Create a stack copy of the given audio buffer list and offset mData pointers
  *
  *  This is useful for creating buffers that point to an offset into the original buffer,
