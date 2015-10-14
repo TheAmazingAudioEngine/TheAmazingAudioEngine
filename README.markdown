@@ -36,6 +36,12 @@ freely, subject to the following restrictions:
 Changelog
 ---------
 
+### In-Development: 1.5.3 (master branch)
+
+- Added AEAudioBufferListCreateOnStack utility
+- Enable automaticLatencyManagement by default
+- Fixed a race condition when using setAudiobusSenderPort*
+
 ### 1.5.2
 
 - Added composite setAudioDescription:inputEnabled:outputEnabled: update method
