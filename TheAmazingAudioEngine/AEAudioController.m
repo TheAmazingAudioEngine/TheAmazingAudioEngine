@@ -846,6 +846,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     _voiceProcessingEnabled = options & AEAudioControllerOptionUseVoiceProcessing;
     _avoidMeasurementModeForBuiltInSpeaker = YES;
     _boostBuiltInMicGainInMeasurementMode = YES;
+    _automaticLatencyManagement = YES;
 #endif
     _audioDescription = audioDescription;
     _inputEnabled = enableInput;

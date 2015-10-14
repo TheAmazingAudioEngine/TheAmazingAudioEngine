@@ -1537,14 +1537,14 @@ BOOL AECurrentThreadIsAudioThread(void);
 /*!
  * Whether to automatically account for input/output latency
  *
- *  If you set this property to YES, the timestamps you see in the various callbacks
- *  will automatically account for input and output latency. If this is NO
- *  (the default), and you wish to account for latency, you will need to use
+ *  If this property to YES (defautlt), the timestamps you see in the various
+ *  callbacks will automatically account for input and output latency. If you set
+ *  this property to NO and you wish to account for latency, you will need to use
  *  the @link inputLatency @endlink and @link outputLatency @endlink properties, 
  *  or their corresponding C functions @link AEAudioControllerInputLatency @endlink
  *  and @link AEAudioControllerOutputLatency @endlink yourself.
  *
- *  Default is NO.
+ *  Default is YES.
  */
 #if TARGET_OS_IPHONE
 @property (nonatomic, assign) BOOL automaticLatencyManagement;
@@ -1633,7 +1633,10 @@ BOOL AECurrentThreadIsAudioThread(void);
 /*!
  * Input latency (in seconds)
  *
- *  To account for hardware latency, you can use this function to offset audio timestamps.
+ *  To account for hardware latency, if @link automaticLatencyManagement @endlink is NO,
+ *  you can use this function to offset audio timestamps. Note that if
+ *  @link automaticLatencyManagement @endlink is YES (the default), you should not use this
+ *  method.
  *
  *  For example:
  *
@@ -1651,7 +1654,10 @@ NSTimeInterval AEAudioControllerInputLatency(__unsafe_unretained AEAudioControll
 /*!
  * Output latency (in seconds)
  *
- *  To account for hardware latency, you can use this function to offset audio timestamps.
+ *  To account for hardware latency, if @link automaticLatencyManagement @endlink is NO,
+ *  you can use this function to offset audio timestamps. Note that if
+ *  @link automaticLatencyManagement @endlink is YES (the default), you should not use this
+ *  method.
  *
  *  For example:
  *
