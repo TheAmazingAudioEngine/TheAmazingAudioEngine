@@ -157,8 +157,9 @@ UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * THIS
     if ( !AECheckOSStatus(result, "AudioFileGetProperty(kAudioFilePropertyDataFormat)") ) {
         *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:result
                                  userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't read the audio file", @"")}];
+        AudioFileClose(_audioFile);
+        _audioFile = NULL;
         return NO;
-        
     }
     
     // Determine length in frames (in original file's sample rate)
@@ -179,10 +180,21 @@ UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * THIS
         if ( !AECheckOSStatus(result, "AudioFileGetProperty(kAudioFilePropertyAudioDataPacketCount)") ) {
             *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:result
                                      userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't read the audio file", @"")}];
+            AudioFileClose(_audioFile);
+            _audioFile = NULL;
             return NO;
         }
         fileLengthInFrames = packetCount * _fileDescription.mFramesPerPacket;
     }
+    
+    if ( fileLengthInFrames == 0 ) {
+        *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:-50
+                                 userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"This audio file is empty", @"")}];
+        AudioFileClose(_audioFile);
+        _audioFile = NULL;
+        return NO;
+    }
+    
     _lengthInFrames = (UInt32)fileLengthInFrames;
     self.url = url;
     
