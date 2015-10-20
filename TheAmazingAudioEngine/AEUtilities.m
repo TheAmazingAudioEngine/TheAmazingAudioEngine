@@ -123,7 +123,7 @@ void AEAudioBufferListSilence(AudioBufferList *bufferList,
     }
 }
 
-AudioStreamBasicDescription AEAudioStreamBasicDescriptionNonInterleavedFloatStereo = {
+AudioStreamBasicDescription const AEAudioStreamBasicDescriptionNonInterleavedFloatStereo = {
     .mFormatID          = kAudioFormatLinearPCM,
     .mFormatFlags       = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved,
     .mChannelsPerFrame  = 2,
@@ -134,7 +134,7 @@ AudioStreamBasicDescription AEAudioStreamBasicDescriptionNonInterleavedFloatSter
     .mSampleRate        = 44100.0,
 };
 
-AudioStreamBasicDescription AEAudioStreamBasicDescriptionNonInterleaved16BitStereo = {
+AudioStreamBasicDescription const AEAudioStreamBasicDescriptionNonInterleaved16BitStereo = {
     .mFormatID          = kAudioFormatLinearPCM,
     .mFormatFlags       = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked | kAudioFormatFlagsNativeEndian | kAudioFormatFlagIsNonInterleaved,
     .mChannelsPerFrame  = 2,
@@ -145,7 +145,7 @@ AudioStreamBasicDescription AEAudioStreamBasicDescriptionNonInterleaved16BitSter
     .mSampleRate        = 44100.0,
 };
 
-AudioStreamBasicDescription AEAudioStreamBasicDescriptionInterleaved16BitStereo = {
+AudioStreamBasicDescription const AEAudioStreamBasicDescriptionInterleaved16BitStereo = {
     .mFormatID          = kAudioFormatLinearPCM,
     .mFormatFlags       = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked | kAudioFormatFlagsNativeEndian,
     .mChannelsPerFrame  = 2,

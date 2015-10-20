@@ -194,17 +194,17 @@ static inline size_t AEAudioBufferListGetStructSize(AudioBufferList *bufferList)
 /*!
  * 32-bit floating-point PCM audio description, non-interleaved, 44.1kHz
  */
-extern AudioStreamBasicDescription AEAudioStreamBasicDescriptionNonInterleavedFloatStereo;
+extern const AudioStreamBasicDescription AEAudioStreamBasicDescriptionNonInterleavedFloatStereo;
 
 /*!
  * 16-bit stereo PCM audio description, non-interleaved, 44.1kHz
  */
-extern AudioStreamBasicDescription AEAudioStreamBasicDescriptionNonInterleaved16BitStereo;
+extern const AudioStreamBasicDescription AEAudioStreamBasicDescriptionNonInterleaved16BitStereo;
 
 /*!
  * 16-bit stereo PCM audio description, interleaved, 44.1kHz
  */
-extern AudioStreamBasicDescription AEAudioStreamBasicDescriptionInterleaved16BitStereo;
+extern const AudioStreamBasicDescription AEAudioStreamBasicDescriptionInterleaved16BitStereo;
     
 /*!
  * Types of samples, for use with AEAudioStreamBasicDescriptionMake
