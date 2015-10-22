@@ -25,6 +25,7 @@
 
 #import "AEMemoryBufferPlayer.h"
 #import "AEAudioFileLoaderOperation.h"
+#import "AEUtilities.h"
 #import <libkern/OSAtomic.h>
 
 @interface AEMemoryBufferPlayer () {
@@ -32,6 +33,7 @@
     BOOL                          _freeWhenDone;
     UInt32                        _lengthInFrames;
     volatile int32_t              _playhead;
+    uint64_t                      _startTime;
 }
 @property (nonatomic, strong) NSURL *url;
 @end
@@ -74,6 +76,13 @@
             free(_audio->mBuffers[i].mData);
         }
         free(_audio);
+    }
+}
+
+- (void)playAtTime:(uint64_t)time {
+    _startTime = time;
+    if ( !self.channelIsPlaying ) {
+        self.channelIsPlaying = YES;
     }
 }
 
@@ -120,6 +129,29 @@ static OSStatus renderCallback(__unsafe_unretained AEMemoryBufferPlayer *THIS, _
     int32_t originalPlayhead = playhead;
     
     if ( !THIS->_channelIsPlaying ) return noErr;
+    
+    uint64_t hostTimeAtBufferEnd = time->mHostTime + AEHostTicksFromSeconds((double)frames / THIS->_audioDescription.mSampleRate);
+    if ( THIS->_startTime && THIS->_startTime > hostTimeAtBufferEnd ) {
+        // Start time not yet reached: emit silence
+        return noErr;
+    }
+    
+    uint32_t silentFrames = THIS->_startTime && THIS->_startTime > time->mHostTime
+    ? AESecondsFromHostTicks(THIS->_startTime - time->mHostTime) * THIS->_audioDescription.mSampleRate : 0;
+    AEAudioBufferListCopyOnStack(scratchAudioBufferList, audio, silentFrames * THIS->_audioDescription.mBytesPerFrame);
+    
+    if ( silentFrames > 0 ) {
+        // Start time is offset into this buffer - silence beginning of buffer
+        for ( int i=0; i<audio->mNumberBuffers; i++) {
+            memset(audio->mBuffers[i].mData, 0, silentFrames * THIS->_audioDescription.mBytesPerFrame);
+        }
+        
+        // Point buffer list to remaining frames
+        audio = scratchAudioBufferList;
+        frames -= silentFrames;
+    }
+    
+    THIS->_startTime = 0;
     
     if ( !THIS->_loop && playhead == THIS->_lengthInFrames ) {
         // Notify main thread that playback has finished
