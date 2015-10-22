@@ -65,6 +65,20 @@ extern "C" {
               audioDescription:(AudioStreamBasicDescription)audioDescription
                   freeWhenDone:(BOOL)freeWhenDone;
 
+/*!
+ * Schedule playback for a particular time
+ *
+ *  This causes the player to emit silence up until the given timestamp
+ *  is reached. Use this method to synchronize playback with other audio
+ *  generators.
+ *
+ *  Note: When you call this method, the property channelIsPlaying will be
+ *  set to YES, to enable playback when the start time is reached.
+ *
+ * @param time The time, in host ticks, at which to begin playback
+ */
+- (void)playAtTime:(uint64_t)time;
+
 @property (nonatomic, readonly) AudioBufferList * buffer;   //!< The audio buffer
 @property (nonatomic, readonly) NSTimeInterval duration;    //!< Length of audio, in seconds
 @property (nonatomic, assign) NSTimeInterval currentTime;   //!< Current playback position, in seconds
