@@ -140,7 +140,7 @@ static void audioCallback(__unsafe_unretained AERecorder *THIS,
         THIS->_buffer->mBuffers[i].mDataByteSize = 0;
     }
     
-    THIS->_currentTime += AEConvertFramesToSeconds(audioController, frames);
+    THIS->_currentTime += AEConvertFramesToSeconds(audioController, frames / THIS->_buffer->mNumberBuffers);
     
     AEMixerBufferDequeue(THIS->_mixer, THIS->_buffer, &bufferLength, NULL);
     
