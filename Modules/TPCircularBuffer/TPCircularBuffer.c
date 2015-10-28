@@ -43,6 +43,8 @@ static inline bool _reportResult(kern_return_t result, const char *operation, co
 
 bool _TPCircularBufferInit(TPCircularBuffer *buffer, int32_t length, size_t structSize) {
     
+    assert(length > 0);
+    
     if ( structSize != sizeof(TPCircularBuffer) ) {
         fprintf(stderr, "TPCircularBuffer: Header version mismatch. Check for old versions of TPCircularBuffer in your project\n");
         abort();
