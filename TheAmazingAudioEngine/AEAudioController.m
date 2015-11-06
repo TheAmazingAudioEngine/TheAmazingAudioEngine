@@ -1087,9 +1087,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
         }
     }
 
-#if TARGET_OS_IPHONE
-#if TARGET_OS_TV
-#else
+#if TARGET_OS_IPHONE && !TARGET_OS_TV
     if ( _inputEnabled ) {
         if ( [audioSession respondsToSelector:@selector(requestRecordPermission:)] ) {
             [audioSession requestRecordPermission:^(BOOL granted) {
@@ -1109,7 +1107,6 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
             [self updateInputDeviceStatus];
         }
     }
-#endif
 #endif
 
     
@@ -1844,17 +1841,14 @@ BOOL AECurrentThreadIsAudioThread(void) {
     }
     
     int options = 0;
-    
+
+#if !TARGET_OS_TV
     if ( [_audioSessionCategory isEqualToString:AVAudioSessionCategoryPlayAndRecord] ) {
-#if TARGET_OS_TV
-#else
         options |= AVAudioSessionCategoryOptionDefaultToSpeaker;
-#endif
     }
-#if TARGET_OS_TV
-#else
     options |= _enableBluetoothInput ? AVAudioSessionCategoryOptionAllowBluetooth : 0;
 #endif
+    
     if ( [_audioSessionCategory isEqualToString:AVAudioSessionCategoryPlayAndRecord] || [_audioSessionCategory isEqualToString:AVAudioSessionCategoryPlayback] ) {
         options |= _allowMixingWithOtherApps ? AVAudioSessionCategoryOptionMixWithOthers : 0;
     }
