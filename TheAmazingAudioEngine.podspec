@@ -8,6 +8,7 @@ Pod::Spec.new do |s|
   s.source       = { :git => "https://github.com/TheAmazingAudioEngine/TheAmazingAudioEngine.git", :tag => "1.5.2" }
   s.ios.deployment_target = '7.0'
   s.osx.deployment_target = '10.9'
+  s.tvos.deployment_target = '9.0'
   s.source_files = 'TheAmazingAudioEngine/**/*.{h,m,c}', 'Modules/**/*.{h,m,c}'
   s.exclude_files = 'Modules/TPCircularBuffer'
   s.osx.exclude_files = 'Modules/Filters/AEReverbFilter.*'
