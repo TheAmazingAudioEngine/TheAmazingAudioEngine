@@ -278,6 +278,30 @@ typedef AEAudioReceiverCallback AEAudioControllerAudioCallback; // Temporary ali
  * @return Pointer to an audio callback
  */
 @property (nonatomic, readonly) AEAudioReceiverCallback receiverCallback;
+    
+@optional
+    
+/*!
+ * Perform setup, to prepare to receive audio
+ *
+ *  Receiver objects may implement this method to be notified when the object is
+ *  being added to the audio controller, or when the audio system is being restored
+ *  after a system error.
+ *
+ *  Use this method to allocate/initialise any required resources.
+ */
+- (void)setupWithAudioController:(AEAudioController *)audioController;
+
+/*!
+ * Clean up resources
+ *
+ *  Filter objects may implement this method to be notified when the object is
+ *  being removed from the audio controller, or when the audio system is being
+ *  cleaned up after a system error.
+ *
+ *  Use this method to free up any resources used.
+ */
+- (void)teardown;
 
 @end
 

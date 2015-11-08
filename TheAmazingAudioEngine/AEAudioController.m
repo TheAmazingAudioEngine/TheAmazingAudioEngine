@@ -1443,9 +1443,6 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 }
 
 - (void)addInputFilter:(id<AEAudioFilter>)filter {
-    if ( [filter respondsToSelector:@selector(setupWithAudioController:)] ) {
-        [filter setupWithAudioController:self];
-    }
     [self addInputFilter:filter forChannels:nil];
 }
 
@@ -1526,18 +1523,27 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 #pragma mark - Output receivers
 
 - (void)addOutputReceiver:(id<AEAudioReceiver>)receiver {
+    if ( [receiver respondsToSelector:@selector(setupWithAudioController:)] ) {
+        [receiver setupWithAudioController:self];
+    }
     if ( [self addCallback:receiver.receiverCallback userInfo:(__bridge void *)receiver flags:kReceiverFlag forChannelGroup:_topGroup] ) {
         CFBridgingRetain(receiver);
     }
 }
 
 - (void)addOutputReceiver:(id<AEAudioReceiver>)receiver forChannel:(id<AEAudioPlayable>)channel {
+    if ( [receiver respondsToSelector:@selector(setupWithAudioController:)] ) {
+        [receiver setupWithAudioController:self];
+    }
     if ( [self addCallback:receiver.receiverCallback userInfo:(__bridge void *)receiver flags:kReceiverFlag forChannel:channel] ) {
         CFBridgingRetain(receiver);
     }
 }
 
 - (void)addOutputReceiver:(id<AEAudioReceiver>)receiver forChannelGroup:(AEChannelGroupRef)group {
+    if ( [receiver respondsToSelector:@selector(setupWithAudioController:)] ) {
+        [receiver setupWithAudioController:self];
+    }
     if ( [self addCallback:receiver.receiverCallback userInfo:(__bridge void *)receiver flags:kReceiverFlag forChannelGroup:group] ) {
         CFBridgingRetain(receiver);
     }
@@ -1547,17 +1553,26 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     if ( [self removeCallback:receiver.receiverCallback userInfo:(__bridge void *)receiver fromChannelGroup:_topGroup] ) {
         CFBridgingRelease((__bridge CFTypeRef)receiver);
     }
+    if ( [receiver respondsToSelector:@selector(teardown)] ) {
+        [receiver teardown];
+    }
 }
 
 - (void)removeOutputReceiver:(id<AEAudioReceiver>)receiver fromChannel:(id<AEAudioPlayable>)channel {
     if ( [self removeCallback:receiver.receiverCallback userInfo:(__bridge void *)receiver fromChannel:channel] ) {
         CFBridgingRelease((__bridge CFTypeRef)receiver);
     }
+    if ( [receiver respondsToSelector:@selector(teardown)] ) {
+        [receiver teardown];
+    }
 }
 
 - (void)removeOutputReceiver:(id<AEAudioReceiver>)receiver fromChannelGroup:(AEChannelGroupRef)group {
     if ( [self removeCallback:receiver.receiverCallback userInfo:(__bridge void *)receiver fromChannelGroup:group] ) {
         CFBridgingRelease((__bridge CFTypeRef)receiver);
+    }
+    if ( [receiver respondsToSelector:@selector(teardown)] ) {
+        [receiver teardown];
     }
 }
 
@@ -1580,6 +1595,10 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 }
 
 - (void)addInputReceiver:(id<AEAudioReceiver>)receiver forChannels:(NSArray *)channels {
+    if ( [receiver respondsToSelector:@selector(setupWithAudioController:)] ) {
+        [receiver setupWithAudioController:self];
+    }
+    
     void *callback = receiver.receiverCallback;
     
     if ( [self addCallback:callback userInfo:(__bridge void *)receiver flags:kReceiverFlag forInputChannels:channels] ) {
@@ -1597,6 +1616,10 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
             if ( found ) instanceCount++;
         }
     }];
+    
+    if ( instanceCount > 0 && [receiver respondsToSelector:@selector(teardown)] ) {
+        [receiver teardown];
+    }
     
     for ( int i=0; i<instanceCount; i++ ) {
         CFBridgingRelease((__bridge CFTypeRef)receiver);
@@ -1617,6 +1640,9 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
             }];
 
             if ( found ) {
+                if ( [receiver respondsToSelector:@selector(teardown)] ) {
+                    [receiver teardown];
+                }
                 CFBridgingRelease((__bridge CFTypeRef)receiver);
             }
             
@@ -2614,7 +2640,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         return NO;
     }
     
-    [self sendSetupToChannelsAndFilters];
+    [self sendSetupToObjects];
     [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerDidRecreateGraphNotification object:self];
     
     if ( wasStarted ) {
@@ -2849,7 +2875,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     }
 #endif
     
-    [self sendTeardownToChannelsAndFilters];
+    [self sendTeardownToObjects];
     
     for ( int i=0; i<_inputCallbackCount; i++ ) {
         if ( _inputCallbacks[i].audioConverter ) {
@@ -3665,39 +3691,51 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
     }
 }
 
-- (void)sendTeardownToChannelsAndFilters {
+- (void)sendTeardownToObjects {
     [self iterateChannelsBeneathGroup:_topGroup block:^(AEChannelRef channel) {
-        for ( id<AEAudioFilter> filter in [self associatedObjectsFromTable:&channel->callbacks matchingFlag:kFilterFlag] ) {
-            if ( [filter respondsToSelector:@selector(teardown)] ) {
-                [filter teardown];
+        for ( id object in [self associatedObjectsFromTable:&channel->callbacks matchingFlag:0] ) {
+            if ( [object respondsToSelector:@selector(teardown)] ) {
+                [object teardown];
             }
         }
         if ( channel->type == kChannelTypeChannel && [(__bridge id<AEAudioPlayable>)channel->object respondsToSelector:@selector(teardown)] ) {
             [(__bridge id<AEAudioPlayable>)channel->object teardown];
         }
     }];
+    for ( int i=0; i<_inputCallbackCount; i++ ) {
+        for ( id object in [self associatedObjectsFromTable:&_inputCallbacks[i].callbacks matchingFlag:0] ) {
+            if ( [object respondsToSelector:@selector(teardown)] ) {
+                [object teardown];
+            }
+        }
+    }
 }
 
-- (void)sendSetupToChannelsAndFilters {
+- (void)sendSetupToObjects {
     [self iterateChannelsBeneathGroup:_topGroup block:^(AEChannelRef channel) {
-        for ( id<AEAudioFilter> filter in [self associatedObjectsFromTable:&channel->callbacks matchingFlag:kFilterFlag] ) {
-            if ( [filter respondsToSelector:@selector(setupWithAudioController:)] ) {
-                [filter setupWithAudioController:self];
+        for ( id object in [self associatedObjectsFromTable:&channel->callbacks matchingFlag:0] ) {
+            if ( [object respondsToSelector:@selector(setupWithAudioController:)] ) {
+                [object setupWithAudioController:self];
             }
         }
         if ( channel->type == kChannelTypeChannel && [(__bridge id<AEAudioPlayable>)channel->object respondsToSelector:@selector(setupWithAudioController:)] ) {
             [(__bridge id<AEAudioPlayable>)channel->object setupWithAudioController:self];
         }
     }];
+    for ( int i=0; i<_inputCallbackCount; i++ ) {
+        for ( id object in [self associatedObjectsFromTable:&_inputCallbacks[i].callbacks matchingFlag:0] ) {
+            if ( [object respondsToSelector:@selector(setupWithAudioController:)] ) {
+                [object setupWithAudioController:self];
+            }
+        }
+    }
 }
 
 - (void)releaseResourcesForChannel:(AEChannelRef)channel {
-    for ( id<AEAudioFilter> filter in [self associatedObjectsFromTable:&channel->callbacks matchingFlag:kFilterFlag] ) {
-        if ( [filter respondsToSelector:@selector(teardown)] ) {
-            [filter teardown];
-        }
-    }
     for ( id object in [self associatedObjectsFromTable:&channel->callbacks matchingFlag:0] ) {
+        if ( [object respondsToSelector:@selector(teardown)] ) {
+            [object teardown];
+        }
         CFBridgingRelease((__bridge CFTypeRef)object);
     }
     
@@ -3783,13 +3821,13 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
         retries--;
         
         [self stopInternal];
-        [self sendTeardownToChannelsAndFilters];
+        [self sendTeardownToObjects];
         [self teardown];
         
         [NSThread sleepForTimeInterval:0.5];
 
         if ( [self initAudioSession] && [self setup] ) {
-            [self sendSetupToChannelsAndFilters];
+            [self sendSetupToObjects];
             [[NSNotificationCenter defaultCenter] postNotificationName:AEAudioControllerDidRecreateGraphNotification object:self];
             
             if ( !start || [self start:error recoveringFromErrors:NO] ) {
