@@ -41,6 +41,10 @@ Changelog
 - Added AEAudioBufferListCreateOnStack utility
 - Enable automaticLatencyManagement by default
 - Fixed a race condition when using setAudiobusSenderPort*
+- Added tvOS support (thanks to Florian Doyon)
+- Added playAtTime: facility to AEMemoryBufferPlayer (thanks to Anton Holmberg)
+- Added setup/teardown methods to AEInputReceiver
+- Fixed missing setup/teardown calls to input filters
 
 ### 1.5.2
 
