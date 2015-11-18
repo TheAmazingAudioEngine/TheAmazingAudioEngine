@@ -130,7 +130,12 @@ void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessage
 
         int32_t availableBytes;
         message_t *reply = TPCircularBufferHead(&THIS->_mainThreadMessageBuffer, &availableBytes);
-        assert(availableBytes >= sizeof(message_t));
+        if ( availableBytes < sizeof(message_t) ) {
+#ifdef DEBUG
+            NSLog(@"AEMessageBuffer: Integrity problem, insufficient space in main thread messaging buffer");
+#endif
+            return;
+        }
         memcpy(reply, &message, sizeof(message_t));
         TPCircularBufferProduce(&THIS->_mainThreadMessageBuffer, sizeof(message_t));
         
@@ -273,7 +278,12 @@ void AEMessageQueueSendMessageToMainThread(__unsafe_unretained AEMessageQueue *T
     
     int32_t availableBytes;
     message_t *message = TPCircularBufferHead(&THIS->_mainThreadMessageBuffer, &availableBytes);
-    assert(availableBytes >= sizeof(message_t) + userInfoLength);
+    if ( availableBytes < sizeof(message_t) + userInfoLength ) {
+#ifdef DEBUG
+        NSLog(@"AEMessageBuffer: Integrity problem, insufficient space in main thread messaging buffer");
+#endif
+        return;
+    }
     memset(message, 0, sizeof(message_t));
     message->handler                = handler;
     message->userInfoLength         = userInfoLength;
