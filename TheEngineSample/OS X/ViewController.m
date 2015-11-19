@@ -34,6 +34,9 @@ static const int kInputChannelsChangedContext;
     NSTableView *_tableView;
     NSTableColumn *_nameColumn;
     NSTableColumn *_sliderColumn;
+	
+	rmsengine_t rmsEngineL;
+	rmsengine_t rmsEngineR;
 }
 
 @property (nonatomic, strong) AEAudioController *audioController;
@@ -56,21 +59,63 @@ static const int kInputChannelsChangedContext;
 @property (nonatomic, strong) NSButton *playButton;
 @property (nonatomic, strong) NSButton *recordButton;
 
+
+
 @end
 
 @implementation ViewController
-
+/*
 - (void)loadView {
     self.view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 400, 500)];
 }
+*/
+
+- (NSString *)nibName
+{ return @"MainView"; }
 
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-    _headerView = [[NSView alloc] initWithFrame:NSMakeRect(0, self.view.bounds.size.height - 100, self.view.bounds.size.width, 100)];
-    _headerView.wantsLayer = YES;
-    [self.view addSubview:_headerView];
+	// Initialize RMS engines using samplerate
+	Float64 sampleRate = _audioController.audioDescription.mSampleRate;
+	rmsEngineL = RMSEngineInit(sampleRate);
+	rmsEngineR = RMSEngineInit(sampleRate);
+	
+	// Attach engines to RMSView and start updating views
+	[self.stereoView setEnginePtrL:&rmsEngineL];
+	[self.stereoView setEnginePtrR:&rmsEngineR];
+	[self.stereoView startUpdating];
 
+	// Add an output receiver
+//	id<AEAudioReceiver> receiver =
+	[_audioController addOutputReceiver:
+	[AEBlockAudioReceiver audioReceiverWithBlock:^
+	(
+		void *source,
+		const AudioTimeStamp *time,
+		UInt32 frames,
+		AudioBufferList *audio
+	)
+	{
+		// Process first output buffer through left engine
+		if (audio->mNumberBuffers > 0)
+		{
+			Float32 *srcPtr = audio->mBuffers[0].mData;
+			RMSEngineAddSamples32(&self->rmsEngineL, srcPtr, frames);
+		}
+		
+		// Process second output through right engine
+		if (audio->mNumberBuffers > 1)
+		{
+			Float32 *srcPtr = audio->mBuffers[1].mData;
+			RMSEngineAddSamples32(&self->rmsEngineR, srcPtr, frames);
+		}
+	}]];
+	
+//	[_audioController addOutputReceiver:receiver];
+//*/
+
+/*
     self.outputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioDescription:_audioController.audioDescription];
     _outputOscilloscope.frame = NSMakeRect(0, 10, _headerView.bounds.size.width, 80);
     [_headerView.layer addSublayer:_outputOscilloscope];
@@ -93,7 +138,11 @@ static const int kInputChannelsChangedContext;
     _outputLevelLayer.backgroundColor = [[NSColor colorWithWhite:0.0 alpha:0.3] CGColor];
     _outputLevelLayer.frame = NSMakeRect(_headerView.bounds.size.width/2.0 + 5.0, 0, 50, 10);
     [_headerView.layer addSublayer:_outputLevelLayer];
-    
+ */
+ 
+ 
+	
+	
     _tableView = [[NSTableView alloc] initWithFrame:NSMakeRect(0, 75, self.view.bounds.size.width, 300)];
     [self.view addSubview:_tableView];
     _tableView.delegate = self;
@@ -163,9 +212,10 @@ static const int kInputChannelsChangedContext;
             // Quick sin-esque oscillator
             float x = oscillatorPosition;
             x *= x; x -= 1.0; x *= x;       // x now in the range 0...1
-            x -= 0.5;
+			//x = x*x*(3-x+x);
+			x -= 0.5;
             oscillatorPosition += oscillatorRate;
-            if ( oscillatorPosition > 1.0 ) oscillatorPosition -= 2.0;
+            if ( oscillatorPosition > 1.0 ) oscillatorPosition -= 1.0;
             ((float *)audio->mBuffers[0].mData)[i] = x;
             ((float *)audio->mBuffers[1].mData)[i] = x;
         }
@@ -299,24 +349,31 @@ static inline float translate(float val, float min, float max) {
 }
 
 - (void)updateLevels:(id)sender {
-    [CATransaction begin];
-    [CATransaction setDisableActions:YES];
-    
-    Float32 inputAvg, inputPeak, outputAvg, outputPeak;
-    [_audioController inputAveragePowerLevel:&inputAvg peakHoldLevel:&inputPeak];
-    [_audioController outputAveragePowerLevel:&outputAvg peakHoldLevel:&outputPeak];
-    
-    _inputLevelLayer.frame = NSMakeRect(_headerView.bounds.size.width/2.0 - 5.0 - (translate(inputAvg, -20, 0) * (_headerView.bounds.size.width/2.0 - 15.0)),
-                                        _inputLevelLayer.frame.origin.y,
-                                        translate(inputAvg, -20, 0) * (_headerView.bounds.size.width/2.0 - 15.0),
-                                        10);
-    
-    _outputLevelLayer.frame = NSMakeRect(_headerView.bounds.size.width/2.0,
-                                         _outputLevelLayer.frame.origin.y,
-                                         translate(outputAvg, -20, 0) * (_headerView.bounds.size.width/2.0 - 15.0),
-                                         10);
-    
-    [CATransaction commit];
+
+	Float32 inputAvg = 0.0;
+	Float32 inputPeak = 0.0;
+	Float32 outputAvg = 0.0;
+	Float32 outputPeak = 0.0;
+	[_audioController inputAveragePowerLevel:&inputAvg peakHoldLevel:&inputPeak];
+	[_audioController outputAveragePowerLevel:&outputAvg peakHoldLevel:&outputPeak];
+
+	[CATransaction begin];
+	[CATransaction setDisableActions:YES];
+
+		_inputLevelLayer.frame = NSMakeRect(
+			_headerView.bounds.size.width/2.0 - 5.0 -
+			translate(inputAvg, -20, 0) * (_headerView.bounds.size.width/2.0 - 15.0),
+			_inputLevelLayer.frame.origin.y,
+			translate(inputAvg, -20, 0) * (_headerView.bounds.size.width/2.0 - 15.0),
+			10);
+
+		_outputLevelLayer.frame = NSMakeRect(
+			_headerView.bounds.size.width/2.0,
+			_outputLevelLayer.frame.origin.y,
+			translate(outputAvg, -20, 0) * (_headerView.bounds.size.width/2.0 - 15.0),
+			10);
+
+	[CATransaction commit];
 }
 
 - (void)viewWillAppear {

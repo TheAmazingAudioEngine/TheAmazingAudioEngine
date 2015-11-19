@@ -7,11 +7,20 @@
 //
 
 #import <Cocoa/Cocoa.h>
+#import "RMSLevelsView.h"
+#import "RMSStereoView.h"
 
 @class AEAudioController;
 
 @interface ViewController : NSViewController <NSTableViewDataSource, NSTableViewDelegate>
 
+@property (nonatomic, weak) IBOutlet RMSStereoView *stereoView;
+@property (nonatomic, weak) IBOutlet RMSLevelsView *levelsViewL;
+@property (nonatomic, weak) IBOutlet RMSLevelsView *levelsViewR;
+
+
 - (instancetype)initWithAudioController:(AEAudioController *)audioController;
+
+
 
 @end

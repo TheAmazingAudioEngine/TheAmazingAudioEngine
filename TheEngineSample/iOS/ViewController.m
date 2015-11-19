@@ -21,6 +21,9 @@ static const int kInputChannelsChangedContext;
 @interface ViewController () {
     AudioFileID _audioUnitFile;
     AEChannelGroupRef _group;
+
+	rmsengine_t rmsEngineL;
+	rmsengine_t rmsEngineR;
 }
 @property (nonatomic, strong) AEAudioFilePlayer *loop1;
 @property (nonatomic, strong) AEAudioFilePlayer *loop2;
@@ -169,7 +172,56 @@ static const int kInputChannelsChangedContext;
     
     UIView *headerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 100)];
     headerView.backgroundColor = [UIColor groupTableViewBackgroundColor];
-    
+ 
+ 
+ 	NSRect frame = headerView.bounds;
+	frame.size.height /= 2.0;
+	
+	// Create levelsView
+	RMSLevelsView *levelsViewL = [[RMSLevelsView alloc] initWithFrame:frame];
+	[headerView addSubview:levelsViewL];
+	self.levelsViewL = levelsViewL;
+
+	frame.origin.y += frame.size.height;
+
+	// Create levelsView
+	RMSLevelsView *levelsViewR = [[RMSLevelsView alloc] initWithFrame:frame];
+	[headerView addSubview:levelsViewR];
+	self.levelsViewR = levelsViewR;
+	
+	// Initialize engine and set
+	rmsEngineL = RMSEngineInit(44100);
+	[self.levelsViewL setEnginePtr:&rmsEngineL];
+
+	rmsEngineR = RMSEngineInit(44100);
+	[self.levelsViewR setEnginePtr:&rmsEngineR];
+	
+	id<AEAudioReceiver> receiver = [AEBlockAudioReceiver audioReceiverWithBlock:^
+	(
+		void *source,
+		const AudioTimeStamp *time,
+		UInt32 frames,
+		AudioBufferList *audio
+	)
+	{
+		// Do something with 'audio'
+		Float32 *srcPtr = nil;
+		
+		if (audio->mNumberBuffers > 0)
+		{
+			srcPtr = audio->mBuffers[0].mData;
+			RMSEngineAddSamples32(&self->rmsEngineL, srcPtr, frames);
+		}
+		
+		if (audio->mNumberBuffers > 1)
+		{
+			srcPtr = audio->mBuffers[1].mData;
+			RMSEngineAddSamples32(&self->rmsEngineR, srcPtr, frames);
+		}
+	}];
+	
+	[_audioController addOutputReceiver:receiver];
+/*
     self.outputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioDescription:_audioController.audioDescription];
     _outputOscilloscope.frame = CGRectMake(0, 0, headerView.bounds.size.width, 80);
     [headerView.layer addSublayer:_outputOscilloscope];
@@ -192,7 +244,9 @@ static const int kInputChannelsChangedContext;
     _outputLevelLayer.backgroundColor = [[UIColor colorWithWhite:0.0 alpha:0.3] CGColor];
     _outputLevelLayer.frame = CGRectMake(headerView.bounds.size.width/2.0 + 5.0, 90, 0, 10);
     [headerView.layer addSublayer:_outputLevelLayer];
-    
+ */
+ 
+	   
     self.tableView.tableHeaderView = headerView;
     
     UIView *footerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 80)];

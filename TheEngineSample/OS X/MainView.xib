@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="9059" systemVersion="15B42" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES" customObjectInstantitationMethod="direct">
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="9059"/>
+    </dependencies>
+    <objects>
+        <customObject id="-2" userLabel="File's Owner" customClass="ViewController">
+            <connections>
+                <outlet property="stereoView" destination="cLz-WE-AU7" id="oLu-uZ-aG3"/>
+                <outlet property="view" destination="c22-O7-iKe" id="rjd-Tm-2lW"/>
+            </connections>
+        </customObject>
+        <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
+        <customObject id="-3" userLabel="Application" customClass="NSObject"/>
+        <customView id="c22-O7-iKe">
+            <rect key="frame" x="0.0" y="0.0" width="480" height="480"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+            <subviews>
+                <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="cLz-WE-AU7" customClass="RMSStereoView">
+                    <rect key="frame" x="0.0" y="310" width="480" height="96"/>
+                    <subviews>
+                        <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="3eL-9U-IXk" customClass="RMSLevelsView">
+                            <rect key="frame" x="0.0" y="60" width="240" height="36"/>
+                            <animations/>
+                        </customView>
+                        <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="gRU-Yk-Wou" customClass="RMSLevelsView">
+                            <rect key="frame" x="240" y="60" width="240" height="36"/>
+                            <animations/>
+                        </customView>
+                    </subviews>
+                    <animations/>
+                    <connections>
+                        <outlet property="viewL" destination="3eL-9U-IXk" id="pbA-CX-PAD"/>
+                        <outlet property="viewR" destination="gRU-Yk-Wou" id="QAT-Bd-feJ"/>
+                    </connections>
+                </customView>
+            </subviews>
+            <animations/>
+            <point key="canvasLocation" x="291" y="281"/>
+        </customView>
+    </objects>
+</document>
