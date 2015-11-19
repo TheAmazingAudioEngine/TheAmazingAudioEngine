@@ -24,7 +24,7 @@
 	RMSEngineAddSample(&engine, sample);
 	
 	// on main thread, periodically call:
-	rmslevels levels = RMSEngineGetLevels(&engine);
+	rmsresult_t levels = RMSEngineFetchResult(&engine);
 	
 	
 */
@@ -55,14 +55,18 @@ rmsengine_t;
 ////////////////////////////////////////////////////////////////////////////////
 
 // Structure to communicate results
-typedef struct rmslevels_t
+typedef struct rmsresult_t
 {
 	double mAvg;
 	double mMax;
 	double mHld;
 	double mClp;
 }
-rmslevels_t;
+rmsresult_t;
+
+#define RMSResultZero (rmsresult_t){ 0.0, 0.0, 0.0, 0.0 }
+
+typedef rmsresult_t rmslevels_t;
 
 #define RMSLevelsZero (rmslevels_t){ 0.0, 0.0, 0.0, 0.0 }
 

@@ -15,12 +15,11 @@
 @interface ViewController : NSViewController <NSTableViewDataSource, NSTableViewDelegate>
 
 @property (nonatomic, weak) IBOutlet RMSStereoView *stereoView;
-@property (nonatomic, weak) IBOutlet RMSLevelsView *levelsViewL;
-@property (nonatomic, weak) IBOutlet RMSLevelsView *levelsViewR;
 
 
 - (instancetype)initWithAudioController:(AEAudioController *)audioController;
 
-
+- (IBAction) rmsEngineButton:(id)button;
+- (IBAction) rmsViewButton:(id)button;
 
 @end

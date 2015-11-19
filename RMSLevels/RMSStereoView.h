@@ -10,6 +10,6 @@
 #import "RMSLevelsView.h"
 
 @interface RMSStereoView : RMSLevelsView
-@property (nonatomic, assign) rmsengine_t *enginePtrL;
-@property (nonatomic, assign) rmsengine_t *enginePtrR;
+@property (nonatomic, assign) const rmsengine_t *enginePtrL;
+@property (nonatomic, assign) const rmsengine_t *enginePtrR;
 @end

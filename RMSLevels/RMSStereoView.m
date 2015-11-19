@@ -12,22 +12,20 @@
 
 @interface RMSStereoView ()
 {
-	rmslevels_t mLevelsL;
-	rmslevels_t mLevelsR;
+	rmsresult_t mResultL;
+	rmsresult_t mResultR;
 }
 @end
 
 
-
+////////////////////////////////////////////////////////////////////////////////
 @implementation RMSStereoView
-
-
 ////////////////////////////////////////////////////////////////////////////////
 
 - (void) timerDidFire:(NSTimer *)timer
 {
-	mLevelsL = RMSEngineFetchResult(self.enginePtrL);
-	mLevelsR = RMSEngineFetchResult(self.enginePtrR);
+	mResultL = RMSEngineFetchResult(self.enginePtrL);
+	mResultR = RMSEngineFetchResult(self.enginePtrR);
 	[self setNeedsDisplayInRect:self.bounds];
 }
 
@@ -53,6 +51,8 @@
 	[self drawBalanceIndicator];
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 - (void) drawBalanceIndicator
 {
 	NSRect R = self.bounds;
@@ -72,6 +72,7 @@
 	NSRectFill(R);
 }
 
+////////////////////////////////////////////////////////////////////////////////
 
 - (void) centerBounds
 {
@@ -79,6 +80,8 @@
 	B.origin.x -= 0.5 * B.size.width;
 	self.bounds = B;
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 static inline NSRect RMSStereoRectWithLR(NSRect B, double L, double R)
 {
@@ -91,12 +94,14 @@ static inline NSRect RMSStereoRectWithLR(NSRect B, double L, double R)
 }
 
 - (NSRect) computeHldR
-{ return RMSStereoRectWithLR(self.bounds, mLevelsL.mHld, mLevelsR.mHld); }
+{ return RMSStereoRectWithLR(self.bounds, mResultL.mHld, mResultR.mHld); }
 
 - (NSRect) computeMaxR
-{ return RMSStereoRectWithLR(self.bounds, mLevelsL.mMax, mLevelsR.mMax); }
+{ return RMSStereoRectWithLR(self.bounds, mResultL.mMax, mResultR.mMax); }
 
 - (NSRect) computeAvgR
-{ return RMSStereoRectWithLR(self.bounds, mLevelsL.mAvg, mLevelsR.mAvg); }
+{ return RMSStereoRectWithLR(self.bounds, mResultL.mAvg, mResultR.mAvg); }
 
+////////////////////////////////////////////////////////////////////////////////
 @end
+////////////////////////////////////////////////////////////////////////////////

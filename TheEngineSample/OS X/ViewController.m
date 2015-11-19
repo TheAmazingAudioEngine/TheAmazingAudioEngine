@@ -76,12 +76,12 @@ static const int kInputChannelsChangedContext;
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-	// Initialize RMS engines using samplerate
+	// Initialize RMS engine structs using samplerate
 	Float64 sampleRate = _audioController.audioDescription.mSampleRate;
 	mRMSEngineL = RMSEngineInit(sampleRate);
 	mRMSEngineR = RMSEngineInit(sampleRate);
 	
-	// Attach engines to RMSStereoView and start updating
+	// Attach engines to RMSStereoView and start updating view
 	[self.stereoView setEnginePtrL:&mRMSEngineL];
 	[self.stereoView setEnginePtrR:&mRMSEngineR];
 	[self.stereoView startUpdating];
@@ -236,6 +236,24 @@ static const int kInputChannelsChangedContext;
     
     return self;
 }
+
+
+- (IBAction) rmsEngineButton:(id)button
+{
+}
+
+- (IBAction) rmsViewButton:(id)button
+{
+	if ([button state])
+		[self.stereoView startUpdating];
+	else
+	{
+		[self.stereoView stopUpdating];
+	}
+}
+
+
+
 
 -(void)dealloc {
     [_audioController removeObserver:self forKeyPath:@"numberOfInputChannels"];
