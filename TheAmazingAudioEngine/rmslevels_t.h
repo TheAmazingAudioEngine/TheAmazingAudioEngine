@@ -76,7 +76,7 @@ void RMSEngineAddSample(rmsengine_t *engine, double sample);
 void RMSEngineAddSamples32(rmsengine_t *engine, float *srcPtr, uint32_t n);
 
 // Get sqrt results. Save to call with enginePtr == nil
-rmslevels_t RMSEngineGetLevels(rmsengine_t *enginePtr);
+rmslevels_t RMSEngineFetchResult(const rmsengine_t *enginePtr);
 
 ////////////////////////////////////////////////////////////////////////////////
 

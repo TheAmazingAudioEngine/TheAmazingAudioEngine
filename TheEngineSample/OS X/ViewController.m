@@ -35,8 +35,8 @@ static const int kInputChannelsChangedContext;
     NSTableColumn *_nameColumn;
     NSTableColumn *_sliderColumn;
 	
-	rmsengine_t rmsEngineL;
-	rmsengine_t rmsEngineR;
+	rmsengine_t mRMSEngineL;
+	rmsengine_t mRMSEngineR;
 }
 
 @property (nonatomic, strong) AEAudioController *audioController;
@@ -78,16 +78,15 @@ static const int kInputChannelsChangedContext;
 
 	// Initialize RMS engines using samplerate
 	Float64 sampleRate = _audioController.audioDescription.mSampleRate;
-	rmsEngineL = RMSEngineInit(sampleRate);
-	rmsEngineR = RMSEngineInit(sampleRate);
+	mRMSEngineL = RMSEngineInit(sampleRate);
+	mRMSEngineR = RMSEngineInit(sampleRate);
 	
-	// Attach engines to RMSView and start updating views
-	[self.stereoView setEnginePtrL:&rmsEngineL];
-	[self.stereoView setEnginePtrR:&rmsEngineR];
+	// Attach engines to RMSStereoView and start updating
+	[self.stereoView setEnginePtrL:&mRMSEngineL];
+	[self.stereoView setEnginePtrR:&mRMSEngineR];
 	[self.stereoView startUpdating];
 
 	// Add an output receiver
-//	id<AEAudioReceiver> receiver =
 	[_audioController addOutputReceiver:
 	[AEBlockAudioReceiver audioReceiverWithBlock:^
 	(
@@ -101,14 +100,14 @@ static const int kInputChannelsChangedContext;
 		if (audio->mNumberBuffers > 0)
 		{
 			Float32 *srcPtr = audio->mBuffers[0].mData;
-			RMSEngineAddSamples32(&self->rmsEngineL, srcPtr, frames);
+			RMSEngineAddSamples32(&self->mRMSEngineL, srcPtr, frames);
 		}
 		
 		// Process second output through right engine
 		if (audio->mNumberBuffers > 1)
 		{
 			Float32 *srcPtr = audio->mBuffers[1].mData;
-			RMSEngineAddSamples32(&self->rmsEngineR, srcPtr, frames);
+			RMSEngineAddSamples32(&self->mRMSEngineR, srcPtr, frames);
 		}
 	}]];
 	

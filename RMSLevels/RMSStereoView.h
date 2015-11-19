@@ -12,7 +12,4 @@
 @interface RMSStereoView : RMSLevelsView
 @property (nonatomic, assign) rmsengine_t *enginePtrL;
 @property (nonatomic, assign) rmsengine_t *enginePtrR;
-
-@property (nonatomic, assign) IBOutlet RMSLevelsView *viewL;
-@property (nonatomic, assign) IBOutlet RMSLevelsView *viewR;
 @end

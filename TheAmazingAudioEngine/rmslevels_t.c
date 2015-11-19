@@ -111,7 +111,7 @@ void RMSEngineAddSamples32(rmsengine_t *engine, float *srcPtr, uint32_t n)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-rmslevels_t RMSEngineGetLevels(rmsengine_t *enginePtr)
+rmslevels_t RMSEngineFetchResult(const rmsengine_t *enginePtr)
 {
 	rmslevels_t levels = RMSLevelsZero;
 	

@@ -32,7 +32,7 @@ enum RMSViewDirection
 
 @interface RMSLevelsView : NSView
 
-@property (nonatomic, assign) rmsengine_t *enginePtr;
+@property (nonatomic, assign) const rmsengine_t *enginePtr;
 
 @property (nonatomic) NSColor *bckColor;
 @property (nonatomic) NSColor *avgColor;

@@ -26,9 +26,12 @@
 
 @interface RMSLevelsView ()
 {
+	// Represented data
+	rmslevels_t mLevels;
+	
+	// Update timer
 	NSTimer *mTimer;
 	
-	rmslevels_t mLevels;
 }
 @end
 
@@ -36,7 +39,7 @@
 @implementation RMSLevelsView
 ////////////////////////////////////////////////////////////////////////////////
 
-- (void) setEnginePtr:(rmsengine_t *)engine
+- (void) setEnginePtr:(const rmsengine_t *)engine
 {
 	if (_enginePtr != engine)
 	{
@@ -59,7 +62,7 @@
 		target:self selector:@selector(timerDidFire:) userInfo:nil repeats:YES];
 		
 		// add tolerance down to appr 24 updates per second
-		[mTimer setTolerance:(1.0/24.0)-(1.0/25.0)];
+		[mTimer setTolerance:(1.0/20.0)-(1.0/25.0)];
 	}
 }
 
@@ -81,7 +84,7 @@
 	if (_enginePtr == nil)
 	{ [self stopUpdating]; }
 	
-	[self setLevels:RMSEngineGetLevels(_enginePtr)];
+	[self setLevels:RMSEngineFetchResult(_enginePtr)];
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -158,12 +161,6 @@
 			[[self hldColor] set];
 		frame = [self boundsWithRatio:levels.mHld];
 		NSRectFill(frame);
-
-		//if (levels.mHld > 1.0)
-		{
-			[[self clpColor] set];
-			NSRectFillUsingOperation(self.clippingRegion, NSCompositeMultiply);
-		}
 		
 		[[self maxColor] set];
 		frame = [self boundsWithRatio:levels.mMax];
