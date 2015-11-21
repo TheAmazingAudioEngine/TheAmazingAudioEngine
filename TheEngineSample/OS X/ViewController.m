@@ -40,6 +40,9 @@ static const int kInputChannelsChangedContext;
 }
 
 @property (nonatomic, strong) AEAudioController *audioController;
+
+@property (nonatomic) id<AEAudioReceiver> meteringReceiver;
+
 @property (nonatomic, strong) AEAudioFilePlayer *loop1;
 @property (nonatomic, strong) AEAudioFilePlayer *loop2;
 @property (nonatomic, strong) AEBlockChannel *oscillator;
@@ -76,46 +79,9 @@ static const int kInputChannelsChangedContext;
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-	self.indexViewL.direction = eRMSViewDirectionW;
-
-	// Initialize RMS engine structs using samplerate
-	Float64 sampleRate = _audioController.audioDescription.mSampleRate;
-	mRMSEngineL = RMSEngineInit(sampleRate);
-	mRMSEngineR = RMSEngineInit(sampleRate);
+	[self prepareMetering];
 	
-	// Attach engines to RMSStereoView and start updating view
-	[self.stereoView setEnginePtrL:&mRMSEngineL];
-	[self.stereoView setEnginePtrR:&mRMSEngineR];
-	[self.stereoView startUpdating];
-
-	// Add an output receiver
-	[_audioController addOutputReceiver:
-	[AEBlockAudioReceiver audioReceiverWithBlock:^
-	(
-		void *source,
-		const AudioTimeStamp *time,
-		UInt32 frames,
-		AudioBufferList *audio
-	)
-	{
-		// Process first output buffer through left engine
-		if (audio->mNumberBuffers > 0)
-		{
-			Float32 *srcPtr = audio->mBuffers[0].mData;
-			RMSEngineAddSamples32(&self->mRMSEngineL, srcPtr, frames);
-		}
-		
-		// Process second output buffer through right engine
-		if (audio->mNumberBuffers > 1)
-		{
-			Float32 *srcPtr = audio->mBuffers[1].mData;
-			RMSEngineAddSamples32(&self->mRMSEngineR, srcPtr, frames);
-		}
-	}]];
 	
-//	[_audioController addOutputReceiver:receiver];
-//*/
-
 /*
     self.outputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioDescription:_audioController.audioDescription];
     _outputOscilloscope.frame = NSMakeRect(0, 10, _headerView.bounds.size.width, 80);
@@ -205,21 +171,18 @@ static const int kInputChannelsChangedContext;
     
     // Create a block-based channel, with an implementation of an oscillator
     __block float oscillatorPosition = 0;
-    __block float oscillatorRate = 622.0/44100.0;
+    __block float oscillatorRate = 440.0/44100.0;
     self.oscillator = [AEBlockChannel channelWithBlock:^(const AudioTimeStamp  *time,
                                                          UInt32           frames,
                                                          AudioBufferList *audio) {
-        for ( int i=0; i<frames; i++ ) {
-            // Quick sin-esque oscillator
-            float x = oscillatorPosition;
-            x *= x; x -= 1.0; x *= x;       // x now in the range 0...1
-			//x = x*x*(3-x+x);
-			x -= 0.5;
-			x *= 2.0;
-            oscillatorPosition += oscillatorRate;
-            if ( oscillatorPosition > 1.0 ) oscillatorPosition -= 1.0;
-            ((float *)audio->mBuffers[0].mData)[i] = x;
-            ((float *)audio->mBuffers[1].mData)[i] = x;
+        for (long i=0; i<frames; i++ )
+		{
+			float y = sin(2.0 * M_PI * oscillatorPosition);
+			((float *)audio->mBuffers[0].mData)[i] = y;
+			((float *)audio->mBuffers[1].mData)[i] = y;
+
+			oscillatorPosition += oscillatorRate;
+			if ( oscillatorPosition >= 1.0 ) oscillatorPosition -= 1.0;
         }
     }];
     _oscillator.audioDescription = audioController.audioDescription;
@@ -239,6 +202,79 @@ static const int kInputChannelsChangedContext;
     
     return self;
 }
+
+
+////////////////////////////////////////////////////////////////////////////////
+
+- (void) prepareMetering
+{
+	// Initialize RMS engine structs using samplerate
+	Float64 sampleRate = _audioController.audioDescription.mSampleRate;
+	mRMSEngineL = RMSEngineInit(sampleRate);
+	mRMSEngineR = RMSEngineInit(sampleRate);
+	
+	// Attach engines to audio graph
+	[self prepareMeteringReceiver];
+	
+	// Attach engines to view
+	[self prepareMeteringView];
+	
+	// Start update loop
+	[self.stereoView startUpdating];
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+- (void) prepareMeteringReceiver
+{
+	// Use local unsafe pointers for block
+	rmsengine_t *enginePtrL = &self->mRMSEngineL;
+	rmsengine_t *enginePtrR = &self->mRMSEngineR;
+	
+	// Create metering receiver
+	self.meteringReceiver =
+	[AEBlockAudioReceiver audioReceiverWithBlock:^
+	(
+		void *source,
+		const AudioTimeStamp *time,
+		UInt32 frames,
+		AudioBufferList *audio
+	)
+	{
+		// Process first output buffer through left engine
+		if (audio->mNumberBuffers > 0)
+		{
+			Float32 *srcPtr = audio->mBuffers[0].mData;
+			RMSEngineAddSamples32(enginePtrL, srcPtr, frames);
+		}
+		
+		// Process second output buffer through right engine
+		if (audio->mNumberBuffers > 1)
+		{
+			Float32 *srcPtr = audio->mBuffers[1].mData;
+			RMSEngineAddSamples32(enginePtrR, srcPtr, frames);
+		}
+	}];
+
+	// Add as output receiver
+	[_audioController addOutputReceiver:self.meteringReceiver];
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+- (void) prepareMeteringView
+{
+	// TODO: implement more elegant solution
+	self.indexViewL.direction = eRMSViewDirectionW;
+
+	// Attach engines to RMSStereoView and start updating view
+	[self.stereoView setEnginePtrL:&self->mRMSEngineL];
+	[self.stereoView setEnginePtrR:&self->mRMSEngineR];
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+
 
 
 - (IBAction) rmsEngineButton:(id)button
