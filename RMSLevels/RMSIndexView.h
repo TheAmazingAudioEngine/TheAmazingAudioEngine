@@ -1,0 +1,14 @@
+////////////////////////////////////////////////////////////////////////////////
+/*
+	RMSIndexView.h
+	
+	Created by 32BT on 15/11/15.
+	Copyright © 2015 32BT. All rights reserved.
+*/
+////////////////////////////////////////////////////////////////////////////////
+
+#import <Cocoa/Cocoa.h>
+
+@interface RMSIndexView : NSView
+@property (nonatomic, assign) NSUInteger direction;
+@end

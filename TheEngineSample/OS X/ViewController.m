@@ -76,6 +76,8 @@ static const int kInputChannelsChangedContext;
 - (void)viewDidLoad {
     [super viewDidLoad];
 
+	self.indexViewL.direction = eRMSViewDirectionW;
+
 	// Initialize RMS engine structs using samplerate
 	Float64 sampleRate = _audioController.audioDescription.mSampleRate;
 	mRMSEngineL = RMSEngineInit(sampleRate);
@@ -213,6 +215,7 @@ static const int kInputChannelsChangedContext;
             x *= x; x -= 1.0; x *= x;       // x now in the range 0...1
 			//x = x*x*(3-x+x);
 			x -= 0.5;
+			x *= 2.0;
             oscillatorPosition += oscillatorRate;
             if ( oscillatorPosition > 1.0 ) oscillatorPosition -= 1.0;
             ((float *)audio->mBuffers[0].mData)[i] = x;

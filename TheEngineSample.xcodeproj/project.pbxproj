@@ -76,6 +76,8 @@
 		7A8D23371B72B5170054D2B2 /* TPCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C7C680716F1609800721E60 /* TPCircularBuffer.c */; };
 		7AFFB76C1B75307500892749 /* AERecorder.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C7C680216F1609800721E60 /* AERecorder.m */; };
 		7F63F3DF1BF9D39E00124729 /* RMSLevelsView.m in Sources */ = {isa = PBXBuildFile; fileRef = 7F63F3DE1BF9D39E00124729 /* RMSLevelsView.m */; };
+		7F642C681C008C8F00D0A9B6 /* RMSIndexView.m in Sources */ = {isa = PBXBuildFile; fileRef = 7F642C671C008C8F00D0A9B6 /* RMSIndexView.m */; };
+		7F642C691C008C8F00D0A9B6 /* RMSIndexView.m in Sources */ = {isa = PBXBuildFile; fileRef = 7F642C671C008C8F00D0A9B6 /* RMSIndexView.m */; };
 		7F7344B41BFDFF7200669192 /* MainView.xib in Resources */ = {isa = PBXBuildFile; fileRef = 7F7344B31BFDFF7200669192 /* MainView.xib */; };
 		7F7344B81BFE042500669192 /* RMSStereoView.m in Sources */ = {isa = PBXBuildFile; fileRef = 7F7344B71BFE042500669192 /* RMSStereoView.m */; };
 		7F7344B91BFE042500669192 /* RMSStereoView.m in Sources */ = {isa = PBXBuildFile; fileRef = 7F7344B71BFE042500669192 /* RMSStereoView.m */; };
@@ -199,6 +201,8 @@
 		7A8D22F51B72AF5C0054D2B2 /* TheEngineSampleOSX.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TheEngineSampleOSX.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7F63F3DD1BF9D39E00124729 /* RMSLevelsView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = RMSLevelsView.h; path = TheAmazingAudioEngine/RMSLevelsView.h; sourceTree = SOURCE_ROOT; };
 		7F63F3DE1BF9D39E00124729 /* RMSLevelsView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = RMSLevelsView.m; path = TheAmazingAudioEngine/RMSLevelsView.m; sourceTree = SOURCE_ROOT; };
+		7F642C661C008C8F00D0A9B6 /* RMSIndexView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = RMSIndexView.h; path = RMSLevels/RMSIndexView.h; sourceTree = SOURCE_ROOT; };
+		7F642C671C008C8F00D0A9B6 /* RMSIndexView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = RMSIndexView.m; path = RMSLevels/RMSIndexView.m; sourceTree = SOURCE_ROOT; };
 		7F7344B31BFDFF7200669192 /* MainView.xib */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.xib; name = MainView.xib; path = "TheEngineSample/OS X/MainView.xib"; sourceTree = SOURCE_ROOT; };
 		7F7344B61BFE042500669192 /* RMSStereoView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = RMSStereoView.h; path = RMSLevels/RMSStereoView.h; sourceTree = SOURCE_ROOT; };
 		7F7344B71BFE042500669192 /* RMSStereoView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = RMSStereoView.m; path = RMSLevels/RMSStereoView.m; sourceTree = SOURCE_ROOT; };
@@ -412,6 +416,8 @@
 				7F63F3DE1BF9D39E00124729 /* RMSLevelsView.m */,
 				7F7344B61BFE042500669192 /* RMSStereoView.h */,
 				7F7344B71BFE042500669192 /* RMSStereoView.m */,
+				7F642C661C008C8F00D0A9B6 /* RMSIndexView.h */,
+				7F642C671C008C8F00D0A9B6 /* RMSIndexView.m */,
 				7A8D22F71B72AF5C0054D2B2 /* Supporting Files */,
 			);
 			path = TheEngineSampleOSX;
@@ -567,6 +573,7 @@
 				4C2933A11BB2814400AAED25 /* AEHighShelfFilter.m in Sources */,
 				4C2933A51BB2814400AAED25 /* AELowShelfFilter.m in Sources */,
 				4C2933AB1BB2814400AAED25 /* AEPeakLimiterFilter.m in Sources */,
+				7F642C681C008C8F00D0A9B6 /* RMSIndexView.m in Sources */,
 				4C50FF0B1B758B5500E56620 /* TPOscilloscopeLayer.m in Sources */,
 				4C2933AF1BB2814400AAED25 /* AEVarispeedFilter.m in Sources */,
 				4C7C680916F1609800721E60 /* AEExpanderFilter.m in Sources */,
@@ -601,6 +608,7 @@
 			files = (
 				4C2933A21BB2814400AAED25 /* AEHighShelfFilter.m in Sources */,
 				4C2933A61BB2814400AAED25 /* AELowShelfFilter.m in Sources */,
+				7F642C691C008C8F00D0A9B6 /* RMSIndexView.m in Sources */,
 				4C2933AC1BB2814400AAED25 /* AEPeakLimiterFilter.m in Sources */,
 				7A532D2B1B7C6FA8006056DB /* AEPlaythroughChannel.m in Sources */,
 				4C2933B01BB2814400AAED25 /* AEVarispeedFilter.m in Sources */,

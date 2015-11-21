@@ -6,6 +6,8 @@
     <objects>
         <customObject id="-2" userLabel="File's Owner" customClass="ViewController">
             <connections>
+                <outlet property="indexViewL" destination="9AC-gq-czc" id="tAk-Ri-D0N"/>
+                <outlet property="indexViewR" destination="5Z2-RW-xBA" id="Lnl-nU-p1l"/>
                 <outlet property="stereoView" destination="cLz-WE-AU7" id="oLu-uZ-aG3"/>
                 <outlet property="view" destination="c22-O7-iKe" id="rjd-Tm-2lW"/>
             </connections>
@@ -22,7 +24,7 @@
                     <animations/>
                 </customView>
                 <button verticalHuggingPriority="750" id="p6x-Z8-Vvg">
-                    <rect key="frame" x="169" y="409" width="143" height="25"/>
+                    <rect key="frame" x="169" y="367" width="143" height="25"/>
                     <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <animations/>
                     <buttonCell key="cell" type="square" title="Start RMSEngine" bezelStyle="shadowlessSquare" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="a1u-6u-OAg">
@@ -31,7 +33,7 @@
                     </buttonCell>
                 </button>
                 <button verticalHuggingPriority="750" id="tRX-e3-iYm">
-                    <rect key="frame" x="169" y="374" width="143" height="25"/>
+                    <rect key="frame" x="169" y="332" width="143" height="25"/>
                     <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <animations/>
                     <buttonCell key="cell" type="square" title="Start RMSView" bezelStyle="shadowlessSquare" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="fuK-GW-ru2">
@@ -42,6 +44,16 @@
                         <action selector="rmsViewButton:" target="-2" id="czP-om-HVu"/>
                     </connections>
                 </button>
+                <customView id="5Z2-RW-xBA" customClass="RMSIndexView">
+                    <rect key="frame" x="240" y="440" width="240" height="10"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMinX="YES" widthSizable="YES" flexibleMinY="YES"/>
+                    <animations/>
+                </customView>
+                <customView id="9AC-gq-czc" customClass="RMSIndexView">
+                    <rect key="frame" x="0.0" y="440" width="240" height="10"/>
+                    <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <animations/>
+                </customView>
             </subviews>
             <animations/>
             <point key="canvasLocation" x="291" y="281"/>
