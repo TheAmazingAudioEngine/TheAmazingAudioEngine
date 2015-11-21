@@ -19,7 +19,7 @@
 
 - (void)drawRect:(NSRect)dirtyRect
 {
-	// Reverse direction
+	// Reverse direction if necessary
 	if (self.direction != 0)
 	{
 		NSAffineTransform *T = [NSAffineTransform transform];

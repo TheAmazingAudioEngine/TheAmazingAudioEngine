@@ -73,6 +73,8 @@ rmsengine_t RMSEngineInit(double sampleRate);
 
 // Update engine with squared samples
 void RMSEngineAddSample(rmsengine_t *engine, double sample);
+
+// Convenience routine for processing packed floats
 void RMSEngineAddSamples32(rmsengine_t *engine, float *srcPtr, uint32_t n);
 
 // Get sqrt results. Save to call with enginePtr == nil

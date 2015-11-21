@@ -19,7 +19,7 @@ static inline double rms_add(double A, double M, double S)
 static inline double rms_max(double A, double M, double S)
 { return A > S ? rms_add(A, M, S) : S; }
 
-static inline double rms_min(double A, double M, double S)
+//static inline double rms_min(double A, double M, double S) \
 { return A < S ? rms_add(A, M, S) : S; }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -137,13 +137,14 @@ rmsresult_t RMSEngineFetchResult(const rmsengine_t *enginePtr)
 ////////////////////////////////////////////////////////////////////////////////
 // 20.0*log10(sqrt()) == 10.0*log10()
 
-rmsresult_t RMSEngineFetchResultDB(rmsengine_t *engine)
+rmsresult_t RMSEngineFetchResultDB(rmsengine_t *enginePtr)
 {
-	rmsresult_t levels;
+	rmsresult_t levels = RMSEngineFetchResult(enginePtr);
 	
-	levels.mAvg = 10.0*log10(engine->mAvg);
-	levels.mMax = 10.0*log10(engine->mMax);
-	
+	levels.mAvg = 10.0*log10(levels.mAvg);
+	levels.mMax = 20.0*log10(levels.mMax);
+	levels.mHld = 20.0*log10(levels.mHld);
+
 	return levels;
 }
 
