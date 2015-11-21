@@ -14,7 +14,7 @@
 static CGContextRef NSGraphicsGetCurrentContext(void)
 {
 #if TARGET_OS_IOS
-	return UIGraphicsGetCurrentContext;
+	return UIGraphicsGetCurrentContext();
 #else
 	return (CGContextRef)[[NSGraphicsContext currentContext] graphicsPort];
 #endif
