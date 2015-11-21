@@ -8,26 +8,12 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #import "RMSLevelsView.h"
-#import "RMSEngine.h"
-/*
-	considerations:
-	Audio thread should do as little as possible, therefore
-	View updates periodically and polls engine
-	
-	Fetching engine values is threadsafe
-	
-	
-	
-	
-	
-	
-	
-*/
+
 
 @interface RMSLevelsView ()
 {
 	// Represented data
-	rmslevels_t mLevels;
+	rmsresult_t mLevels;
 	
 	// Update timer
 	NSTimer *mTimer;
@@ -90,7 +76,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma mark
 
-- (void) setLevels:(rmslevels_t)levels
+- (void) setLevels:(rmsresult_t)levels
 {
 	mLevels = levels;
 	[self setNeedsDisplayInRect:self.bounds];
@@ -147,11 +133,10 @@
 
 - (void)drawRect:(NSRect)rect
 {
-	NSRect frame = self.bounds;
 	[[self bckColor] set];
-	NSRectFill(frame);
+	NSRectFill(self.bounds);
 
-	rmslevels_t levels = mLevels;
+	rmsresult_t levels = mLevels;
 
 	if (levels.mHld > 0.0)
 	{
@@ -159,39 +144,17 @@
 			[[self clpColor] set];
 		else
 			[[self hldColor] set];
-		frame = [self boundsWithRatio:levels.mHld];
-		NSRectFill(frame);
+		NSRectFill([self boundsWithRatio:levels.mHld]);
 		
 		[[self maxColor] set];
-		frame = [self boundsWithRatio:levels.mMax];
-		NSRectFill(frame);
+		NSRectFill([self boundsWithRatio:levels.mMax]);
 		
 		[[self avgColor] set];
-		frame = [self boundsWithRatio:levels.mAvg];
-		NSRectFill(frame);
-
+		NSRectFill([self boundsWithRatio:levels.mAvg]);
 	}
 }
 
-- (NSRect) clippingRegion
-{
-	NSRect bounds = self.bounds;
-
-	if (_direction & 0x01)
-	{
-		bounds.size.width *= 0.2;
-		if ((_direction & 0x02)==0)
-		bounds.origin.x += self.bounds.size.width - bounds.size.width;
-	}
-	else
-	{
-		bounds.size.height *= 0.2;
-		if ((_direction & 0x02)==0)
-		bounds.origin.y += self.bounds.size.height - bounds.size.height;
-	}
-	
-	return bounds;
-}
+////////////////////////////////////////////////////////////////////////////////
 
 - (NSRect) boundsWithRatio:(double)ratio
 {

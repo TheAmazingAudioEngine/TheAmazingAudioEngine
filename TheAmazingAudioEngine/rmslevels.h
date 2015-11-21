@@ -1,14 +1,14 @@
 ////////////////////////////////////////////////////////////////////////////////
 /*
-	rmslevels_t.h
+	rmslevels.h
 	
 	Created by 32BT on 15/11/15.
 	Copyright © 2015 32BT. All rights reserved.
 */
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef rmslevels_t_h
-#define rmslevels_t_h
+#ifndef rmslevels_h
+#define rmslevels_h
 
 #include <stddef.h>
 #include <stdint.h>
@@ -66,21 +66,17 @@ rmsresult_t;
 
 #define RMSResultZero (rmsresult_t){ 0.0, 0.0, 0.0, 0.0 }
 
-typedef rmsresult_t rmslevels_t;
-
-#define RMSLevelsZero (rmslevels_t){ 0.0, 0.0, 0.0, 0.0 }
-
 ////////////////////////////////////////////////////////////////////////////////
 
 // Prepare engine struct using samplerate
 rmsengine_t RMSEngineInit(double sampleRate);
 
-// Update values with squared samples
+// Update engine with squared samples
 void RMSEngineAddSample(rmsengine_t *engine, double sample);
 void RMSEngineAddSamples32(rmsengine_t *engine, float *srcPtr, uint32_t n);
 
 // Get sqrt results. Save to call with enginePtr == nil
-rmslevels_t RMSEngineFetchResult(const rmsengine_t *enginePtr);
+rmsresult_t RMSEngineFetchResult(const rmsengine_t *enginePtr);
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -88,7 +84,7 @@ void RMSEngineSetResponse(rmsengine_t *engine, double milliSeconds, double sampl
 void RMSEngineSetDecayRate(rmsengine_t *engine, double decayRate);
 
 ////////////////////////////////////////////////////////////////////////////////
-#endif // rmslevels_t_h
+#endif // rmslevels_h
 ////////////////////////////////////////////////////////////////////////////////
 
 

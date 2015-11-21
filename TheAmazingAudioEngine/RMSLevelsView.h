@@ -19,7 +19,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#import "rmslevels_t.h"
+#import "rmslevels.h"
 
 enum RMSViewDirection
 {
@@ -32,6 +32,18 @@ enum RMSViewDirection
 
 @interface RMSLevelsView : NSView
 
+/*
+	enginePtr
+	---------
+	A pointer to the rmsengine being updated by the audiothread
+	
+	The view will periodically fetch the result levels and draw
+	a useful representation. Fetching the results is threadsafe 
+	in the sense that atomicity is not specifically relevant.
+	
+	const is supposed to indicate that this call will not adjust 
+	the struct internals
+*/
 @property (nonatomic, assign) const rmsengine_t *enginePtr;
 
 @property (nonatomic) NSColor *bckColor;
@@ -44,7 +56,7 @@ enum RMSViewDirection
 
 - (void) startUpdating;
 - (void) stopUpdating;
-- (void) setLevels:(rmslevels_t)levels;
+- (void) setLevels:(rmsresult_t)result;
 
 @end
 

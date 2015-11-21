@@ -80,8 +80,8 @@
 		7F7344B81BFE042500669192 /* RMSStereoView.m in Sources */ = {isa = PBXBuildFile; fileRef = 7F7344B71BFE042500669192 /* RMSStereoView.m */; };
 		7F7344B91BFE042500669192 /* RMSStereoView.m in Sources */ = {isa = PBXBuildFile; fileRef = 7F7344B71BFE042500669192 /* RMSStereoView.m */; };
 		7F9C7F461BFBE37300D58252 /* RMSLevelsView.m in Sources */ = {isa = PBXBuildFile; fileRef = 7F63F3DE1BF9D39E00124729 /* RMSLevelsView.m */; };
-		7FEBA8851BF9346E00DE2C1B /* rmslevels_t.c in Sources */ = {isa = PBXBuildFile; fileRef = 7FEBA8831BF9346E00DE2C1B /* rmslevels_t.c */; };
-		7FEBA8861BF9346E00DE2C1B /* rmslevels_t.c in Sources */ = {isa = PBXBuildFile; fileRef = 7FEBA8831BF9346E00DE2C1B /* rmslevels_t.c */; };
+		7FEBA8851BF9346E00DE2C1B /* rmslevels.c in Sources */ = {isa = PBXBuildFile; fileRef = 7FEBA8831BF9346E00DE2C1B /* rmslevels.c */; };
+		7FEBA8861BF9346E00DE2C1B /* rmslevels.c in Sources */ = {isa = PBXBuildFile; fileRef = 7FEBA8831BF9346E00DE2C1B /* rmslevels.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -202,8 +202,8 @@
 		7F7344B31BFDFF7200669192 /* MainView.xib */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.xib; name = MainView.xib; path = "TheEngineSample/OS X/MainView.xib"; sourceTree = SOURCE_ROOT; };
 		7F7344B61BFE042500669192 /* RMSStereoView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = RMSStereoView.h; path = RMSLevels/RMSStereoView.h; sourceTree = SOURCE_ROOT; };
 		7F7344B71BFE042500669192 /* RMSStereoView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = RMSStereoView.m; path = RMSLevels/RMSStereoView.m; sourceTree = SOURCE_ROOT; };
-		7FEBA8831BF9346E00DE2C1B /* rmslevels_t.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = rmslevels_t.c; path = TheAmazingAudioEngine/rmslevels_t.c; sourceTree = SOURCE_ROOT; };
-		7FEBA8841BF9346E00DE2C1B /* rmslevels_t.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = rmslevels_t.h; path = TheAmazingAudioEngine/rmslevels_t.h; sourceTree = SOURCE_ROOT; };
+		7FEBA8831BF9346E00DE2C1B /* rmslevels.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = rmslevels.c; path = TheAmazingAudioEngine/rmslevels.c; sourceTree = SOURCE_ROOT; };
+		7FEBA8841BF9346E00DE2C1B /* rmslevels.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = rmslevels.h; path = TheAmazingAudioEngine/rmslevels.h; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -406,8 +406,8 @@
 				4C50FF2C1B75936000E56620 /* ViewController.h */,
 				4C50FF2D1B75936000E56620 /* ViewController.m */,
 				7F7344B31BFDFF7200669192 /* MainView.xib */,
-				7FEBA8831BF9346E00DE2C1B /* rmslevels_t.c */,
-				7FEBA8841BF9346E00DE2C1B /* rmslevels_t.h */,
+				7FEBA8831BF9346E00DE2C1B /* rmslevels.c */,
+				7FEBA8841BF9346E00DE2C1B /* rmslevels.h */,
 				7F63F3DD1BF9D39E00124729 /* RMSLevelsView.h */,
 				7F63F3DE1BF9D39E00124729 /* RMSLevelsView.m */,
 				7F7344B61BFE042500669192 /* RMSStereoView.h */,
@@ -574,7 +574,7 @@
 				4C2933991BB2814400AAED25 /* AEDelayFilter.m in Sources */,
 				4C7C680B16F1609800721E60 /* AELimiterFilter.m in Sources */,
 				4C50FEFD1B75883D00E56620 /* AppDelegate.m in Sources */,
-				7FEBA8851BF9346E00DE2C1B /* rmslevels_t.c in Sources */,
+				7FEBA8851BF9346E00DE2C1B /* rmslevels.c in Sources */,
 				4C7C680C16F1609800721E60 /* AEMixerBuffer.m in Sources */,
 				4C2933A31BB2814400AAED25 /* AELowPassFilter.m in Sources */,
 				4C50FF011B75883D00E56620 /* ViewController.m in Sources */,
@@ -617,7 +617,7 @@
 				4C50FF0C1B758B5500E56620 /* TPOscilloscopeLayer.m in Sources */,
 				4C29339E1BB2814400AAED25 /* AEDynamicsProcessorFilter.m in Sources */,
 				7A8D23331B72B4E20054D2B2 /* AEExpanderFilter.m in Sources */,
-				7FEBA8861BF9346E00DE2C1B /* rmslevels_t.c in Sources */,
+				7FEBA8861BF9346E00DE2C1B /* rmslevels.c in Sources */,
 				7A8D23321B72B4DD0054D2B2 /* AELimiter.m in Sources */,
 				4C50FF2E1B75936000E56620 /* AppDelegate.m in Sources */,
 				4C2933AA1BB2814400AAED25 /* AEParametricEqFilter.m in Sources */,

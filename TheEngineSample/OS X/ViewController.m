@@ -103,7 +103,7 @@ static const int kInputChannelsChangedContext;
 			RMSEngineAddSamples32(&self->mRMSEngineL, srcPtr, frames);
 		}
 		
-		// Process second output through right engine
+		// Process second output buffer through right engine
 		if (audio->mNumberBuffers > 1)
 		{
 			Float32 *srcPtr = audio->mBuffers[1].mData;

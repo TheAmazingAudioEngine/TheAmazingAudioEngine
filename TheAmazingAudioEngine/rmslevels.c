@@ -1,14 +1,13 @@
-//
 ////////////////////////////////////////////////////////////////////////////////
 /*
-	rmslevels_t.h
+	rmslevels.h
 	
 	Created by 32BT on 15/11/15.
 	Copyright © 2015 32BT. All rights reserved.
 */
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "rmslevels_t.h"
+#include "rmslevels.h"
 #include <math.h>
 
 
@@ -79,15 +78,16 @@ void RMSEngineSetResponse(rmsengine_t *engine, double milliSeconds, double sampl
 
 void RMSEngineAddSample(rmsengine_t *engine, double sample)
 {
-	// Compute squared values
-	sample *= sample;
+	// Compute absolute value
+	sample = fabs(sample);
 	
-	// Update average
-	engine->mAvg = rms_add(engine->mAvg, engine->mAvgM, sample);
 	
-	// Update maximum
-	engine->mMax = rms_max(engine->mMax, engine->mMaxM, sample);
-	
+	// Update clipping counts
+	if (sample >= 1.0)
+		engine->mClpN += 1;
+	engine->mClpD += 1;
+
+
 	// Update hold value
 	if (engine->mHld < sample)
 	{
@@ -99,6 +99,13 @@ void RMSEngineAddSample(rmsengine_t *engine, double sample)
 		engine->mHldN -= 1.0;
 	else
 		engine->mHld = rms_add(engine->mHld, engine->mHldM, sample);
+	
+	
+	// Update maximum
+	engine->mMax = rms_max(engine->mMax, engine->mMaxM, sample);
+
+	// Update rms average
+	engine->mAvg = rms_add(engine->mAvg, engine->mAvgM, sample * sample);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -111,15 +118,17 @@ void RMSEngineAddSamples32(rmsengine_t *engine, float *srcPtr, uint32_t n)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-rmslevels_t RMSEngineFetchResult(const rmsengine_t *enginePtr)
+rmsresult_t RMSEngineFetchResult(const rmsengine_t *enginePtr)
 {
-	rmslevels_t levels = RMSLevelsZero;
+	rmsresult_t levels = RMSResultZero;
 	
 	if (enginePtr != NULL)
 	{
 		levels.mAvg = sqrt(enginePtr->mAvg);
-		levels.mMax = sqrt(enginePtr->mMax);
-		levels.mHld = sqrt(enginePtr->mHld);
+		levels.mMax = (enginePtr->mMax);
+		levels.mHld = (enginePtr->mHld);
+		levels.mClp = enginePtr->mClpD != 0.0 ?
+		enginePtr->mClpN / enginePtr->mClpD : 0.0;
 	}
 	
 	return levels;
@@ -128,9 +137,9 @@ rmslevels_t RMSEngineFetchResult(const rmsengine_t *enginePtr)
 ////////////////////////////////////////////////////////////////////////////////
 // 20.0*log10(sqrt()) == 10.0*log10()
 
-rmslevels_t RMSEngineGetLevelsDB(rmsengine_t *engine)
+rmsresult_t RMSEngineFetchResultDB(rmsengine_t *engine)
 {
-	rmslevels_t levels;
+	rmsresult_t levels;
 	
 	levels.mAvg = 10.0*log10(engine->mAvg);
 	levels.mMax = 10.0*log10(engine->mMax);
