@@ -2820,12 +2820,6 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 
 #if TARGET_OS_IPHONE
     if ( [self usingVPIO] ) {
-        // Set quality
-        UInt32 quality = 127;
-        OSStatus result = AudioUnitSetProperty(_ioAudioUnit, kAUVoiceIOProperty_VoiceProcessingQuality, kAudioUnitScope_Global, 0, &quality, sizeof(quality));
-        AECheckOSStatus(result, "AudioUnitSetProperty(kAUVoiceIOProperty_VoiceProcessingQuality)");
-
-
         if ( _preferredBufferDuration ) {
             // If we're using voice processing, clamp the buffer duration
             Float32 preferredBufferSize = MAX(kMaxBufferDurationWithVPIO, _preferredBufferDuration);
