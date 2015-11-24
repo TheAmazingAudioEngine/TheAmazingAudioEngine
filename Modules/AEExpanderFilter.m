@@ -95,7 +95,10 @@ typedef void (^AECalibrateCompletionBlock)(void);
 - (void)teardown {
     self.audioController = nil;
     self.floatConverter = nil;
-    AEAudioBufferListFree(_scratchBuffer);
+    if ( _scratchBuffer ) {
+        AEAudioBufferListFree(_scratchBuffer);
+        _scratchBuffer = NULL;
+    }
 }
 
 - (void)assignPreset:(AEExpanderFilterPreset)preset {
