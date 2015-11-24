@@ -562,7 +562,7 @@ static const int kInputChannelsChangedContext;
 
 - (void)playthroughSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
-        self.playthrough = [[AEPlaythroughChannel alloc] initWithAudioController:_audioController];
+        self.playthrough = [[AEPlaythroughChannel alloc] init];
         [_audioController addInputReceiver:_playthrough];
         [_audioController addChannels:@[_playthrough]];
     } else {

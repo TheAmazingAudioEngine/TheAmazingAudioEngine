@@ -37,26 +37,36 @@ static const int kAudiobusReceiverPortConnectedToSelfChanged;
     TPCircularBuffer _buffer;
     BOOL _audiobusConnectedToSelf;
 }
-@property (nonatomic, strong) AEAudioController *audioController;
+@property (nonatomic, weak) AEAudioController *audioController;
 @end
 
 @implementation AEPlaythroughChannel
-@synthesize audioController=_audioController, volume = _volume;
 
 +(NSSet *)keyPathsForValuesAffectingAudioDescription {
     return [NSSet setWithObject:@"audioController.inputAudioDescription"];
 }
 
 - (id)initWithAudioController:(AEAudioController*)audioController {
+    return [self init];
+}
+
+- (id)init {
     if ( !(self = [super init]) ) return nil;
     TPCircularBufferInit(&_buffer, kAudioBufferLength);
-    self.audioController = audioController;
     _volume = 1.0;
     return self;
 }
 
 - (void)dealloc {
     TPCircularBufferCleanup(&_buffer);
+    self.audioController = nil;
+}
+
+- (void)setupWithAudioController:(AEAudioController *)audioController {
+    self.audioController = audioController;
+}
+
+- (void)teardown {
     self.audioController = nil;
 }
 
