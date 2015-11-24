@@ -281,7 +281,6 @@ static const int kInputChannelsChangedContext;
             UISwitch * onSwitch = [[UISwitch alloc] initWithFrame:CGRectZero];
             onSwitch.translatesAutoresizingMaskIntoConstraints = NO;
             onSwitch.on = _expander != nil;
-            [onSwitch addTarget:self action:@selector(expanderSwitchChanged:) forControlEvents:UIControlEventValueChanged];
             [view addSubview:slider];
             [view addSubview:onSwitch];
             [view addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|[slider]-20-[onSwitch]|" options:0 metrics:nil views:NSDictionaryOfVariableBindings(slider, onSwitch)]];
