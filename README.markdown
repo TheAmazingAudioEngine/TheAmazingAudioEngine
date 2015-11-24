@@ -36,7 +36,7 @@ freely, subject to the following restrictions:
 Changelog
 ---------
 
-### In-Development: 1.5.3 (master branch)
+### 1.5.3
 
 - Added AEAudioBufferListCreateOnStack utility
 - Enable automaticLatencyManagement by default
@@ -45,6 +45,7 @@ Changelog
 - Added playAtTime: facility to AEMemoryBufferPlayer (thanks to Anton Holmberg)
 - Added setup/teardown methods to AEInputReceiver
 - Fixed missing setup/teardown calls to input filters
+- Replaced AEPlaythroughChannel initializer
 
 ### 1.5.2
 
