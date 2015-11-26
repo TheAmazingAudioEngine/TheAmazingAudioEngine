@@ -39,6 +39,8 @@ Changelog
 ### In-development: 1.5.4
 
 - Fixed an output latency compensation issue when hosted via Inter-App Audio
+- Deprecated "audiobusSenderPort" facility (use ABSenderPort's audioUnit initializer instead, with AEAudioController's audioUnit property)
+- Improved performance reports (made these less verbose, added percentage of render budget)
 
 ### 1.5.3
 
