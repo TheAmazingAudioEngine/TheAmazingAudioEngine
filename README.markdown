@@ -36,6 +36,10 @@ freely, subject to the following restrictions:
 Changelog
 ---------
 
+### In-development: 1.5.4
+
+- Fixed an output latency compensation issue when hosted via Inter-App Audio
+
 ### 1.5.3
 
 - Added AEAudioBufferListCreateOnStack utility
