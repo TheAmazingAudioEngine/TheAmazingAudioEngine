@@ -2045,6 +2045,15 @@ NSTimeInterval AEAudioControllerInputLatency(__unsafe_unretained AEAudioControll
 
 NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioController *THIS) {
     if ( AECurrentThreadIsAudioThread() ) {
+        UInt32 iaaConnected;
+        UInt32 size = sizeof(iaaConnected);
+        if ( AECheckOSStatus(AudioUnitGetProperty(THIS->_ioAudioUnit, kAudioUnitProperty_IsInterAppConnected,
+                                                  kAudioUnitScope_Global, 0, &iaaConnected, &size), "AudioUnitGetProperty")
+                && iaaConnected ) {
+            // If the node is being hosted over IAA, then don't do any output latency compensation
+            return 0.0;
+        }
+        
         AEChannelRef channelBeingRendered = THIS->_channelBeingRendered;
         if ( !channelBeingRendered ) channelBeingRendered = THIS->_topChannel;
         
