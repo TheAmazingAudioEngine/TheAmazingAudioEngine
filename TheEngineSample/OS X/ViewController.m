@@ -626,7 +626,7 @@ static inline float translate(float val, float min, float max) {
 - (void)playthroughSwitchChanged:(NSButton *)sender {
     BOOL isOn = (sender.state == NSOnState);
     if ( isOn ) {
-        self.playthrough = [[AEPlaythroughChannel alloc] initWithAudioController:_audioController];
+        self.playthrough = [[AEPlaythroughChannel alloc] init];
         [_audioController addInputReceiver:_playthrough];
         [_audioController addChannels:@[_playthrough]];
     } else {

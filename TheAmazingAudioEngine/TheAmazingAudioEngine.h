@@ -546,8 +546,8 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioFilterProducer producer,
  @link AEAudioPlayable @endlink *and* the @link AEAudioReceiver @endlink protocols, so that it acts as both an
  audio receiver and an audio source.
  
- To use it, initialize it using @link AEPlaythroughChannel::initWithAudioController: initWithAudioController: @endlink,
- then add it as an input receiver using AEAudioController's @link AEAudioController::addInputReceiver: addInputReceiver: @endlink
+ To use it, initialize it then add it as an input receiver using 
+ AEAudioController's @link AEAudioController::addInputReceiver: addInputReceiver: @endlink
  and add it as a channel using @link AEAudioController::addChannels: addChannels: @endlink.
  
  @section Recording Recording
