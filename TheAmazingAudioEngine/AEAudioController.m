@@ -2873,19 +2873,6 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 }
 
 - (void)teardown {
-    AECheckOSStatus(AUGraphClose(_audioGraph), "AUGraphClose");
-    AECheckOSStatus(DisposeAUGraph(_audioGraph), "DisposeAUGraph");
-    _audioGraph = NULL;
-    _ioAudioUnit = NULL;
-#if !TARGET_OS_IPHONE
-    if ( _inputEnabled ) {
-        AECheckOSStatus(AudioUnitUninitialize(_iAudioUnit), "AudioUnitUninitialize");
-        AECheckOSStatus(AudioComponentInstanceDispose(_iAudioUnit), "AudioComponentInstanceDispose");
-        _iAudioUnit = NULL;
-    }
-#endif
-    
-    [self sendTeardownToObjects];
     
     for ( int i=0; i<_inputCallbackCount; i++ ) {
         if ( _inputCallbacks[i].audioConverter ) {
@@ -2903,6 +2890,20 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         _topChannel->setRenderNotification = NO;
         [self markGroupTorndown:_topGroup];
     }
+    
+    [self sendTeardownToObjects];
+    
+    AECheckOSStatus(AUGraphClose(_audioGraph), "AUGraphClose");
+    AECheckOSStatus(DisposeAUGraph(_audioGraph), "DisposeAUGraph");
+    _audioGraph = NULL;
+    _ioAudioUnit = NULL;
+#if !TARGET_OS_IPHONE
+    if ( _inputEnabled ) {
+        AECheckOSStatus(AudioUnitUninitialize(_iAudioUnit), "AudioUnitUninitialize");
+        AECheckOSStatus(AudioComponentInstanceDispose(_iAudioUnit), "AudioComponentInstanceDispose");
+        _iAudioUnit = NULL;
+    }
+#endif
 }
 
 - (OSStatus)updateGraph {
