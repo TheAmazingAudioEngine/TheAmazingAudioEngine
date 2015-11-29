@@ -200,10 +200,25 @@ AudioComponentDescription AEAudioComponentDescriptionMake(OSType manufacturer, O
 static void AETimeInit() {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        mach_timebase_info_data_t tinfo;
+		
+		// Fetch timebase info
+        mach_timebase_info_data_t tinfo = { 0, 0 };
         mach_timebase_info(&tinfo);
-        __hostTicksToSeconds = ((double)tinfo.numer / tinfo.denom) * 1.0e-9;
-        __secondsToHostTicks = 1.0 / __hostTicksToSeconds;
+		
+		// Test for valid response
+		if (tinfo.numer && tinfo.denom)
+		{
+			__hostTicksToSeconds = (1.0e-9) * tinfo.numer / tinfo.denom;
+			__secondsToHostTicks = (1.0e+9) * tinfo.denom / tinfo.numer;
+		}
+		else
+		{
+			// Default to nanoseconds
+			__hostTicksToSeconds = (1.0e-9);
+			__secondsToHostTicks = (1.0e+9);
+			// Report problem
+			NSLog(@"Invalid timebase info = { %d, %d }", tinfo.numer, tinfo.denom);
+		}
     });
 }
 
