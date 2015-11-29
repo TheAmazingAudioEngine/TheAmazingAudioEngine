@@ -761,8 +761,11 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 		// Warn if total render takes longer than 50% of buffer duration (gives us a bit of headroom)
 		if (durationInSeconds > 0.5*bufferInSeconds)
 		{
-			NSLog(@"TAAE: Warning: render took too long (%lfs, %0.2lf%% of budget). Expect glitches.",
-			durationInSeconds, 100.0 * durationInSeconds/bufferInSeconds);
+			// Local copies for block, D = duration, R = ratio
+			double D = durationInSeconds;
+			double R = 100.0 * durationInSeconds/bufferInSeconds;
+			dispatch_async(dispatch_get_main_queue(), ^{
+			NSLog(@"TAAE: Warning: render took too long (%lfs, %0.2lf%% of budget). Expect glitches.", D, R); });
 			
 			THIS->_lastReportTime = finishTime0;
 		}
