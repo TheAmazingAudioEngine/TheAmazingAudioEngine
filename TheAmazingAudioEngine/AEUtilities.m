@@ -217,7 +217,10 @@ static void AETimeInit() {
 			__hostTicksToSeconds = (1.0e-9);
 			__secondsToHostTicks = (1.0e+9);
 			// Report problem
-			NSLog(@"Invalid timebase info = { %d, %d }", tinfo.numer, tinfo.denom);
+			uint32_t N = tinfo.numer;
+			uint32_t D = tinfo.denom;
+			dispatch_async(dispatch_get_main_queue(), ^{
+			NSLog(@"Invalid timebase info = { %d, %d }", N, D); });
 		}
     });
 }
