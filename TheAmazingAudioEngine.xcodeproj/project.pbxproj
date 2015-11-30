@@ -152,6 +152,12 @@
 		4C99588616BB74720011FB01 /* AEAudioUnitChannel.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C99588416BB74720011FB01 /* AEAudioUnitChannel.m */; };
 		4C99588D16C0825F0011FB01 /* AEAudioUnitFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C99588B16C0825E0011FB01 /* AEAudioUnitFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4C99588E16C0825F0011FB01 /* AEAudioUnitFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C99588C16C0825F0011FB01 /* AEAudioUnitFilter.m */; };
+		4CCAFEFC1C0BCFF100B87416 /* AEAudioBufferManager.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CCAFEFA1C0BCFF100B87416 /* AEAudioBufferManager.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4CCAFEFD1C0BCFF100B87416 /* AEAudioBufferManager.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CCAFEFA1C0BCFF100B87416 /* AEAudioBufferManager.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4CCAFEFE1C0BCFF100B87416 /* AEAudioBufferManager.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CCAFEFA1C0BCFF100B87416 /* AEAudioBufferManager.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4CCAFEFF1C0BCFF100B87416 /* AEAudioBufferManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CCAFEFB1C0BCFF100B87416 /* AEAudioBufferManager.m */; };
+		4CCAFF001C0BCFF100B87416 /* AEAudioBufferManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CCAFEFB1C0BCFF100B87416 /* AEAudioBufferManager.m */; };
+		4CCAFF011C0BCFF100B87416 /* AEAudioBufferManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CCAFEFB1C0BCFF100B87416 /* AEAudioBufferManager.m */; };
 		4CEC0EB916B5294300D11ED9 /* AEBlockFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CEC0EB716B5294200D11ED9 /* AEBlockFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4CEC0EBA16B5294300D11ED9 /* AEBlockFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CEC0EB816B5294300D11ED9 /* AEBlockFilter.m */; };
 		7A5687141B54617200243427 /* AEAudioController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CAD56811516281D003CE861 /* AEAudioController.m */; };
@@ -285,6 +291,8 @@
 		4CAD569315162822003CE861 /* TheAmazingAudioEngine.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TheAmazingAudioEngine.h; sourceTree = "<group>"; };
 		4CAD56A915163488003CE861 /* AEAudioFilePlayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEAudioFilePlayer.h; sourceTree = "<group>"; };
 		4CAD56AA15163488003CE861 /* AEAudioFilePlayer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEAudioFilePlayer.m; sourceTree = "<group>"; };
+		4CCAFEFA1C0BCFF100B87416 /* AEAudioBufferManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEAudioBufferManager.h; sourceTree = "<group>"; };
+		4CCAFEFB1C0BCFF100B87416 /* AEAudioBufferManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEAudioBufferManager.m; sourceTree = "<group>"; };
 		4CE501971493F82600F23607 /* TheAmazingAudioEngine-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TheAmazingAudioEngine-Prefix.pch"; sourceTree = "<group>"; };
 		4CEC0EB716B5294200D11ED9 /* AEBlockFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEBlockFilter.h; sourceTree = "<group>"; };
 		4CEC0EB816B5294300D11ED9 /* AEBlockFilter.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEBlockFilter.m; sourceTree = "<group>"; };
@@ -470,6 +478,8 @@
 				4CE501971493F82600F23607 /* TheAmazingAudioEngine-Prefix.pch */,
 				4C0944FF16FBD7460054608E /* AEBlockScheduler.h */,
 				4C09450016FBD7460054608E /* AEBlockScheduler.m */,
+				4CCAFEFA1C0BCFF100B87416 /* AEAudioBufferManager.h */,
+				4CCAFEFB1C0BCFF100B87416 /* AEAudioBufferManager.m */,
 			);
 			path = TheAmazingAudioEngine;
 			sourceTree = "<group>";
@@ -510,6 +520,7 @@
 				17BB5BAB1BECD338007A2892 /* AEBlockAudioReceiver.h in Headers */,
 				17BB5BAC1BECD338007A2892 /* AEFloatConverter.h in Headers */,
 				17BB5BAD1BECD338007A2892 /* AEAudioFileLoaderOperation.h in Headers */,
+				4CCAFEFE1C0BCFF100B87416 /* AEAudioBufferManager.h in Headers */,
 				17BB5BAE1BECD338007A2892 /* AEBlockScheduler.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -533,6 +544,7 @@
 				4C99588D16C0825F0011FB01 /* AEAudioUnitFilter.h in Headers */,
 				4C456B8D16D59365008ED99D /* AEBlockAudioReceiver.h in Headers */,
 				4C4B11F416833FDD00A3BA2E /* AEBlockChannel.h in Headers */,
+				4CCAFEFC1C0BCFF100B87416 /* AEAudioBufferManager.h in Headers */,
 				4C09450116FBD7460054608E /* AEBlockScheduler.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -556,6 +568,7 @@
 				7A5687301B5461BE00243427 /* AEBlockAudioReceiver.h in Headers */,
 				7A5687311B5461BE00243427 /* AEFloatConverter.h in Headers */,
 				7A5687321B5461BE00243427 /* AEAudioFileLoaderOperation.h in Headers */,
+				4CCAFEFD1C0BCFF100B87416 /* AEAudioBufferManager.h in Headers */,
 				7A5687341B5461BE00243427 /* AEBlockScheduler.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -720,6 +733,7 @@
 				17BB5B861BECD1D9007A2892 /* AENewTimePitchFilter.h in Sources */,
 				17BB5B871BECD1D9007A2892 /* AENewTimePitchFilter.m in Sources */,
 				17BB5B881BECD1D9007A2892 /* AEParametricEqFilter.h in Sources */,
+				4CCAFF011C0BCFF100B87416 /* AEAudioBufferManager.m in Sources */,
 				17BB5B891BECD1D9007A2892 /* AEParametricEqFilter.m in Sources */,
 				17BB5B8A1BECD1D9007A2892 /* AEPeakLimiterFilter.h in Sources */,
 				17BB5B8B1BECD1D9007A2892 /* AEPeakLimiterFilter.m in Sources */,
@@ -751,6 +765,7 @@
 				4C215D091523A8E500D36CAD /* AEAudioFilePlayer.m in Sources */,
 				4C215D0A1523A8E500D36CAD /* AEUtilities.m in Sources */,
 				4C70F9AD1BB0D2FE0064CF73 /* AENewTimePitchFilter.m in Sources */,
+				4CCAFEFF1C0BCFF100B87416 /* AEAudioBufferManager.m in Sources */,
 				4C70F9B31BB0D2FE0064CF73 /* AEReverbFilter.m in Sources */,
 				4C70F99F1BB0D2FE0064CF73 /* AEDelayFilter.m in Sources */,
 				4C70F9B11BB0D2FE0064CF73 /* AEPeakLimiterFilter.m in Sources */,
@@ -787,6 +802,7 @@
 				7A5687151B54617200243427 /* AEAudioController+Audiobus.m in Sources */,
 				7A5687161B54617200243427 /* AEAudioFilePlayer.m in Sources */,
 				7A5687171B54617200243427 /* AEAudioFileWriter.m in Sources */,
+				4CCAFF001C0BCFF100B87416 /* AEAudioBufferManager.m in Sources */,
 				4C13AA9E1BB0FC9900DE05E0 /* AEMemoryBufferPlayer.m in Sources */,
 				7A5687181B54617200243427 /* AEUtilities.m in Sources */,
 				7A5687191B54617200243427 /* AEBlockChannel.m in Sources */,
@@ -901,6 +917,7 @@
 					"-DTPCircularBufferPeek=AECBPeek",
 					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
 					"-D_TPCircularBufferPeek=_AECBPeek",
+					"-DNSLog=LPLog",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PUBLIC_HEADERS_FOLDER_PATH = "$(TARGET_NAME)";
@@ -941,6 +958,7 @@
 					"-DTPCircularBufferPeek=AECBPeek",
 					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
 					"-D_TPCircularBufferPeek=_AECBPeek",
+					"-DNSLog=LPLog",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PUBLIC_HEADERS_FOLDER_PATH = "$(TARGET_NAME)";
@@ -1113,6 +1131,7 @@
 				17BB5B471BECD101007A2892 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		4C215CF61523A7D600D36CAD /* Build configuration list for PBXNativeTarget "TheAmazingAudioEngine" */ = {
 			isa = XCConfigurationList;

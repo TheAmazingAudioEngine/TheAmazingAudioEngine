@@ -44,6 +44,7 @@ extern "C" {
 #import "AEBlockScheduler.h"
 #import "AEUtilities.h"
 #import "AEMessageQueue.h"
+#import "AEAudioBufferManager.h"
 
 /*!
 @mainpage
@@ -788,6 +789,9 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioFilterProducer producer,
  
  Note: Do not use those functions above that perform memory allocation or deallocation from within the Core Audio thread,
  as this may cause performance problems.
+ 
+ Additionally, the AEAudioBufferManager class lets you perform standard ARC/retain-release memory management with
+ AudioBufferLists.
  
  @section Audio-Formats Defining Audio Formats
  

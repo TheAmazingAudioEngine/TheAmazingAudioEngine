@@ -36,6 +36,10 @@ freely, subject to the following restrictions:
 Changelog
 ---------
 
+### In-development version: 1.5.5
+
+- Added AEAudioBufferManager class, to enable management of AudioBufferList structures using normal ARC/retain-release memory management techniques
+
 ### 1.5.4
 
 - Fixed an output latency compensation issue when hosted via Inter-App Audio
