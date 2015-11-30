@@ -917,7 +917,6 @@
 					"-DTPCircularBufferPeek=AECBPeek",
 					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
 					"-D_TPCircularBufferPeek=_AECBPeek",
-					"-DNSLog=LPLog",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PUBLIC_HEADERS_FOLDER_PATH = "$(TARGET_NAME)";
@@ -958,7 +957,6 @@
 					"-DTPCircularBufferPeek=AECBPeek",
 					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
 					"-D_TPCircularBufferPeek=_AECBPeek",
-					"-DNSLog=LPLog",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PUBLIC_HEADERS_FOLDER_PATH = "$(TARGET_NAME)";
