@@ -220,7 +220,9 @@ typedef struct _channel_group_t {
     BOOL                _interrupted;
     BOOL                _hardwareInputAvailable;
     BOOL                _hasSystemError;
-#if !TARGET_OS_IPHONE
+#if TARGET_OS_IPHONE
+    BOOL                _hostedViaInterAppAudio;
+#else
     AudioUnit           _iAudioUnit;
 #endif
     
@@ -2051,11 +2053,7 @@ NSTimeInterval AEAudioControllerInputLatency(__unsafe_unretained AEAudioControll
 }
 
 NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioController *THIS) {
-    UInt32 iaaConnected;
-    UInt32 size = sizeof(iaaConnected);
-    if ( AECheckOSStatus(AudioUnitGetProperty(THIS->_ioAudioUnit, kAudioUnitProperty_IsInterAppConnected,
-                                              kAudioUnitScope_Global, 0, &iaaConnected, &size), "AudioUnitGetProperty")
-            && iaaConnected ) {
+    if ( THIS->_hostedViaInterAppAudio ) {
         // If the node is being hosted over IAA, then don't do any output latency compensation
         return 0.0;
     }
@@ -2445,12 +2443,14 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
 
 #if TARGET_OS_IPHONE
 static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, AudioUnitPropertyID inID, AudioUnitScope inScope, AudioUnitElement inElement) {
-    @autoreleasepool {
+    dispatch_async(dispatch_get_main_queue(), ^{
         AEAudioController *THIS = (__bridge AEAudioController*)inRefCon;
         
         UInt32 iaaConnected;
         UInt32 size = sizeof(iaaConnected);
         AudioUnitGetProperty(THIS->_ioAudioUnit, kAudioUnitProperty_IsInterAppConnected, kAudioUnitScope_Global, 0, &iaaConnected, &size);
+        THIS->_hostedViaInterAppAudio = iaaConnected;
+        
         if ( !iaaConnected ) {
             if ( [[UIApplication sharedApplication] applicationState] == UIApplicationStateBackground ) {
                 THIS->_interrupted = YES;
@@ -2462,7 +2462,7 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         if ( THIS->_inputEnabled ) {
             [THIS updateInputDeviceStatus];
         }
-    }
+    });
 }
 #endif
 
