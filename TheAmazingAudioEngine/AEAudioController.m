@@ -220,9 +220,7 @@ typedef struct _channel_group_t {
     BOOL                _interrupted;
     BOOL                _hardwareInputAvailable;
     BOOL                _hasSystemError;
-#if TARGET_OS_IPHONE
-    BOOL                _hostedViaInterAppAudio;
-#else
+#if !TARGET_OS_IPHONE
     AudioUnit           _iAudioUnit;
 #endif
     
@@ -2054,10 +2052,6 @@ NSTimeInterval AEAudioControllerInputLatency(__unsafe_unretained AEAudioControll
 }
 
 NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioController *THIS) {
-    if ( THIS->_hostedViaInterAppAudio ) {
-        // If the node is being hosted over IAA, then don't do any output latency compensation
-        return 0.0;
-    }
     
     if ( AECurrentThreadIsAudioThread() ) {
         AEChannelRef channelBeingRendered = THIS->_channelBeingRendered;
@@ -2450,7 +2444,6 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         UInt32 iaaConnected;
         UInt32 size = sizeof(iaaConnected);
         AudioUnitGetProperty(THIS->_ioAudioUnit, kAudioUnitProperty_IsInterAppConnected, kAudioUnitScope_Global, 0, &iaaConnected, &size);
-        THIS->_hostedViaInterAppAudio = iaaConnected;
         
         if ( !iaaConnected ) {
             if ( [[UIApplication sharedApplication] applicationState] == UIApplicationStateBackground ) {
