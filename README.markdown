@@ -40,6 +40,7 @@ Changelog
 
 - Added AEAudioBufferManager class, to enable management of AudioBufferList structures using normal ARC/retain-release memory management techniques
 - Addressed a problem introduced in 1.5.3 that could cause a 30s hang when restarting audio system
+- Revised timestamp management with Audiobus/IAA: now, TAAE will pass uncompensated timestamps to ABReceiverPortReceive, and will assume incoming timestamps, when hosted via IAA or Audiobus, are uncompensated.
 
 ### 1.5.4
 
