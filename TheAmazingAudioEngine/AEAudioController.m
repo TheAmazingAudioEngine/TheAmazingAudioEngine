@@ -600,15 +600,16 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
     if ( useAudiobusReceiverPort ) {
         // If Audiobus is connected, then serve Audiobus queue rather than serving system input queue
         timestamp = outputBusTimeStamp ? *outputBusTimeStamp : *inputBusTimeStamp;
-#if TARGET_OS_IPHONE
-        if ( outputBusTimeStamp && THIS->_automaticLatencyManagement ) {
-            // Adjust timestamp to factor in hardware output latency
-            timestamp.mHostTime += AEHostTicksFromSeconds(AEAudioControllerOutputLatency(THIS));
-        }
-#endif
         static Float64 __sampleTime = 0;
         ABReceiverPortReceive(THIS->_audiobusReceiverPort, nil, THIS->_inputAudioBufferList, inNumberFrames, &timestamp);
         timestamp.mSampleTime = __sampleTime;
+#if TARGET_OS_IPHONE
+        if ( outputBusTimeStamp && THIS->_automaticLatencyManagement ) {
+            // Adjust timestamp to factor in hardware output latency. Note that we do this after
+            // ABReceiverPortReceive, which needs an uncompensated audio timestamp
+            timestamp.mHostTime += AEHostTicksFromSeconds(AEAudioControllerOutputLatency(THIS));
+        }
+#endif
         __sampleTime += inNumberFrames;
     } else {
         timestamp = *inputBusTimeStamp;
