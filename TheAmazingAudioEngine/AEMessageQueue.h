@@ -87,6 +87,18 @@ typedef void (*AEMessageQueueMessageHandler)(void *userInfo, int userInfoLength)
 - (void)stopPolling;
 
 /*!
+ * Poll for main thread messages once
+ *
+ *  Use this method to poll the main thread message queue once. This can be useful
+ *  when performing some synchronous/wait operation that is dependent on a message
+ *  exchange to complete, similar to running an NSRunLoop manually.
+ *
+ *  Use @link startPolling @endlink/@link stopPolling @endlink to control message 
+ *  processing the rest of the time.
+ */
+-(void)processMainThreadMessages;
+
+/*!
  * Send a message to the realtime thread asynchronously, optionally receiving a response via a block
  *
  *  This is a synchronization mechanism that allows you to schedule actions to be performed 

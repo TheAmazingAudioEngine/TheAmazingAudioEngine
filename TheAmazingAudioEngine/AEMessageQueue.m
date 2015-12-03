@@ -143,7 +143,11 @@ void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessage
     }
 }
 
--(void)pollForMessageResponses {
+-(void)processMainThreadMessages {
+    [self processMainThreadMessagesMatchingResponseBlock:nil];
+}
+
+-(void)processMainThreadMessagesMatchingResponseBlock:(void (^)())responseBlock {
     pthread_t thread = pthread_self();
     BOOL isMainThread = [NSThread isMainThread];
 
@@ -169,6 +173,9 @@ void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessage
                     
                     if ( (buffer->sourceThread && buffer->sourceThread != thread) && (buffer->sourceThread == NULL && !isMainThread) ) {
                         // Skip this message, it's for a different thread
+                        hasUnservicedMessages = YES;
+                    } else if ( responseBlock && buffer->responseBlock != responseBlock ) {
+                        // Skip this message, it doesn't match
                         hasUnservicedMessages = YES;
                     } else {
                         // Service this message
@@ -252,14 +259,15 @@ void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessage
 
 - (BOOL)performSynchronousMessageExchangeWithBlock:(void (^)())block {
     __block BOOL finished = NO;
+    void (^responseBlock)() = ^{ finished = YES; };
     [self performAsynchronousMessageExchangeWithBlock:block
-                                        responseBlock:^{ finished = YES; }
+                                        responseBlock:responseBlock
                                          sourceThread:pthread_self()];
 
     // Wait for response
     uint64_t giveUpTime = AECurrentTimeInHostTicks() + AEHostTicksFromSeconds(kSynchronousTimeoutInterval);
     while ( !finished && AECurrentTimeInHostTicks() < giveUpTime ) {
-        [self pollForMessageResponses];
+        [self processMainThreadMessagesMatchingResponseBlock:responseBlock];
         if ( finished ) break;
         [NSThread sleepForTimeInterval: kActiveMessagingPollDuration];
     }
@@ -320,7 +328,7 @@ static BOOL AEMessageQueueHasPendingMainThreadMessages(__unsafe_unretained AEMes
                     AEMessageQueueProcessMessagesOnRealtimeThread(_messageQueue);
                 }
                 if ( AEMessageQueueHasPendingMainThreadMessages(_messageQueue) ) {
-                    [_messageQueue performSelectorOnMainThread:@selector(pollForMessageResponses) withObject:nil waitUntilDone:NO];
+                    [_messageQueue performSelectorOnMainThread:@selector(processMainThreadMessages) withObject:nil waitUntilDone:NO];
                 }
                 usleep(_pollInterval*1.0e6);
             }
