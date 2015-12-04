@@ -52,9 +52,6 @@ NSString * kAERecorderErrorKey = @"error";
     self.mixer = [[AEMixerBuffer alloc] initWithClientFormat:audioController.audioDescription];
     self.writer = [[AEAudioFileWriter alloc] initWithAudioDescription:audioController.audioDescription];
     
-    // Initialize async writing
-    AECheckOSStatus(AEAudioFileWriterAddAudio(_writer, NULL, 0), "AEAudioFileWriterAddAudio");
-    
     if ( audioController.inputEnabled && audioController.audioInputAvailable && audioController.inputAudioDescription.mChannelsPerFrame != audioController.audioDescription.mChannelsPerFrame ) {
         [_mixer setAudioDescription:*AEAudioControllerInputAudioDescription(audioController) forSource:AEAudioSourceInput];
     }
@@ -95,6 +92,12 @@ NSString * kAERecorderErrorKey = @"error";
 {
     _currentTime = 0.0;
     BOOL result = [_writer beginWritingToFileAtPath:path fileType:fileType bitDepth:bits channels:channels error:error];
+    
+    if ( result ) {
+        // Initialize async writing
+        AECheckOSStatus(AEAudioFileWriterAddAudio(_writer, NULL, 0), "AEAudioFileWriterAddAudio");
+    }
+    
     return result;
 }
 
