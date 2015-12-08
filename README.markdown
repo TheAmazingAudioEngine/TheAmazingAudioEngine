@@ -36,7 +36,7 @@ freely, subject to the following restrictions:
 Changelog
 ---------
 
-### In-development version: 1.5.5
+### 1.5.5
 
 - Added AEAudioBufferManager class, to enable management of AudioBufferList structures using normal ARC/retain-release memory management techniques
 - Addressed a problem introduced in 1.5.3 that could cause a 30s hang when restarting audio system
