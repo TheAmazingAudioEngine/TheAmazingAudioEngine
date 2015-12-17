@@ -407,8 +407,8 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
                 float volume = channel->volume;
                 for ( int i=0; i<channel->audiobusScratchBuffer->mNumberBuffers; i++ ) {
                     float gain = (channel->audiobusScratchBuffer->mNumberBuffers == 2 ?
-                                  i == 0 ? (channel->pan <= 0.0 ? 1.0 : (1.0-((channel->pan/2)+0.5))*2.0) :
-                                  i == 1 ? (channel->pan >= 0.0 ? 1.0 : ((channel->pan/2)+0.5)*2.0) :
+                                  i == 0 ? (channel->pan <= 0.0 ? 1.0 : 1.0-channel->pan) :
+                                  i == 1 ? (channel->pan >= 0.0 ? 1.0 : 1.0+channel->pan) :
                                   1 : 1) * volume;
                     vDSP_vsmul(channel->audiobusScratchBuffer->mBuffers[i].mData, 1, &gain, channel->audiobusScratchBuffer->mBuffers[i].mData, 1, inNumberFrames);
                 }
