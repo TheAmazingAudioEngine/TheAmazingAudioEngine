@@ -122,7 +122,7 @@ static __inline__ __attribute__((always_inline)) AudioBufferList *TPCircularBuff
  * @param outTimestamp      On output, if not NULL, the timestamp corresponding to the buffer
  * @return Pointer to the next buffer list in the buffer, or NULL
  */
-AudioBufferList *TPCircularBufferNextBufferListAfter(TPCircularBuffer *buffer, AudioBufferList *bufferList, AudioTimeStamp *outTimestamp);
+AudioBufferList *TPCircularBufferNextBufferListAfter(TPCircularBuffer *buffer, const AudioBufferList *bufferList, AudioTimeStamp *outTimestamp);
 
 /*!
  * Consume the next buffer list
@@ -162,7 +162,7 @@ void TPCircularBufferConsumeNextBufferListPartial(TPCircularBuffer *buffer, int 
  * @param outTimestamp      On output, if not NULL, the timestamp corresponding to the first audio frame returned
  * @param audioFormat       The format of the audio stored in the buffer
  */
-void TPCircularBufferDequeueBufferListFrames(TPCircularBuffer *buffer, UInt32 *ioLengthInFrames, AudioBufferList *outputBufferList, AudioTimeStamp *outTimestamp, const AudioStreamBasicDescription *audioFormat);
+void TPCircularBufferDequeueBufferListFrames(TPCircularBuffer *buffer, UInt32 *ioLengthInFrames, const AudioBufferList *outputBufferList, AudioTimeStamp *outTimestamp, const AudioStreamBasicDescription *audioFormat);
 
 /*!
  * Determine how many frames of audio are buffered

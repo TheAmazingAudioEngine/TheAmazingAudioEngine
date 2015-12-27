@@ -102,7 +102,7 @@ AudioBufferList *AEAudioBufferListCreate(AudioStreamBasicDescription audioFormat
  * @param original          The original AudioBufferList to copy
  * @return The new, copied audio buffer list
  */
-AudioBufferList *AEAudioBufferListCopy(AudioBufferList *original);
+AudioBufferList *AEAudioBufferListCopy(const AudioBufferList *original);
 #define AECopyAudioBufferList AEAudioBufferListCopy // Legacy alias
 
 /*!
@@ -125,7 +125,7 @@ void AEAudioBufferListFree(AudioBufferList *bufferList);
  * @param oNumberOfChannels If not NULL, will be set to the number of channels of audio in 'list'
  * @return Number of frames in the buffer list
  */
-UInt32 AEAudioBufferListGetLength(AudioBufferList *bufferList,
+UInt32 AEAudioBufferListGetLength(const AudioBufferList *bufferList,
                                   AudioStreamBasicDescription audioFormat,
                                   int *oNumberOfChannels);
 #define AEGetNumberOfFramesInAudioBufferList AEAudioBufferListGetLength // Legacy alias
@@ -166,7 +166,7 @@ void AEAudioBufferListOffset(AudioBufferList *bufferList,
  * @param offset        Offset into buffer
  * @param length        Number of frames to silence (0 for whole buffer)
  */
-void AEAudioBufferListSilence(AudioBufferList *bufferList,
+void AEAudioBufferListSilence(const AudioBufferList *bufferList,
                               AudioStreamBasicDescription audioFormat,
                               UInt32 offset,
                               UInt32 length);
@@ -182,7 +182,7 @@ void AEAudioBufferListSilence(AudioBufferList *bufferList,
  * @param bufferList    Pointer to an AudioBufferList
  * @return Size of the AudioBufferList structure
  */
-static inline size_t AEAudioBufferListGetStructSize(AudioBufferList *bufferList) {
+static inline size_t AEAudioBufferListGetStructSize(const AudioBufferList *bufferList) {
     return sizeof(AudioBufferList) + (bufferList->mNumberBuffers-1) * sizeof(AudioBuffer);
 }
 

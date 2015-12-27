@@ -138,7 +138,7 @@ bool TPCircularBufferCopyAudioBufferList(TPCircularBuffer *buffer, const AudioBu
     return true;
 }
 
-AudioBufferList *TPCircularBufferNextBufferListAfter(TPCircularBuffer *buffer, AudioBufferList *bufferList, AudioTimeStamp *outTimestamp) {
+AudioBufferList *TPCircularBufferNextBufferListAfter(TPCircularBuffer *buffer, const AudioBufferList *bufferList, AudioTimeStamp *outTimestamp) {
     int32_t availableBytes;
     void *tail = TPCircularBufferTail(buffer, &availableBytes);
     void *end = (char*)tail + availableBytes;
@@ -202,7 +202,7 @@ void TPCircularBufferConsumeNextBufferListPartial(TPCircularBuffer *buffer, int 
     TPCircularBufferConsume(buffer, (int32_t)bytesFreed);
 }
 
-void TPCircularBufferDequeueBufferListFrames(TPCircularBuffer *buffer, UInt32 *ioLengthInFrames, AudioBufferList *outputBufferList, AudioTimeStamp *outTimestamp, const AudioStreamBasicDescription *audioFormat) {
+void TPCircularBufferDequeueBufferListFrames(TPCircularBuffer *buffer, UInt32 *ioLengthInFrames, const AudioBufferList *outputBufferList, AudioTimeStamp *outTimestamp, const AudioStreamBasicDescription *audioFormat) {
     bool hasTimestamp = false;
     UInt32 bytesToGo = *ioLengthInFrames * audioFormat->mBytesPerFrame;
     UInt32 bytesCopied = 0;

@@ -181,7 +181,7 @@ static __inline__ __attribute__((always_inline)) void TPCircularBufferProduce(TP
 /*!
  * Helper routine to copy bytes to buffer
  *
- *  This copies the given bytes to the buffer, and marks them ready for writing.
+ *  This copies the given bytes to the buffer, and marks them ready for reading.
  *
  * @param buffer Circular buffer
  * @param src Source buffer
