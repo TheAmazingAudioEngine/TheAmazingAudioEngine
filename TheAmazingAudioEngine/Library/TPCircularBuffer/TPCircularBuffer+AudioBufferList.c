@@ -99,6 +99,8 @@ void TPCircularBufferProduceAudioBufferList(TPCircularBuffer *buffer, const Audi
     
     assert(!((unsigned long)block & 0xF) /* Beware unaligned accesses */);
     
+    assert(block->bufferList.mBuffers[0].mDataByteSize > 0);
+    
     if ( inTimestamp ) {
         memcpy(&block->timestamp, inTimestamp, sizeof(AudioTimeStamp));
     }
@@ -229,7 +231,7 @@ void TPCircularBufferDequeueBufferListFrames(TPCircularBuffer *buffer, UInt32 *i
     *ioLengthInFrames -= bytesToGo / audioFormat->mBytesPerFrame;
 }
 
-static UInt32 _TPCircularBufferPeek(TPCircularBuffer *buffer, AudioTimeStamp *outTimestamp, const AudioStreamBasicDescription *audioFormat, UInt32 contiguousToleranceSampleTime) {
+UInt32 TPCircularBufferPeekContiguousWrapped(TPCircularBuffer *buffer, AudioTimeStamp *outTimestamp, const AudioStreamBasicDescription *audioFormat, UInt32 contiguousToleranceSampleTime, UInt32 wrapPoint) {
     int32_t availableBytes;
     TPCircularBufferABLBlockHeader *block = (TPCircularBufferABLBlockHeader*)TPCircularBufferTail(buffer, &availableBytes);
     if ( !block ) return 0;
@@ -246,11 +248,20 @@ static UInt32 _TPCircularBufferPeek(TPCircularBuffer *buffer, AudioTimeStamp *ou
     while ( 1 ) {
         byteCount += block->bufferList.mBuffers[0].mDataByteSize;
         TPCircularBufferABLBlockHeader *nextBlock = (TPCircularBufferABLBlockHeader*)((char*)block + block->totalLength);
-        if ( (void*)nextBlock >= end ||
-                (contiguousToleranceSampleTime != UINT32_MAX
-                    && fabs(nextBlock->timestamp.mSampleTime - (block->timestamp.mSampleTime + (block->bufferList.mBuffers[0].mDataByteSize / audioFormat->mBytesPerFrame))) > contiguousToleranceSampleTime) ) {
+        if ( (void*)nextBlock >= end ) {
             break;
         }
+        
+        if ( contiguousToleranceSampleTime != UINT32_MAX ) {
+            UInt32 frames = block->bufferList.mBuffers[0].mDataByteSize / audioFormat->mBytesPerFrame;
+            Float64 nextTime = block->timestamp.mSampleTime + frames;
+            if ( wrapPoint && nextTime > wrapPoint ) nextTime = fmod(nextTime, wrapPoint);
+            Float64 diff = fabs(nextBlock->timestamp.mSampleTime - nextTime);
+            if ( diff > contiguousToleranceSampleTime && (!wrapPoint || fabs(diff-wrapPoint) > contiguousToleranceSampleTime) ) {
+                break;
+            }
+        }
+        
         assert(!((unsigned long)nextBlock & 0xF) /* Beware unaligned accesses */);
         block = nextBlock;
     }
@@ -259,11 +270,11 @@ static UInt32 _TPCircularBufferPeek(TPCircularBuffer *buffer, AudioTimeStamp *ou
 }
 
 UInt32 TPCircularBufferPeek(TPCircularBuffer *buffer, AudioTimeStamp *outTimestamp, const AudioStreamBasicDescription *audioFormat) {
-    return _TPCircularBufferPeek(buffer, outTimestamp, audioFormat, UINT32_MAX);
+    return TPCircularBufferPeekContiguousWrapped(buffer, outTimestamp, audioFormat, UINT32_MAX, 0);
 }
 
 UInt32 TPCircularBufferPeekContiguous(TPCircularBuffer *buffer, AudioTimeStamp *outTimestamp, const AudioStreamBasicDescription *audioFormat, UInt32 contiguousToleranceSampleTime) {
-    return _TPCircularBufferPeek(buffer, outTimestamp, audioFormat, contiguousToleranceSampleTime);
+    return TPCircularBufferPeekContiguousWrapped(buffer, outTimestamp, audioFormat, contiguousToleranceSampleTime, 0);
 }
 
 UInt32 TPCircularBufferGetAvailableSpace(TPCircularBuffer *buffer, const AudioStreamBasicDescription *audioFormat) {

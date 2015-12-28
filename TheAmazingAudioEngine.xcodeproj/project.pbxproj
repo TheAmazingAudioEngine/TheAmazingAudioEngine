@@ -916,7 +916,7 @@
 					"-DTPCircularBufferDequeueBufferListFrames=AECBDequeueBLFrames",
 					"-DTPCircularBufferPeek=AECBPeek",
 					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
-					"-D_TPCircularBufferPeek=_AECBPeek",
+					"-DTPCircularBufferPeekContiguousWrapped=AECBPeekContiguousWrapped",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PUBLIC_HEADERS_FOLDER_PATH = "$(TARGET_NAME)";
@@ -956,7 +956,7 @@
 					"-DTPCircularBufferDequeueBufferListFrames=AECBDequeueBLFrames",
 					"-DTPCircularBufferPeek=AECBPeek",
 					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
-					"-D_TPCircularBufferPeek=_AECBPeek",
+					"-DTPCircularBufferPeekContiguousWrapped=AECBPeekContiguousWrapped",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PUBLIC_HEADERS_FOLDER_PATH = "$(TARGET_NAME)";
@@ -1056,7 +1056,7 @@
 					"-DTPCircularBufferDequeueBufferListFrames=AECBDequeueBLFrames",
 					"-DTPCircularBufferGetAvailableSpace=AECBGetAvailableSpace",
 					"-DTPCircularBufferPeek=AECBPeek",
-					"-D_TPCircularBufferPeek=_AECBPeek",
+					"-DTPCircularBufferPeekContiguousWrapped=AECBPeekContiguousWrapped",
 					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1111,7 +1111,7 @@
 					"-DTPCircularBufferDequeueBufferListFrames=AECBDequeueBLFrames",
 					"-DTPCircularBufferGetAvailableSpace=AECBGetAvailableSpace",
 					"-DTPCircularBufferPeek=AECBPeek",
-					"-D_TPCircularBufferPeek=_AECBPeek",
+					"-DTPCircularBufferPeekContiguousWrapped=AECBPeekContiguousWrapped",
 					"-DTPCircularBufferPeekContiguous=AECBPeekContiguous",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
