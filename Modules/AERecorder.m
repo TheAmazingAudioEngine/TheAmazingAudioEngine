@@ -147,11 +147,10 @@ static void audioCallback(__unsafe_unretained AERecorder *THIS,
         THIS->_buffer->mBuffers[i].mDataByteSize = 0;
     }
     
-    THIS->_currentTime += AEConvertFramesToSeconds(audioController, frames);
-    
     AEMixerBufferDequeue(THIS->_mixer, THIS->_buffer, &bufferLength, NULL);
     
     if ( bufferLength > 0 ) {
+        THIS->_currentTime += AEConvertFramesToSeconds(audioController, bufferLength);
         OSStatus status = AEAudioFileWriterAddAudio(THIS->_writer, THIS->_buffer, bufferLength);
         if ( status != noErr ) {
             THIS->_recording = NO;
