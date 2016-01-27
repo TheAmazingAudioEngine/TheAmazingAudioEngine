@@ -2368,19 +2368,10 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
         AVAudioSessionRouteDescription *currentRoute = audioSession.currentRoute;
         NSLog(@"TAAE: Changed audio route to %@", [self stringFromRouteDescription:currentRoute]);
         
-        Float64 currentSampleRate = audioSession.sampleRate;
-        if ( _useHardwareSampleRate && currentSampleRate != _audioDescription.mSampleRate ) {
-            NSError *error = nil;
-            NSLog(@"TAAE: Changing sample rate to %g", currentSampleRate);
-            if ( ![self reinitializeWithChanges:^{
-                [self willChangeValueForKey:@"audioDescription"];
-                _audioDescription.mSampleRate = currentSampleRate;
-                [self didChangeValueForKey:@"audioDescription"];
-            } error:&error] ) {
-                NSLog(@"TAAE: Couldn't change sample rate: %@", error);
-            }
+        if ( _useHardwareSampleRate ) {
+            [self updateSampleRate];
         }
-
+        
         BOOL playingThroughSpeaker;
         if ( [currentRoute.outputs filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"portType = %@", AVAudioSessionPortBuiltInSpeaker]].count > 0 ) {
             playingThroughSpeaker = YES;
@@ -2487,25 +2478,7 @@ static void audioUnitStreamFormatChanged(void *inRefCon, AudioUnit inUnit, Audio
         if ( inUnit != THIS->_ioAudioUnit ) {
             return;
         }
-        
-        if ( (THIS->_outputEnabled && inScope == kAudioUnitScope_Output && inElement == 0) ||
-             (THIS->_inputEnabled && inScope == kAudioUnitScope_Input && inElement == 1) ) {
-            AudioStreamBasicDescription asbd = {};
-            UInt32 size = sizeof(asbd);
-            AudioUnitGetProperty(inUnit, kAudioUnitProperty_StreamFormat, inScope, inElement, &asbd, &size);
-            
-            if ( THIS->_useHardwareSampleRate && asbd.mSampleRate != THIS->_audioDescription.mSampleRate ) {
-                NSError *error = nil;
-                NSLog(@"TAAE: Changing sample rate to %g", asbd.mSampleRate);
-                if ( ![THIS reinitializeWithChanges:^{
-                    [THIS willChangeValueForKey:@"audioDescription"];
-                    THIS->_audioDescription.mSampleRate = asbd.mSampleRate;
-                    [THIS didChangeValueForKey:@"audioDescription"];
-                } error:&error] ) {
-                    NSLog(@"TAAE: Couldn't change sample rate: %@", error);
-                }
-            }
-        }
+        [THIS updateSampleRate];
     });
 }
 
@@ -4145,6 +4118,35 @@ static void performLevelMonitoring(audio_level_monitor_t* monitor, AudioBufferLi
         
         monitor->chanAverage[i] = monitor->chanMeanAccumulator[i] / (double)monitor->chanMeanBlockCount;
         monitor->average = monitor->meanAccumulator / (double)monitor->meanBlockCount;
+    }
+}
+
+- (void)updateSampleRate {
+    if ( !_useHardwareSampleRate ) return;
+    
+    AudioStreamBasicDescription asbd = {};
+    UInt32 size = sizeof(asbd);
+    AudioUnit unit = _ioAudioUnit;
+    AudioUnitElement element = _outputEnabled ? 0 : 1;
+#if !TARGET_OS_IPHONE
+    if ( !_outputEnabled ) {
+        unit = _iAudioUnit;
+        element = 0;
+    }
+#endif
+    if ( unit ) {
+        BOOL result = AECheckOSStatus(AudioUnitGetProperty(unit, kAudioUnitProperty_StreamFormat, _outputEnabled ? kAudioUnitScope_Output : kAudioUnitScope_Input, element, &asbd, &size), "AudioUnitGetProperty(kAudioUnitProperty_StreamFormat)");
+        if ( result && asbd.mSampleRate != _audioDescription.mSampleRate ) {
+            NSError *error = nil;
+            NSLog(@"TAAE: Changing sample rate to %g", asbd.mSampleRate);
+            if ( ![self reinitializeWithChanges:^{
+                [self willChangeValueForKey:@"audioDescription"];
+                _audioDescription.mSampleRate = asbd.mSampleRate;
+                [self didChangeValueForKey:@"audioDescription"];
+            } error:&error] ) {
+                NSLog(@"TAAE: Couldn't change sample rate: %@", error);
+            }
+        }
     }
 }
 
