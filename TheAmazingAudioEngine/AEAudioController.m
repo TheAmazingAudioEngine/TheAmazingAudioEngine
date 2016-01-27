@@ -2480,6 +2480,35 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
 }
 #endif
 
+
+static void audioUnitStreamFormatChanged(void *inRefCon, AudioUnit inUnit, AudioUnitPropertyID inID, AudioUnitScope inScope, AudioUnitElement inElement) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        AEAudioController *THIS = (__bridge AEAudioController*)inRefCon;
+        if ( inUnit != THIS->_ioAudioUnit ) {
+            return;
+        }
+        
+        if ( (THIS->_outputEnabled && inScope == kAudioUnitScope_Output && inElement == 0) ||
+             (THIS->_inputEnabled && inScope == kAudioUnitScope_Input && inElement == 1) ) {
+            AudioStreamBasicDescription asbd = {};
+            UInt32 size = sizeof(asbd);
+            AudioUnitGetProperty(inUnit, kAudioUnitProperty_StreamFormat, inScope, inElement, &asbd, &size);
+            
+            if ( THIS->_useHardwareSampleRate && asbd.mSampleRate != THIS->_audioDescription.mSampleRate ) {
+                NSError *error = nil;
+                NSLog(@"TAAE: Changing sample rate to %g", asbd.mSampleRate);
+                if ( ![THIS reinitializeWithChanges:^{
+                    [THIS willChangeValueForKey:@"audioDescription"];
+                    THIS->_audioDescription.mSampleRate = asbd.mSampleRate;
+                    [THIS didChangeValueForKey:@"audioDescription"];
+                } error:&error] ) {
+                    NSLog(@"TAAE: Couldn't change sample rate: %@", error);
+                }
+            }
+        }
+    });
+}
+
 #pragma mark - Graph and audio session configuration
 
 - (BOOL)initAudioSession {
@@ -2872,6 +2901,10 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
     // Set the audio unit to handle up to 4096 frames per slice to keep rendering during screen lock
     AECheckOSStatus(AudioUnitSetProperty(_ioAudioUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &kMaxFramesPerSlice, sizeof(kMaxFramesPerSlice)),
                 "AudioUnitSetProperty(kAudioUnitProperty_MaximumFramesPerSlice)");
+    
+    // Register a callback to watch for sample rate changes
+    AECheckOSStatus(AudioUnitAddPropertyListener(_ioAudioUnit, kAudioUnitProperty_StreamFormat, audioUnitStreamFormatChanged, (__bridge void*)self),
+                    "AudioUnitAddPropertyListener(kAudioUnitProperty_StreamFormat)");
 
 #if !TARGET_OS_IPHONE
     if ( _inputEnabled ) {
