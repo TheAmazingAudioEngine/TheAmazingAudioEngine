@@ -3250,16 +3250,6 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         }
     }
     
-    AudioBufferList *oldInputBuffer     = _inputAudioBufferList;
-    
-#if TARGET_OS_IPHONE
-    AudioBufferList *oldInputScratchBuffer = _inputAudioScratchBufferList;
-#endif
-    
-    input_callback_table_t *oldInputCallbacks = _inputCallbacks;
-    int oldInputCallbackCount = _inputCallbackCount;
-    audio_level_monitor_t oldInputLevelMonitorData = _inputLevelMonitorData;
-    
     if ( usingAudiobusReceiver) {
         AudioStreamBasicDescription clientFormat = [(id<AEAudiobusForwardDeclarationsProtocol>)_audiobusReceiverPort clientFormat];
         if ( memcmp(&clientFormat, &rawAudioDescription, sizeof(AudioStreamBasicDescription)) != 0 ) {
@@ -3267,8 +3257,24 @@ static void interAppConnectedChangeCallback(void *inRefCon, AudioUnit inUnit, Au
         }
     }
     
+    __block AudioBufferList *oldInputBuffer;
+#if TARGET_OS_IPHONE
+    __block AudioBufferList *oldInputScratchBuffer;
+#endif
+    __block input_callback_table_t *oldInputCallbacks;
+    __block int oldInputCallbackCount;
+    __block audio_level_monitor_t oldInputLevelMonitorData;
+    
     // Set input stream format and update the properties, on the realtime thread
     [self performAsynchronousMessageExchangeWithBlock:^{
+        oldInputBuffer           = _inputAudioBufferList;
+#if TARGET_OS_IPHONE
+        oldInputScratchBuffer    = _inputAudioScratchBufferList;
+#endif
+        oldInputCallbacks        = _inputCallbacks;
+        oldInputCallbackCount    = _inputCallbackCount;
+        oldInputLevelMonitorData = _inputLevelMonitorData;
+        
         _numberOfInputChannels    = numberOfInputChannels;
         _rawInputAudioDescription = rawAudioDescription;
         _inputAudioBufferList     = inputAudioBufferList;
