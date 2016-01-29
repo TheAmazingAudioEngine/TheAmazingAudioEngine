@@ -1,0 +1,10 @@
+framework module TheAmazingAudioEngine {
+  umbrella header "TheAmazingAudioEngine.h"
+
+  export *
+  explicit module Modules {
+    header "AEModules.h"
+    link "AEModules"
+    export *
+  }
+}

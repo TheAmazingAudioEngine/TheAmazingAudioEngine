@@ -186,6 +186,7 @@
 		4AB1D6EC1C5BB731004D96EB /* AESequencerChannel.m in Sources */ = {isa = PBXBuildFile; fileRef = B0EE36FF1AD4270400D7AB17 /* AESequencerChannel.m */; };
 		4AB1D6ED1C5BB731004D96EB /* AESequencerChannelSequence.h in Headers */ = {isa = PBXBuildFile; fileRef = B0EE37001AD4270400D7AB17 /* AESequencerChannelSequence.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4AB1D6EE1C5BB731004D96EB /* AESequencerChannelSequence.m in Sources */ = {isa = PBXBuildFile; fileRef = B0EE37011AD4270400D7AB17 /* AESequencerChannelSequence.m */; };
+		4AB1D6F11C5BB9FF004D96EB /* AEModules.h in Headers */ = {isa = PBXBuildFile; fileRef = 4AB1D6F01C5BB9FF004D96EB /* AEModules.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4C09450116FBD7460054608E /* AEBlockScheduler.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C0944FF16FBD7460054608E /* AEBlockScheduler.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4C09450216FBD7460054608E /* AEBlockScheduler.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C09450016FBD7460054608E /* AEBlockScheduler.m */; };
 		4C13AA9B1BB0FC9900DE05E0 /* AEMemoryBufferPlayer.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C13AA991BB0FC9900DE05E0 /* AEMemoryBufferPlayer.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -296,6 +297,8 @@
 		17BB5B9C1BECD25D007A2892 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/AppleTVOS.platform/Developer/SDKs/AppleTVOS9.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		4AB1D6911C5BB330004D96EB /* TheAmazingAudioEngine.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = TheAmazingAudioEngine.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		4AB1D6951C5BB330004D96EB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		4AB1D6EF1C5BB972004D96EB /* module.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = module.modulemap; sourceTree = "<group>"; };
+		4AB1D6F01C5BB9FF004D96EB /* AEModules.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEModules.h; sourceTree = "<group>"; };
 		4C0944FF16FBD7460054608E /* AEBlockScheduler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEBlockScheduler.h; sourceTree = "<group>"; };
 		4C09450016FBD7460054608E /* AEBlockScheduler.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEBlockScheduler.m; sourceTree = "<group>"; };
 		4C12CC98151D1EDA00562E2A /* AEUtilities.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEUtilities.h; sourceTree = "<group>"; };
@@ -435,7 +438,9 @@
 		4AB1D6921C5BB330004D96EB /* Framwork */ = {
 			isa = PBXGroup;
 			children = (
+				4AB1D6EF1C5BB972004D96EB /* module.modulemap */,
 				4AB1D6951C5BB330004D96EB /* Info.plist */,
+				4AB1D6F01C5BB9FF004D96EB /* AEModules.h */,
 			);
 			name = Framwork;
 			path = "TheAmazingAudioEngine Framework";
@@ -678,6 +683,7 @@
 				4AB1D6C51C5BB3A1004D96EB /* AEBlockScheduler.h in Headers */,
 				4AB1D6B91C5BB3A1004D96EB /* AEAudioFilePlayer.h in Headers */,
 				4AB1D6CB1C5BB6C2004D96EB /* AEPlaythroughChannel.h in Headers */,
+				4AB1D6F11C5BB9FF004D96EB /* AEModules.h in Headers */,
 				4AB1D6C01C5BB3A1004D96EB /* AEAudioUnitChannel.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1155,6 +1161,7 @@
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				IPHONEOS_DEPLOYMENT_TARGET = 8.1;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				MODULEMAP_FILE = "TheAmazingAudioEngine Framework/module.modulemap";
 				MTL_ENABLE_DEBUG_INFO = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.theamazingaudioengine.TheAmazingAudioEngine;
 				PRODUCT_NAME = TheAmazingAudioEngine;
@@ -1198,6 +1205,7 @@
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				IPHONEOS_DEPLOYMENT_TARGET = 8.1;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				MODULEMAP_FILE = "TheAmazingAudioEngine Framework/module.modulemap";
 				MTL_ENABLE_DEBUG_INFO = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = com.theamazingaudioengine.TheAmazingAudioEngine;
 				PRODUCT_NAME = TheAmazingAudioEngine;
