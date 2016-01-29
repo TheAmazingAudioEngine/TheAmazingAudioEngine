@@ -73,7 +73,7 @@ extern "C" {
  *  Set this property to an Audiobus filter port to let TAAE correctly update the
  *  number of input channels when connected.
  */
-@property (nonatomic, retain) ABFilterPort *audiobusFilterPort;
+@property (nonatomic, retain) ABFilterPort *audiobusFilterPort __deprecated_msg("No longer in use");
 
 /*!
  * Audiobus sender port

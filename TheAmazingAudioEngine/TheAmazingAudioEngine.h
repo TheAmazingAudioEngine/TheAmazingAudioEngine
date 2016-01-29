@@ -689,9 +689,7 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioFilterProducer producer,
    @link AEAudioController::setAudiobusSenderPort:forChannel: setAudiobusSenderPort:forChannel: @endlink
  - Send a channel group via Audiobus by assigning a new ABSenderPort via
    @link AEAudioController::setAudiobusSenderPort:forChannelGroup: setAudiobusSenderPort:forChannelGroup: @endlink
- - Filter Audiobus audio by creating an ABFilterPort with AEAudioController's [audioUnit](@ref AEAudioController::audioUnit),
-   and passing it to The Amazing Audio Engine via AEAudioController's [audiobusFilterPort](@ref AEAudioController::audiobusFilterPort)
-   property.
+ - Filter Audiobus audio by creating an ABFilterPort with AEAudioController's [audioUnit](@ref AEAudioController::audioUnit).
  
  
  Take a look at the header documentation for the @link AEAudioController(AudiobusAdditions) Audiobus functions @endlink
