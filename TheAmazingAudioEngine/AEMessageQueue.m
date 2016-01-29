@@ -55,10 +55,12 @@ static const NSTimeInterval kSynchronousTimeoutInterval  = 1.0;
 
 @end
 
-@interface AEMessageQueue ()
+@interface AEMessageQueue () {
+    pthread_mutex_t _mutex;
+    BOOL _holdRealtimeProcessing;
+}
 
 @property (nonatomic, readonly) uint64_t lastProcessTime;
-
 @end
 
 @implementation AEMessageQueue {
@@ -73,7 +75,7 @@ static const NSTimeInterval kSynchronousTimeoutInterval  = 1.0;
     
     TPCircularBufferInit(&_realtimeThreadMessageBuffer, numBytes);
     TPCircularBufferInit(&_mainThreadMessageBuffer, numBytes);
-    
+    pthread_mutex_init(&_mutex, NULL);
     return self;
 }
 
@@ -82,9 +84,10 @@ static const NSTimeInterval kSynchronousTimeoutInterval  = 1.0;
 }
 
 - (void)dealloc {
+    [self stopPolling];
     TPCircularBufferCleanup(&_realtimeThreadMessageBuffer);
     TPCircularBufferCleanup(&_mainThreadMessageBuffer);
-    [self stopPolling];
+    pthread_mutex_destroy(&_mutex);
 }
 
 - (void)startPolling {
@@ -111,6 +114,15 @@ static const NSTimeInterval kSynchronousTimeoutInterval  = 1.0;
 void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessageQueue *THIS) {
     // Only call this from the realtime thread, or the main thread if realtime thread not yet running
 
+    if ( pthread_mutex_trylock(&THIS->_mutex) != 0 ) {
+        return;
+    }
+    
+    if ( THIS->_holdRealtimeProcessing ) {
+        pthread_mutex_unlock(&THIS->_mutex);
+        return;
+    }
+    
     THIS->_lastProcessTime = AECurrentTimeInHostTicks();
 
     int32_t availableBytes;
@@ -134,6 +146,7 @@ void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessage
 #ifdef DEBUG
             NSLog(@"AEMessageBuffer: Integrity problem, insufficient space in main thread messaging buffer");
 #endif
+            pthread_mutex_unlock(&THIS->_mutex);
             return;
         }
         memcpy(reply, &message, sizeof(message_t));
@@ -141,6 +154,8 @@ void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessage
         
         buffer++;
     }
+    
+    pthread_mutex_unlock(&THIS->_mutex);
 }
 
 -(void)processMainThreadMessages {
@@ -277,6 +292,18 @@ void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessage
     }
     
     return finished;
+}
+
+- (void)beginMessageExchangeBlock {
+    pthread_mutex_lock(&_mutex);
+    _holdRealtimeProcessing = YES;
+    pthread_mutex_unlock(&_mutex);
+}
+
+- (void)endMessageExchangeBlock {
+    pthread_mutex_lock(&_mutex);
+    _holdRealtimeProcessing = NO;
+    pthread_mutex_unlock(&_mutex);
 }
 
 void AEMessageQueueSendMessageToMainThread(__unsafe_unretained AEMessageQueue *THIS,

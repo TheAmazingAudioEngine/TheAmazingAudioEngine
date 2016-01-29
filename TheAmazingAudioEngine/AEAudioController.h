@@ -1262,6 +1262,19 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(__unsafe_unretained AE
                                                           void                                  *userInfo,
                                                           int                                    userInfoLength);
 
+/*!
+ * Begins a block of messages to be performed consecutively.
+ *
+ *  Calling this method will cause message processing on the realtime thread to be
+ *  suspended until @link endMessageExchangeBlock @endlink is called.
+ */
+- (void)beginMessageExchangeBlock;
+
+/*!
+ * Ends a consecutive block of messages
+ */
+- (void)endMessageExchangeBlock;
+
 ///@}
 #pragma mark - Metering
 /** @name Metering */

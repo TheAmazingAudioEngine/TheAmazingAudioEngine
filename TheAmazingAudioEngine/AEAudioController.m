@@ -1732,6 +1732,15 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(__unsafe_unretained AE
     AEMessageQueueSendMessageToMainThread(THIS->_messageQueue, handler, userInfo, userInfoLength);
 }
 
+- (void)beginMessageExchangeBlock {
+    [_messageQueue beginMessageExchangeBlock];
+}
+
+- (void)endMessageExchangeBlock {
+    [_messageQueue endMessageExchangeBlock];
+}
+
+
 #pragma mark - Metering
 
 - (void)outputAveragePowerLevel:(Float32*)averagePower peakHoldLevel:(Float32*)peakLevel {

@@ -187,6 +187,20 @@ void AEMessageQueueSendMessageToMainThread(AEMessageQueue               *message
                                            int                           userInfoLength);
 
 /*!
+ * Begins a block of messages to be performed consecutively.
+ *
+ *  Calling this method will cause message processing on the realtime thread to be
+ *  suspended until @link endMessageExchangeBlock @endlink is called.
+ */
+- (void)beginMessageExchangeBlock;
+
+/*!
+ * Ends a consecutive block of messages
+ */
+- (void)endMessageExchangeBlock;
+
+
+/*!
  * Timeout for when realtime message blocks should be executed automatically
  *
  *  If greater than zero and @link AEMessageQueueProcessMessagesOnRealtimeThread @endlink 
