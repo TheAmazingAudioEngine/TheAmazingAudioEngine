@@ -154,7 +154,38 @@
 		4AB1D6C51C5BB3A1004D96EB /* AEBlockScheduler.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C0944FF16FBD7460054608E /* AEBlockScheduler.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4AB1D6C61C5BB3A1004D96EB /* AEAudioBufferManager.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CCAFEFA1C0BCFF100B87416 /* AEAudioBufferManager.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4AB1D6C71C5BB3E1004D96EB /* TPCircularBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C25747215F0D8E000D232E8 /* TPCircularBuffer.c */; };
-		4AB1D6C81C5BB3E1004D96EB /* TPCircularBuffer+AudioBufferList.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C698CF9162B02EF008B159D /* TPCircularBuffer+AudioBufferList.c */; };
+		4AB1D6CB1C5BB6C2004D96EB /* AEPlaythroughChannel.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CA689BF1542DC8C00AF8DDD /* AEPlaythroughChannel.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6CC1C5BB6C2004D96EB /* AEPlaythroughChannel.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA689C01542DC8C00AF8DDD /* AEPlaythroughChannel.m */; };
+		4AB1D6CE1C5BB6CE004D96EB /* AEMixerBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C8A0F3D1540BBD300307CB6 /* AEMixerBuffer.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6CF1C5BB6CE004D96EB /* AEMixerBuffer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C8A0F3E1540BBD300307CB6 /* AEMixerBuffer.m */; };
+		4AB1D6D01C5BB6CE004D96EB /* AELimiter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CA689B11541EF4A00AF8DDD /* AELimiter.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6D11C5BB6CE004D96EB /* AELimiter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA689B21541EF4A00AF8DDD /* AELimiter.m */; };
+		4AB1D6D21C5BB6CE004D96EB /* AELimiterFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CA689BC1542D4FE00AF8DDD /* AELimiterFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6D31C5BB6CE004D96EB /* AELimiterFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA689BD1542D4FE00AF8DDD /* AELimiterFilter.m */; };
+		4AB1D6D41C5BB6CE004D96EB /* AEExpanderFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CA689C315447E3100AF8DDD /* AEExpanderFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6D51C5BB6CE004D96EB /* AEExpanderFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA689C415447E3100AF8DDD /* AEExpanderFilter.m */; };
+		4AB1D6D61C5BB6CE004D96EB /* AERecorder.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C38DC501545840E009F4454 /* AERecorder.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6D71C5BB6CE004D96EB /* AERecorder.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C38DC511545840E009F4454 /* AERecorder.m */; };
+		4AB1D6D81C5BB6D8004D96EB /* AEBandpassFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C70F97C1BB0D0900064CF73 /* AEBandpassFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6D91C5BB6D8004D96EB /* AEDelayFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C70F97E1BB0D0900064CF73 /* AEDelayFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6DA1C5BB6D8004D96EB /* AEDistortionFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C70F9801BB0D0900064CF73 /* AEDistortionFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6DB1C5BB6D8004D96EB /* AEDynamicsProcessorFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C70F9821BB0D0900064CF73 /* AEDynamicsProcessorFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6DC1C5BB6D8004D96EB /* AEHighPassFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C70F9841BB0D0900064CF73 /* AEHighPassFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6DD1C5BB6D8004D96EB /* AEHighShelfFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C70F9861BB0D0900064CF73 /* AEHighShelfFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6DE1C5BB6D8004D96EB /* AELowPassFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C70F9881BB0D0900064CF73 /* AELowPassFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6DF1C5BB6D8004D96EB /* AELowShelfFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C70F98A1BB0D0900064CF73 /* AELowShelfFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6E01C5BB6D8004D96EB /* AENewTimePitchFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C70F98C1BB0D0900064CF73 /* AENewTimePitchFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6E11C5BB6D8004D96EB /* AEParametricEqFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C70F9901BB0D0900064CF73 /* AEParametricEqFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6E21C5BB6D8004D96EB /* AEPeakLimiterFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C70F9921BB0D0900064CF73 /* AEPeakLimiterFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6E31C5BB6D8004D96EB /* AEReverbFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C70F9941BB0D0900064CF73 /* AEReverbFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6E41C5BB6D8004D96EB /* AEVarispeedFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C70F9981BB0D0900064CF73 /* AEVarispeedFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6E71C5BB719004D96EB /* TPCircularBuffer+AudioBufferList.c in Sources */ = {isa = PBXBuildFile; fileRef = 4C698CF9162B02EF008B159D /* TPCircularBuffer+AudioBufferList.c */; };
+		4AB1D6E91C5BB731004D96EB /* AESequencerBeat.h in Headers */ = {isa = PBXBuildFile; fileRef = B0EE36FC1AD4270400D7AB17 /* AESequencerBeat.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6EA1C5BB731004D96EB /* AESequencerBeat.m in Sources */ = {isa = PBXBuildFile; fileRef = B0EE36FD1AD4270400D7AB17 /* AESequencerBeat.m */; };
+		4AB1D6EB1C5BB731004D96EB /* AESequencerChannel.h in Headers */ = {isa = PBXBuildFile; fileRef = B0EE36FE1AD4270400D7AB17 /* AESequencerChannel.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6EC1C5BB731004D96EB /* AESequencerChannel.m in Sources */ = {isa = PBXBuildFile; fileRef = B0EE36FF1AD4270400D7AB17 /* AESequencerChannel.m */; };
+		4AB1D6ED1C5BB731004D96EB /* AESequencerChannelSequence.h in Headers */ = {isa = PBXBuildFile; fileRef = B0EE37001AD4270400D7AB17 /* AESequencerChannelSequence.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4AB1D6EE1C5BB731004D96EB /* AESequencerChannelSequence.m in Sources */ = {isa = PBXBuildFile; fileRef = B0EE37011AD4270400D7AB17 /* AESequencerChannelSequence.m */; };
 		4C09450116FBD7460054608E /* AEBlockScheduler.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C0944FF16FBD7460054608E /* AEBlockScheduler.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4C09450216FBD7460054608E /* AEBlockScheduler.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C09450016FBD7460054608E /* AEBlockScheduler.m */; };
 		4C13AA9B1BB0FC9900DE05E0 /* AEMemoryBufferPlayer.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C13AA991BB0FC9900DE05E0 /* AEMemoryBufferPlayer.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -617,6 +648,27 @@
 				4AB1D6C61C5BB3A1004D96EB /* AEAudioBufferManager.h in Headers */,
 				4AB1D6C21C5BB3A1004D96EB /* AEBlockAudioReceiver.h in Headers */,
 				4AB1D6C31C5BB3A1004D96EB /* AEFloatConverter.h in Headers */,
+				4AB1D6D81C5BB6D8004D96EB /* AEBandpassFilter.h in Headers */,
+				4AB1D6D41C5BB6CE004D96EB /* AEExpanderFilter.h in Headers */,
+				4AB1D6CE1C5BB6CE004D96EB /* AEMixerBuffer.h in Headers */,
+				4AB1D6ED1C5BB731004D96EB /* AESequencerChannelSequence.h in Headers */,
+				4AB1D6E01C5BB6D8004D96EB /* AENewTimePitchFilter.h in Headers */,
+				4AB1D6DF1C5BB6D8004D96EB /* AELowShelfFilter.h in Headers */,
+				4AB1D6DA1C5BB6D8004D96EB /* AEDistortionFilter.h in Headers */,
+				4AB1D6DB1C5BB6D8004D96EB /* AEDynamicsProcessorFilter.h in Headers */,
+				4AB1D6E21C5BB6D8004D96EB /* AEPeakLimiterFilter.h in Headers */,
+				4AB1D6D01C5BB6CE004D96EB /* AELimiter.h in Headers */,
+				4AB1D6D61C5BB6CE004D96EB /* AERecorder.h in Headers */,
+				4AB1D6DE1C5BB6D8004D96EB /* AELowPassFilter.h in Headers */,
+				4AB1D6DC1C5BB6D8004D96EB /* AEHighPassFilter.h in Headers */,
+				4AB1D6E41C5BB6D8004D96EB /* AEVarispeedFilter.h in Headers */,
+				4AB1D6E31C5BB6D8004D96EB /* AEReverbFilter.h in Headers */,
+				4AB1D6D21C5BB6CE004D96EB /* AELimiterFilter.h in Headers */,
+				4AB1D6E11C5BB6D8004D96EB /* AEParametricEqFilter.h in Headers */,
+				4AB1D6E91C5BB731004D96EB /* AESequencerBeat.h in Headers */,
+				4AB1D6DD1C5BB6D8004D96EB /* AEHighShelfFilter.h in Headers */,
+				4AB1D6EB1C5BB731004D96EB /* AESequencerChannel.h in Headers */,
+				4AB1D6D91C5BB6D8004D96EB /* AEDelayFilter.h in Headers */,
 				4AB1D6BF1C5BB3A1004D96EB /* AEAudioUnitFilter.h in Headers */,
 				4AB1D6B81C5BB394004D96EB /* AEAudioController+Audiobus.h in Headers */,
 				4AB1D6B61C5BB386004D96EB /* TheAmazingAudioEngine.h in Headers */,
@@ -625,6 +677,7 @@
 				4AB1D6BC1C5BB3A1004D96EB /* AEMessageQueue.h in Headers */,
 				4AB1D6C51C5BB3A1004D96EB /* AEBlockScheduler.h in Headers */,
 				4AB1D6B91C5BB3A1004D96EB /* AEAudioFilePlayer.h in Headers */,
+				4AB1D6CB1C5BB6C2004D96EB /* AEPlaythroughChannel.h in Headers */,
 				4AB1D6C01C5BB3A1004D96EB /* AEAudioUnitChannel.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -898,12 +951,18 @@
 			buildActionMask = 2147483647;
 			files = (
 				4AB1D6A21C5BB35B004D96EB /* AEAudioUnitChannel.m in Sources */,
+				4AB1D6CF1C5BB6CE004D96EB /* AEMixerBuffer.m in Sources */,
 				4AB1D6AD1C5BB363004D96EB /* AEHighPassFilter.m in Sources */,
 				4AB1D69D1C5BB35B004D96EB /* AEMemoryBufferPlayer.m in Sources */,
+				4AB1D6D71C5BB6CE004D96EB /* AERecorder.m in Sources */,
+				4AB1D6E71C5BB719004D96EB /* TPCircularBuffer+AudioBufferList.c in Sources */,
 				4AB1D6A31C5BB35B004D96EB /* AEBlockFilter.m in Sources */,
 				4AB1D6B11C5BB363004D96EB /* AENewTimePitchFilter.m in Sources */,
 				4AB1D6B41C5BB363004D96EB /* AEReverbFilter.m in Sources */,
+				4AB1D6EA1C5BB731004D96EB /* AESequencerBeat.m in Sources */,
+				4AB1D6EE1C5BB731004D96EB /* AESequencerChannelSequence.m in Sources */,
 				4AB1D6AA1C5BB363004D96EB /* AEDelayFilter.m in Sources */,
+				4AB1D6CC1C5BB6C2004D96EB /* AEPlaythroughChannel.m in Sources */,
 				4AB1D6B31C5BB363004D96EB /* AEPeakLimiterFilter.m in Sources */,
 				4AB1D6AF1C5BB363004D96EB /* AELowPassFilter.m in Sources */,
 				4AB1D6AB1C5BB363004D96EB /* AEDistortionFilter.m in Sources */,
@@ -911,20 +970,23 @@
 				4AB1D6991C5BB35B004D96EB /* AEAudioController.m in Sources */,
 				4AB1D6A91C5BB363004D96EB /* AEBandpassFilter.m in Sources */,
 				4AB1D6A41C5BB35B004D96EB /* AEBlockAudioReceiver.m in Sources */,
+				4AB1D6EC1C5BB731004D96EB /* AESequencerChannel.m in Sources */,
 				4AB1D69B1C5BB35B004D96EB /* AEAudioFilePlayer.m in Sources */,
 				4AB1D6AC1C5BB363004D96EB /* AEDynamicsProcessorFilter.m in Sources */,
 				4AB1D6B01C5BB363004D96EB /* AELowShelfFilter.m in Sources */,
+				4AB1D6D31C5BB6CE004D96EB /* AELimiterFilter.m in Sources */,
 				4AB1D6A61C5BB35B004D96EB /* AEAudioFileLoaderOperation.m in Sources */,
 				4AB1D6C71C5BB3E1004D96EB /* TPCircularBuffer.c in Sources */,
 				4AB1D6A51C5BB35B004D96EB /* AEFloatConverter.m in Sources */,
 				4AB1D69F1C5BB35B004D96EB /* AEUtilities.m in Sources */,
 				4AB1D6B51C5BB363004D96EB /* AEVarispeedFilter.m in Sources */,
 				4AB1D6A01C5BB35B004D96EB /* AEBlockChannel.m in Sources */,
-				4AB1D6C81C5BB3E1004D96EB /* TPCircularBuffer+AudioBufferList.c in Sources */,
+				4AB1D6D11C5BB6CE004D96EB /* AELimiter.m in Sources */,
 				4AB1D6AE1C5BB363004D96EB /* AEHighShelfFilter.m in Sources */,
 				4AB1D69C1C5BB35B004D96EB /* AEAudioFileWriter.m in Sources */,
 				4AB1D69E1C5BB35B004D96EB /* AEMessageQueue.m in Sources */,
 				4AB1D6A71C5BB35B004D96EB /* AEBlockScheduler.m in Sources */,
+				4AB1D6D51C5BB6CE004D96EB /* AEExpanderFilter.m in Sources */,
 				4AB1D6A81C5BB35B004D96EB /* AEAudioBufferManager.m in Sources */,
 				4AB1D6A11C5BB35B004D96EB /* AEAudioUnitFilter.m in Sources */,
 				4AB1D6B21C5BB363004D96EB /* AEParametricEqFilter.m in Sources */,
