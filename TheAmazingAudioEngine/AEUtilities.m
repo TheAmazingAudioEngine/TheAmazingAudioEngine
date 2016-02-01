@@ -29,7 +29,7 @@
 static double __hostTicksToSeconds = 0.0;
 static double __secondsToHostTicks = 0.0;
 
-AudioBufferList *AEAllocateAndInitAudioBufferList(AudioStreamBasicDescription audioFormat, int frameCount) {
+AudioBufferList *AEAudioBufferListCreate(AudioStreamBasicDescription audioFormat, int frameCount) {
     int numberOfBuffers = audioFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? audioFormat.mChannelsPerFrame : 1;
     int channelsPerBuffer = audioFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? 1 : audioFormat.mChannelsPerFrame;
     int bytesPerBuffer = audioFormat.mBytesPerFrame * frameCount;
@@ -56,7 +56,7 @@ AudioBufferList *AEAllocateAndInitAudioBufferList(AudioStreamBasicDescription au
     return audio;
 }
 
-AudioBufferList *AECopyAudioBufferList(AudioBufferList *original) {
+AudioBufferList *AEAudioBufferListCopy(const AudioBufferList *original) {
     AudioBufferList *audio = malloc(sizeof(AudioBufferList) + (original->mNumberBuffers-1)*sizeof(AudioBuffer));
     if ( !audio ) {
         return NULL;
@@ -76,30 +76,116 @@ AudioBufferList *AECopyAudioBufferList(AudioBufferList *original) {
     return audio;
 }
 
-void AEFreeAudioBufferList(AudioBufferList *bufferList ) {
+void AEAudioBufferListFree(AudioBufferList *bufferList ) {
     for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
         if ( bufferList->mBuffers[i].mData ) free(bufferList->mBuffers[i].mData);
     }
     free(bufferList);
 }
 
-void AEInitAudioBufferList(AudioBufferList *list, int listSize, AudioStreamBasicDescription audioFormat, void *data, int dataSize) {
-    list->mNumberBuffers = audioFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? audioFormat.mChannelsPerFrame : 1;
-    assert(list->mNumberBuffers == 1 || listSize >= (sizeof(AudioBufferList)+sizeof(AudioBuffer)) );
-    
-    for ( int i=0; i<list->mNumberBuffers; i++ ) {
-        list->mBuffers[0].mNumberChannels = audioFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? 1 : audioFormat.mChannelsPerFrame;
-        list->mBuffers[0].mData = (char*)data + (i * (dataSize/list->mNumberBuffers));
-        list->mBuffers[0].mDataByteSize = dataSize/list->mNumberBuffers;
-    }
-}
-
-int AEGetNumberOfFramesInAudioBufferList(AudioBufferList *list, AudioStreamBasicDescription audioFormat, int *oNumberOfChannels) {
-    int channelCount = audioFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? list->mNumberBuffers : list->mBuffers[0].mNumberChannels;
+UInt32 AEAudioBufferListGetLength(const AudioBufferList *bufferList,
+                                  AudioStreamBasicDescription audioFormat,
+                                  int *oNumberOfChannels) {
+    int channelCount = audioFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved
+        ? bufferList->mNumberBuffers : bufferList->mBuffers[0].mNumberChannels;
     if ( oNumberOfChannels ) {
         *oNumberOfChannels = channelCount;
     }
-    return list->mBuffers[0].mDataByteSize / ((audioFormat.mBitsPerChannel/8) * channelCount);
+    return bufferList->mBuffers[0].mDataByteSize / ((audioFormat.mBitsPerChannel/8) * channelCount);
+}
+
+void AEAudioBufferListSetLength(AudioBufferList *bufferList,
+                                AudioStreamBasicDescription audioFormat,
+                                UInt32 frames) {
+    for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
+        bufferList->mBuffers[i].mDataByteSize = frames * audioFormat.mBytesPerFrame;
+    }
+}
+
+void AEAudioBufferListOffset(AudioBufferList *bufferList,
+                             AudioStreamBasicDescription audioFormat,
+                             UInt32 frames) {
+    for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
+        bufferList->mBuffers[i].mData = (char*)bufferList->mBuffers[i].mData + frames * audioFormat.mBytesPerFrame;
+        bufferList->mBuffers[i].mDataByteSize -= frames * audioFormat.mBytesPerFrame;
+    }
+}
+
+void AEAudioBufferListSilence(const AudioBufferList *bufferList,
+                              AudioStreamBasicDescription audioFormat,
+                              UInt32 offset,
+                              UInt32 length) {
+    for ( int i=0; i<bufferList->mNumberBuffers; i++ ) {
+        memset((char*)bufferList->mBuffers[i].mData + offset * audioFormat.mBytesPerFrame,
+               0,
+               length ? length * audioFormat.mBytesPerFrame
+                      : bufferList->mBuffers[i].mDataByteSize - offset * audioFormat.mBytesPerFrame);
+    }
+}
+
+AudioStreamBasicDescription const AEAudioStreamBasicDescriptionNonInterleavedFloatStereo = {
+    .mFormatID          = kAudioFormatLinearPCM,
+    .mFormatFlags       = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved,
+    .mChannelsPerFrame  = 2,
+    .mBytesPerPacket    = sizeof(float),
+    .mFramesPerPacket   = 1,
+    .mBytesPerFrame     = sizeof(float),
+    .mBitsPerChannel    = 8 * sizeof(float),
+    .mSampleRate        = 44100.0,
+};
+
+AudioStreamBasicDescription const AEAudioStreamBasicDescriptionNonInterleaved16BitStereo = {
+    .mFormatID          = kAudioFormatLinearPCM,
+    .mFormatFlags       = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked | kAudioFormatFlagsNativeEndian | kAudioFormatFlagIsNonInterleaved,
+    .mChannelsPerFrame  = 2,
+    .mBytesPerPacket    = sizeof(SInt16),
+    .mFramesPerPacket   = 1,
+    .mBytesPerFrame     = sizeof(SInt16),
+    .mBitsPerChannel    = 8 * sizeof(SInt16),
+    .mSampleRate        = 44100.0,
+};
+
+AudioStreamBasicDescription const AEAudioStreamBasicDescriptionInterleaved16BitStereo = {
+    .mFormatID          = kAudioFormatLinearPCM,
+    .mFormatFlags       = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked | kAudioFormatFlagsNativeEndian,
+    .mChannelsPerFrame  = 2,
+    .mBytesPerPacket    = sizeof(SInt16)*2,
+    .mFramesPerPacket   = 1,
+    .mBytesPerFrame     = sizeof(SInt16)*2,
+    .mBitsPerChannel    = 8 * sizeof(SInt16),
+    .mSampleRate        = 44100.0,
+};
+
+AudioStreamBasicDescription AEAudioStreamBasicDescriptionMake(AEAudioStreamBasicDescriptionSampleType sampleType,
+                                                              BOOL interleaved,
+                                                              int numberOfChannels,
+                                                              double sampleRate) {
+    int sampleSize = sampleType == AEAudioStreamBasicDescriptionSampleTypeFloat32 ? 4 :
+                     sampleType == AEAudioStreamBasicDescriptionSampleTypeInt16 ? 2 :
+                     sampleType == AEAudioStreamBasicDescriptionSampleTypeInt32 ? 4 : 0;
+    NSCAssert(sampleSize, @"Unrecognized sample type");
+    
+    return (AudioStreamBasicDescription) {
+        .mFormatID = kAudioFormatLinearPCM,
+        .mFormatFlags = (sampleType == AEAudioStreamBasicDescriptionSampleTypeFloat32
+                          ? kAudioFormatFlagIsFloat : kAudioFormatFlagIsSignedInteger | kAudioFormatFlagsNativeEndian)
+                        | kAudioFormatFlagIsPacked
+                        | (interleaved ? 0 : kAudioFormatFlagIsNonInterleaved),
+        .mChannelsPerFrame  = numberOfChannels,
+        .mBytesPerPacket    = sampleSize * (interleaved ? numberOfChannels : 1),
+        .mFramesPerPacket   = 1,
+        .mBytesPerFrame     = sampleSize * (interleaved ? numberOfChannels : 1),
+        .mBitsPerChannel    = 8 * sampleSize,
+        .mSampleRate        = sampleRate,
+    };
+}
+
+void AEAudioStreamBasicDescriptionSetChannelsPerFrame(AudioStreamBasicDescription *audioDescription, int numberOfChannels) {
+    if ( !(audioDescription->mFormatFlags & kAudioFormatFlagIsNonInterleaved) ) {
+        audioDescription->mBytesPerFrame *= (float)numberOfChannels / (float)audioDescription->mChannelsPerFrame;
+        audioDescription->mBytesPerPacket *= (float)numberOfChannels / (float)audioDescription->mChannelsPerFrame;
+    }
+    audioDescription->mChannelsPerFrame = numberOfChannels;
 }
 
 AudioComponentDescription AEAudioComponentDescriptionMake(OSType manufacturer, OSType type, OSType subtype) {
@@ -109,14 +195,6 @@ AudioComponentDescription AEAudioComponentDescriptionMake(OSType manufacturer, O
     description.componentType = type;
     description.componentSubType = subtype;
     return description;
-}
-
-void AEAudioStreamBasicDescriptionSetChannelsPerFrame(AudioStreamBasicDescription *audioDescription, int numberOfChannels) {
-    if ( !(audioDescription->mFormatFlags & kAudioFormatFlagIsNonInterleaved) ) {
-        audioDescription->mBytesPerFrame *= (float)numberOfChannels / (float)audioDescription->mChannelsPerFrame;
-        audioDescription->mBytesPerPacket *= (float)numberOfChannels / (float)audioDescription->mChannelsPerFrame;
-    }
-    audioDescription->mChannelsPerFrame = numberOfChannels;
 }
 
 static void AETimeInit() {

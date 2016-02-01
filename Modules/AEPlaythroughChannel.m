@@ -30,32 +30,43 @@
 #import "AEAudioController+AudiobusStub.h"
 
 static const int kAudioBufferLength = 16384;
+static const int kSkipThreshold = 2;
 static const int kAudiobusReceiverPortConnectedToSelfChanged;
 
 @interface AEPlaythroughChannel () {
     TPCircularBuffer _buffer;
     BOOL _audiobusConnectedToSelf;
 }
-@property (nonatomic, strong) AEAudioController *audioController;
+@property (nonatomic, weak) AEAudioController *audioController;
 @end
 
 @implementation AEPlaythroughChannel
-@synthesize audioController=_audioController, volume = _volume;
 
 +(NSSet *)keyPathsForValuesAffectingAudioDescription {
     return [NSSet setWithObject:@"audioController.inputAudioDescription"];
 }
 
 - (id)initWithAudioController:(AEAudioController*)audioController {
+    return [self init];
+}
+
+- (id)init {
     if ( !(self = [super init]) ) return nil;
     TPCircularBufferInit(&_buffer, kAudioBufferLength);
-    self.audioController = audioController;
     _volume = 1.0;
     return self;
 }
 
 - (void)dealloc {
     TPCircularBufferCleanup(&_buffer);
+    self.audioController = nil;
+}
+
+- (void)setupWithAudioController:(AEAudioController *)audioController {
+    self.audioController = audioController;
+}
+
+- (void)teardown {
     self.audioController = nil;
 }
 
@@ -83,7 +94,7 @@ static void inputCallback(__unsafe_unretained AEPlaythroughChannel *THIS,
     TPCircularBufferCopyAudioBufferList(&THIS->_buffer, audio, time, kTPCircularBufferCopyAll, NULL);
 }
 
--(AEAudioControllerAudioCallback)receiverCallback {
+-(AEAudioReceiverCallback)receiverCallback {
     return inputCallback;
 }
 
@@ -101,7 +112,7 @@ static OSStatus renderCallback(__unsafe_unretained AEPlaythroughChannel *THIS,
     }
     
     UInt32 fillCount = TPCircularBufferPeek(&THIS->_buffer, NULL, AEAudioControllerAudioDescription(audioController));
-    if ( fillCount > frames ) {
+    if ( fillCount > frames+kSkipThreshold ) {
         UInt32 skip = fillCount - frames;
         TPCircularBufferDequeueBufferListFrames(&THIS->_buffer,
                                                 &skip,
@@ -119,7 +130,7 @@ static OSStatus renderCallback(__unsafe_unretained AEPlaythroughChannel *THIS,
     return noErr;
 }
 
--(AEAudioControllerRenderCallback)renderCallback {
+-(AEAudioRenderCallback)renderCallback {
     return renderCallback;
 }
 

@@ -265,7 +265,7 @@ static OSStatus renderCallback(__unsafe_unretained AESequencerChannel *THIS,
     return noErr;
 }
 
--(AEAudioControllerRenderCallback)renderCallback {
+-(AEAudioRenderCallback)renderCallback {
     return &renderCallback;
 }
 

@@ -204,9 +204,6 @@ NSString * const AEAudioFileWriterErrorDomain = @"com.theamazingaudioengine.AEAu
         return NO;
     }
     
-    // Init the async file writing mechanism
-    AECheckOSStatus(ExtAudioFileWriteAsync(_audioFile, 0, NULL), "ExtAudioFileWriteAsync");
-    
     self.path = path;
     _writing = YES;
     

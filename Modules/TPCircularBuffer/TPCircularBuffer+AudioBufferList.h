@@ -122,7 +122,7 @@ static __inline__ __attribute__((always_inline)) AudioBufferList *TPCircularBuff
  * @param outTimestamp      On output, if not NULL, the timestamp corresponding to the buffer
  * @return Pointer to the next buffer list in the buffer, or NULL
  */
-AudioBufferList *TPCircularBufferNextBufferListAfter(TPCircularBuffer *buffer, AudioBufferList *bufferList, AudioTimeStamp *outTimestamp);
+AudioBufferList *TPCircularBufferNextBufferListAfter(TPCircularBuffer *buffer, const AudioBufferList *bufferList, AudioTimeStamp *outTimestamp);
 
 /*!
  * Consume the next buffer list
@@ -162,7 +162,7 @@ void TPCircularBufferConsumeNextBufferListPartial(TPCircularBuffer *buffer, int 
  * @param outTimestamp      On output, if not NULL, the timestamp corresponding to the first audio frame returned
  * @param audioFormat       The format of the audio stored in the buffer
  */
-void TPCircularBufferDequeueBufferListFrames(TPCircularBuffer *buffer, UInt32 *ioLengthInFrames, AudioBufferList *outputBufferList, AudioTimeStamp *outTimestamp, const AudioStreamBasicDescription *audioFormat);
+void TPCircularBufferDequeueBufferListFrames(TPCircularBuffer *buffer, UInt32 *ioLengthInFrames, const AudioBufferList *outputBufferList, AudioTimeStamp *outTimestamp, const AudioStreamBasicDescription *audioFormat);
 
 /*!
  * Determine how many frames of audio are buffered
@@ -172,7 +172,7 @@ void TPCircularBufferDequeueBufferListFrames(TPCircularBuffer *buffer, UInt32 *i
  *  Note: This function should only be used on the consumer thread, not the producer thread.
  *
  * @param buffer            Circular buffer
- * @param outTimestamp      On output, if not NULL, the timestamp corresponding to the first audio frame returned
+ * @param outTimestamp      On output, if not NULL, the timestamp corresponding to the first audio frame
  * @param audioFormat       The format of the audio stored in the buffer
  * @return The number of frames in the given audio format that are in the buffer
  */
@@ -187,12 +187,30 @@ UInt32 TPCircularBufferPeek(TPCircularBuffer *buffer, AudioTimeStamp *outTimesta
  *  Note: This function should only be used on the consumer thread, not the producer thread.
  *
  * @param buffer            Circular buffer
- * @param outTimestamp      On output, if not NULL, the timestamp corresponding to the first audio frame returned
+ * @param outTimestamp      On output, if not NULL, the timestamp corresponding to the first audio frame
  * @param audioFormat       The format of the audio stored in the buffer
  * @param contiguousToleranceSampleTime The number of samples of discrepancy to tolerate
  * @return The number of frames in the given audio format that are in the buffer
  */
 UInt32 TPCircularBufferPeekContiguous(TPCircularBuffer *buffer, AudioTimeStamp *outTimestamp, const AudioStreamBasicDescription *audioFormat, UInt32 contiguousToleranceSampleTime);
+    
+/*!
+ * Determine how many contiguous frames of audio are buffered, with wrap around
+ *
+ *  Like TPCircularBufferPeekContiguous, determines how many contiguous frames are buffered,
+ *  but considers audio that wraps around a region of a given length as also contiguous. This
+ *  is good for audio that loops.
+ *
+ *  Note: This function should only be used on the consumer thread, not the producer thread.
+ *
+ * @param buffer            Circular buffer
+ * @param outTimestamp      On output, if not NULL, the timestamp corresponding to the first audio frame
+ * @param audioFormat       The format of the audio stored in the buffer
+ * @param contiguousToleranceSampleTime The number of samples of discrepancy to tolerate
+ * @param wrapPoint         The point around which the audio may wrap and still be considered contiguous, or 0 to disable
+ * @return The number of frames in the given audio format that are in the buffer
+ */
+UInt32 TPCircularBufferPeekContiguousWrapped(TPCircularBuffer *buffer, AudioTimeStamp *outTimestamp, const AudioStreamBasicDescription *audioFormat, UInt32 contiguousToleranceSampleTime, UInt32 wrapPoint);
 
 /*!
  * Determine how many much space there is in the buffer

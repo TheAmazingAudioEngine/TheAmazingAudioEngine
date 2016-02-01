@@ -13,4 +13,6 @@
 
 - (id)initWithAudioController:(AEAudioController*)audioController;
 
+@property (nonatomic, strong) AEAudioController *audioController;
+
 @end

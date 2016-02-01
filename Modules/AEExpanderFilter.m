@@ -89,13 +89,16 @@ typedef void (^AECalibrateCompletionBlock)(void);
     _clientFormat = audioController.audioDescription;
     
     self.floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:_clientFormat];
-    _scratchBuffer = AEAllocateAndInitAudioBufferList(_floatConverter.floatingPointAudioDescription, kScratchBufferLength);
+    _scratchBuffer = AEAudioBufferListCreate(_floatConverter.floatingPointAudioDescription, kScratchBufferLength);
 }
 
 - (void)teardown {
     self.audioController = nil;
     self.floatConverter = nil;
-    AEFreeAudioBufferList(_scratchBuffer);
+    if ( _scratchBuffer ) {
+        AEAudioBufferListFree(_scratchBuffer);
+        _scratchBuffer = NULL;
+    }
 }
 
 - (void)assignPreset:(AEExpanderFilterPreset)preset {
@@ -178,7 +181,7 @@ typedef void (^AECalibrateCompletionBlock)(void);
     return _hysteresis_db;
 }
 
-static void completeCalibration(AEAudioController *audioController, void *userInfo, int len) {
+static void completeCalibration(void *userInfo, int len) {
     AEExpanderFilter *THIS = (__bridge AEExpanderFilter*)*(void**)userInfo;
     THIS->_threshold = min((THIS->_calibrationMaxValue + ratio_from_db(kCalibrationThresholdOffset)),
                            ratio_from_db(kMaxAutoThreshold)) * THIS->_thresholdOffset;
@@ -191,7 +194,7 @@ static void completeCalibration(AEAudioController *audioController, void *userIn
 
 static OSStatus filterCallback(__unsafe_unretained AEExpanderFilter *THIS,
                                __unsafe_unretained AEAudioController *audioController,
-                               AEAudioControllerFilterProducer producer,
+                               AEAudioFilterProducer producer,
                                void                     *producerToken,
                                const AudioTimeStamp     *time,
                                UInt32                    frames,
@@ -310,7 +313,7 @@ static OSStatus filterCallback(__unsafe_unretained AEExpanderFilter *THIS,
     return noErr;
 }
 
--(AEAudioControllerFilterCallback)filterCallback {
+-(AEAudioFilterCallback)filterCallback {
     return filterCallback;
 }
 

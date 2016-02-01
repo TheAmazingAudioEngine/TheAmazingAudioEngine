@@ -54,10 +54,10 @@ static void VRAMPMUL(const SAMPLETYPE *__vDSP_I, vDSP_Stride __vDSP_IS, SAMPLETY
 
 @implementation TPOscilloscopeLayer
 
-- (id)initWithAudioController:(AEAudioController*)audioController {
+- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription {
     if ( !(self = [super init]) ) return nil;
 
-    self.floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:audioController.audioDescription];
+    self.floatConverter = [[AEFloatConverter alloc] initWithSourceFormat:audioDescription];
     _conversionBuffer = AEAllocateAndInitAudioBufferList(_floatConverter.floatingPointAudioDescription, kMaxConversionSize);
     _buffer = (SAMPLETYPE*)calloc(kBufferLength, sizeof(SAMPLETYPE));
     _scratchBuffer = (CGPoint*)malloc(kBufferLength * sizeof(CGPoint));
@@ -115,7 +115,7 @@ static void VRAMPMUL(const SAMPLETYPE *__vDSP_I, vDSP_Stride __vDSP_IS, SAMPLETY
 #endif
 }
 
--(AEAudioControllerAudioCallback)receiverCallback {
+-(AEAudioReceiverCallback)receiverCallback {
     return &audioCallback;
 }
 

@@ -37,10 +37,10 @@ extern "C" {
 
 /*!
  * Initialise
- *
- * @param audioController The Audio Controller
  */
-- (id)initWithAudioController:(AEAudioController*)audioController;
+- (instancetype)init;
+
+- (id)initWithAudioController:(AEAudioController*)audioController __deprecated_msg("use 'init' instead");
 
 @property (nonatomic, assign) float volume;
 @property (nonatomic, assign) float pan;

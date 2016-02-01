@@ -30,6 +30,7 @@ extern "C" {
 #import <AudioToolbox/AudioToolbox.h>
 #import <AudioUnit/AudioUnit.h>
 #import <Foundation/Foundation.h>
+#import "AEMessageQueue.h"
 
 @class AEAudioController;
 
@@ -124,17 +125,19 @@ typedef enum {
  * @param audio             The audio buffer list - audio should be copied into the provided buffers
  * @return A status code
  */
-typedef OSStatus (*AEAudioControllerRenderCallback) (__unsafe_unretained id    channel,
-                                                     __unsafe_unretained AEAudioController *audioController,
-                                                     const AudioTimeStamp     *time,
-                                                     UInt32                    frames,
-                                                     AudioBufferList          *audio);
+typedef OSStatus (*AEAudioRenderCallback) (__unsafe_unretained id    channel,
+                                           __unsafe_unretained AEAudioController *audioController,
+                                           const AudioTimeStamp     *time,
+                                           UInt32                    frames,
+                                           AudioBufferList          *audio);
+
+typedef AEAudioRenderCallback AEAudioControllerRenderCallback; // Temporary alias
 
 /*!
  * AEAudioPlayable protocol
  *
  *  The interface that a channel object must implement - this includes 'renderCallback',
- *  which is a @link AEAudioControllerRenderCallback C callback @endlink to be called when 
+ *  which is a @link AEAudioRenderCallback C callback @endlink to be called when 
  *  audio is required.  The callback will be passed a reference to this object, so you should
  *  implement it from within the \@implementation block to gain access to your
  *  instance variables.
@@ -149,7 +152,7 @@ typedef OSStatus (*AEAudioControllerRenderCallback) (__unsafe_unretained id    c
  *
  * @return Pointer to a render callback function
  */
-@property (nonatomic, readonly) AEAudioControllerRenderCallback renderCallback;
+@property (nonatomic, readonly) AEAudioRenderCallback renderCallback;
 
 @optional
 
@@ -223,18 +226,11 @@ typedef OSStatus (*AEAudioControllerRenderCallback) (__unsafe_unretained id    c
 
 @end
 
-/*!
- * @var AEAudioSourceInput
- *  Main audio input
- *
- * @var AEAudioSourceMainOutput
- *  Main audio output
- */
-#define AEAudioSourceInput           ((void*)0x01)
-#define AEAudioSourceMainOutput      ((void*)0x02)
+static void * const AEAudioSourceInput         = ((void*)0x01); //!< Main audio input
+static void * const AEAudioSourceMainOutput    = ((void*)0x02); //!< Main audio output
 
 /*!
- * Audio callback
+ * Audio receiver callback
  *
  *  This callback is used for notifying you of incoming audio (either from 
  *  the built-in microphone, or another input device), and outgoing audio that
@@ -253,19 +249,21 @@ typedef OSStatus (*AEAudioControllerRenderCallback) (__unsafe_unretained id    c
  * @param frames     The length of the audio, in frames
  * @param audio      The audio buffer list
  */
-typedef void (*AEAudioControllerAudioCallback) (__unsafe_unretained id    receiver,
-                                                __unsafe_unretained AEAudioController *audioController,
-                                                void                     *source,
-                                                const AudioTimeStamp     *time,
-                                                UInt32                    frames,
-                                                AudioBufferList          *audio);
+typedef void (*AEAudioReceiverCallback) (__unsafe_unretained id    receiver,
+                                         __unsafe_unretained AEAudioController *audioController,
+                                         void                     *source,
+                                         const AudioTimeStamp     *time,
+                                         UInt32                    frames,
+                                         AudioBufferList          *audio);
 
+typedef AEAudioReceiverCallback AEAudioControllerAudioCallback; // Temporary alias
+    
 
 /*!
  * AEAudioReceiver protocol
  *
  *  The interface that a object must implement to receive incoming or outgoing output audio.
- *  This includes 'receiverCallback', which is a @link AEAudioControllerAudioCallback C callback @endlink 
+ *  This includes 'receiverCallback', which is a @link AEAudioReceiverCallback C callback @endlink 
  *  to be called when audio is available.  The callback will be passed a reference to this object, so you 
  *  should implement it from within the \@implementation block to gain access to your instance variables.
  */
@@ -279,14 +277,38 @@ typedef void (*AEAudioControllerAudioCallback) (__unsafe_unretained id    receiv
  *
  * @return Pointer to an audio callback
  */
-@property (nonatomic, readonly) AEAudioControllerAudioCallback receiverCallback;
+@property (nonatomic, readonly) AEAudioReceiverCallback receiverCallback;
+    
+@optional
+    
+/*!
+ * Perform setup, to prepare to receive audio
+ *
+ *  Receiver objects may implement this method to be notified when the object is
+ *  being added to the audio controller, or when the audio system is being restored
+ *  after a system error.
+ *
+ *  Use this method to allocate/initialise any required resources.
+ */
+- (void)setupWithAudioController:(AEAudioController *)audioController;
+
+/*!
+ * Clean up resources
+ *
+ *  Filter objects may implement this method to be notified when the object is
+ *  being removed from the audio controller, or when the audio system is being
+ *  cleaned up after a system error.
+ *
+ *  Use this method to free up any resources used.
+ */
+- (void)teardown;
 
 @end
 
 /*!
  * Filter audio producer
  *
- *  This defines the function passed to a AEAudioControllerFilterCallback,
+ *  This defines the function passed to a AEAudioFilterCallback,
  *  which is used to produce input audio to be processed by the filter.
  *
  * @param producerToken    An opaque pointer to be passed to the function
@@ -294,10 +316,11 @@ typedef void (*AEAudioControllerAudioCallback) (__unsafe_unretained id    receiv
  * @param frames           Number of frames to produce on input, number of frames produced on output
  * @return A status code
  */
-typedef OSStatus (*AEAudioControllerFilterProducer)(void            *producerToken, 
-                                                    AudioBufferList *audio, 
-                                                    UInt32          *frames);
+typedef OSStatus (*AEAudioFilterProducer)(void            *producerToken,
+                                          AudioBufferList *audio,
+                                          UInt32          *frames);
 
+typedef AEAudioFilterProducer AEAudioControllerFilterProducer; // Temporary alias
 
 /*!
  * Filter callback
@@ -328,19 +351,21 @@ typedef OSStatus (*AEAudioControllerFilterProducer)(void            *producerTok
  * @param audio     The audio buffer list to write output audio to
  * @return A status code
  */
-typedef OSStatus (*AEAudioControllerFilterCallback)(__unsafe_unretained id    filter,
-                                                    __unsafe_unretained AEAudioController *audioController,
-                                                    AEAudioControllerFilterProducer producer,
-                                                    void                     *producerToken,
-                                                    const AudioTimeStamp     *time,
-                                                    UInt32                    frames,
-                                                    AudioBufferList          *audio);
+typedef OSStatus (*AEAudioFilterCallback)(__unsafe_unretained id    filter,
+                                          __unsafe_unretained AEAudioController *audioController,
+                                          AEAudioFilterProducer producer,
+                                          void                     *producerToken,
+                                          const AudioTimeStamp     *time,
+                                          UInt32                    frames,
+                                          AudioBufferList          *audio);
+    
+typedef AEAudioFilterCallback AEAudioControllerFilterCallback; // Temporary alias
 
 /*!
  * AEAudioFilter protocol
  *
  *  The interface that a filter must implement - this includes 'filterCallback', which is a 
- *  @link AEAudioControllerFilterCallback C callback @endlink to be called when
+ *  @link AEAudioFilterCallback C callback @endlink to be called when
  *  audio is to be filtered.  The callback will be passed a reference to this object, so you should
  *  implement it from within the \@implementation block to gain access to your
  *  instance variables.
@@ -358,7 +383,7 @@ typedef OSStatus (*AEAudioControllerFilterCallback)(__unsafe_unretained id    fi
  *
  * @return Pointer to a variable speed filter callback
  */
-@property (nonatomic, readonly) AEAudioControllerFilterCallback filterCallback;
+@property (nonatomic, readonly) AEAudioFilterCallback filterCallback;
     
 @optional
     
@@ -426,17 +451,19 @@ typedef enum {
  * @param frames    The number of frames for the current block
  * @param context   The timing context - either input, or output
  */
-typedef void (*AEAudioControllerTimingCallback) (__unsafe_unretained id    receiver,
-                                                 __unsafe_unretained AEAudioController *audioController,
-                                                 const AudioTimeStamp     *time,
-                                                 UInt32                    frames,
-                                                 AEAudioTimingContext      context);
+typedef void (*AEAudioTimingCallback) (__unsafe_unretained id    receiver,
+                                       __unsafe_unretained AEAudioController *audioController,
+                                       const AudioTimeStamp     *time,
+                                       UInt32                    frames,
+                                       AEAudioTimingContext      context);
+    
+typedef AEAudioTimingCallback AEAudioControllerTimingCallback; // Temporary alias
 
 /*!
  * AEAudioTimingReceiver protocol
  *
  *  The interface that a object must implement to receive system time advance notices.
- *  This includes 'timingReceiver', which is a @link AEAudioControllerTimingCallback C callback @endlink 
+ *  This includes 'timingReceiver', which is a @link AEAudioTimingCallback C callback @endlink 
  *  to be called when the system time advances.  The callback will be passed a reference to this object, so you 
  *  should implement it from within the \@implementation block to gain access to your instance variables.
  */
@@ -450,7 +477,7 @@ typedef void (*AEAudioControllerTimingCallback) (__unsafe_unretained id    recei
  *
  * @return Pointer to an audio callback
  */
-@property (nonatomic, readonly) AEAudioControllerTimingCallback timingReceiverCallback;
+@property (nonatomic, readonly) AEAudioTimingCallback timingReceiverCallback;
 
 @end
 
@@ -464,16 +491,29 @@ typedef struct _channel_group_t* AEChannelGroupRef;
 
 @class AEAudioController;
 
-/*!
- * Message handler function
- *
- * @param audioController   The audio controller
- * @param userInfo          Pointer to your data
- * @param userInfoLength    Length of userInfo in bytes
- */
-typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AEAudioController *audioController, void *userInfo, int userInfoLength);
-
 #pragma mark -
+
+/*!
+ @typedef AEAudioControllerOptions
+ @brief Options for initializing.
+ */
+typedef enum {
+    /// Whether to enable audio input from the microphone or another input device.
+    AEAudioControllerOptionEnableInput              = 1 << 0,
+    /// Whether to enable audio output.
+    AEAudioControllerOptionEnableOutput             = 1 << 1,
+    /// Whether to use the voice processing unit (see @link AEAudioController::voiceProcessingEnabled voiceProcessingEnabled @endlink and @link AEAudioController::voiceProcessingAvailable voiceProcessingAvailable @endlink).
+    AEAudioControllerOptionUseVoiceProcessing       = 1 << 2,
+    /// Whether to use the the actual hardware sample rate instead of converting.
+    AEAudioControllerOptionUseHardwareSampleRate    = 1 << 3,
+    /// Enable audio input from Bluetooth devices.
+    AEAudioControllerOptionEnableBluetoothInput     = 1 << 4,
+    /// Whether to allow mixing audio with other apps.
+    AEAudioControllerOptionAllowMixingWithOtherApps = 1 << 5,
+    /// Default options
+    AEAudioControllerOptionDefaults =
+        AEAudioControllerOptionEnableOutput | AEAudioControllerOptionAllowMixingWithOtherApps,
+} AEAudioControllerOptions;
 
 /*!
  * Main controller class
@@ -495,26 +535,26 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
 /*!
  * 16-bit stereo audio description, interleaved
  *
- *  This is a 16-bit signed PCM, stereo, interleaved format at 44.1kHz that can be used
- *  with @link initWithAudioDescription: @endlink.
+ * @deprecated Use AEAudioStreamBasicDescriptionInterleaved16BitStereo instead.
  */
 + (AudioStreamBasicDescription)interleaved16BitStereoAudioDescription;
+// Soon:    __deprecated_msg("use AEAudioStreamBasicDescriptionInterleaved16BitStereo instead");
 
 /*!
  * 16-bit stereo audio description, non-interleaved
  *
- *  This is a 16-bit signed PCM, stereo, non-interleaved format at 44.1kHz that can be used
- *  with @link initWithAudioDescription: @endlink.
+ * @deprecated Use AEAudioStreamBasicDescriptionNonInterleaved16BitStereo instead.
  */
 + (AudioStreamBasicDescription)nonInterleaved16BitStereoAudioDescription;
+// Soon:    __deprecated_msg("use AEAudioStreamBasicDescriptionNonInterleaved16BitStereo instead");
 
 /*!
  * Floating-point stereo audio description, non-interleaved
  *
- *  This is a floating-point PCM, stereo, non-interleaved format at 44.1kHz that can be used
- *  with @link initWithAudioDescription: @endlink.
+ * @deprecated Use AEAudioStreamBasicDescriptionNonInterleavedFloatStereo instead.
  */
 + (AudioStreamBasicDescription)nonInterleavedFloatStereoAudioDescription;
+// Soon:    __deprecated_msg("use AEAudioStreamBasicDescriptionNonInterleavedFloatStereo instead");
 
 /*!
  * Determine whether voice processing is available on this device
@@ -546,6 +586,17 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
  */
 - (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput;
 
+
+/*!
+ * Initialize the audio controller system, with the audio description you provide.
+ *
+ *  Creates and configures the audio unit and initial mixer audio unit.
+ *
+ * @param audioDescription  Audio description to use for all audio
+ * @param options           Options to enable input, voice processing, etc. (See @link AEAudioControllerOptions @endlink).
+ */
+- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription options:(AEAudioControllerOptions)options;
+
 /*!
  * Initialize the audio controller system, with the audio description you provide.
  *
@@ -554,8 +605,9 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
  * @param audioDescription    Audio description to use for all audio
  * @param enableInput         Whether to enable audio input from the microphone or another input device
  * @param useVoiceProcessing  Whether to use the voice processing unit (see @link voiceProcessingEnabled @endlink and @link voiceProcessingAvailable @endlink).
+ * @deprecated Use initWithAudioDescription:options: instead
  */
-- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing;
+- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing __deprecated_msg("use initWithAudioDescription:options: instead");
 
 /*!
  * Initialize the audio controller system, with the audio description you provide.
@@ -566,8 +618,9 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
  * @param enableInput         Whether to enable audio input from the microphone or another input device
  * @param useVoiceProcessing  Whether to use the voice processing unit (see @link voiceProcessingEnabled @endlink and @link voiceProcessingAvailable @endlink).
  * @param enableOutput        Whether to enable audio output.  Sometimes when recording from external input-only devices at high sample rates (96k) you may need to disable output for the sample rate to be actually used.
+ * @deprecated Use initWithAudioDescription:options: instead
  */
-- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing outputEnabled:(BOOL)enableOutput;
+- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription inputEnabled:(BOOL)enableInput useVoiceProcessing:(BOOL)useVoiceProcessing outputEnabled:(BOOL)enableOutput __deprecated_msg("use initWithAudioDescription:options: instead");
 
 /*!
  * Start audio engine
@@ -617,6 +670,23 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
  * @result YES on success, NO on failure
  */
 - (BOOL)setOutputEnabled:(BOOL)outputEnabled error:(NSError**)error;
+
+/*!
+ * Composite update method
+ *
+ *  This convenience method updates the audio description, and the input and output enabled status.
+ *
+ * @param audioDescription The new audio description
+ * @param inputEnabled Whether to enable input
+ * @param outputEnabled Whether to enable output
+ * @param error On output, the error, if one occurred
+ * @result YES on success, NO on failure
+ */
+- (BOOL)setAudioDescription:(AudioStreamBasicDescription)audioDescription
+               inputEnabled:(BOOL)inputEnabled
+              outputEnabled:(BOOL)outputEnabled
+                      error:(NSError**)error;
+
 
 ///@}
 #pragma mark - Channel and channel group management
@@ -1091,7 +1161,15 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
 ///@{
 
 /*!
- * Send a message to the realtime thread asynchronously, optionally receiving a response via a block
+ * The asynchronous message queue used for safe communication between main and realtime thread
+ *
+ *  If @link running @endlink is NO, then message blocks passed to this instance will be performed 
+ *  on the main thread instead of the realtime thread.
+ */
+@property (nonatomic, readonly, strong) AEMessageQueue *messageQueue;
+
+/*!
+ * Send a message to the realtime thread asynchronously, if running, optionally receiving a response via a block.
  *
  *  This is a synchronization mechanism that allows you to schedule actions to be performed 
  *  on the realtime audio thread without any locking mechanism required.  Pass in a block, and
@@ -1103,7 +1181,10 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
  *
  *  If provided, the response block will be called on the main thread after the message has
  *  been sent. You may exchange information from the realtime thread to the main thread via a
- *  shared data structure (such as a struct, allocated on the heap in advance).
+ *  shared data structure (such as a struct, allocated on the heap in advance), or __block variables.
+ *
+ *  If [running](@ref running) is NO, then message blocks will be performed on the main thread instead
+ *  of the realtime thread.
  *
  * @param block         A block to be performed on the realtime thread.
  * @param responseBlock A block to be performed on the main thread after the handler has been run, or nil.
@@ -1112,7 +1193,7 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
                                       responseBlock:(void (^)())responseBlock;
 
 /*!
- * Send a message to the realtime thread synchronously
+ * Send a message to the realtime thread synchronously, if running.
  *
  *  This is a synchronization mechanism that allows you to schedule actions to be performed 
  *  on the realtime audio thread without any locking mechanism required. Pass in a block, and
@@ -1128,17 +1209,48 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
  *  If all you need is a checkpoint to make sure the Core Audio thread is not mid-render, etc, then
  *  you may pass nil for the block.
  *
+ *  If [running](@ref running) is NO, then message blocks will be performed on the main thread instead
+ *  of the realtime thread.
+ *
+ *  If the block is not processed within a timeout interval, this method will return NO.
+ *
  * @param block         A block to be performed on the realtime thread.
+ * @return              YES if the block could be performed, NO otherwise.
  */
-- (void)performSynchronousMessageExchangeWithBlock:(void (^)())block;
+- (BOOL)performSynchronousMessageExchangeWithBlock:(void (^)())block;
 
 /*!
  * Send a message to the main thread asynchronously
  *
  *  This is a synchronization mechanism that allows you to schedule actions to be performed 
- *  on the main thread, without any locking or memory allocation.  Pass in a function pointer
+ *  on the main thread, without any locking or memory allocation.  Pass in a function pointer and
  *  optionally a pointer to data to be copied and passed to the handler, and the function will 
  *  be called on the realtime thread at the next polling interval.
+ *
+ *  Tip: To pass a pointer (including pointers to __unsafe_unretained Objective-C objects) through the
+ *  userInfo parameter, be sure to pass the address to the pointer, using the "&" prefix:
+ *
+ *  @code
+ *  AEMessageQueueSendMessageToMainThread(queue, myMainThreadFunction, &pointer, sizeof(void*));
+ *  @endcode
+ *
+ *  or
+ *
+ *  @code
+ *  AEMessageQueueSendMessageToMainThread(queue, myMainThreadFunction, &object, sizeof(MyObject*));
+ *  @endcode
+ *
+ *  You can then retrieve the pointer value via a void** dereference from your function:
+ *
+ *  @code
+ *  void * myPointerValue = *(void**)userInfo;
+ *  @endcode
+ *
+ *  To access an Objective-C object pointer, you also need to bridge the pointer value:
+ *
+ *  @code
+ *  MyObject *object = (__bridge MyObject*)*(void**)userInfo;
+ *  @endcode
  *
  * @param audioController The audio controller.
  * @param handler         A pointer to a function to call on the main thread.
@@ -1146,10 +1258,22 @@ typedef void (*AEAudioControllerMainThreadMessageHandler)(__unsafe_unretained AE
  * @param userInfoLength  Length of userInfo in bytes.
  */
 void AEAudioControllerSendAsynchronousMessageToMainThread(__unsafe_unretained AEAudioController *audioController,
-                                                          AEAudioControllerMainThreadMessageHandler    handler, 
-                                                          void                              *userInfo,
-                                                          int                                userInfoLength);
+                                                          AEMessageQueueMessageHandler           handler,
+                                                          void                                  *userInfo,
+                                                          int                                    userInfoLength);
 
+/*!
+ * Begins a block of messages to be performed consecutively.
+ *
+ *  Calling this method will cause message processing on the realtime thread to be
+ *  suspended until @link endMessageExchangeBlock @endlink is called.
+ */
+- (void)beginMessageExchangeBlock;
+
+/*!
+ * Ends a consecutive block of messages
+ */
+- (void)endMessageExchangeBlock;
 
 ///@}
 #pragma mark - Metering
@@ -1234,6 +1358,11 @@ long AEConvertSecondsToFrames(__unsafe_unretained AEAudioController *audioContro
  * Convert a number of frames into a time span in seconds
  */
 NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *audioController, long frames);
+
+/*!
+ * Determine if the current thread is the audio thread
+ */
+BOOL AECurrentThreadIsAudioThread(void);
 
 ///@}
 #pragma mark - Properties
@@ -1327,7 +1456,9 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
  *
  *  Default is NO.
  */
+#if TARGET_OS_IPHONE
 @property (nonatomic, assign) BOOL enableBluetoothInput;
+#endif
 
 /*!
  * Determine whether input gain is available
@@ -1443,14 +1574,14 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
 /*!
  * Whether to automatically account for input/output latency
  *
- *  If you set this property to YES, the timestamps you see in the various callbacks
- *  will automatically account for input and output latency. If this is NO
- *  (the default), and you wish to account for latency, you will need to use
+ *  If this property to YES (defautlt), the timestamps you see in the various
+ *  callbacks will automatically account for input and output latency. If you set
+ *  this property to NO and you wish to account for latency, you will need to use
  *  the @link inputLatency @endlink and @link outputLatency @endlink properties, 
  *  or their corresponding C functions @link AEAudioControllerInputLatency @endlink
  *  and @link AEAudioControllerOutputLatency @endlink yourself.
  *
- *  Default is NO.
+ *  Default is YES.
  */
 #if TARGET_OS_IPHONE
 @property (nonatomic, assign) BOOL automaticLatencyManagement;
@@ -1539,7 +1670,10 @@ NSTimeInterval AEConvertFramesToSeconds(__unsafe_unretained AEAudioController *a
 /*!
  * Input latency (in seconds)
  *
- *  To account for hardware latency, you can use this function to offset audio timestamps.
+ *  To account for hardware latency, if @link automaticLatencyManagement @endlink is NO,
+ *  you can use this function to offset audio timestamps. Note that if
+ *  @link automaticLatencyManagement @endlink is YES (the default), you should not use this
+ *  method.
  *
  *  For example:
  *
@@ -1557,7 +1691,10 @@ NSTimeInterval AEAudioControllerInputLatency(__unsafe_unretained AEAudioControll
 /*!
  * Output latency (in seconds)
  *
- *  To account for hardware latency, you can use this function to offset audio timestamps.
+ *  To account for hardware latency, if @link automaticLatencyManagement @endlink is NO,
+ *  you can use this function to offset audio timestamps. Note that if
+ *  @link automaticLatencyManagement @endlink is YES (the default), you should not use this
+ *  method.
  *
  *  For example:
  *

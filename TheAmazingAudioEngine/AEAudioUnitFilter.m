@@ -34,14 +34,16 @@
     AudioUnit _inConverterUnit;
     AUNode _outConverterNode;
     AudioUnit _outConverterUnit;
-    AEAudioControllerFilterProducer _currentProducer;
+    AEAudioFilterProducer _currentProducer;
     void *_currentProducerToken;
     BOOL _wasBypassed;
 }
 @property (nonatomic, copy) void (^preInitializeBlock)(AudioUnit audioUnit);
+@property (nonatomic, strong) NSMutableDictionary * savedParameters;
 @end
 
 @implementation AEAudioUnitFilter
+@synthesize audioGraphNode = _node;
 
 - (id)initWithComponentDescription:(AudioComponentDescription)audioComponentDescription {
     return [self initWithComponentDescription:audioComponentDescription preInitializeBlock:nil];
@@ -166,6 +168,7 @@ AudioUnit AEAudioUnitFilterGetAudioUnit(__unsafe_unretained AEAudioUnitFilter * 
         AudioComponentDescription audioConverterDescription = AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_FormatConverter, kAudioUnitSubType_AUConverter);
         if ( !AECheckOSStatus(result=AUGraphAddNode(_audioGraph, &audioConverterDescription, &_inConverterNode), "AUGraphAddNode") ||
             !AECheckOSStatus(result=AUGraphNodeInfo(_audioGraph, _inConverterNode, NULL, &_inConverterUnit), "AUGraphNodeInfo") ||
+            !AECheckOSStatus(result=AudioUnitSetProperty(_inConverterUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &audioDescription, sizeof(AudioStreamBasicDescription)), "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)") ||
             !AECheckOSStatus(result=AudioUnitSetProperty(_inConverterUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &replacementAudioDescription, sizeof(AudioStreamBasicDescription)), "AudioUnitSetProperty(kAudioUnitProperty_StreamFormat)") ||
             !AECheckOSStatus(result=AudioUnitSetProperty(_inConverterUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFPS, sizeof(maxFPS)), "kAudioUnitProperty_MaximumFramesPerSlice") ||
             !AECheckOSStatus(result=AudioUnitSetProperty(_audioUnit, kAudioUnitProperty_MakeConnection, kAudioUnitScope_Input, 0, &(AudioUnitConnection) {
@@ -198,6 +201,19 @@ AudioUnit AEAudioUnitFilterGetAudioUnit(__unsafe_unretained AEAudioUnitFilter * 
     rcbs.inputProcRefCon = (__bridge void *)self;
     AECheckOSStatus(AudioUnitSetProperty(_inConverterUnit ? _inConverterUnit : _audioUnit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &rcbs, sizeof(rcbs)),
                 "AudioUnitSetProperty(kAudioUnitProperty_SetRenderCallback)");
+    
+    if ( _savedParameters ) {
+        // Restore parameters
+        for ( NSNumber * key in _savedParameters.allKeys ) {
+            NSNumber * value = _savedParameters[key];
+            AECheckOSStatus(AudioUnitSetParameter(_audioUnit,
+                                                  (AudioUnitParameterID)[key unsignedIntValue],
+                                                  kAudioUnitScope_Global,
+                                                  0,
+                                                  (AudioUnitParameterValue)[value doubleValue],
+                                                  0), "AudioUnitSetParameter");
+        }
+    }
     
     if ( _preInitializeBlock ) _preInitializeBlock(_audioUnit);
 
@@ -241,9 +257,31 @@ AudioUnit AEAudioUnitFilterGetAudioUnit(__unsafe_unretained AEAudioUnitFilter * 
     return _audioUnit;
 }
 
+- (double)getParameterValueForId:(AudioUnitParameterID)parameterId {
+    if ( !_audioUnit ) {
+        return [_savedParameters[@(parameterId)] doubleValue];
+    }
+    
+    AudioUnitParameterValue value = 0;
+    AECheckOSStatus(AudioUnitGetParameter(_audioUnit, parameterId, kAudioUnitScope_Global, 0, &value),
+                    "AudioUnitGetParameter");
+    return value;
+}
+
+- (void)setParameterValue:(double)value forId:(AudioUnitParameterID)parameterId {
+    if ( !_savedParameters ) {
+        self.savedParameters = [[NSMutableDictionary alloc] init];
+    }
+    _savedParameters[@(parameterId)] = @(value);
+    if ( _audioUnit ) {
+        AECheckOSStatus(AudioUnitSetParameter(_audioUnit, parameterId, kAudioUnitScope_Global, 0, value, 0),
+                        "AudioUnitSetParameter");
+    }
+}
+
 static OSStatus filterCallback(__unsafe_unretained AEAudioUnitFilter *THIS,
                                __unsafe_unretained AEAudioController *audioController,
-                               AEAudioControllerFilterProducer producer,
+                               AEAudioFilterProducer producer,
                                void                     *producerToken,
                                const AudioTimeStamp     *time,
                                UInt32                    frames,
@@ -275,7 +313,7 @@ static OSStatus filterCallback(__unsafe_unretained AEAudioUnitFilter *THIS,
     return noErr;
 }
 
--(AEAudioControllerFilterCallback)filterCallback {
+-(AEAudioFilterCallback)filterCallback {
     return filterCallback;
 }
 

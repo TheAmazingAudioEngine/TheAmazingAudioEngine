@@ -51,10 +51,11 @@ NSString * kAERecorderErrorKey = @"error";
     if ( !(self = [super init]) ) return nil;
     self.mixer = [[AEMixerBuffer alloc] initWithClientFormat:audioController.audioDescription];
     self.writer = [[AEAudioFileWriter alloc] initWithAudioDescription:audioController.audioDescription];
-    if ( audioController.audioInputAvailable && audioController.inputAudioDescription.mChannelsPerFrame != audioController.audioDescription.mChannelsPerFrame ) {
+    
+    if ( audioController.inputEnabled && audioController.audioInputAvailable && audioController.inputAudioDescription.mChannelsPerFrame != audioController.audioDescription.mChannelsPerFrame ) {
         [_mixer setAudioDescription:*AEAudioControllerInputAudioDescription(audioController) forSource:AEAudioSourceInput];
     }
-    _buffer = AEAllocateAndInitAudioBufferList(audioController.audioDescription, 0);
+    _buffer = AEAudioBufferListCreate(audioController.audioDescription, 0);
     
     return self;
 }
@@ -91,6 +92,12 @@ NSString * kAERecorderErrorKey = @"error";
 {
     _currentTime = 0.0;
     BOOL result = [_writer beginWritingToFileAtPath:path fileType:fileType bitDepth:bits channels:channels error:error];
+    
+    if ( result ) {
+        // Initialize async writing
+        AECheckOSStatus(AEAudioFileWriterAddAudio(_writer, NULL, 0), "AEAudioFileWriterAddAudio");
+    }
+    
     return result;
 }
 
@@ -112,7 +119,7 @@ void AERecorderStopRecording(__unsafe_unretained AERecorder* THIS) {
 }
 
 struct reportError_t { void *THIS; OSStatus result; };
-static void reportError(AEAudioController *audioController, void *userInfo, int length) {
+static void reportError(void *userInfo, int length) {
     struct reportError_t *arg = userInfo;
     [((__bridge AERecorder*)arg->THIS) finishRecording];
     NSError *error = [NSError errorWithDomain:NSOSStatusErrorDomain 
@@ -140,11 +147,10 @@ static void audioCallback(__unsafe_unretained AERecorder *THIS,
         THIS->_buffer->mBuffers[i].mDataByteSize = 0;
     }
     
-    THIS->_currentTime += AEConvertFramesToSeconds(audioController, frames);
-    
     AEMixerBufferDequeue(THIS->_mixer, THIS->_buffer, &bufferLength, NULL);
     
     if ( bufferLength > 0 ) {
+        THIS->_currentTime += AEConvertFramesToSeconds(audioController, bufferLength);
         OSStatus status = AEAudioFileWriterAddAudio(THIS->_writer, THIS->_buffer, bufferLength);
         if ( status != noErr ) {
             THIS->_recording = NO;
@@ -156,7 +162,7 @@ static void audioCallback(__unsafe_unretained AERecorder *THIS,
     }
 }
 
--(AEAudioControllerAudioCallback)receiverCallback {
+-(AEAudioReceiverCallback)receiverCallback {
     return audioCallback;
 }
 

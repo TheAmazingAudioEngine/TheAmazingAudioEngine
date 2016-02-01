@@ -52,7 +52,7 @@ static void receiverCallback(__unsafe_unretained AEBlockAudioReceiver *THIS,
     THIS->_block(source, time, frames, audio);
 }
 
--(AEAudioControllerAudioCallback)receiverCallback {
+-(AEAudioReceiverCallback)receiverCallback {
     return receiverCallback;
 }
 

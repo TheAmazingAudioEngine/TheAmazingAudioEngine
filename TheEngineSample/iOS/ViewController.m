@@ -13,19 +13,15 @@
 #import "AEExpanderFilter.h"
 #import "AELimiterFilter.h"
 #import "AERecorder.h"
+#import "AEReverbFilter.h"
 #import <QuartzCore/QuartzCore.h>
 
 static const int kInputChannelsChangedContext;
-
-
-#define kAuxiliaryViewTag 251
-
 
 @interface ViewController () {
     AudioFileID _audioUnitFile;
     AEChannelGroupRef _group;
 }
-@property (nonatomic, strong) AEAudioController *audioController;
 @property (nonatomic, strong) AEAudioFilePlayer *loop1;
 @property (nonatomic, strong) AEAudioFilePlayer *loop2;
 @property (nonatomic, strong) AEBlockChannel *oscillator;
@@ -34,7 +30,7 @@ static const int kInputChannelsChangedContext;
 @property (nonatomic, strong) AEPlaythroughChannel *playthrough;
 @property (nonatomic, strong) AELimiterFilter *limiter;
 @property (nonatomic, strong) AEExpanderFilter *expander;
-@property (nonatomic, strong) AEAudioUnitFilter *reverb;
+@property (nonatomic, strong) AEReverbFilter *reverb;
 @property (nonatomic, strong) TPOscilloscopeLayer *outputOscilloscope;
 @property (nonatomic, strong) TPOscilloscopeLayer *inputOscilloscope;
 @property (nonatomic, strong) CALayer *inputLevelLayer;
@@ -55,93 +51,117 @@ static const int kInputChannelsChangedContext;
     
     self.audioController = audioController;
     
-    // Create the first loop player
-    self.loop1 = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Drums" withExtension:@"m4a"] error:NULL];
-    _loop1.volume = 1.0;
-    _loop1.channelIsMuted = YES;
-    _loop1.loop = YES;
-    
-    // Create the second loop player
-    self.loop2 = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Organ" withExtension:@"m4a"] error:NULL];
-    _loop2.volume = 1.0;
-    _loop2.channelIsMuted = YES;
-    _loop2.loop = YES;
-    
-    // Create a block-based channel, with an implementation of an oscillator
-    __block float oscillatorPosition = 0;
-    __block float oscillatorRate = 622.0/44100.0;
-    self.oscillator = [AEBlockChannel channelWithBlock:^(const AudioTimeStamp  *time,
-                                                               UInt32           frames,
-                                                               AudioBufferList *audio) {
-        for ( int i=0; i<frames; i++ ) {
-            // Quick sin-esque oscillator
-            float x = oscillatorPosition;
-            x *= x; x -= 1.0; x *= x;       // x now in the range 0...1
-            x *= INT16_MAX;
-            x -= INT16_MAX / 2;
-            oscillatorPosition += oscillatorRate;
-            if ( oscillatorPosition > 1.0 ) oscillatorPosition -= 2.0;
-            
-            ((SInt16*)audio->mBuffers[0].mData)[i] = x;
-            ((SInt16*)audio->mBuffers[1].mData)[i] = x;
-        }
-    }];
-    _oscillator.audioDescription = [AEAudioController nonInterleaved16BitStereoAudioDescription];
-    
-    _oscillator.channelIsMuted = YES;
-    
-    // Create an audio unit channel (a file player)
-    self.audioUnitPlayer = [[AEAudioUnitChannel alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Generator, kAudioUnitSubType_AudioFilePlayer)];
-    
-    // Create a group for loop1, loop2 and oscillator
-    _group = [_audioController createChannelGroup];
-    [_audioController addChannels:@[_loop1, _loop2, _oscillator] toChannelGroup:_group];
-    
-    // Finally, add the audio unit player
-    [_audioController addChannels:@[_audioUnitPlayer]];
-    
-    [_audioController addObserver:self forKeyPath:@"numberOfInputChannels" options:0 context:(void*)&kInputChannelsChangedContext];
-    
     return self;
 }
 
--(void)dealloc {
-    [_audioController removeObserver:self forKeyPath:@"numberOfInputChannels"];
+- (void)setAudioController:(AEAudioController *)audioController {
+    if ( _audioController ) {
+        [_audioController removeObserver:self forKeyPath:@"numberOfInputChannels"];
+        
+        NSMutableArray *channelsToRemove = [NSMutableArray arrayWithObjects:_loop1, _loop2, _oscillator, _audioUnitPlayer, nil];
+        
+        self.loop1 = nil;
+        self.loop2 = nil;
+        self.oscillator = nil;
+        self.audioUnitPlayer = nil;
+        
+        if ( _player ) {
+            [channelsToRemove addObject:_player];
+            self.player = nil;
+        }
+        
+        if ( _oneshot ) {
+            [channelsToRemove addObject:_oneshot];
+            self.oneshot = nil;
+        }
+        
+        if ( _playthrough ) {
+            [channelsToRemove addObject:_playthrough];
+            [_audioController removeInputReceiver:_playthrough];
+            self.playthrough = nil;
+        }
+        
+        [_audioController removeChannels:channelsToRemove];
+        
+        if ( _limiter ) {
+            [_audioController removeFilter:_limiter];
+            self.limiter = nil;
+        }
+        
+        if ( _expander ) {
+            [_audioController removeFilter:_expander];
+            self.expander = nil;
+        }
+        
+        if ( _reverb ) {
+            [_audioController removeFilter:_reverb];
+            self.reverb = nil;
+        }
+        
+        [_audioController removeChannelGroup:_group];
+        _group = NULL;
+        
+        if ( _audioUnitFile ) {
+            AudioFileClose(_audioUnitFile);
+            _audioUnitFile = NULL;
+        }
+    }
     
-    if ( _levelsTimer ) [_levelsTimer invalidate];
+    _audioController = audioController;
+    
+    if ( _audioController ) {
+        // Create the first loop player
+        self.loop1 = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Drums" withExtension:@"m4a"] error:NULL];
+        _loop1.volume = 1.0;
+        _loop1.channelIsMuted = YES;
+        _loop1.loop = YES;
+        
+        // Create the second loop player
+        self.loop2 = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Organ" withExtension:@"m4a"] error:NULL];
+        _loop2.volume = 1.0;
+        _loop2.channelIsMuted = YES;
+        _loop2.loop = YES;
+        
+        // Create a block-based channel, with an implementation of an oscillator
+        __block float oscillatorPosition = 0;
+        __block float oscillatorRate = 622.0/44100.0;
+        self.oscillator = [AEBlockChannel channelWithBlock:^(const AudioTimeStamp  *time,
+                                                             UInt32           frames,
+                                                             AudioBufferList *audio) {
+            for ( int i=0; i<frames; i++ ) {
+                // Quick sin-esque oscillator
+                float x = oscillatorPosition;
+                x *= x; x -= 1.0; x *= x;       // x now in the range 0...1
+                x *= INT16_MAX;
+                x -= INT16_MAX / 2;
+                oscillatorPosition += oscillatorRate;
+                if ( oscillatorPosition > 1.0 ) oscillatorPosition -= 2.0;
+                
+                ((SInt16*)audio->mBuffers[0].mData)[i] = x;
+                ((SInt16*)audio->mBuffers[1].mData)[i] = x;
+            }
+        }];
+        _oscillator.audioDescription = AEAudioStreamBasicDescriptionNonInterleaved16BitStereo;
+        _oscillator.channelIsMuted = YES;
+        
+        // Create an audio unit channel (a file player)
+        self.audioUnitPlayer = [[AEAudioUnitChannel alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Generator, kAudioUnitSubType_AudioFilePlayer)];
+        
+        // Create a group for loop1, loop2 and oscillator
+        _group = [_audioController createChannelGroup];
+        [_audioController addChannels:@[_loop1, _loop2, _oscillator] toChannelGroup:_group];
+        
+        // Finally, add the audio unit player
+        [_audioController addChannels:@[_audioUnitPlayer]];
+        
+        [_audioController addObserver:self forKeyPath:@"numberOfInputChannels" options:0 context:(void*)&kInputChannelsChangedContext];
+    }
+}
 
-    NSMutableArray *channelsToRemove = [NSMutableArray arrayWithObjects:_loop1, _loop2, nil];
+-(void)dealloc {
+    self.audioController = nil;
     
-    if ( _player ) {
-        [channelsToRemove addObject:_player];
-    }
-    
-    if ( _oneshot ) {
-        [channelsToRemove addObject:_oneshot];
-    }
-    
-    if ( _playthrough ) {
-        [channelsToRemove addObject:_playthrough];
-        [_audioController removeInputReceiver:_playthrough];
-    }
-    
-    [_audioController removeChannels:channelsToRemove];
-    
-    if ( _limiter ) {
-        [_audioController removeFilter:_limiter];
-    }
-    
-    if ( _expander ) {
-        [_audioController removeFilter:_expander];
-    }
-    
-    if ( _reverb ) {
-        [_audioController removeFilter:_reverb];
-    }
-    
-    if ( _audioUnitFile ) {
-        AudioFileClose(_audioUnitFile);
-    }
+    if ( _levelsTimer ) [_levelsTimer invalidate];    
 }
 
 -(void)viewDidLoad {
@@ -150,13 +170,13 @@ static const int kInputChannelsChangedContext;
     UIView *headerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 100)];
     headerView.backgroundColor = [UIColor groupTableViewBackgroundColor];
     
-    self.outputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioController:_audioController];
+    self.outputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioDescription:_audioController.audioDescription];
     _outputOscilloscope.frame = CGRectMake(0, 0, headerView.bounds.size.width, 80);
     [headerView.layer addSublayer:_outputOscilloscope];
     [_audioController addOutputReceiver:_outputOscilloscope];
     [_outputOscilloscope start];
     
-    self.inputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioController:_audioController];
+    self.inputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioDescription:_audioController.audioDescription];
     _inputOscilloscope.frame = CGRectMake(0, 0, headerView.bounds.size.width, 80);
     _inputOscilloscope.lineColor = [UIColor colorWithWhite:0.0 alpha:0.3];
     [headerView.layer addSublayer:_inputOscilloscope];
@@ -248,48 +268,57 @@ static const int kInputChannelsChangedContext;
     
     cell.accessoryView = nil;
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
-    [[cell viewWithTag:kAuxiliaryViewTag] removeFromSuperview];
     
     switch ( indexPath.section ) {
         case 0: {
-            cell.accessoryView = [[UISwitch alloc] initWithFrame:CGRectZero];
-            UISlider *slider = [[UISlider alloc] initWithFrame:CGRectMake(cell.bounds.size.width - (isiPad ? 250 : 210), 0, 100, cell.bounds.size.height)];
-            slider.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
-            slider.tag = kAuxiliaryViewTag;
+            UIView *view = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 200, 40)];
+            
+            UISlider *slider = [[UISlider alloc] initWithFrame:CGRectZero];
+            slider.translatesAutoresizingMaskIntoConstraints = NO;
             slider.maximumValue = 1.0;
             slider.minimumValue = 0.0;
-            [cell addSubview:slider];
+            
+            UISwitch * onSwitch = [[UISwitch alloc] initWithFrame:CGRectZero];
+            onSwitch.translatesAutoresizingMaskIntoConstraints = NO;
+            onSwitch.on = _expander != nil;
+            [view addSubview:slider];
+            [view addSubview:onSwitch];
+            [view addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|[slider]-20-[onSwitch]|" options:0 metrics:nil views:NSDictionaryOfVariableBindings(slider, onSwitch)]];
+            [view addConstraint:[NSLayoutConstraint constraintWithItem:slider attribute:NSLayoutAttributeCenterY relatedBy:NSLayoutRelationEqual toItem:view attribute:NSLayoutAttributeCenterY multiplier:1 constant:0]];
+            [view addConstraint:[NSLayoutConstraint constraintWithItem:onSwitch attribute:NSLayoutAttributeCenterY relatedBy:NSLayoutRelationEqual toItem:view attribute:NSLayoutAttributeCenterY multiplier:1 constant:0]];
+            
+            cell.accessoryView = view;
             
             switch ( indexPath.row ) {
                 case 0: {
                     cell.textLabel.text = @"Drums";
-                    ((UISwitch*)cell.accessoryView).on = !_loop1.channelIsMuted;
+                    onSwitch.on = !_loop1.channelIsMuted;
                     slider.value = _loop1.volume;
-                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(loop1SwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                    [onSwitch addTarget:self action:@selector(loop1SwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     [slider addTarget:self action:@selector(loop1VolumeChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
                 }
                 case 1: {
                     cell.textLabel.text = @"Organ";
-                    ((UISwitch*)cell.accessoryView).on = !_loop2.channelIsMuted;
+                    onSwitch.on = !_loop2.channelIsMuted;
                     slider.value = _loop2.volume;
-                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(loop2SwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                    [onSwitch addTarget:self action:@selector(loop2SwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     [slider addTarget:self action:@selector(loop2VolumeChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
                 }
                 case 2: {
                     cell.textLabel.text = @"Oscillator";
-                    ((UISwitch*)cell.accessoryView).on = !_oscillator.channelIsMuted;
+                    onSwitch.on = !_oscillator.channelIsMuted;
                     slider.value = _oscillator.volume;
-                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(oscillatorSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                    [onSwitch addTarget:self action:@selector(oscillatorSwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     [slider addTarget:self action:@selector(oscillatorVolumeChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
                 }
                 case 3: {
                     cell.textLabel.text = @"Group";
-                    ((UISwitch*)cell.accessoryView).on = ![_audioController channelGroupIsMuted:_group];
+                    onSwitch.on = ![_audioController channelGroupIsMuted:_group];
                     slider.value = [_audioController volumeForChannelGroup:_group];
-                    [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(channelGroupSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+                    [onSwitch addTarget:self action:@selector(channelGroupSwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     [slider addTarget:self action:@selector(channelGroupVolumeChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
                 }
@@ -533,7 +562,7 @@ static const int kInputChannelsChangedContext;
 
 - (void)playthroughSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
-        self.playthrough = [[AEPlaythroughChannel alloc] initWithAudioController:_audioController];
+        self.playthrough = [[AEPlaythroughChannel alloc] init];
         [_audioController addInputReceiver:_playthrough];
         [_audioController addChannels:@[_playthrough]];
     } else {
@@ -595,10 +624,8 @@ static const int kInputChannelsChangedContext;
 
 - (void)reverbSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
-        self.reverb = [[AEAudioUnitFilter alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Effect, kAudioUnitSubType_Reverb2) preInitializeBlock:^(AudioUnit audioUnit) {
-            AudioUnitSetParameter(audioUnit, kReverb2Param_DryWetMix, kAudioUnitScope_Global, 0, 100.f, 0);
-        }];
-        
+        self.reverb = [[AEReverbFilter alloc] init];
+        _reverb.dryWetMix = 80;
         [_audioController addFilter:_reverb];
     } else {
         [_audioController removeFilter:_reverb];

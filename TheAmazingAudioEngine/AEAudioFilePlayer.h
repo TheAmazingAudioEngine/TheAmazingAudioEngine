@@ -62,11 +62,25 @@ extern "C" {
 - (instancetype)initWithURL:(NSURL *)url error:(NSError **)error;
 
 /*!
+ * Schedule playback for a particular time
+ *
+ *  This causes the player to emit silence up until the given timestamp
+ *  is reached. Use this method to synchronize playback with other audio
+ *  generators.
+ *
+ *  Note: When you call this method, the property channelIsPlaying will be
+ *  set to YES, to enable playback when the start time is reached.
+ *
+ * @param time The time, in host ticks, at which to begin playback
+ */
+- (void)playAtTime:(uint64_t)time;
+
+/*!
  * Get playhead position, in frames
  *
  *  For use on the realtime thread.
  *
- * @param The player
+ * @param filePlayer The player
  */
 UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * filePlayer);
 

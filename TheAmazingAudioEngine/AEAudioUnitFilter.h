@@ -57,7 +57,7 @@ extern "C" {
  * @return The initialised filter
  */
 - (id)initWithComponentDescription:(AudioComponentDescription)audioComponentDescription
-                preInitializeBlock:(void(^)(AudioUnit audioUnit))block;
+                preInitializeBlock:(void(^)(AudioUnit audioUnit))preInitializeBlock;
 
 /*!
  * Retrieve audio unit reference
@@ -71,9 +71,34 @@ extern "C" {
 AudioUnit AEAudioUnitFilterGetAudioUnit(__unsafe_unretained AEAudioUnitFilter * filter);
 
 /*!
+ * Get an audio unit parameter
+ *
+ * @param parameterId The audio unit parameter identifier
+ * @return The value of the parameter
+ */
+- (double)getParameterValueForId:(AudioUnitParameterID)parameterId;
+
+/*!
+ * Set an audio unit parameter
+ *
+ *  Note: Parameters set via this method will be automatically assigned again if the
+ *  audio unit is recreated due to removal from the audio controller, an audio controller 
+ *  reload, or a media server error.
+ *
+ * @param value The value of the parameter to set
+ * @param parameterId The audio unit parameter identifier
+ */
+- (void)setParameterValue:(double)value forId:(AudioUnitParameterID)parameterId;
+
+/*!
  * The audio unit
  */
 @property (nonatomic, readonly) AudioUnit audioUnit;
+
+/*!
+ * The audio graph node
+ */
+@property (nonatomic, readonly) AUNode audioGraphNode;
 
 /*!
  * Audio Unit effect bypass. Default is false.

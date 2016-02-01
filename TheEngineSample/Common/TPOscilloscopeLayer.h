@@ -19,7 +19,7 @@
 /*!
  * Initialize
  */
-- (id)initWithAudioController:(AEAudioController*)audioController;
+- (id)initWithAudioDescription:(AudioStreamBasicDescription)audioDescription;
 
 /*!
  * Begin rendering
@@ -43,6 +43,6 @@
 @property (nonatomic, strong) NSColor *lineColor;
 #endif
 
-- (AEAudioControllerAudioCallback)receiverCallback;
+- (AEAudioReceiverCallback)receiverCallback;
 
 @end
