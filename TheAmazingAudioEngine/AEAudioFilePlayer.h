@@ -84,12 +84,14 @@ extern "C" {
  */
 UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * filePlayer);
 
-@property (nonatomic, strong, readonly) NSURL *url;         //!< Original media URL
-@property (nonatomic, readonly) NSTimeInterval duration;    //!< Length of audio, in seconds
-@property (nonatomic, assign) NSTimeInterval currentTime;   //!< Current playback position, in seconds
-@property (nonatomic, readwrite) BOOL loop;                 //!< Whether to loop this track
-@property (nonatomic, readwrite) BOOL removeUponFinish;     //!< Whether the track automatically removes itself from the audio controller after playback completes
-@property (nonatomic, copy) void(^completionBlock)();       //!< A block to be called when playback finishes
+@property (nonatomic, strong, readonly) NSURL *url;            //!< Original media URL
+@property (nonatomic, readonly) NSTimeInterval duration;       //!< Length of audio, in seconds
+@property (nonatomic, assign) NSTimeInterval regionStartTime;  //!< Time offset within file to begin playback
+@property (nonatomic, assign) NSTimeInterval regionDuration;   //!< Duration of playback within the file
+@property (nonatomic, assign) NSTimeInterval currentTime;      //!< Current playback position relative to the beginning of the file, in seconds
+@property (nonatomic, readwrite) BOOL loop;                    //!< Whether to loop this track
+@property (nonatomic, readwrite) BOOL removeUponFinish;        //!< Whether the track automatically removes itself from the audio controller after playback completes
+@property (nonatomic, copy) void(^completionBlock)();          //!< A block to be called when playback finishes
 @end
 
 #ifdef __cplusplus
