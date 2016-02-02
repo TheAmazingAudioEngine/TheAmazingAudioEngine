@@ -85,7 +85,7 @@ extern "C" {
 UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * filePlayer);
 
 @property (nonatomic, strong, readonly) NSURL *url;            //!< Original media URL
-@property (nonatomic, readonly) NSTimeInterval duration;       //!< Length of audio, in seconds
+@property (nonatomic, readonly) NSTimeInterval duration;       //!< Length of audio file, in seconds
 @property (nonatomic, assign) NSTimeInterval regionStartTime;  //!< Time offset within file to begin playback
 @property (nonatomic, assign) NSTimeInterval regionDuration;   //!< Duration of playback within the file
 @property (nonatomic, assign) NSTimeInterval currentTime;      //!< Current playback position relative to the beginning of the file, in seconds

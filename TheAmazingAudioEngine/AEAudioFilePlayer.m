@@ -118,9 +118,10 @@
 
 - (void)setCurrentTime:(NSTimeInterval)currentTime {
     if ( _lengthInFrames == 0 ) return;
-    if (currentTime < self.regionStartTime) return;
-    if (self.regionStartTime + self.regionDuration < currentTime) return;
-    [self schedulePlayRegionFromPosition:((UInt32)(currentTime * _fileDescription.mSampleRate) % _lengthInFrames)];
+
+    double sampleRate = _fileDescription.mSampleRate;
+
+    [self schedulePlayRegionFromPosition:(UInt32)(self.regionStartTime * sampleRate) + ((UInt32)((currentTime - self.regionStartTime) * sampleRate) % (UInt32)(self.regionDuration * sampleRate))];
 }
 
 - (void)setChannelIsPlaying:(BOOL)playing {
@@ -269,9 +270,9 @@ UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * THIS
         self.regionDuration = self.duration - self.regionStartTime;
     }
     
-    if ( position > 0 ) {
+    if ( position > self.regionStartTime ) {
         // Schedule the remaining part of the audio, from startFrame to the end (starting immediately, without the delay)
-        UInt32 framesToPlay = _regionDuration * _fileDescription.mSampleRate - (position - _regionStartTime * _fileDescription.mSampleRate);
+        UInt32 framesToPlay = self.regionDuration * _fileDescription.mSampleRate - (position - self.regionStartTime * _fileDescription.mSampleRate);
         ScheduledAudioFileRegion region = {
             .mTimeStamp = { .mFlags = kAudioTimeStampSampleTimeValid, .mSampleTime = 0 },
             .mAudioFile = _audioFile,
