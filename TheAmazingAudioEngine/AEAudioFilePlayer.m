@@ -36,6 +36,8 @@
     AudioStreamBasicDescription _fileDescription;
     AudioStreamBasicDescription _unitOutputDescription;
     UInt32 _lengthInFrames;
+    NSTimeInterval _regionDuration;
+    NSTimeInterval _regionStartTime;
     volatile int32_t _playhead;
     volatile int32_t _playbackStoppedCallbackScheduled;
     BOOL _running;
@@ -116,7 +118,10 @@
 
 - (void)setCurrentTime:(NSTimeInterval)currentTime {
     if ( _lengthInFrames == 0 ) return;
-    [self schedulePlayRegionFromPosition:((UInt32)(currentTime * _fileDescription.mSampleRate) % _lengthInFrames)];
+
+    double sampleRate = _fileDescription.mSampleRate;
+
+    [self schedulePlayRegionFromPosition:(UInt32)(self.regionStartTime * sampleRate) + ((UInt32)((currentTime - self.regionStartTime) * sampleRate) % (UInt32)(self.regionDuration * sampleRate))];
 }
 
 - (void)setChannelIsPlaying:(BOOL)playing {
@@ -134,6 +139,43 @@
             AECheckOSStatus(AudioUnitReset(self.audioUnit, kAudioUnitScope_Global, 0), "AudioUnitReset");
         }
     }
+}
+
+- (NSTimeInterval)regionDuration {
+    return _regionDuration;
+}
+
+- (void)setRegionDuration:(NSTimeInterval)regionDuration {
+    if (regionDuration < 0) {
+        regionDuration = 0;
+    }
+    _regionDuration = regionDuration;
+
+    if (_playhead < self.regionStartTime || _playhead >= self.regionStartTime + regionDuration) {
+        _playhead = self.regionStartTime * _fileDescription.mSampleRate;
+    }
+
+    [self schedulePlayRegionFromPosition:(UInt32)(_regionStartTime * _fileDescription.mSampleRate)];
+}
+
+- (NSTimeInterval)regionStartTime {
+    return _regionStartTime;
+}
+
+- (void)setRegionStartTime:(NSTimeInterval)regionStartTime {
+    if (regionStartTime < 0) {
+        regionStartTime = 0;
+    }
+    if (regionStartTime > _lengthInFrames / _fileDescription.mSampleRate) {
+        regionStartTime = _lengthInFrames / _fileDescription.mSampleRate;
+    }
+    _regionStartTime = regionStartTime;
+
+    if (_playhead < regionStartTime || _playhead >= regionStartTime + self.regionDuration) {
+        _playhead = self.regionStartTime * _fileDescription.mSampleRate;
+    }
+
+    [self schedulePlayRegionFromPosition:(UInt32)(_regionStartTime * _fileDescription.mSampleRate)];
 }
 
 UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * THIS) {
@@ -196,6 +238,8 @@ UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * THIS
     }
     
     _lengthInFrames = (UInt32)fileLengthInFrames;
+    _regionStartTime = 0;
+    _regionDuration = (double)_lengthInFrames / _fileDescription.mSampleRate;
     self.url = url;
     
     return YES;
@@ -217,19 +261,28 @@ UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * THIS
     
     // Determine start time
     Float64 mainRegionStartTime = 0;
+
+    // Make sure region is valid
+    if (self.regionStartTime > self.duration) {
+        self.regionStartTime = self.duration;
+    }
+    if (self.regionStartTime + self.regionDuration > self.duration) {
+        self.regionDuration = self.duration - self.regionStartTime;
+    }
     
-    if ( position > 0 ) {
+    if ( position > self.regionStartTime ) {
         // Schedule the remaining part of the audio, from startFrame to the end (starting immediately, without the delay)
+        UInt32 framesToPlay = self.regionDuration * _fileDescription.mSampleRate - (position - self.regionStartTime * _fileDescription.mSampleRate);
         ScheduledAudioFileRegion region = {
             .mTimeStamp = { .mFlags = kAudioTimeStampSampleTimeValid, .mSampleTime = 0 },
             .mAudioFile = _audioFile,
             .mStartFrame = position,
-            .mFramesToPlay = _lengthInFrames - position
+            .mFramesToPlay = framesToPlay
         };
         OSStatus result = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_ScheduledFileRegion, kAudioUnitScope_Global, 0, &region, sizeof(region));
         AECheckOSStatus(result, "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileRegion)");
-        
-        mainRegionStartTime = (_lengthInFrames - position) * sourceToOutputSampleRateScale;
+
+        mainRegionStartTime = framesToPlay * sourceToOutputSampleRateScale;
     }
     
     // Set the main file region to play
@@ -238,8 +291,9 @@ UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * THIS
         .mAudioFile = _audioFile,
             // Always loop the unit, even if we're not actually looping, to avoid expensive rescheduling when switching loop mode.
             // We'll handle play completion in AEAudioFilePlayerRenderNotify
+        .mStartFrame = _regionStartTime * _fileDescription.mSampleRate,
         .mLoopCount = (UInt32)-1,
-        .mFramesToPlay = (UInt32)-1,
+        .mFramesToPlay = _regionDuration * _fileDescription.mSampleRate
     };
     OSStatus result = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_ScheduledFileRegion, kAudioUnitScope_Global, 0, &region, sizeof(region));
     AECheckOSStatus(result, "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileRegion)");
@@ -292,12 +346,12 @@ static OSStatus renderCallback(__unsafe_unretained AEAudioFilePlayer *THIS,
     int32_t playhead = THIS->_playhead;
     int32_t originalPlayhead = THIS->_playhead;
     
-    double sourceToOutputSampleRateScale = THIS->_unitOutputDescription.mSampleRate / THIS->_fileDescription.mSampleRate;
-    UInt32 lengthInFrames = ceil(THIS->_lengthInFrames * sourceToOutputSampleRateScale);
-    
-    if ( playhead + frames >= lengthInFrames && !THIS->_loop ) {
+    UInt32 regionLengthInFrames = ceil(THIS->_regionDuration * THIS->_unitOutputDescription.mSampleRate);
+    UInt32 regionStartTimeInFrames = ceil(THIS->_regionStartTime * THIS->_unitOutputDescription.mSampleRate);
+
+    if ( playhead - regionStartTimeInFrames + frames >= regionLengthInFrames && !THIS->_loop ) {
         // We just crossed the loop boundary; if not looping, end the track.
-        UInt32 finalFrames = MIN(lengthInFrames - playhead, frames);
+        UInt32 finalFrames = MIN(regionLengthInFrames - (playhead - regionStartTimeInFrames), frames);
         for ( int i=0; i<audio->mNumberBuffers; i++) {
             // Silence the rest of the buffer past the end
             memset((char*)audio->mBuffers[i].mData + (THIS->_unitOutputDescription.mBytesPerFrame * finalFrames), 0, (THIS->_unitOutputDescription.mBytesPerFrame * (frames - finalFrames)));
@@ -316,7 +370,7 @@ static OSStatus renderCallback(__unsafe_unretained AEAudioFilePlayer *THIS,
     }
     
     // Update the playhead
-    playhead = (playhead + frames) % lengthInFrames;
+    playhead = regionStartTimeInFrames + ((playhead - regionStartTimeInFrames + frames) % regionLengthInFrames);
     OSAtomicCompareAndSwap32(originalPlayhead, playhead, &THIS->_playhead);
     
     return noErr;
