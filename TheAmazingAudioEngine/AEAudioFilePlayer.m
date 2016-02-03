@@ -264,10 +264,10 @@ UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * THIS
 
     // Make sure region is valid
     if (self.regionStartTime > self.duration) {
-        self.regionStartTime = self.duration;
+        _regionStartTime = self.duration;
     }
     if (self.regionStartTime + self.regionDuration > self.duration) {
-        self.regionDuration = self.duration - self.regionStartTime;
+        _regionDuration = self.duration - self.regionStartTime;
     }
     
     if ( position > self.regionStartTime ) {
