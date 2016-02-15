@@ -325,15 +325,42 @@ static OSStatus renderCallback(__unsafe_unretained AEAudioFilePlayer *THIS,
     
     uint32_t silentFrames = THIS->_startTime && THIS->_startTime > time->mHostTime
         ? AESecondsFromHostTicks(THIS->_startTime - time->mHostTime) * THIS->_unitOutputDescription.mSampleRate : 0;
-    AEAudioBufferListCopyOnStack(scratchAudioBufferList, audio, silentFrames * THIS->_unitOutputDescription.mBytesPerFrame);
+    
+    // NOTE: AEAudioBufferListCopyOnStack was causing strange bugs such as audio data being written to the audio AudioBufferList WITHIN the silent region defined by silentFrames.
+//    AEAudioBufferListCopyOnStack(scratchAudioBufferList, audio, silentFrames * THIS->_unitOutputDescription.mBytesPerFrame);
+    
+    // Create the scratchAudioBufferList that AEAudioBufferListCopyOnStack was attempting to create. Part 1: Create the pointer.
+    void *bytesForAudioBufferList = char[sizeof(audio->mNumberBuffers) + audio->mNumberBuffers * sizeof(AudioBuffer)];
+    AudioBufferList *scratchAudioBufferList = &bytesForAudioBufferList;
+    
+    // Create a new timestamp that represents the start time for the scratchAudioBufferList. Part 1: Create the pointer.
+    AudioTimeStamp bytesForAdjustedTimeStamp = char[sizeof(AudioTimeStamp)];
+    AudioTimeStamp *adjustedTimeStamp = &bytesForAdjustedTimeStamp;
+    
     if ( silentFrames > 0 ) {
         // Start time is offset into this buffer - silence beginning of buffer
         for ( int i=0; i<audio->mNumberBuffers; i++) {
             memset(audio->mBuffers[i].mData, 0, silentFrames * THIS->_unitOutputDescription.mBytesPerFrame);
         }
         
+        // Create the scratchAudioBufferList that AEAudioBufferListCopyOnStack was attempting to create. Part 2: Fill in the proper data.
+        scratchAudioBufferList->mNumberBuffers = audio->mNumberBuffers;
+        for(int i=0; i<audio->mNumberBuffers; i++) {
+            AudioBuffer *buffer = &(scratchAudioBufferList->mBuffers[i]);
+            AudioBuffer *sourceBuffer = &(audio->mBuffers[i]);
+            buffer->mNumberChannels = sourceBuffer->mNumberChannels;
+            buffer->mDataByteSize = sourceBuffer->mDataByteSize * (frames - silentFrames) / frames;
+            buffer->mData = &(sourceBuffer->mData[sourceBuffer->mDataByteSize * silentFrames / frames]);
+        }
+        
+        // Create a new timestamp that represents the start time for the scratchAudioBufferList. Part 2: Fill in the proper data.
+        memcpy(adjustedTimeStamp, time, sizeof(AudioTimeStamp));
+        adjustedTimeStamp.mSampleTime = time->mSampleTime + silentFrames;
+        adjustedTimeStamp.mHostTime = THIS->_startTime;
+        
         // Point buffer list to remaining frames
         audio = scratchAudioBufferList;
+        time = adjustedTimeStamp;
         frames -= silentFrames;
     }
     
