@@ -118,9 +118,9 @@
 
 - (void)setCurrentTime:(NSTimeInterval)currentTime {
     if ( _lengthInFrames == 0 ) return;
-
+    
     double sampleRate = _fileDescription.mSampleRate;
-
+    
     [self schedulePlayRegionFromPosition:(UInt32)(self.regionStartTime * sampleRate) + ((UInt32)((currentTime - self.regionStartTime) * sampleRate) % (UInt32)(self.regionDuration * sampleRate))];
 }
 
@@ -150,11 +150,11 @@
         regionDuration = 0;
     }
     _regionDuration = regionDuration;
-
+    
     if (_playhead < self.regionStartTime || _playhead >= self.regionStartTime + regionDuration) {
         _playhead = self.regionStartTime * _fileDescription.mSampleRate;
     }
-
+    
     [self schedulePlayRegionFromPosition:(UInt32)(_regionStartTime * _fileDescription.mSampleRate)];
 }
 
@@ -170,11 +170,11 @@
         regionStartTime = _lengthInFrames / _fileDescription.mSampleRate;
     }
     _regionStartTime = regionStartTime;
-
+    
     if (_playhead < regionStartTime || _playhead >= regionStartTime + self.regionDuration) {
         _playhead = self.regionStartTime * _fileDescription.mSampleRate;
     }
-
+    
     [self schedulePlayRegionFromPosition:(UInt32)(_regionStartTime * _fileDescription.mSampleRate)];
 }
 
@@ -261,7 +261,7 @@ UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * THIS
     
     // Determine start time
     Float64 mainRegionStartTime = 0;
-
+    
     // Make sure region is valid
     if (self.regionStartTime > self.duration) {
         _regionStartTime = self.duration;
@@ -281,7 +281,7 @@ UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * THIS
         };
         OSStatus result = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_ScheduledFileRegion, kAudioUnitScope_Global, 0, &region, sizeof(region));
         AECheckOSStatus(result, "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileRegion)");
-
+        
         mainRegionStartTime = framesToPlay * sourceToOutputSampleRateScale;
     }
     
@@ -289,8 +289,8 @@ UInt32 AEAudioFilePlayerGetPlayhead(__unsafe_unretained AEAudioFilePlayer * THIS
     ScheduledAudioFileRegion region = {
         .mTimeStamp = { .mFlags = kAudioTimeStampSampleTimeValid, .mSampleTime = mainRegionStartTime },
         .mAudioFile = _audioFile,
-            // Always loop the unit, even if we're not actually looping, to avoid expensive rescheduling when switching loop mode.
-            // We'll handle play completion in AEAudioFilePlayerRenderNotify
+        // Always loop the unit, even if we're not actually looping, to avoid expensive rescheduling when switching loop mode.
+        // We'll handle play completion in AEAudioFilePlayerRenderNotify
         .mStartFrame = _regionStartTime * _fileDescription.mSampleRate,
         .mLoopCount = (UInt32)-1,
         .mFramesToPlay = _regionDuration * _fileDescription.mSampleRate
@@ -324,16 +324,43 @@ static OSStatus renderCallback(__unsafe_unretained AEAudioFilePlayer *THIS,
     }
     
     uint32_t silentFrames = THIS->_startTime && THIS->_startTime > time->mHostTime
-        ? AESecondsFromHostTicks(THIS->_startTime - time->mHostTime) * THIS->_unitOutputDescription.mSampleRate : 0;
-    AEAudioBufferListCopyOnStack(scratchAudioBufferList, audio, silentFrames * THIS->_unitOutputDescription.mBytesPerFrame);
+    ? AESecondsFromHostTicks(THIS->_startTime - time->mHostTime) * THIS->_unitOutputDescription.mSampleRate : 0;
+    
+    // NOTE: AEAudioBufferListCopyOnStack was causing strange bugs such as audio data being written to the audio AudioBufferList WITHIN the silent region defined by silentFrames.
+    //    AEAudioBufferListCopyOnStack(scratchAudioBufferList, audio, silentFrames * THIS->_unitOutputDescription.mBytesPerFrame);
+    
+    // Create the scratchAudioBufferList that AEAudioBufferListCopyOnStack was attempting to create. Part 1: Create the pointer.
+    char bytesForAudioBufferList[sizeof(audio->mNumberBuffers) + audio->mNumberBuffers * sizeof(AudioBuffer)];
+    AudioBufferList *scratchAudioBufferList = (AudioBufferList*)bytesForAudioBufferList;
+    
+    // Create a new timestamp that represents the start time for the scratchAudioBufferList. Part 1: Create the pointer.
+    char bytesForAdjustedTimeStamp[sizeof(AudioTimeStamp)];
+    AudioTimeStamp *adjustedTimeStamp = (AudioTimeStamp*)bytesForAdjustedTimeStamp;
+    
     if ( silentFrames > 0 ) {
         // Start time is offset into this buffer - silence beginning of buffer
         for ( int i=0; i<audio->mNumberBuffers; i++) {
             memset(audio->mBuffers[i].mData, 0, silentFrames * THIS->_unitOutputDescription.mBytesPerFrame);
         }
         
+        // Create the scratchAudioBufferList that AEAudioBufferListCopyOnStack was attempting to create. Part 2: Fill in the proper data.
+        scratchAudioBufferList->mNumberBuffers = audio->mNumberBuffers;
+        for(int i=0; i<audio->mNumberBuffers; i++) {
+            AudioBuffer *buffer = &(scratchAudioBufferList->mBuffers[i]);
+            AudioBuffer *sourceBuffer = &(audio->mBuffers[i]);
+            buffer->mNumberChannels = sourceBuffer->mNumberChannels;
+            buffer->mDataByteSize = sourceBuffer->mDataByteSize * (frames - silentFrames) / frames;
+            buffer->mData = &(sourceBuffer->mData[sourceBuffer->mDataByteSize * silentFrames / frames]);
+        }
+        
+        // Create a new timestamp that represents the start time for the scratchAudioBufferList. Part 2: Fill in the proper data.
+        memcpy(adjustedTimeStamp, time, sizeof(AudioTimeStamp));
+        adjustedTimeStamp->mSampleTime = time->mSampleTime + silentFrames;
+        adjustedTimeStamp->mHostTime = THIS->_startTime;
+        
         // Point buffer list to remaining frames
         audio = scratchAudioBufferList;
+        time = adjustedTimeStamp;
         frames -= silentFrames;
     }
     
@@ -348,7 +375,7 @@ static OSStatus renderCallback(__unsafe_unretained AEAudioFilePlayer *THIS,
     
     UInt32 regionLengthInFrames = ceil(THIS->_regionDuration * THIS->_unitOutputDescription.mSampleRate);
     UInt32 regionStartTimeInFrames = ceil(THIS->_regionStartTime * THIS->_unitOutputDescription.mSampleRate);
-
+    
     if ( playhead - regionStartTimeInFrames + frames >= regionLengthInFrames && !THIS->_loop ) {
         // We just crossed the loop boundary; if not looping, end the track.
         UInt32 finalFrames = MIN(regionLengthInFrames - (playhead - regionStartTimeInFrames), frames);
