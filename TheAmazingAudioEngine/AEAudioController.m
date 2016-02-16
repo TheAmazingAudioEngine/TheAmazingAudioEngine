@@ -3035,7 +3035,7 @@ static void audioUnitStreamFormatChanged(void *inRefCon, AudioUnit inUnit, Audio
     if ( !_audioGraph ) return;
     NSAssert(_inputEnabled, @"Input must be enabled");
     
-    if ( _updatingInputStatus ) {
+    if ( _updatingInputStatus && self.running ) {
         // Defer update until prior update complete
         [_messageQueue performAsynchronousMessageExchangeWithBlock:^{} responseBlock:^{ [self updateInputDeviceStatus]; }];
         return;
