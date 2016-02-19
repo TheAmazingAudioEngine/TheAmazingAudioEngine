@@ -288,7 +288,7 @@ static OSStatus filterCallback(__unsafe_unretained AEAudioUnitFilter *THIS,
                                AudioBufferList          *audio) {
     
     if ( !THIS->_audioUnit ) {
-        THIS->_currentProducer(THIS->_currentProducerToken, audio, &frames);
+        THIS->_currentProducer(producerToken, audio, &frames);
         return noErr;
     }
     
