@@ -97,6 +97,10 @@
 }
 
 - (void)teardown {
+    if ( OSAtomicCompareAndSwap32(YES, NO, &_playbackStoppedCallbackScheduled) ) {
+        // A playback stop callback was scheduled - we need to flush events from the message queue to clear it out
+        [self.audioController.messageQueue processMainThreadMessages];
+    }
     self.audioController = nil;
     [super teardown];
 }
