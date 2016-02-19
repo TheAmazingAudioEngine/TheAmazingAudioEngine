@@ -1425,30 +1425,36 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 #pragma mark - Filters
 
 - (void)addFilter:(id<AEAudioFilter>)filter {
-    if ( [filter respondsToSelector:@selector(setupWithAudioController:)] ) {
-        [filter setupWithAudioController:self];
-    }
-    if ( [self addCallback:filter.filterCallback userInfo:(__bridge void *)filter flags:kFilterFlag forChannelGroup:_topGroup] ) {
-        CFBridgingRetain(filter);
-    }
+    [self performAsynchronousMessageExchangeWithBlock:nil responseBlock:^{
+        if ( [filter respondsToSelector:@selector(setupWithAudioController:)] ) {
+            [filter setupWithAudioController:self];
+        }
+        if ( [self addCallback:filter.filterCallback userInfo:(__bridge void *)filter flags:kFilterFlag forChannelGroup:_topGroup] ) {
+            CFBridgingRetain(filter);
+        }
+    }];
 }
 
 - (void)addFilter:(id<AEAudioFilter>)filter toChannel:(id<AEAudioPlayable>)channel {
-    if ( [filter respondsToSelector:@selector(setupWithAudioController:)] ) {
-        [filter setupWithAudioController:self];
-    }
-    if ( [self addCallback:filter.filterCallback userInfo:(__bridge void *)filter flags:kFilterFlag forChannel:channel] ) {
-        CFBridgingRetain(filter);
-    }
+    [self performAsynchronousMessageExchangeWithBlock:nil responseBlock:^{
+        if ( [filter respondsToSelector:@selector(setupWithAudioController:)] ) {
+            [filter setupWithAudioController:self];
+        }
+        if ( [self addCallback:filter.filterCallback userInfo:(__bridge void *)filter flags:kFilterFlag forChannel:channel] ) {
+            CFBridgingRetain(filter);
+        }
+    }];
 }
 
 - (void)addFilter:(id<AEAudioFilter>)filter toChannelGroup:(AEChannelGroupRef)group {
-    if ( [filter respondsToSelector:@selector(setupWithAudioController:)] ) {
-        [filter setupWithAudioController:self];
-    }
-    if ( [self addCallback:filter.filterCallback userInfo:(__bridge void *)filter flags:kFilterFlag forChannelGroup:group] ) {
-        CFBridgingRetain(filter);
-    }
+    [self performAsynchronousMessageExchangeWithBlock:nil responseBlock:^{
+        if ( [filter respondsToSelector:@selector(setupWithAudioController:)] ) {
+            [filter setupWithAudioController:self];
+        }
+        if ( [self addCallback:filter.filterCallback userInfo:(__bridge void *)filter flags:kFilterFlag forChannelGroup:group] ) {
+            CFBridgingRetain(filter);
+        }
+    }];
 }
 
 - (void)addInputFilter:(id<AEAudioFilter>)filter {
@@ -1456,13 +1462,15 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 }
 
 - (void)addInputFilter:(id<AEAudioFilter>)filter forChannels:(NSArray *)channels {
-    if ( [filter respondsToSelector:@selector(setupWithAudioController:)] ) {
-        [filter setupWithAudioController:self];
-    }
-    void *callback = filter.filterCallback;
-    if ( [self addCallback:callback userInfo:(__bridge void *)filter flags:kFilterFlag forInputChannels:channels] ) {
-        CFBridgingRetain(filter);
-    }
+    [self performAsynchronousMessageExchangeWithBlock:nil responseBlock:^{
+        if ( [filter respondsToSelector:@selector(setupWithAudioController:)] ) {
+            [filter setupWithAudioController:self];
+        }
+        void *callback = filter.filterCallback;
+        if ( [self addCallback:callback userInfo:(__bridge void *)filter flags:kFilterFlag forInputChannels:channels] ) {
+            CFBridgingRetain(filter);
+        }
+    }];
 }
 
 - (void)removeFilter:(id<AEAudioFilter>)filter {
