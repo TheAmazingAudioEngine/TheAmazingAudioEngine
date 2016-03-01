@@ -1277,6 +1277,12 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     NSAssert(group == _topGroup || parentGroup != NULL, @"Channel group not found");
     
     if ( parentGroup ) {
+        // Disable monitoring if needed
+        if (group->level_monitor_data.monitoringEnabled) {
+            group->level_monitor_data.monitoringEnabled = NO;
+            [self configureChannelsInRange:NSMakeRange(index, 1) forGroup:parentGroup];
+        }
+
         // Remove the group from the parent group's table, on the core audio thread
         [self performAsynchronousMessageExchangeWithBlock:^{
             removeChannelsFromGroup(self, parentGroup, (void*[1]){ group }, (void*[1]){ NULL }, NULL, 1);
