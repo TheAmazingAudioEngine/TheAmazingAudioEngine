@@ -48,19 +48,6 @@
     return [self getParameterValueForId:kReverb2Param_RandomizeReflections];
 }
 
-- (double)filterFrequency {
-    return [self getParameterValueForId:kReverbParam_FilterFrequency];
-}
-
-- (double)filterBandwidth {
-    return [self getParameterValueForId:kReverbParam_FilterBandwidth];
-}
-
-- (double)filterGain {
-    return [self getParameterValueForId:kReverbParam_FilterGain];
-}
-
-
 #pragma mark - Setters
 
 - (void)setDryWetMix:(double)dryWetMix {
@@ -96,21 +83,6 @@
 - (void)setRandomizeReflections:(double)randomizeReflections {
     [self setParameterValue: randomizeReflections
                       forId: kReverb2Param_RandomizeReflections];
-}
-
-- (void)setFilterFrequency:(double)filterFrequency {
-    [self setParameterValue: filterFrequency
-                      forId: kReverbParam_FilterFrequency];
-}
-
-- (void)setFilterBandwidth:(double)filterBandwidth {
-    [self setParameterValue: filterBandwidth
-                      forId: kReverbParam_FilterBandwidth];
-}
-
-- (void)setFilterGain:(double)filterGain {
-    [self setParameterValue: filterGain
-                      forId: kReverbParam_FilterGain];
 }
 
 @end
