@@ -34,13 +34,4 @@
 // range is from 1 to 1000 (unitless). Default is 1.
 @property (nonatomic) double randomizeReflections;
 
-// range is from 10Hz to 20000Hz. Default is 800Hz.
-@property (nonatomic) double filterFrequency;
-
-// range is from 0.05 to 4.0 octaves. Default is 3.0 octaves.
-@property (nonatomic) double filterBandwidth;
-
-// range is from -18dB to 18dB. Default is 0.0dB.
-@property (nonatomic) double filterGain;
-
 @end

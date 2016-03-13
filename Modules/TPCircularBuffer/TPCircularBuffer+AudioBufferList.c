@@ -48,7 +48,9 @@ AudioBufferList *TPCircularBufferPrepareEmptyAudioBufferList(TPCircularBuffer *b
     TPCircularBufferABLBlockHeader *block = (TPCircularBufferABLBlockHeader*)TPCircularBufferHead(buffer, &availableBytes);
     if ( !block || availableBytes < sizeof(TPCircularBufferABLBlockHeader)+((numberOfBuffers-1)*sizeof(AudioBuffer))+(numberOfBuffers*bytesPerBuffer) ) return NULL;
     
+    #ifdef DEBUG
     assert(!((unsigned long)block & 0xF) /* Beware unaligned accesses */);
+    #endif
     
     if ( inTimestamp ) {
         memcpy(&block->timestamp, inTimestamp, sizeof(AudioTimeStamp));
@@ -97,7 +99,9 @@ void TPCircularBufferProduceAudioBufferList(TPCircularBuffer *buffer, const Audi
     
     assert(block);
     
+    #ifdef DEBUG
     assert(!((unsigned long)block & 0xF) /* Beware unaligned accesses */);
+    #endif
     
     assert(block->bufferList.mBuffers[0].mDataByteSize > 0);
     
@@ -147,12 +151,17 @@ AudioBufferList *TPCircularBufferNextBufferListAfter(TPCircularBuffer *buffer, c
     assert((void*)bufferList > (void*)tail && (void*)bufferList < end);
     
     TPCircularBufferABLBlockHeader *originalBlock = (TPCircularBufferABLBlockHeader*)((char*)bufferList - offsetof(TPCircularBufferABLBlockHeader, bufferList));
-    assert(!((unsigned long)originalBlock & 0xF) /* Beware unaligned accesses */);
     
+    #ifdef DEBUG
+    assert(!((unsigned long)originalBlock & 0xF) /* Beware unaligned accesses */);
+    #endif
     
     TPCircularBufferABLBlockHeader *nextBlock = (TPCircularBufferABLBlockHeader*)((char*)originalBlock + originalBlock->totalLength);
     if ( (void*)nextBlock >= end ) return NULL;
+    
+    #ifdef DEBUG
     assert(!((unsigned long)nextBlock & 0xF) /* Beware unaligned accesses */);
+    #endif
     
     if ( outTimestamp ) {
         memcpy(outTimestamp, &nextBlock->timestamp, sizeof(AudioTimeStamp));
@@ -167,7 +176,10 @@ void TPCircularBufferConsumeNextBufferListPartial(TPCircularBuffer *buffer, int 
     int32_t dontcare;
     TPCircularBufferABLBlockHeader *block = (TPCircularBufferABLBlockHeader*)TPCircularBufferTail(buffer, &dontcare);
     if ( !block ) return;
+    
+    #ifdef DEBUG
     assert(!((unsigned long)block & 0xF)); // Beware unaligned accesses
+    #endif
     
     int bytesToConsume = (int)min(framesToConsume * audioFormat->mBytesPerFrame, block->bufferList.mBuffers[0].mDataByteSize);
     
@@ -235,7 +247,10 @@ UInt32 TPCircularBufferPeekContiguousWrapped(TPCircularBuffer *buffer, AudioTime
     int32_t availableBytes;
     TPCircularBufferABLBlockHeader *block = (TPCircularBufferABLBlockHeader*)TPCircularBufferTail(buffer, &availableBytes);
     if ( !block ) return 0;
+    
+    #ifdef DEBUG
     assert(!((unsigned long)block & 0xF) /* Beware unaligned accesses */);
+    #endif
     
     if ( outTimestamp ) {
         memcpy(outTimestamp, &block->timestamp, sizeof(AudioTimeStamp));
@@ -262,7 +277,10 @@ UInt32 TPCircularBufferPeekContiguousWrapped(TPCircularBuffer *buffer, AudioTime
             }
         }
         
+        #ifdef DEBUG
         assert(!((unsigned long)nextBlock & 0xF) /* Beware unaligned accesses */);
+        #endif
+        
         block = nextBlock;
     }
     
@@ -282,7 +300,10 @@ UInt32 TPCircularBufferGetAvailableSpace(TPCircularBuffer *buffer, const AudioSt
     int32_t availableBytes;
     TPCircularBufferABLBlockHeader *block = (TPCircularBufferABLBlockHeader*)TPCircularBufferHead(buffer, &availableBytes);
     if ( !block ) return 0;
+    
+    #ifdef DEBUG
     assert(!((unsigned long)block & 0xF) /* Beware unaligned accesses */);
+    #endif
     
     // Now find out how much 16-byte aligned audio we can store in the space available
     int numberOfBuffers = audioFormat->mFormatFlags & kAudioFormatFlagIsNonInterleaved ? audioFormat->mChannelsPerFrame : 1;
