@@ -3811,6 +3811,8 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
             [self releaseResourcesForChannel:group->channels[i]];
         }
     }
+
+    AECheckOSStatus([self updateGraph], "Update graph");
     
     free(group);
 }
