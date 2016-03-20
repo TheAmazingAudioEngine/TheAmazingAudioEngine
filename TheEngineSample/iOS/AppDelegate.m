@@ -14,11 +14,16 @@
 
 @synthesize window = _window;
 @synthesize viewController = _viewController;
+@synthesize navController = _navController;
 @synthesize audioController = _audioController;
 
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
+    
+    // Load default defaults
+    [[NSUserDefaults standardUserDefaults] registerDefaults:[NSDictionary dictionaryWithContentsOfFile:[[NSBundle mainBundle] pathForResource:@"Defaults" ofType:@"plist"]]];
+    
     self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
     
     // Create an instance of the audio controller, set it up and start it running
@@ -29,7 +34,11 @@
     
     // Create and display view controller
     self.viewController = [[ViewController alloc] initWithAudioController:_audioController];
-    self.window.rootViewController = self.viewController;
+    
+    self.navController = [[UINavigationController alloc] initWithRootViewController:self.viewController];
+    self.window.rootViewController = self.navController;
+    
+    //self.window.rootViewController = self.viewController;
     [self.window makeKeyAndVisible];
     
     return YES;

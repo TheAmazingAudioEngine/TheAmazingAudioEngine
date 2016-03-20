@@ -15,8 +15,12 @@
 #import "AERecorder.h"
 #import "AEReverbFilter.h"
 #import <QuartzCore/QuartzCore.h>
+#import "RecordingsTVC.h"
+#import "TimecodeFormatter.h"
 
 static const int kInputChannelsChangedContext;
+
+static NSString *initTimecode = nil;
 
 @interface ViewController () {
     AudioFileID _audioUnitFile;
@@ -38,10 +42,25 @@ static const int kInputChannelsChangedContext;
 @property (nonatomic, weak) NSTimer *levelsTimer;
 @property (nonatomic, strong) AERecorder *recorder;
 @property (nonatomic, strong) AEAudioFilePlayer *player;
+@property (nonatomic, strong) UILabel *recordedTimecodeLabel;
 @property (nonatomic, strong) UIButton *recordButton;
+@property (nonatomic, strong) UILabel *playbackTimecodeLabel;
 @property (nonatomic, strong) UIButton *playButton;
 @property (nonatomic, strong) UIButton *oneshotButton;
 @property (nonatomic, strong) UIButton *oneshotAudioUnitButton;
+
+@property (nonatomic, strong) NSUserDefaults *defaults;
+@property (nonatomic, strong) NSString *currentAudioClip;
+@property (nonatomic, strong) NSArray *documentsFolders;
+@property (nonatomic, strong) NSString *recordingPath;
+@property (nonatomic, strong) NSArray *directoryContent;
+@property (nonatomic, strong) TimecodeFormatter *timecodeFormatter;
+@property (nonatomic, strong) NSString *timecode;
+@property (nonatomic, weak) NSTimer *timecodeTimer;
+@property (nonatomic, strong) NSMutableArray *timecodeDurationArray;
+@property (nonatomic) int timerCount;
+@property (nonatomic) int seconds;
+
 @end
 
 @implementation ViewController
@@ -160,13 +179,26 @@ static const int kInputChannelsChangedContext;
 
 -(void)dealloc {
     self.audioController = nil;
-    
-    if ( _levelsTimer ) [_levelsTimer invalidate];    
+    if ( _levelsTimer ) [_levelsTimer invalidate];
 }
 
 -(void)viewDidLoad {
     [super viewDidLoad];
     
+    _timecodeFormatter = [[TimecodeFormatter alloc] init];
+    _timecodeDurationArray = [[NSMutableArray alloc] init];
+    initTimecode = [_timecodeFormatter timeFormatted:0];
+    _timerCount = 0;
+    _seconds = 1;
+    
+    _defaults = [NSUserDefaults standardUserDefaults];
+    
+    _documentsFolders = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(playRecording:) name:@"play_audio_clip" object:nil];
+    
+    _recordingPath = _documentsFolders[0];
+       
     UIView *headerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 100)];
     headerView.backgroundColor = [UIColor groupTableViewBackgroundColor];
     
@@ -196,32 +228,81 @@ static const int kInputChannelsChangedContext;
     self.tableView.tableHeaderView = headerView;
     
     UIView *footerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 80)];
+    
+    self.recordedTimecodeLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, -5, ((footerView.bounds.size.width-50) / 2), 30)];
+    self.recordedTimecodeLabel.textAlignment = NSTextAlignmentCenter;
+    self.recordedTimecodeLabel.text = initTimecode;
+    self.recordedTimecodeLabel.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleRightMargin;
+    
+    self.playbackTimecodeLabel = [[UILabel alloc] initWithFrame:CGRectMake(CGRectGetMaxX(self.recordedTimecodeLabel.frame)+10, -5, ((footerView.bounds.size.width-50) / 2), 30)];
+    self.playbackTimecodeLabel.textAlignment = NSTextAlignmentCenter;
+    self.playbackTimecodeLabel.text = initTimecode;
+    self.playbackTimecodeLabel.enabled = false;
+    self.playbackTimecodeLabel.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleLeftMargin;
+    
     self.recordButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
-    [_recordButton setTitle:@"Record" forState:UIControlStateNormal];
-    [_recordButton setTitle:@"Stop" forState:UIControlStateSelected];
+    self.recordButton.tintColor = [UIColor redColor];
+    [_recordButton setTitle:@"◉ Record" forState:UIControlStateNormal];
+    [_recordButton setTitle:@"◼︎ Stop" forState:UIControlStateSelected];
     [_recordButton addTarget:self action:@selector(record:) forControlEvents:UIControlEventTouchUpInside];
     _recordButton.frame = CGRectMake(20, 10, ((footerView.bounds.size.width-50) / 2), footerView.bounds.size.height - 20);
     _recordButton.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleRightMargin;
+    
     self.playButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
-    [_playButton setTitle:@"Play" forState:UIControlStateNormal];
-    [_playButton setTitle:@"Stop" forState:UIControlStateSelected];
-    [_playButton addTarget:self action:@selector(play:) forControlEvents:UIControlEventTouchUpInside];
+    self.playButton.tintColor = [UIColor colorWithRed:0.0/255.0 green:165.0/255.0 blue:0.0/255.0 alpha:1.0];
+    self.playButton.enabled = false;
+    [_playButton setTitle:@"▶︎ Play" forState:UIControlStateNormal];
+    [_playButton setTitle:@"◼︎ Stop" forState:UIControlStateSelected];
+    [_playButton addTarget:self action:@selector(playRecording:) forControlEvents:UIControlEventTouchUpInside];
     _playButton.frame = CGRectMake(CGRectGetMaxX(_recordButton.frame)+10, 10, ((footerView.bounds.size.width-50) / 2), footerView.bounds.size.height - 20);
     _playButton.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleLeftMargin;
+    
+    [footerView addSubview:_recordedTimecodeLabel];
     [footerView addSubview:_recordButton];
+    [footerView addSubview:_playbackTimecodeLabel];
     [footerView addSubview:_playButton];
     self.tableView.tableFooterView = footerView;
 }
 
 -(void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    
     self.levelsTimer = [NSTimer scheduledTimerWithTimeInterval:0.05 target:self selector:@selector(updateLevels:) userInfo:nil repeats:YES];
+    if (self.navigationController.topViewController == self)
+    {
+        [self.navigationController setNavigationBarHidden:YES animated:animated];
+        [self.navigationController setToolbarHidden:YES animated:animated];
+    }
+    [self listFiles];
+    [self.tableView reloadData];
+    
+    NSArray *timecodeArray = [_defaults objectForKey:@"timecodeDurationArray"];
+    _timecodeDurationArray = [NSMutableArray arrayWithArray:timecodeArray];
+    
+    if (_directoryContent.count > 0) {
+        self.playbackTimecodeLabel.enabled = true;
+        self.playButton.enabled = true;
+    } else {
+        self.playbackTimecodeLabel.enabled = false;
+        self.playButton.enabled = false;
+    }
+    self.recordedTimecodeLabel.text = initTimecode;
+    self.playbackTimecodeLabel.text = initTimecode;
 }
 
 -(void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
     [_levelsTimer invalidate];
     self.levelsTimer = nil;
+    if (self.navigationController.topViewController != self)
+    {
+        [self.navigationController setNavigationBarHidden:NO animated:animated];
+        if ([_directoryContent count] > 0) {
+            self.navigationController.toolbarHidden = NO;
+        } else {
+            self.navigationController.toolbarHidden = YES;
+        }
+    }
 }
 
 -(void)viewDidLayoutSubviews {
@@ -234,7 +315,7 @@ static const int kInputChannelsChangedContext;
 }
 
 -(NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 4;
+    return 5;
 }
 
 -(NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
@@ -251,6 +332,8 @@ static const int kInputChannelsChangedContext;
         case 3:
             return 4 + (_audioController.numberOfInputChannels > 1 ? 1 : 0);
             
+        case 4:
+            return 1;
         default:
             return 0;
     }
@@ -263,7 +346,7 @@ static const int kInputChannelsChangedContext;
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellIdentifier];
     
     if ( !cell ) {
-        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:cellIdentifier];
+        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:cellIdentifier];
     }
     
     cell.accessoryView = nil;
@@ -292,6 +375,7 @@ static const int kInputChannelsChangedContext;
             switch ( indexPath.row ) {
                 case 0: {
                     cell.textLabel.text = @"Drums";
+                    cell.detailTextLabel.text = @"";
                     onSwitch.on = !_loop1.channelIsMuted;
                     slider.value = _loop1.volume;
                     [onSwitch addTarget:self action:@selector(loop1SwitchChanged:) forControlEvents:UIControlEventValueChanged];
@@ -300,6 +384,7 @@ static const int kInputChannelsChangedContext;
                 }
                 case 1: {
                     cell.textLabel.text = @"Organ";
+                    cell.detailTextLabel.text = @"";
                     onSwitch.on = !_loop2.channelIsMuted;
                     slider.value = _loop2.volume;
                     [onSwitch addTarget:self action:@selector(loop2SwitchChanged:) forControlEvents:UIControlEventValueChanged];
@@ -308,6 +393,7 @@ static const int kInputChannelsChangedContext;
                 }
                 case 2: {
                     cell.textLabel.text = @"Oscillator";
+                    cell.detailTextLabel.text = @"";
                     onSwitch.on = !_oscillator.channelIsMuted;
                     slider.value = _oscillator.volume;
                     [onSwitch addTarget:self action:@selector(oscillatorSwitchChanged:) forControlEvents:UIControlEventValueChanged];
@@ -316,6 +402,7 @@ static const int kInputChannelsChangedContext;
                 }
                 case 3: {
                     cell.textLabel.text = @"Group";
+                    cell.detailTextLabel.text = @"";
                     onSwitch.on = ![_audioController channelGroupIsMuted:_group];
                     slider.value = [_audioController volumeForChannelGroup:_group];
                     [onSwitch addTarget:self action:@selector(channelGroupSwitchChanged:) forControlEvents:UIControlEventValueChanged];
@@ -324,7 +411,7 @@ static const int kInputChannelsChangedContext;
                 }
             }
             break;
-        } 
+        }
         case 1: {
             switch ( indexPath.row ) {
                 case 0: {
@@ -335,6 +422,7 @@ static const int kInputChannelsChangedContext;
                     [_oneshotButton setSelected:_oneshot != nil];
                     [_oneshotButton addTarget:self action:@selector(oneshotPlayButtonPressed:) forControlEvents:UIControlEventTouchUpInside];
                     cell.textLabel.text = @"One Shot";
+                    cell.detailTextLabel.text = @"";
                     break;
                 }
                 case 1: {
@@ -345,6 +433,7 @@ static const int kInputChannelsChangedContext;
                     [_oneshotAudioUnitButton setSelected:_oneshot != nil];
                     [_oneshotAudioUnitButton addTarget:self action:@selector(oneshotAudioUnitPlayButtonPressed:) forControlEvents:UIControlEventTouchUpInside];
                     cell.textLabel.text = @"One Shot (Audio Unit)";
+                    cell.detailTextLabel.text = @"";
                     break;
                 }
             }
@@ -356,12 +445,14 @@ static const int kInputChannelsChangedContext;
             switch ( indexPath.row ) {
                 case 0: {
                     cell.textLabel.text = @"Limiter";
+                    cell.detailTextLabel.text = @"";
                     ((UISwitch*)cell.accessoryView).on = _limiter != nil;
                     [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(limiterSwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
                 }
                 case 1: {
                     cell.textLabel.text = @"Expander";
+                    cell.detailTextLabel.text = @"";
                     UIView *view = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 250, 40)];
                     UIButton *calibrateButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
                     calibrateButton.translatesAutoresizingMaskIntoConstraints = NO;
@@ -381,6 +472,7 @@ static const int kInputChannelsChangedContext;
                 }
                 case 2: {
                     cell.textLabel.text = @"Reverb";
+                    cell.detailTextLabel.text = @"";
                     ((UISwitch*)cell.accessoryView).on = _reverb != nil;
                     [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(reverbSwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
@@ -394,18 +486,21 @@ static const int kInputChannelsChangedContext;
             switch ( indexPath.row ) {
                 case 0: {
                     cell.textLabel.text = @"Input Playthrough";
+                    cell.detailTextLabel.text = @"";
                     ((UISwitch*)cell.accessoryView).on = _playthrough != nil;
                     [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(playthroughSwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
                 }
                 case 1: {
                     cell.textLabel.text = @"Measurement Mode";
+                    cell.detailTextLabel.text = @"";
                     ((UISwitch*)cell.accessoryView).on = _audioController.useMeasurementMode;
                     [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(measurementModeSwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
                 }
                 case 2: {
                     cell.textLabel.text = @"Input Gain";
+                    cell.detailTextLabel.text = @"";
                     UISlider *inputGainSlider = [[UISlider alloc] initWithFrame:CGRectMake(0, 0, 100, 40)];
                     inputGainSlider.minimumValue = 0.0;
                     inputGainSlider.maximumValue = 1.0;
@@ -416,21 +511,23 @@ static const int kInputChannelsChangedContext;
                 }
                 case 3: {
                     cell.textLabel.text = @"Use 48K Audio";
+                    cell.detailTextLabel.text = @"";
                     ((UISwitch*)cell.accessoryView).on = fabs(_audioController.audioDescription.mSampleRate - 48000) < 1.0;
                     [((UISwitch*)cell.accessoryView) addTarget:self action:@selector(sampleRateSwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
                 }
                 case 4: {
                     cell.textLabel.text = @"Channels";
+                    cell.detailTextLabel.text = @"";
                     
                     int channelCount = _audioController.numberOfInputChannels;
                     CGSize buttonSize = CGSizeMake(30, 30);
-
+                    
                     UIScrollView *channelStrip = [[UIScrollView alloc] initWithFrame:CGRectMake(0,
-                                                                                                 0,
-                                                                                                 MIN(channelCount * (buttonSize.width+5) + 5,
-                                                                                                     isiPad ? 400 : 200),
-                                                                                                 cell.bounds.size.height)];
+                                                                                                0,
+                                                                                                MIN(channelCount * (buttonSize.width+5) + 5,
+                                                                                                    isiPad ? 400 : 200),
+                                                                                                cell.bounds.size.height)];
                     channelStrip.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth;
                     channelStrip.backgroundColor = [UIColor clearColor];
                     
@@ -453,10 +550,54 @@ static const int kInputChannelsChangedContext;
             }
             break;
         }
-            
+        case 4: {
+            if (_recorder) {
+                cell.selectionStyle = UITableViewCellSelectionStyleNone;
+            } else {
+                cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+            }
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+            cell.textLabel.text = @"Recordings";
+            cell.detailTextLabel.text = [NSString stringWithFormat:@"%lu",(unsigned long)_directoryContent.count];
+            break;
+        }
+        break;
     }
     
     return cell;
+}
+
+- (void)setMasterVolumeToZero:(NSNotification *)notification {
+    self.audioController.masterOutputVolume = 0;
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    
+    switch ( indexPath.section ) {            
+        case 4: {
+            switch (indexPath.row) {
+                case 0:
+                    if (!_recorder) {
+                        [self openRecordingsList];
+                    }
+                    break;
+                default:
+                    break;
+            }
+            break;
+        }
+    }
+}
+
+- (void)doneAction:(id)sender
+{
+    [self dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void) openRecordingsList {
+    RecordingsTVC *recordingsTVC = [[RecordingsTVC alloc] initWithNibName:@"RecordingsTVC" bundle:nil];
+    [self.navigationController pushViewController:recordingsTVC animated:YES];
+    recordingsTVC = nil;
 }
 
 - (void)loop1SwitchChanged:(UISwitch*)sender {
@@ -518,46 +659,46 @@ static const int kInputChannelsChangedContext;
     
     // Set the file to play
     AECheckOSStatus(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFileIDs, kAudioUnitScope_Global, 0, &_audioUnitFile, sizeof(_audioUnitFile)),
-                "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileIDs)");
-
+                    "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileIDs)");
+    
     // Determine file properties
     UInt64 packetCount;
-	UInt32 size = sizeof(packetCount);
-	AECheckOSStatus(AudioFileGetProperty(_audioUnitFile, kAudioFilePropertyAudioDataPacketCount, &size, &packetCount),
-                "AudioFileGetProperty(kAudioFilePropertyAudioDataPacketCount)");
-	
-	AudioStreamBasicDescription dataFormat;
-	size = sizeof(dataFormat);
-	AECheckOSStatus(AudioFileGetProperty(_audioUnitFile, kAudioFilePropertyDataFormat, &size, &dataFormat),
-                "AudioFileGetProperty(kAudioFilePropertyDataFormat)");
+    UInt32 size = sizeof(packetCount);
+    AECheckOSStatus(AudioFileGetProperty(_audioUnitFile, kAudioFilePropertyAudioDataPacketCount, &size, &packetCount),
+                    "AudioFileGetProperty(kAudioFilePropertyAudioDataPacketCount)");
     
-	// Assign the region to play
-	ScheduledAudioFileRegion region;
-	memset (&region.mTimeStamp, 0, sizeof(region.mTimeStamp));
-	region.mTimeStamp.mFlags = kAudioTimeStampSampleTimeValid;
-	region.mTimeStamp.mSampleTime = 0;
-	region.mCompletionProc = NULL;
-	region.mCompletionProcUserData = NULL;
-	region.mAudioFile = _audioUnitFile;
-	region.mLoopCount = 0;
-	region.mStartFrame = 0;
-	region.mFramesToPlay = (UInt32)packetCount * dataFormat.mFramesPerPacket;
-	AECheckOSStatus(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFileRegion, kAudioUnitScope_Global, 0, &region, sizeof(region)),
-                "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileRegion)");
-	
-	// Prime the player by reading some frames from disk
-	UInt32 defaultNumberOfFrames = 0;
-	AECheckOSStatus(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFilePrime, kAudioUnitScope_Global, 0, &defaultNumberOfFrames, sizeof(defaultNumberOfFrames)),
-                "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFilePrime)");
+    AudioStreamBasicDescription dataFormat;
+    size = sizeof(dataFormat);
+    AECheckOSStatus(AudioFileGetProperty(_audioUnitFile, kAudioFilePropertyDataFormat, &size, &dataFormat),
+                    "AudioFileGetProperty(kAudioFilePropertyDataFormat)");
+    
+    // Assign the region to play
+    ScheduledAudioFileRegion region;
+    memset (&region.mTimeStamp, 0, sizeof(region.mTimeStamp));
+    region.mTimeStamp.mFlags = kAudioTimeStampSampleTimeValid;
+    region.mTimeStamp.mSampleTime = 0;
+    region.mCompletionProc = NULL;
+    region.mCompletionProcUserData = NULL;
+    region.mAudioFile = _audioUnitFile;
+    region.mLoopCount = 0;
+    region.mStartFrame = 0;
+    region.mFramesToPlay = (UInt32)packetCount * dataFormat.mFramesPerPacket;
+    AECheckOSStatus(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFileRegion, kAudioUnitScope_Global, 0, &region, sizeof(region)),
+                    "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFileRegion)");
+    
+    // Prime the player by reading some frames from disk
+    UInt32 defaultNumberOfFrames = 0;
+    AECheckOSStatus(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduledFilePrime, kAudioUnitScope_Global, 0, &defaultNumberOfFrames, sizeof(defaultNumberOfFrames)),
+                    "AudioUnitSetProperty(kAudioUnitProperty_ScheduledFilePrime)");
     
     // Set the start time (now = -1)
     AudioTimeStamp startTime;
-	memset (&startTime, 0, sizeof(startTime));
-	startTime.mFlags = kAudioTimeStampSampleTimeValid;
-	startTime.mSampleTime = -1;
-	AECheckOSStatus(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduleStartTimeStamp, kAudioUnitScope_Global, 0, &startTime, sizeof(startTime)),
-			   "AudioUnitSetProperty(kAudioUnitProperty_ScheduleStartTimeStamp)");
-
+    memset (&startTime, 0, sizeof(startTime));
+    startTime.mFlags = kAudioTimeStampSampleTimeValid;
+    startTime.mSampleTime = -1;
+    AECheckOSStatus(AudioUnitSetProperty(_audioUnitPlayer.audioUnit, kAudioUnitProperty_ScheduleStartTimeStamp, kAudioUnitScope_Global, 0, &startTime, sizeof(startTime)),
+                    "AudioUnitSetProperty(kAudioUnitProperty_ScheduleStartTimeStamp)");
+    
 }
 
 - (void)playthroughSwitchChanged:(UISwitch*)sender {
@@ -658,17 +799,56 @@ static const int kInputChannelsChangedContext;
         [_audioController removeInputReceiver:_recorder];
         self.recorder = nil;
         _recordButton.selected = NO;
+
+        _currentAudioClip = [_defaults objectForKey:@"currentAudioClip"];
+        [self stopTimer];
+
+        NSString *audioDuration = _timecode;
+        
+        // Add timecode duration to the array.
+        [_timecodeDurationArray addObject:audioDuration];
+        
+        // Add this timecodeDurationArray to NSUserDefaults for data persistence.
+        [_defaults setObject:_timecodeDurationArray forKey:@"timecodeDurationArray"];
+        
+        if ( _player ) {
+            [_audioController removeChannels:@[_player]];
+            self.player = nil;
+        }
+        self.playbackTimecodeLabel.enabled = true;
+        self.playButton.enabled = true;
+        
+        [self listFiles];
+        [self.tableView reloadData];
+
     } else {
+        self.recordedTimecodeLabel.text = initTimecode;
+        self.playbackTimecodeLabel.enabled = false;
+        self.playButton.enabled = false;
+        self.playbackTimecodeLabel.text = initTimecode;
+        
         self.recorder = [[AERecorder alloc] initWithAudioController:_audioController];
+        
+        
+        NSDate *date = [NSDate date];
+        NSDateFormatter *timeFormatter = [[NSDateFormatter alloc] init];
+        [timeFormatter setDateFormat:@"H:mm:ss"];
+        NSString *formattedTime = [timeFormatter stringFromDate:date];
+         _currentAudioClip = [NSString stringWithFormat:@"Recorded Audio %@.m4a", formattedTime];
+        
+        [_defaults setObject:_currentAudioClip forKey:@"currentAudioClip"];
+        [self startTimer];
+        
         NSArray *documentsFolders = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-        NSString *path = [documentsFolders[0] stringByAppendingPathComponent:@"Recording.m4a"];
+        NSString *path = [documentsFolders[0] stringByAppendingPathComponent:_currentAudioClip];
+        
         NSError *error = nil;
         if ( ![_recorder beginRecordingToFileAtPath:path fileType:kAudioFileM4AType error:&error] ) {
-            [[[UIAlertView alloc] initWithTitle:@"Error" 
-                                         message:[NSString stringWithFormat:@"Couldn't start recording: %@", [error localizedDescription]]
-                                        delegate:nil
-                               cancelButtonTitle:nil
-                               otherButtonTitles:@"OK", nil] show];
+            [[[UIAlertView alloc] initWithTitle:@"Error"
+                                        message:[NSString stringWithFormat:@"Couldn't start recording: %@", [error localizedDescription]]
+                                       delegate:nil
+                              cancelButtonTitle:nil
+                              otherButtonTitles:@"OK", nil] show];
             self.recorder = nil;
             return;
         }
@@ -678,29 +858,75 @@ static const int kInputChannelsChangedContext;
         [_audioController addOutputReceiver:_recorder];
         [_audioController addInputReceiver:_recorder];
     }
+    [self.tableView reloadData];
 }
 
-- (void)play:(id)sender {
+-(void) checkIfFileExists {
+    
+    _directoryContent = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:_recordingPath error:NULL];
+    
+    NSString *newAudioClipName = [NSString stringWithFormat:@"New Recording %lu.m4a", _directoryContent.count+1];
+    
+    NSPredicate* predicate = [NSPredicate predicateWithFormat:@"SELF CONTAINS %@",newAudioClipName];
+    
+    if ([predicate evaluateWithObject:_directoryContent])
+    {
+        _currentAudioClip = [NSString stringWithFormat:@"New Recording %lu.m4a", _directoryContent.count+2];
+        
+    } else {
+        _currentAudioClip = [NSString stringWithFormat:@"New Recording %lu.m4a", _directoryContent.count+1];
+    }
+}
+
+- (void)playRecording:(id)sender {
+    __weak ViewController *weakSelf = self;
     if ( _player ) {
         [_audioController removeChannels:@[_player]];
         self.player = nil;
         _playButton.selected = NO;
+        [self stopTimer];
+        
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"deselect_table_row" object:weakSelf];
     } else {
+        
+        _currentAudioClip = [_defaults objectForKey:@"currentAudioClip"];
+        
         NSArray *documentsFolders = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-        NSString *path = [documentsFolders[0] stringByAppendingPathComponent:@"Recording.m4a"];
+        NSString *path = [documentsFolders[0] stringByAppendingPathComponent:_currentAudioClip];
         
         if ( ![[NSFileManager defaultManager] fileExistsAtPath:path] ) return;
         
         NSError *error = nil;
         self.player = [AEAudioFilePlayer audioFilePlayerWithURL:[NSURL fileURLWithPath:path] error:&error];
         
-        if ( !_player ) {
-            [[[UIAlertView alloc] initWithTitle:@"Error" 
-                                         message:[NSString stringWithFormat:@"Couldn't start playback: %@", [error localizedDescription]]
-                                        delegate:nil
-                               cancelButtonTitle:nil
-                               otherButtonTitles:@"OK", nil] show];
-            return;
+        if (!_player) {
+            
+            UIAlertController *alertController = [UIAlertController
+                                                  alertControllerWithTitle:@"Error"
+                                                  message:[NSString stringWithFormat:@"Couldn't start playback: %@", [error localizedDescription]]
+                                                  preferredStyle:UIAlertControllerStyleAlert];
+            
+            UIAlertAction *okAction = [UIAlertAction
+                                       actionWithTitle:NSLocalizedString(@"OK", @"Okay action")
+                                       style:UIAlertActionStyleDefault
+                                       handler:^(UIAlertAction *action)
+                                       {
+
+                                       }];
+            
+            UIAlertAction *cancelAction = [UIAlertAction
+                                           actionWithTitle:NSLocalizedString(@"Cancel", @"Cancel action")
+                                           style:UIAlertActionStyleCancel
+                                           handler:^(UIAlertAction *action)
+                                           {
+
+                                           }];
+            
+            [alertController addAction:okAction];
+            [alertController addAction:cancelAction];
+            
+            [self presentViewController:alertController animated:YES completion:nil];
+            
         }
         
         _player.removeUponFinish = YES;
@@ -709,9 +935,12 @@ static const int kInputChannelsChangedContext;
             ViewController *strongSelf = weakSelf;
             strongSelf->_playButton.selected = NO;
             weakSelf.player = nil;
+            [weakSelf stopTimer];
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"deselect_table_row" object:weakSelf];
         };
         [_audioController addChannels:@[_player]];
-        
+        self.playbackTimecodeLabel.text = initTimecode;
+        [self startTimer];
         _playButton.selected = YES;
     }
 }
@@ -737,7 +966,7 @@ static inline float translate(float val, float min, float max) {
                                         10);
     
     _outputLevelLayer.frame = CGRectMake(headerView.bounds.size.width/2.0,
-                                         _outputLevelLayer.frame.origin.y, 
+                                         _outputLevelLayer.frame.origin.y,
                                          translate(outputAvg, -20, 0) * (headerView.bounds.size.width/2.0 - 15.0),
                                          10);
     
@@ -747,6 +976,38 @@ static inline float translate(float val, float min, float max) {
 -(void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
     if ( context == &kInputChannelsChangedContext ) {
         [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:3] withRowAnimation:UITableViewRowAnimationFade];
+    }
+}
+
+-(void) listFiles {
+    _directoryContent = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:_recordingPath error:NULL];
+}
+
+- (void) onTick:(id)sender {
+    _timecode = [_timecodeFormatter timeFormatted:_seconds++];
+    if (_recorder) {
+        self.recordedTimecodeLabel.text = _timecode;
+    }
+    if (_player && !_recorder) {
+        self.playbackTimecodeLabel.text = [NSString stringWithFormat:@"%@", _timecode];
+    }
+}
+
+- (void) startTimer {
+    if (!_timecodeTimer) {
+        _timecodeTimer = [NSTimer scheduledTimerWithTimeInterval: 1.0f
+                                                          target: self
+                                                        selector: @selector(onTick:)
+                                                        userInfo: nil
+                                                         repeats: YES];
+    }
+}
+
+- (void) stopTimer {
+    if (_timecodeTimer) {
+        [_timecodeTimer invalidate];
+        _timecodeTimer = nil;
+        _seconds = 1;
     }
 }
 
