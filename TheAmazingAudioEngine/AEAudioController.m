@@ -124,14 +124,18 @@ typedef struct __callback_table_t {
 /*!
  * Mulichannel input callback table
  */
-typedef struct __input_callback_table_t {
+typedef struct {
     callback_table_t    callbacks;
     void               *channelMap;
     AudioStreamBasicDescription audioDescription;
     AudioBufferList    *audioBufferList;
     AudioConverterRef   audioConverter;
-} input_callback_table_t;
+} input_entry_t;
 
+typedef struct {
+    int count;
+    input_entry_t * entries;
+} input_table_t;
 
 /*!
  * Audio level monitoring data
@@ -229,8 +233,7 @@ typedef struct _channel_group_t {
     
     callback_table_t    _timingCallbacks;
     
-    input_callback_table_t *_inputCallbacks;
-    int                 _inputCallbackCount;
+    input_table_t      *_inputTable;
     AudioStreamBasicDescription _rawInputAudioDescription;
     AudioBufferList    *_inputAudioBufferList;
 #if TARGET_OS_IPHONE
@@ -437,7 +440,7 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
 
 typedef struct __input_producer_arg_t {
     void *THIS;
-    input_callback_table_t *table;
+    input_entry_t *table;
     AudioTimeStamp inTimeStamp;
     AudioUnitRenderActionFlags *ioActionFlags;
     int nextFilterIndex;
@@ -673,31 +676,32 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
     }
     
     if ( result == noErr ) {
-        for ( int tableIndex = 0; tableIndex < THIS->_inputCallbackCount; tableIndex++ ) {
-            input_callback_table_t *table = &THIS->_inputCallbacks[tableIndex];
-            
-            if ( !table->audioBufferList || table->callbacks.count == 0 ) continue;
+        input_table_t *table = THIS->_inputTable;
+        for ( int tableIndex = 0; tableIndex < table->count; tableIndex++ ) {
+            input_entry_t *entry = &table->entries[tableIndex];
+            AudioBufferList * audioBufferList = entry->audioBufferList;
+            if ( !audioBufferList || entry->callbacks.count == 0 ) continue;
             
             input_producer_arg_t arg = {
                 .THIS = (__bridge void*)THIS,
-                .table = table,
+                .table = entry,
                 .inTimeStamp = timestamp,
                 .ioActionFlags = 0,
                 .nextFilterIndex = 0
             };
             
-            for ( int i=0; i<table->audioBufferList->mNumberBuffers; i++ ) {
-                table->audioBufferList->mBuffers[i].mDataByteSize = inNumberFrames * table->audioDescription.mBytesPerFrame;
+            for ( int i=0; i<audioBufferList->mNumberBuffers; i++ ) {
+                audioBufferList->mBuffers[i].mDataByteSize = inNumberFrames * entry->audioDescription.mBytesPerFrame;
             }
             
-            result = inputAudioProducer((void*)&arg, table->audioBufferList, &inNumberFrames);
+            result = inputAudioProducer((void*)&arg, audioBufferList, &inNumberFrames);
             
             // Pass audio to callbacks
-            for ( int i=0; i<table->callbacks.count; i++ ) {
-                callback_t *callback = &table->callbacks.callbacks[i];
+            for ( int i=0; i<entry->callbacks.count; i++ ) {
+                callback_t *callback = &entry->callbacks.callbacks[i];
                 if ( !(callback->flags & kReceiverFlag) ) continue;
                 
-                ((AEAudioReceiverCallback)callback->callback)((__bridge id)callback->userInfo, THIS, AEAudioSourceInput, &timestamp, inNumberFrames, table->audioBufferList);
+                ((AEAudioReceiverCallback)callback->callback)((__bridge id)callback->userInfo, THIS, AEAudioSourceInput, &timestamp, inNumberFrames, audioBufferList);
             }
         }
         
@@ -859,8 +863,9 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     _useHardwareSampleRate = options & AEAudioControllerOptionUseHardwareSampleRate;
     _inputMode = AEInputModeFixedAudioFormat;
     _voiceProcessingOnlyForSpeakerAndMicrophone = YES;
-    _inputCallbacks = (input_callback_table_t*)calloc(sizeof(input_callback_table_t), 1);
-    _inputCallbackCount = 1;
+    _inputTable = (input_table_t *)calloc(sizeof(input_table_t), 1);
+    _inputTable->count = 1;
+    _inputTable->entries = (input_entry_t*)calloc(sizeof(input_entry_t), 1);
     
 #if TARGET_OS_IPHONE
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationWillEnterForeground:) name:UIApplicationWillEnterForegroundNotification object:nil];
@@ -1010,12 +1015,13 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     }
 #endif
     
-    for ( int i=0; i<_inputCallbackCount; i++ ) {
-        if ( _inputCallbacks[i].channelMap ) {
-            CFBridgingRelease(_inputCallbacks[i].channelMap);
+    for ( int i=0; i<_inputTable->count; i++ ) {
+        if ( _inputTable->entries[i].channelMap ) {
+            CFBridgingRelease(_inputTable->entries[i].channelMap);
         }
     }
-    free(_inputCallbacks);
+    free(_inputTable->entries);
+    free(_inputTable);
     
     if ( _audiobusMonitorBuffer ) AEAudioBufferListFree(_audiobusMonitorBuffer);
 }
@@ -1514,19 +1520,28 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 
 - (void)removeInputFilter:(id<AEAudioFilter>)filter {
     void *callback = filter.filterCallback;
-    __block BOOL found = NO;
-    [self performAsynchronousMessageExchangeWithBlock:^{
-        for ( int i=0; i<_inputCallbackCount; i++ ) {
-            removeCallbackFromTable(self, &_inputCallbacks[i].callbacks, callback, (__bridge void *)filter, &found);
-        }
-    } responseBlock:^{
-        if ( found ) {
+    
+    input_table_t * newTable = [self duplicateInputTable:_inputTable];
+    BOOL found = NO;
+    for ( int i=0; i<newTable->count; i++ ) {
+        removeCallbackFromTable(self, &newTable->entries[i].callbacks, callback, (__bridge void *)filter, &found);
+    }
+    
+    if ( found ) {
+        input_table_t * oldTable = _inputTable;
+        _inputTable = newTable;
+        [self performAsynchronousMessageExchangeWithBlock:^{} responseBlock:^{
+            free(oldTable->entries);
+            free(oldTable);
             if ( [filter respondsToSelector:@selector(teardown)] ) {
                 [filter teardown];
             }
             CFBridgingRelease((__bridge CFTypeRef)filter);
-        }
-    }];
+        }];
+    } else {
+        free(newTable->entries);
+        free(newTable);
+    }
 }
 
 - (NSArray*)filters {
@@ -1543,8 +1558,8 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 
 -(NSArray *)inputFilters {
     NSMutableArray *result = [NSMutableArray array];
-    for ( int i=0; i<_inputCallbackCount; i++ ) {
-        [result addObjectsFromArray:[self associatedObjectsFromTable:&_inputCallbacks[i].callbacks matchingFlag:kFilterFlag]];
+    for ( int i=0; i<_inputTable->count; i++ ) {
+        [result addObjectsFromArray:[self associatedObjectsFromTable:&_inputTable->entries[i].callbacks matchingFlag:kFilterFlag]];
     }
     return result;
 }
@@ -1643,52 +1658,72 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
 
 - (void)removeInputReceiver:(id<AEAudioReceiver>)receiver {
     void *callback = receiver.receiverCallback;
-    __block int instanceCount = 0;
-    [self performAsynchronousMessageExchangeWithBlock:^{
-        for ( int i=0; i<_inputCallbackCount; i++ ) {
-            BOOL found = NO;
-            removeCallbackFromTable(self, &_inputCallbacks[i].callbacks, callback, (__bridge void *)receiver, &found);
-            if ( found ) instanceCount++;
-        }
-    } responseBlock:^{
- 	    if ( instanceCount > 0 && [receiver respondsToSelector:@selector(teardown)] ) {
-  	       [receiver teardown];
-  	    }
     
-   		for ( int i=0; i<instanceCount; i++ ) {
-            CFBridgingRelease((__bridge CFTypeRef)receiver);
-        }
-    }];
+    input_table_t * newTable = [self duplicateInputTable:_inputTable];
+    int instanceCount = 0;
+    for ( int i=0; i<newTable->count; i++ ) {
+        BOOL found = NO;
+        removeCallbackFromTable(self, &newTable->entries[i].callbacks, callback, (__bridge void *)receiver, &found);
+        if ( found ) instanceCount++;
+    }
+    
+    if ( instanceCount > 0 ) {
+        input_table_t * oldTable = _inputTable;
+        _inputTable = newTable;
+        [self performAsynchronousMessageExchangeWithBlock:^{} responseBlock:^{
+            free(oldTable->entries);
+            free(oldTable);
+            if ( [receiver respondsToSelector:@selector(teardown)] ) {
+                [receiver teardown];
+            }
+            for ( int i=0; i<instanceCount; i++ ) {
+                CFBridgingRelease((__bridge CFTypeRef)receiver);
+            }
+        }];
+    } else {
+        free(newTable->entries);
+        free(newTable);
+    }
 }
 
 - (void)removeInputReceiver:(id<AEAudioReceiver>)receiver fromChannels:(NSArray *)channels {
     void *callback = receiver.receiverCallback;
-    __block int instanceCount = 0;
-    [self performAsynchronousMessageExchangeWithBlock:^{
-        for ( int i=0; i<_inputCallbackCount; i++ ) {
-            // Compare channel maps to find a matching entry
-            if ( (_inputCallbacks[i].channelMap && [(__bridge NSArray*)_inputCallbacks[i].channelMap isEqualToArray:channels]) ||
-                (i == 0 && !_inputCallbacks[i].channelMap && [self.inputChannelSelection isEqualToArray:channels]) ) {
-                
-                BOOL found = NO;
-                removeCallbackFromTable(self, &_inputCallbacks[i].callbacks, callback, (__bridge void *)receiver, &found);
-                if ( found ) instanceCount++;
+    
+    input_table_t * newTable = [self duplicateInputTable:_inputTable];
+    int instanceCount = 0;
+    for ( int i=0; i<newTable->count; i++ ) {
+        // Compare channel maps to find a matching entry
+        if ( (newTable->entries[i].channelMap && [(__bridge NSArray*)newTable->entries[i].channelMap isEqualToArray:channels]) ||
+                (i == 0 && !newTable->entries[i].channelMap && [self.inputChannelSelection isEqualToArray:channels]) ) {
+            BOOL found = NO;
+            removeCallbackFromTable(self, &newTable->entries[i].callbacks, callback, (__bridge void *)receiver, &found);
+            if ( found ) instanceCount++;
+        }
+    }
+    
+    if ( instanceCount > 0 ) {
+        input_table_t * oldTable = _inputTable;
+        _inputTable = newTable;
+        [self performAsynchronousMessageExchangeWithBlock:^{} responseBlock:^{
+            free(oldTable->entries);
+            free(oldTable);
+            if ( [receiver respondsToSelector:@selector(teardown)] ) {
+                [receiver teardown];
             }
-        }
-    } responseBlock:^{
-        if ( instanceCount > 0 && [receiver respondsToSelector:@selector(teardown)] ) {
-            [receiver teardown];
-        }
-        for ( int i=0; i<instanceCount; i++ ) {
-            CFBridgingRelease((__bridge CFTypeRef)receiver);
-        }
-    }];
+            for ( int i=0; i<instanceCount; i++ ) {
+                CFBridgingRelease((__bridge CFTypeRef)receiver);
+            }
+        }];
+    } else {
+        free(newTable->entries);
+        free(newTable);
+    }
 }
 
 -(NSArray *)inputReceivers {
     NSMutableArray *result = [NSMutableArray array];
-    for ( int i=0; i<_inputCallbackCount; i++ ) {
-        [result addObjectsFromArray:[self associatedObjectsFromTable:&_inputCallbacks[i].callbacks matchingFlag:kReceiverFlag]];
+    for ( int i=0; i<_inputTable->count; i++ ) {
+        [result addObjectsFromArray:[self associatedObjectsFromTable:&_inputTable->entries[i].callbacks matchingFlag:kReceiverFlag]];
     }
     return result;
 }
@@ -1877,7 +1912,7 @@ AudioStreamBasicDescription *AEAudioControllerAudioDescription(__unsafe_unretain
 }
 
 AudioStreamBasicDescription *AEAudioControllerInputAudioDescription(__unsafe_unretained AEAudioController *THIS) {
-    return &THIS->_inputCallbacks[0].audioDescription;
+    return &THIS->_inputTable->entries[0].audioDescription;
 }
 
 long AEConvertSecondsToFrames(__unsafe_unretained AEAudioController *THIS, NSTimeInterval seconds) {
@@ -2008,7 +2043,7 @@ BOOL AECurrentThreadIsAudioThread(void) {
 }
 
 -(AudioStreamBasicDescription)inputAudioDescription {
-    return _inputCallbacks[0].audioDescription;
+    return _inputTable->entries[0].audioDescription;
 }
 
 #if TARGET_OS_IPHONE
@@ -2028,19 +2063,19 @@ BOOL AECurrentThreadIsAudioThread(void) {
 }
 
 -(NSArray *)inputChannelSelection {
-    if ( _inputCallbacks[0].channelMap ) return (__bridge NSArray *)_inputCallbacks[0].channelMap;
+    if ( _inputTable->entries[0].channelMap ) return (__bridge NSArray *)_inputTable->entries[0].channelMap;
     NSMutableArray *selection = [NSMutableArray array];
-    for ( int i=0; i<MIN(_numberOfInputChannels, _inputCallbacks[0].audioDescription.mChannelsPerFrame); i++ ) {
+    for ( int i=0; i<MIN(_numberOfInputChannels, _inputTable->entries[0].audioDescription.mChannelsPerFrame); i++ ) {
         [selection addObject:@(i)];
     }
     return selection;
 }
 
 -(void)setInputChannelSelection:(NSArray *)inputChannelSelection {
-    if ( (!inputChannelSelection && !_inputCallbacks[0].channelMap) || [inputChannelSelection isEqualToArray:(__bridge NSArray *)_inputCallbacks[0].channelMap] ) return;
+    if ( (!inputChannelSelection && !_inputTable->entries[0].channelMap) || [inputChannelSelection isEqualToArray:(__bridge NSArray *)_inputTable->entries[0].channelMap] ) return;
     
-    CFBridgingRelease(_inputCallbacks[0].channelMap);
-    _inputCallbacks[0].channelMap = (__bridge_retained void*)inputChannelSelection;
+    CFBridgingRelease(_inputTable->entries[0].channelMap);
+    _inputTable->entries[0].channelMap = (__bridge_retained void*)inputChannelSelection;
     
     if ( _inputEnabled ) {
         [self updateInputDeviceStatus];
@@ -2900,15 +2935,15 @@ static void audioUnitStreamFormatChanged(void *inRefCon, AudioUnit inUnit, Audio
 
 - (void)teardown {
     
-    for ( int i=0; i<_inputCallbackCount; i++ ) {
-        if ( _inputCallbacks[i].audioConverter ) {
-            AudioConverterDispose(_inputCallbacks[i].audioConverter);
-            _inputCallbacks[i].audioConverter = NULL;
+    for ( int i=0; i<_inputTable->count; i++ ) {
+        if ( _inputTable->entries[i].audioConverter ) {
+            AudioConverterDispose(_inputTable->entries[i].audioConverter);
+            _inputTable->entries[i].audioConverter = NULL;
         }
         
-        if ( _inputCallbacks[i].audioBufferList ) {
-            AEAudioBufferListFree(_inputCallbacks[i].audioBufferList);
-            _inputCallbacks[i].audioBufferList = NULL;
+        if ( _inputTable->entries[i].audioBufferList ) {
+            AEAudioBufferListFree(_inputTable->entries[i].audioBufferList);
+            _inputTable->entries[i].audioBufferList = NULL;
         }
     }
     
@@ -3072,17 +3107,17 @@ static void audioUnitStreamFormatChanged(void *inRefCon, AudioUnit inUnit, Audio
         AEAudioStreamBasicDescriptionSetChannelsPerFrame(&rawAudioDescription, numberOfInputChannels);
         
         // Configure input tables
-        for ( int entryIndex = 0; entryIndex < _inputCallbackCount; entryIndex++ ) {
-            const input_callback_table_t *entry = &_inputCallbacks[entryIndex];
+        for ( int entryIndex = 0; entryIndex < _inputTable->count; entryIndex++ ) {
+            const input_entry_t *entry = &_inputTable->entries[entryIndex];
             
             AudioStreamBasicDescription audioDescription = _audioDescription;
             
             if ( _inputMode == AEInputModeVariableAudioFormat ) {
                 audioDescription = rawAudioDescription;
                 
-                if ( [(__bridge NSArray*)_inputCallbacks[entryIndex].channelMap count] > 0 ) {
+                if ( [(__bridge NSArray*)_inputTable->entries[entryIndex].channelMap count] > 0 ) {
                     // Set the target input audio description channels to the number of selected channels
-                    AEAudioStreamBasicDescriptionSetChannelsPerFrame(&audioDescription, (int)[(__bridge NSArray*)_inputCallbacks[entryIndex].channelMap count]);
+                    AEAudioStreamBasicDescriptionSetChannelsPerFrame(&audioDescription, (int)[(__bridge NSArray*)_inputTable->entries[entryIndex].channelMap count]);
                 }
             }
             
@@ -3092,16 +3127,17 @@ static void audioUnitStreamFormatChanged(void *inRefCon, AudioUnit inUnit, Audio
                     inputDescriptionChanged = YES;
                 }
                 
-                __block AudioBufferList * priorBufferList = NULL;
-                [self performAsynchronousMessageExchangeWithBlock:^{
-                    priorBufferList = entry->audioBufferList;
-                    ((input_callback_table_t*)entry)->audioDescription = audioDescription;
-                    ((input_callback_table_t*)entry)->audioBufferList = AEAudioBufferListCreate(entry->audioDescription, kInputAudioBufferFrames);
-                } responseBlock:^{
-                    if ( priorBufferList ) {
+                __block AudioBufferList * priorBufferList = entry->audioBufferList;
+                
+                ((input_entry_t*)entry)->audioDescription = audioDescription;
+                ((input_entry_t*)entry)->audioBufferList
+                    = AEAudioBufferListCreate(entry->audioDescription, kInputAudioBufferFrames);
+                
+                if ( priorBufferList ) {
+                    [self performAsynchronousMessageExchangeWithBlock:^{} responseBlock:^{
                         AEFreeAudioBufferList(priorBufferList);
-                    }
-                }];
+                    }];
+                }
             }
             
             // Determine if conversion is required
@@ -3200,7 +3236,7 @@ static void audioUnitStreamFormatChanged(void *inRefCon, AudioUnit inUnit, Audio
                     __block AudioConverterRef oldConverter;
                     [self performAsynchronousMessageExchangeWithBlock:^{
                         oldConverter = entry->audioConverter;
-                        ((input_callback_table_t*)entry)->audioConverter = newConverter;
+                        ((input_entry_t*)entry)->audioConverter = newConverter;
                     } responseBlock:^{
                         if ( oldConverter ) AudioConverterDispose(oldConverter);
                     }];
@@ -3215,7 +3251,7 @@ static void audioUnitStreamFormatChanged(void *inRefCon, AudioUnit inUnit, Audio
                     __block AudioConverterRef oldConverter;
                     [self performAsynchronousMessageExchangeWithBlock:^{
                         oldConverter = entry->audioConverter;
-                        ((input_callback_table_t*)entry)->audioConverter = NULL;
+                        ((input_entry_t*)entry)->audioConverter = NULL;
                     } responseBlock:^{
                         if ( oldConverter ) AudioConverterDispose(oldConverter);
                     }];
@@ -3294,16 +3330,16 @@ static void audioUnitStreamFormatChanged(void *inRefCon, AudioUnit inUnit, Audio
         }];
         
         // Remove all conversion facilities
-        for ( int entryIndex = 0; entryIndex < _inputCallbackCount; entryIndex++ ) {
-            input_callback_table_t *entry = &_inputCallbacks[entryIndex];
+        for ( int entryIndex = 0; entryIndex < _inputTable->count; entryIndex++ ) {
+            input_entry_t *entry = &_inputTable->entries[entryIndex];
             if ( entry->audioConverter ) {
                 __block AudioConverterRef oldConverter = NULL;
                 __block AudioBufferList * oldBufferList = NULL;
                 [self performAsynchronousMessageExchangeWithBlock:^{
                     oldConverter = entry->audioConverter;
                     oldBufferList = entry->audioBufferList;
-                    ((input_callback_table_t*)entry)->audioConverter = NULL;
-                    ((input_callback_table_t*)entry)->audioBufferList = NULL;
+                    ((input_entry_t*)entry)->audioConverter = NULL;
+                    ((input_entry_t*)entry)->audioBufferList = NULL;
                 } responseBlock:^{
                     if ( oldConverter ) AudioConverterDispose(oldConverter);
                     if ( oldBufferList ) AEFreeAudioBufferList(oldBufferList);
@@ -3367,7 +3403,7 @@ static void audioUnitStreamFormatChanged(void *inRefCon, AudioUnit inUnit, Audio
                   usingAudiobusReceiverPort ? @"using Audiobus, " : @"",
                   rawAudioDescription.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? @"non-interleaved" : @"interleaved",
                   [self usingVPIO] ? @", using voice processing" : @"",
-                  _inputCallbacks[0].audioConverter ? @", with converter" : @"");
+                  _inputTable->entries[0].audioConverter ? @", with converter" : @"");
         } else {
             NSLog(@"TAAE: Input status updated: No input avaliable");
         }
@@ -3731,8 +3767,8 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
             [(__bridge id<AEAudioPlayable>)channel->object teardown];
         }
     }];
-    for ( int i=0; i<_inputCallbackCount; i++ ) {
-        for ( id object in [self associatedObjectsFromTable:&_inputCallbacks[i].callbacks matchingFlag:0] ) {
+    for ( int i=0; i<_inputTable->count; i++ ) {
+        for ( id object in [self associatedObjectsFromTable:&_inputTable->entries[i].callbacks matchingFlag:0] ) {
             if ( [object respondsToSelector:@selector(teardown)] ) {
                 [object teardown];
             }
@@ -3751,8 +3787,8 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
             [(__bridge id<AEAudioPlayable>)channel->object setupWithAudioController:self];
         }
     }];
-    for ( int i=0; i<_inputCallbackCount; i++ ) {
-        for ( id object in [self associatedObjectsFromTable:&_inputCallbacks[i].callbacks matchingFlag:0] ) {
+    for ( int i=0; i<_inputTable->count; i++ ) {
+        for ( id object in [self associatedObjectsFromTable:&_inputTable->entries[i].callbacks matchingFlag:0] ) {
             if ( [object respondsToSelector:@selector(setupWithAudioController:)] ) {
                 [object setupWithAudioController:self];
             }
@@ -3920,6 +3956,14 @@ static void removeCallbackFromTable(__unsafe_unretained AEAudioController *THIS,
     return result;
 }
 
+- (input_table_t *)duplicateInputTable:(input_table_t *)table {
+    input_table_t * newTable = (input_table_t*)malloc(sizeof(input_table_t));
+    newTable->count = table->count;
+    newTable->entries = (input_entry_t*)malloc(sizeof(input_entry_t) * newTable->count);
+    memcpy(newTable->entries, table->entries, sizeof(input_entry_t) * newTable->count);
+    return newTable;
+}
+
 - (BOOL)addCallback:(void*)callback userInfo:(void*)userInfo flags:(uint8_t)flags forChannel:(id<AEAudioPlayable>)channelObj {
     int index=0;
     AEChannelGroupRef parentGroup = [self searchForGroupContainingChannelMatchingPtr:channelObj.renderCallback userInfo:(__bridge void*)channelObj index:&index];
@@ -3963,55 +4007,48 @@ static void removeCallbackFromTable(__unsafe_unretained AEAudioController *THIS,
 }
 
 - (BOOL)addCallback:(void*)callback userInfo:(void*)userInfo flags:(uint8_t)flags forInputChannels:(NSArray*)channels {
+    input_table_t * newTable = [self duplicateInputTable:_inputTable];
     callback_table_t *callbackTable = NULL;
-    input_callback_table_t *inputCallbacks = NULL;
-    int inputCallbackCount = _inputCallbackCount;
-    input_callback_table_t *oldMultichannelInputCallbacks = _inputCallbacks;
     
     if ( !channels ) {
-        callbackTable = &_inputCallbacks[0].callbacks;
+        callbackTable = &newTable->entries[0].callbacks;
     } else {
-        for ( int i=0; i<_inputCallbackCount; i++ ) {
+        for ( int i=0; i<newTable->count; i++ ) {
             // Compare channel maps to find a match
-            if ( (_inputCallbacks[i].channelMap && [(__bridge NSArray*)_inputCallbacks[i].channelMap isEqualToArray:channels]) ||
-                    (i == 0 && !_inputCallbacks[i].channelMap && [self.inputChannelSelection isEqualToArray:channels]) ) {
-                callbackTable = &_inputCallbacks[i].callbacks;
+            if ( (newTable->entries[i].channelMap && [(__bridge NSArray*)newTable->entries[i].channelMap isEqualToArray:channels]) ||
+                    (i == 0 && !newTable->entries[i].channelMap && [self.inputChannelSelection isEqualToArray:channels]) ) {
+                callbackTable = &newTable->entries[i].callbacks;
                 break;
             }
         }
         
+        if ( callbackTable && callbackTable->count == kMaximumCallbacksPerSource ) {
+            NSLog(@"TAAE: Warning: Maximum number of callbacks reached");
+            free(newTable->entries);
+            free(newTable);
+            return NO;
+        }
+        
         if ( !callbackTable ) {
-            // Create new callback entry
-            inputCallbacks = malloc(sizeof(input_callback_table_t) * (_inputCallbackCount+1));
-            memcpy(inputCallbacks, _inputCallbacks, _inputCallbackCount * sizeof(input_callback_table_t));
-            input_callback_table_t *newCallbackTable = &inputCallbacks[_inputCallbackCount];
-            memset(newCallbackTable, 0, sizeof(input_callback_table_t));
-            
-            newCallbackTable->channelMap = (__bridge_retained void*)[channels copy];
-            
-            callbackTable = &newCallbackTable->callbacks;
-            
-            inputCallbackCount = _inputCallbackCount+1;
+            // Create new callback table
+            newTable->entries = (input_entry_t*)realloc(newTable->entries, sizeof(input_entry_t) * (newTable->count+1));
+            newTable->count++;
+            input_entry_t *newEntry = &newTable->entries[newTable->count-1];
+            memset(newEntry, 0, sizeof(input_entry_t));
+            newEntry->channelMap = (__bridge_retained void*)[channels copy];
+            callbackTable = &newEntry->callbacks;
         }
     }
     
-    if ( callbackTable->count == kMaximumCallbacksPerSource ) {
-        NSLog(@"TAAE: Warning: Maximum number of callbacks reached");
-        return NO;
-    }
-    [self performAsynchronousMessageExchangeWithBlock:^{
-        if ( inputCallbacks ) {
-            _inputCallbacks = inputCallbacks;
-            _inputCallbackCount = inputCallbackCount;
-        }
-        
-        addCallbackToTable(self, callbackTable, callback, userInfo, flags);
-    } responseBlock:^{
-        if ( inputCallbacks ) {
-            free(oldMultichannelInputCallbacks);
-            if ( _inputEnabled ) {
-                [self updateInputDeviceStatus];
-            }
+    addCallbackToTable(self, callbackTable, callback, userInfo, flags);
+    
+    input_table_t * oldTable = _inputTable;
+    _inputTable = newTable;
+    [self performAsynchronousMessageExchangeWithBlock:^{} responseBlock:^{
+        free(oldTable->entries);
+        free(oldTable);
+        if ( _inputEnabled ) {
+            [self updateInputDeviceStatus];
         }
     }];
     
