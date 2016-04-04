@@ -3405,7 +3405,7 @@ static void audioUnitStreamFormatChanged(void *inRefCon, AudioUnit inUnit, Audio
                   [self usingVPIO] ? @", using voice processing" : @"",
                   _inputTable->entries[0].audioConverter ? @", with converter" : @"");
         } else {
-            NSLog(@"TAAE: Input status updated: No input avaliable");
+            NSLog(@"TAAE: Input status updated: No input available");
         }
     }
 }
