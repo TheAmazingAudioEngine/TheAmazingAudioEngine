@@ -36,11 +36,12 @@ freely, subject to the following restrictions:
 Changelog
 ---------
 
-### In-development version: 1.5.6
+### 1.5.6
 
 - Replaced internal use of synchronous cross-thread messaging with async messaging, to avoid risk of deadlocks and other timing issues
 - Fixed a crash that can occur when input format is changing
 - Watch for audio unit stream format changes in order to better react to sample rate changes
+- Implemented AEMessageQueue message exchange blocks
 
 ### 1.5.5
 
