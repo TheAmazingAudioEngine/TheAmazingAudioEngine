@@ -2362,7 +2362,7 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
     if ( _inputEnabled ) {
         [self updateInputDeviceStatus];
     }
-    if ( [(id<AEAudiobusForwardDeclarationsProtocol>)notification.object connected] && !self.running ) {
+    if ( [(id<AEAudiobusForwardDeclarationsProtocol>)notification.object connected] && !_started ) {
         [self start:NULL];
     }
 }
