@@ -152,6 +152,10 @@
 		4C99588616BB74720011FB01 /* AEAudioUnitChannel.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C99588416BB74720011FB01 /* AEAudioUnitChannel.m */; };
 		4C99588D16C0825F0011FB01 /* AEAudioUnitFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 4C99588B16C0825E0011FB01 /* AEAudioUnitFilter.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4C99588E16C0825F0011FB01 /* AEAudioUnitFilter.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C99588C16C0825F0011FB01 /* AEAudioUnitFilter.m */; };
+		4CB2273A1D0E5FD100B1135F /* AERealtimeWatchdog-arm64.s in Sources */ = {isa = PBXBuildFile; fileRef = 4CB227361D0E5FD100B1135F /* AERealtimeWatchdog-arm64.s */; settings = {COMPILER_FLAGS = "-fno-modules"; }; };
+		4CB2273B1D0E5FD100B1135F /* AERealtimeWatchdog-simulator-x86_64.s in Sources */ = {isa = PBXBuildFile; fileRef = 4CB227371D0E5FD100B1135F /* AERealtimeWatchdog-simulator-x86_64.s */; settings = {COMPILER_FLAGS = "-fno-modules"; }; };
+		4CB2273C1D0E5FD100B1135F /* AERealtimeWatchdog.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CB227381D0E5FD100B1135F /* AERealtimeWatchdog.h */; };
+		4CB2273D1D0E5FD100B1135F /* AERealtimeWatchdog.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CB227391D0E5FD100B1135F /* AERealtimeWatchdog.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
 		4CCAFEFC1C0BCFF100B87416 /* AEAudioBufferManager.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CCAFEFA1C0BCFF100B87416 /* AEAudioBufferManager.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4CCAFEFD1C0BCFF100B87416 /* AEAudioBufferManager.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CCAFEFA1C0BCFF100B87416 /* AEAudioBufferManager.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4CCAFEFE1C0BCFF100B87416 /* AEAudioBufferManager.h in Headers */ = {isa = PBXBuildFile; fileRef = 4CCAFEFA1C0BCFF100B87416 /* AEAudioBufferManager.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -291,6 +295,10 @@
 		4CAD569315162822003CE861 /* TheAmazingAudioEngine.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TheAmazingAudioEngine.h; sourceTree = "<group>"; };
 		4CAD56A915163488003CE861 /* AEAudioFilePlayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEAudioFilePlayer.h; sourceTree = "<group>"; };
 		4CAD56AA15163488003CE861 /* AEAudioFilePlayer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEAudioFilePlayer.m; sourceTree = "<group>"; };
+		4CB227361D0E5FD100B1135F /* AERealtimeWatchdog-arm64.s */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.asm; path = "AERealtimeWatchdog-arm64.s"; sourceTree = "<group>"; };
+		4CB227371D0E5FD100B1135F /* AERealtimeWatchdog-simulator-x86_64.s */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.asm; path = "AERealtimeWatchdog-simulator-x86_64.s"; sourceTree = "<group>"; };
+		4CB227381D0E5FD100B1135F /* AERealtimeWatchdog.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AERealtimeWatchdog.h; sourceTree = "<group>"; };
+		4CB227391D0E5FD100B1135F /* AERealtimeWatchdog.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AERealtimeWatchdog.m; sourceTree = "<group>"; };
 		4CCAFEFA1C0BCFF100B87416 /* AEAudioBufferManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AEAudioBufferManager.h; sourceTree = "<group>"; };
 		4CCAFEFB1C0BCFF100B87416 /* AEAudioBufferManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AEAudioBufferManager.m; sourceTree = "<group>"; };
 		4CE501971493F82600F23607 /* TheAmazingAudioEngine-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TheAmazingAudioEngine-Prefix.pch"; sourceTree = "<group>"; };
@@ -480,6 +488,10 @@
 				4C09450016FBD7460054608E /* AEBlockScheduler.m */,
 				4CCAFEFA1C0BCFF100B87416 /* AEAudioBufferManager.h */,
 				4CCAFEFB1C0BCFF100B87416 /* AEAudioBufferManager.m */,
+				4CB227361D0E5FD100B1135F /* AERealtimeWatchdog-arm64.s */,
+				4CB227371D0E5FD100B1135F /* AERealtimeWatchdog-simulator-x86_64.s */,
+				4CB227381D0E5FD100B1135F /* AERealtimeWatchdog.h */,
+				4CB227391D0E5FD100B1135F /* AERealtimeWatchdog.m */,
 			);
 			path = TheAmazingAudioEngine;
 			sourceTree = "<group>";
@@ -529,6 +541,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4CB2273C1D0E5FD100B1135F /* AERealtimeWatchdog.h in Headers */,
 				4C215D121523A94200D36CAD /* TheAmazingAudioEngine.h in Headers */,
 				F9C23C1E1BA979050060718F /* AEMessageQueue.h in Headers */,
 				4C13AA9B1BB0FC9900DE05E0 /* AEMemoryBufferPlayer.h in Headers */,
@@ -777,6 +790,7 @@
 				4C38DC5715458AB1009F4454 /* AEAudioFileWriter.m in Sources */,
 				4C70F99D1BB0D2FE0064CF73 /* AEBandpassFilter.m in Sources */,
 				4C2886521557DB800074175A /* AEAudioController+Audiobus.m in Sources */,
+				4CB2273D1D0E5FD100B1135F /* AERealtimeWatchdog.m in Sources */,
 				4C25747415F0D8E100D232E8 /* TPCircularBuffer.c in Sources */,
 				4C70F9A31BB0D2FE0064CF73 /* AEDynamicsProcessorFilter.m in Sources */,
 				4C70F9AB1BB0D2FE0064CF73 /* AELowShelfFilter.m in Sources */,
@@ -786,8 +800,10 @@
 				4CEC0EBA16B5294300D11ED9 /* AEBlockFilter.m in Sources */,
 				4C70F9A71BB0D2FE0064CF73 /* AEHighShelfFilter.m in Sources */,
 				4C99588616BB74720011FB01 /* AEAudioUnitChannel.m in Sources */,
+				4CB2273B1D0E5FD100B1135F /* AERealtimeWatchdog-simulator-x86_64.s in Sources */,
 				4C99588E16C0825F0011FB01 /* AEAudioUnitFilter.m in Sources */,
 				4C456B8E16D59365008ED99D /* AEBlockAudioReceiver.m in Sources */,
+				4CB2273A1D0E5FD100B1135F /* AERealtimeWatchdog-arm64.s in Sources */,
 				F9C23C201BA979050060718F /* AEMessageQueue.m in Sources */,
 				4C09450216FBD7460054608E /* AEBlockScheduler.m in Sources */,
 				4C70F9AF1BB0D2FE0064CF73 /* AEParametricEqFilter.m in Sources */,
