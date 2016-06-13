@@ -36,6 +36,11 @@ freely, subject to the following restrictions:
 Changelog
 ---------
 
+### 1.5.7
+
+- Added [Realtime Watchdog](https://github.com/TheAmazingAudioEngine/RealtimeWatchdog)
+- Fixed a spurious audio system restart issue
+
 ### 1.5.6
 
 - Replaced internal use of synchronous cross-thread messaging with async messaging, to avoid risk of deadlocks and other timing issues
