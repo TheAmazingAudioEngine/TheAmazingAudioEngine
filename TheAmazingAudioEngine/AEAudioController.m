@@ -3353,6 +3353,7 @@ static void audioUnitStreamFormatChanged(void *inRefCon, AudioUnit inUnit, Audio
     
     // Ensure format coming from the audio input bus is correct
     #if TARGET_OS_IPHONE
+    BOOL wasRunning = self.running;
     BOOL unitStopped = NO;
     if ( numberOfInputChannels > 0 && !usingAudiobusReceiverPort ) {
         AudioStreamBasicDescription currentAudioDescription;
@@ -3393,7 +3394,7 @@ static void audioUnitStreamFormatChanged(void *inRefCon, AudioUnit inUnit, Audio
     
     #if TARGET_OS_IPHONE
     // Restart unit if we stopped it
-    if ( unitStopped ) {
+    if ( unitStopped && wasRunning ) {
         AECheckOSStatus(AudioOutputUnitStart(_ioAudioUnit), "AudioOutputUnitStart");
     }
     #endif
