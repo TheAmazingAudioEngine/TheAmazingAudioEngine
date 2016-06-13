@@ -243,6 +243,11 @@ void AEAudioStreamBasicDescriptionSetChannelsPerFrame(AudioStreamBasicDescriptio
 ///@{
 
 /*!
+ * Initialize time utilities
+ */
+void AETimeInit(void);
+
+/*!
  * Get current global timestamp, in host ticks
  */
 uint64_t AECurrentTimeInHostTicks(void);

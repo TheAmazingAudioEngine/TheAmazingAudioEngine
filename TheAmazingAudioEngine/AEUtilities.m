@@ -197,7 +197,7 @@ AudioComponentDescription AEAudioComponentDescriptionMake(OSType manufacturer, O
     return description;
 }
 
-static void AETimeInit() {
+void AETimeInit(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         mach_timebase_info_data_t tinfo;

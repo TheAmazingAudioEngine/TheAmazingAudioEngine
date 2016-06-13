@@ -844,6 +844,8 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     
     NSAssert(audioDescription.mFormatID == kAudioFormatLinearPCM, @"Only linear PCM supported");
 
+    AETimeInit();
+    
     BOOL enableInput            = options & AEAudioControllerOptionEnableInput;
     BOOL enableOutput           = options & AEAudioControllerOptionEnableOutput;
     
