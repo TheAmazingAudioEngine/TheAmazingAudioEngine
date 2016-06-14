@@ -60,15 +60,8 @@ BOOL AERealtimeWatchdogIsOnRealtimeThread(void);
 BOOL AERealtimeWatchdogIsOnRealtimeThread(void) {
     pthread_t thread = pthread_self();
     
-    static pthread_t __audioThread = NULL;
-    
-    if ( __audioThread ) {
-        return thread == __audioThread;
-    }
-    
     char name[21] = {0};
     if ( pthread_getname_np(thread, name, sizeof(name)) == 0 && !strcmp(name, "AURemoteIO::IOThread") ) {
-        __audioThread = thread;
         return YES;
     }
     
@@ -132,7 +125,7 @@ void * realloc(void * ptr, size_t size) {
 void free(void *p) {
     static free_t funcptr = NULL;
     if ( !funcptr ) funcptr = (free_t) dlsym(RTLD_NEXT, "free");
-    if ( AERealtimeWatchdogIsOnRealtimeThread() ) AERealtimeWatchdogUnsafeActivityWarning("free");
+    if ( p && AERealtimeWatchdogIsOnRealtimeThread() ) AERealtimeWatchdogUnsafeActivityWarning("free");
     funcptr(p);
 }
 
