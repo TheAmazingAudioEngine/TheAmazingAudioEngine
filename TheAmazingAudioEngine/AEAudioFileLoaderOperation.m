@@ -129,7 +129,7 @@ static const int kMaxAudioFileReadSize = 16384;
     
     if ( _targetAudioDescription.mChannelsPerFrame > fileAudioDescription.mChannelsPerFrame ) {
         // More channels in target format than file format - set up a map to duplicate channel
-        SInt32 channelMap[8];
+        SInt32 channelMap[_targetAudioDescription.mChannelsPerFrame];
         AudioConverterRef converter;
         AECheckOSStatus(ExtAudioFileGetProperty(audioFile, kExtAudioFileProperty_AudioConverter, &size, &converter),
                     "ExtAudioFileGetProperty(kExtAudioFileProperty_AudioConverter)");
