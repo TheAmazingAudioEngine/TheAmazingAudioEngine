@@ -41,7 +41,7 @@
 #import <pthread.h>
 
 // Uncomment the following or define the following symbol as part of your build process to enable per-second performance reports
-// #define TAAE_REPORT_RENDER_TIME
+ #define TAAE_REPORT_RENDER_TIME
 
 static const int kMaximumChannelsPerGroup              = 100;
 static const int kMaximumCallbacksPerSource            = 15;
@@ -253,10 +253,9 @@ typedef struct _channel_group_t {
     BOOL                _useHardwareSampleRate;
 
 #ifdef DEBUG
-    uint64_t            _firstRenderTime;
-    uint64_t            _lastReportTime;
-    uint64_t            _renderStartTime[2];
-    uint64_t            _renderDuration[2];
+	uint64_t            _renderStartTime[2];
+	uint64_t            _renderFinishTime[2];
+	uint64_t            _lastReportTime;
 #endif
 }
 
@@ -587,7 +586,6 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
     }
     
 #ifdef DEBUG
-    if ( !THIS->_firstRenderTime ) THIS->_firstRenderTime = AECurrentTimeInHostTicks();
     THIS->_renderStartTime[1] = AECurrentTimeInHostTicks();
 #endif
     
@@ -717,8 +715,7 @@ static void serviceAudioInput(__unsafe_unretained AEAudioController * THIS, cons
     }
     
 #ifdef DEBUG
-    uint64_t renderEndTime = AECurrentTimeInHostTicks();
-    THIS->_renderDuration[1] = renderEndTime - THIS->_renderStartTime[1];
+	THIS->_renderFinishTime[1] = AECurrentTimeInHostTicks();
 #endif
 }
 
@@ -729,48 +726,77 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     
     __unsafe_unretained AEAudioController * THIS = (__bridge AEAudioController*)inRefCon;
     
-    if ( inBusNumber == 0 && *ioActionFlags & kAudioUnitRenderAction_PreRender ) {
-        // Remember the time we started rendering
-        if ( !THIS->_firstRenderTime ) THIS->_firstRenderTime = AECurrentTimeInHostTicks();
-        THIS->_renderStartTime[0] = AECurrentTimeInHostTicks();
-        
-    } else if ( inBusNumber == 0 && *ioActionFlags & kAudioUnitRenderAction_PostRender ) {
-        // Calculate total render duration
-        uint64_t renderEndTime = AECurrentTimeInHostTicks();
-        THIS->_renderDuration[0] = renderEndTime - THIS->_renderStartTime[MIN(1, inBusNumber)];
-        
-        if ( THIS->_renderDuration[0] && (!THIS->_inputEnabled || THIS->_renderDuration[1]) ) {
-            // Got render duration for all buses
-            uint64_t duration = THIS->_renderDuration[0] + THIS->_renderDuration[1];
-            THIS->_renderDuration[0] = THIS->_renderDuration[1] = THIS->_renderStartTime[0] = THIS->_renderStartTime[1] = 0;
-            // Warn if total render takes longer than 50% of buffer duration (gives us a bit of headroom)
-            NSTimeInterval threshold = THIS->_currentBufferDuration * 0.5;
-            if ( duration >= AEHostTicksFromSeconds(threshold)
-                    && (renderEndTime-THIS->_firstRenderTime) > AEHostTicksFromSeconds(10.0)
-                    && (renderEndTime-THIS->_lastReportTime) > AEHostTicksFromSeconds(30.0) ) {
-                NSTimeInterval durationSeconds = AESecondsFromHostTicks(duration);
-                NSLog(@"TAAE: Warning: render took too long (%lfs, %0.2lf%% of budget). Expect glitches.",
-                      durationSeconds, (durationSeconds/THIS->_currentBufferDuration) * 100.0);
-                THIS->_lastReportTime = renderEndTime;
-            }
-        
+    if ( inBusNumber == 0 && *ioActionFlags & kAudioUnitRenderAction_PreRender )
+	{
+		THIS->_renderStartTime[0] = AECurrentTimeInHostTicks();
+    }
+	else
+	if ( inBusNumber == 0 && *ioActionFlags & kAudioUnitRenderAction_PostRender )
+	{
+		THIS->_renderFinishTime[0] = AECurrentTimeInHostTicks();
+
+		// Fetch timing for output bus
+		uint64_t startTime0 = THIS->_renderStartTime[0];
+		uint64_t finishTime0 = THIS->_renderFinishTime[0];
+		
+		// Compute duration
+		uint64_t duration = finishTime0 - startTime0;
+		
+		// Fetch timing for input bus
+		uint64_t startTime1 = THIS->_renderStartTime[1];
+		uint64_t finishTime1 = THIS->_renderFinishTime[1];
+		
+		/*
+			Note: on OS X input bus timing may be manipulated by serviceAudioInput
+			on a different thread, so we test if we have a valid pair
+		*/
+		
+		// Test if it is valid
+		if (startTime1 < finishTime1)
+		{ duration += finishTime1 - startTime1; }
+		
+		// Convert to seconds
+		NSTimeInterval durationInSeconds = AESecondsFromHostTicks(duration);
+		NSTimeInterval bufferInSeconds = THIS->_currentBufferDuration;
+		
+		// Warn if total render takes longer than 50% of buffer duration (gives us a bit of headroom)
+		if (durationInSeconds > 0.5*bufferInSeconds)
+		{
+			// Local copies for block, D = duration, R = ratio
+			double D = durationInSeconds;
+			double R = 100.0 * durationInSeconds/bufferInSeconds;
+			dispatch_async(dispatch_get_main_queue(), ^{
+			NSLog(@"TAAE: Warning: render took too long (%lfs, %0.2lf%% of budget). Expect glitches.", D, R); });
+			
+			THIS->_lastReportTime = finishTime0;
+		}
+		
+// Define TAAE_REPORT_RENDER_TIME to report ongoing (max) render time every second
 #ifdef TAAE_REPORT_RENDER_TIME
-            // Define the above symbol to report ongoing (max) render time every second
-            static uint64_t max = 0;
-            static uint64_t lastReport = 0;
-            if ( duration > max ) {
-                max = duration;
-            }
-            if ( renderEndTime > lastReport + AEHostTicksFromSeconds(1.0) ) {
-                NSTimeInterval value = AESecondsFromHostTicks(max);
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    NSLog(@"TAAE: Render time %lfs, %0.2lf%% of budget)", value, (value/THIS->_currentBufferDuration)*100.0);
-                });
-                lastReport = renderEndTime;
-                max = 0;
-            }
+
+		// Remember maximum duration within 1sec reporting period
+		static NSTimeInterval max = 0;
+		if (max < durationInSeconds)
+			max = durationInSeconds;
+		
+		// Test if 1sec has elapsed since last report
+		static uint64_t lastReport = 0;
+		if ( finishTime0 > lastReport + AEHostTicksFromSeconds(1.0) )
+		{
+			// Local copies for block, M = max, R = ratio
+			double M = max;
+			double R = 100.0 * max/THIS->_currentBufferDuration;
+			
+			dispatch_async(dispatch_get_main_queue(), ^{
+				NSLog(@"TAAE: Render time %lfs, %0.2lf%% of budget)", M, R);
+			});
+			
+			lastReport = finishTime0;
+			max = 0;
+		}
+		
 #endif
-        }
+
     }
     
     return noErr;
