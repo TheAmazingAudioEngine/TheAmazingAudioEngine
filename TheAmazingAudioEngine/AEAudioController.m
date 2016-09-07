@@ -1200,13 +1200,15 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
         memset(&channelElement->timeStamp, 0, sizeof(channelElement->timeStamp));
         channelElement->audioController = (__bridge void*)self;
         
-        group->channels[group->channelCount++] = channelElement;
+        [self performAsynchronousMessageExchangeWithBlock:^{
+            group->channels[group->channelCount++] = channelElement;
+        } responseBlock:nil];
     }
 
-    // Configure each channel
-    [self configureChannelsInRange:NSMakeRange(group->channelCount - channels.count, channels.count) forGroup:group];
-    
-    AECheckOSStatus([self updateGraph], "Update graph");
+    [self performAsynchronousMessageExchangeWithBlock:^{} responseBlock:^{
+        [self configureChannelsInRange:NSMakeRange(group->channelCount - channels.count, channels.count) forGroup:group];
+        AECheckOSStatus([self updateGraph], "Update graph");
+    }];
 }
 
 - (void)removeChannels:(NSArray *)channels {
@@ -1337,8 +1339,6 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     AEChannelGroupRef group = (AEChannelGroupRef)calloc(1, sizeof(channel_group_t));
     
     // Add group as a channel to the parent group
-    int groupIndex = parentGroup->channelCount;
-    
     AEChannelRef channel = (AEChannelRef)calloc(1, sizeof(channel_t));
     
     channel->type    = kChannelTypeGroup;
@@ -1349,19 +1349,22 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     channel->pan     = 0.0;
     channel->muted   = NO;
     channel->audioController = (__bridge void *)self;
-    
-    parentGroup->channels[groupIndex] = channel;
     group->channel   = channel;
     
-    parentGroup->channelCount++;
+    __block int groupIndex;
     
-    // Set bus count
-    UInt32 busCount = parentGroup->channelCount;
-    OSStatus result = AudioUnitSetProperty(parentGroup->mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &busCount, sizeof(busCount));
-    if ( !AECheckOSStatus(result, "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) return NULL;
-
-    [self configureChannelsInRange:NSMakeRange(groupIndex, 1) forGroup:parentGroup];
-    AECheckOSStatus([self updateGraph], "Update graph");
+    [self performAsynchronousMessageExchangeWithBlock:^{
+        parentGroup->channels[parentGroup->channelCount] = channel;
+        parentGroup->channelCount++;
+    } responseBlock:^{
+        // Set bus count
+        UInt32 busCount = parentGroup->channelCount;
+        OSStatus result = AudioUnitSetProperty(parentGroup->mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &busCount, sizeof(busCount));
+        if ( AECheckOSStatus(result, "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) {
+            [self configureChannelsInRange:NSMakeRange(groupIndex, 1) forGroup:parentGroup];
+            AECheckOSStatus([self updateGraph], "Update graph");
+        }
+    }];
     
     return group;
 }
@@ -3680,7 +3683,7 @@ static void removeChannelsFromGroup(__unsafe_unretained AEAudioController *THIS,
         int index = 0;
         for ( index=0; index < group->channelCount; index++ ) {
             if ( group->channels[index] && group->channels[index]->ptr == ptrs[i] && group->channels[index]->object == objects[i] ) {
-                // Disable this channel until we update the graph
+                // Mute this channel until we update the graph
                 AudioUnitParameterValue enabledValue = 0;
                 AECheckOSStatus(AudioUnitSetParameter(group->mixerAudioUnit, kMultiChannelMixerParam_Enable, kAudioUnitScope_Input, index, enabledValue, 0),
                             "AudioUnitSetParameter(kMultiChannelMixerParam_Enable)");
