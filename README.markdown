@@ -36,6 +36,10 @@ freely, subject to the following restrictions:
 Changelog
 ---------
 
+### Under development: 1.5.8
+
+- Fixed a crash that can occur with rapid adding/removing of channels
+
 ### 1.5.7
 
 - Added [Realtime Watchdog](https://github.com/TheAmazingAudioEngine/RealtimeWatchdog)
