@@ -1206,7 +1206,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     }
 
     [self performAsynchronousMessageExchangeWithBlock:^{} responseBlock:^{
-        [self configureChannelsInRange:NSMakeRange(group->channelCount - channels.count, channels.count) forGroup:group];
+        [self configureChannelsForGroup:group];
         AECheckOSStatus([self updateGraph], "Update graph");
     }];
 }
@@ -1251,14 +1251,13 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     }
     AEChannelRef * removedChannels = (AEChannelRef*)malloc(count * sizeof(AEChannelRef));
     memset(removedChannels, 0, sizeof(count * sizeof(AEChannelRef)));
-    int priorCount = group->channelCount;
     [self performAsynchronousMessageExchangeWithBlock:^{
         removeChannelsFromGroup(self, group, ptrMatchArray, objectMatchArray, removedChannels, count);
     } responseBlock:^{
         free(ptrMatchArray);
         free(objectMatchArray);
         
-        [self configureChannelsInRange:NSMakeRange(0, priorCount) forGroup:group];
+        [self configureChannelsForGroup:group];
         
         AECheckOSStatus([self updateGraph], "Update graph");
         
@@ -1290,14 +1289,14 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
         // Disable monitoring if needed
         if (group->level_monitor_data.monitoringEnabled) {
             group->level_monitor_data.monitoringEnabled = NO;
-            [self configureChannelsInRange:NSMakeRange(index, 1) forGroup:parentGroup];
+            [self configureChannelsForGroup:parentGroup];
         }
 
         // Remove the group from the parent group's table, on the core audio thread
         [self performAsynchronousMessageExchangeWithBlock:^{
             removeChannelsFromGroup(self, parentGroup, (void*[1]){ group }, (void*[1]){ NULL }, NULL, 1);
         } responseBlock:^{
-            [self configureChannelsInRange:NSMakeRange(0, parentGroup->channelCount) forGroup:parentGroup];
+            [self configureChannelsForGroup:parentGroup];
             
             AECheckOSStatus([self updateGraph], "Update graph");
             
@@ -1351,8 +1350,6 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     channel->audioController = (__bridge void *)self;
     group->channel   = channel;
     
-    __block int groupIndex;
-    
     [self performAsynchronousMessageExchangeWithBlock:^{
         parentGroup->channels[parentGroup->channelCount] = channel;
         parentGroup->channelCount++;
@@ -1361,7 +1358,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
         UInt32 busCount = parentGroup->channelCount;
         OSStatus result = AudioUnitSetProperty(parentGroup->mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &busCount, sizeof(busCount));
         if ( AECheckOSStatus(result, "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)") ) {
-            [self configureChannelsInRange:NSMakeRange(groupIndex, 1) forGroup:parentGroup];
+            [self configureChannelsForGroup:parentGroup];
             AECheckOSStatus([self updateGraph], "Update graph");
         }
     }];
@@ -1820,7 +1817,7 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(__unsafe_unretained AE
                 NSAssert(parentGroup != NULL, @"Channel group not found");
             }
             
-            [self configureChannelsInRange:NSMakeRange(index, 1) forGroup:parentGroup];
+            [self configureChannelsForGroup:parentGroup];
             AECheckOSStatus([self updateGraph], "Update graph");
         }
     }
@@ -1850,7 +1847,7 @@ void AEAudioControllerSendAsynchronousMessageToMainThread(__unsafe_unretained AE
                 NSAssert(parentGroup != NULL, @"Channel group not found");
             }
 
-            [self configureChannelsInRange:NSMakeRange(index, 1) forGroup:parentGroup];
+            [self configureChannelsForGroup:parentGroup];
             AECheckOSStatus([self updateGraph], "Update graph");
         }
     }
@@ -2252,7 +2249,7 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
                 NSAssert(parentGroup != NULL, @"Channel group not found");
             }
             
-            [self configureChannelsInRange:NSMakeRange(index, 1) forGroup:parentGroup];
+            [self configureChannelsForGroup:parentGroup];
             AECheckOSStatus([self updateGraph], "Update graph");
         }
     }
@@ -2680,7 +2677,7 @@ static void audioUnitStreamFormatChanged(void *inRefCon, AudioUnit inUnit, Audio
     }
     
     // Initialise group
-    [self configureChannelsInRange:NSMakeRange(0, 1) forGroup:NULL];
+    [self configureChannelsForGroup:NULL];
     
     // Register a callback to be notified when the main mixer unit renders
     AECheckOSStatus(AudioUnitAddRenderNotify(_topGroup->mixerAudioUnit, &topRenderNotifyCallback, (__bridge void*)self), "AudioUnitAddRenderNotify");
@@ -2777,7 +2774,7 @@ static void audioUnitStreamFormatChanged(void *inRefCon, AudioUnit inUnit, Audio
     }
     
     
-    [self configureChannelsInRange:NSMakeRange(0, 1) forGroup:NULL];
+    [self configureChannelsForGroup:NULL];
     
     AECheckOSStatus([self updateGraph], "Update graph");
     
@@ -3416,10 +3413,15 @@ static void audioUnitStreamFormatChanged(void *inRefCon, AudioUnit inUnit, Audio
     }
 }
 
-- (void)configureChannelsInRange:(NSRange)range forGroup:(AEChannelGroupRef)group {
+- (void)configureChannelsForGroup:(AEChannelGroupRef)group {
+    
+    UInt32 priorBusCount = 0;
     
     if ( group ) {
         // Ensure that we have enough input buses in the mixer
+        UInt32 size = sizeof(priorBusCount);
+        AECheckOSStatus(AudioUnitGetProperty(group->mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &priorBusCount, &size), "AudioUnitGetProperty(kAudioUnitProperty_ElementCount)");
+        
         UInt32 busCount = group->channelCount;
         AECheckOSStatus(AudioUnitSetProperty(group->mixerAudioUnit, kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &busCount, sizeof(busCount)), "AudioUnitSetProperty(kAudioUnitProperty_ElementCount)");
     }
@@ -3429,7 +3431,7 @@ static void audioUnitStreamFormatChanged(void *inRefCon, AudioUnit inUnit, Audio
     AUNodeInteraction interactions[numInteractions];
     AECheckOSStatus(AUGraphGetNodeInteractions(_audioGraph, group ? group->mixerNode : _ioNode, &numInteractions, interactions), "AUGraphGetNodeInteractions");
     
-    for ( int i = (int)range.location; i < range.location+range.length; i++ ) {
+    for ( int i = 0; i < (group ? MAX(group->channelCount, priorBusCount) : 1); i++ ) {
         AEChannelRef channel = group ? group->channels[i] : _topChannel;
         
         // Find the existing upstream connection
@@ -3646,7 +3648,7 @@ static void audioUnitStreamFormatChanged(void *inRefCon, AudioUnit inUnit, Audio
                 }
             }
             
-            [self configureChannelsInRange:NSMakeRange(0, busCount) forGroup:subgroup];
+            [self configureChannelsForGroup:subgroup];
         }
         
         
@@ -4005,7 +4007,7 @@ static void removeCallbackFromTable(__unsafe_unretained AEAudioController *THIS,
             NSAssert(parentGroup != NULL, @"Channel group not found");
         }
         
-        [self configureChannelsInRange:NSMakeRange(index, 1) forGroup:parentGroup];
+        [self configureChannelsForGroup:parentGroup];
         AECheckOSStatus([self updateGraph], "Update graph");
     }];
     
@@ -4089,7 +4091,7 @@ static void removeCallbackFromTable(__unsafe_unretained AEAudioController *THIS,
                 NSAssert(parentGroup != NULL, @"Channel group not found");
             }
             
-            [self configureChannelsInRange:NSMakeRange(index, 1) forGroup:parentGroup];
+            [self configureChannelsForGroup:parentGroup];
             AECheckOSStatus([self updateGraph], "Update graph");
         }
         
