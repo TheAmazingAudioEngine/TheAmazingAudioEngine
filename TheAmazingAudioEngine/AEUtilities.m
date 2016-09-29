@@ -198,13 +198,10 @@ AudioComponentDescription AEAudioComponentDescriptionMake(OSType manufacturer, O
 }
 
 void AETimeInit(void) {
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        mach_timebase_info_data_t tinfo;
-        mach_timebase_info(&tinfo);
-        __hostTicksToSeconds = ((double)tinfo.numer / tinfo.denom) * 1.0e-9;
-        __secondsToHostTicks = 1.0 / __hostTicksToSeconds;
-    });
+    mach_timebase_info_data_t tinfo;
+    mach_timebase_info(&tinfo);
+    __hostTicksToSeconds = ((double)tinfo.numer / tinfo.denom) * 1.0e-9;
+    __secondsToHostTicks = 1.0 / __hostTicksToSeconds;
 }
 
 uint64_t AECurrentTimeInHostTicks(void) {
