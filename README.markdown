@@ -1,13 +1,5 @@
-The Amazing Audio Engine
-========================
+**Important Notice: The Amazing Audio Engine has been retired. [See the announcement here](http://theamazingaudioengine.com/retirement/)**
 
-The Amazing Audio Engine is a sophisticated framework for iOS audio applications, built so you don't have to.
-
-It is designed to be very easy to work with, and handles all of the intricacies of iOS audio on your behalf.
-
-Built upon the efficient and low-latency Core Audio Remote IO system, and written by developer of [Audiobus](http://audiob.us) and [Loopy](http://loopyapp.com) Michael Tyson, The Amazing Audio Engine lets you get to work on making your app great instead of reinventing the wheel.
-
-See http://theamazingaudioengine.com for details and http://theamazingaudioengine.com/doc for documentation.
 
 License
 -------
