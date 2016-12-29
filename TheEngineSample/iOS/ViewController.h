@@ -7,6 +7,7 @@
 //
 
 #import <UIKit/UIKit.h>
+#import "RMSLevelsView.h"
 
 @class AEAudioController;
 @interface ViewController : UITableViewController
@@ -14,5 +15,8 @@
 - (id)initWithAudioController:(AEAudioController*)audioController;
 
 @property (nonatomic, strong) AEAudioController *audioController;
+
+@property (nonatomic, weak) IBOutlet RMSLevelsView *levelsViewL;
+@property (nonatomic, weak) IBOutlet RMSLevelsView *levelsViewR;
 
 @end
