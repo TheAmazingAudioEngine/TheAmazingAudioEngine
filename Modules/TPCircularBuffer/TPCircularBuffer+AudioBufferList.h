@@ -34,7 +34,11 @@
 extern "C" {
 #endif
 
+#if COCOAPODS
+#include <TPCircularBuffer/TPCircularBuffer.h>
+#else
 #include "TPCircularBuffer.h"
+#endif    
 #include <AudioToolbox/AudioToolbox.h>
 
 #define kTPCircularBufferCopyAll UINT32_MAX

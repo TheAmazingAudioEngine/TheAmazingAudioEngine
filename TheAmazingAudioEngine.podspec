@@ -37,5 +37,6 @@ Pod::Spec.new do |s|
 					'-DTPCircularBufferPeekContiguous=AECBPeekContiguous',
 					'-D_TPCircularBufferPeek=_AECBPeek'
   s.frameworks = 'AudioToolbox', 'Accelerate'
+  s.dependency 'TPCircularBuffer', '~> 0.0'
   s.requires_arc = true
 end

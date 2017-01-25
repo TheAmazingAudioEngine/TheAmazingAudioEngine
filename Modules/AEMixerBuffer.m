@@ -24,8 +24,13 @@
 //
 
 #import "AEMixerBuffer.h"
+#if COCOAPODS
+#import <TPCircularBuffer.h>
+#import <TPCircularBuffer+AudioBufferList.h>
+#else
 #import "TPCircularBuffer.h"
 #import "TPCircularBuffer+AudioBufferList.h"
+#endif
 #import "AEFloatConverter.h"
 #import "AEUtilities.h"
 #import <libkern/OSAtomic.h>

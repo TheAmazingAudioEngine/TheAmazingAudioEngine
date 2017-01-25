@@ -25,8 +25,13 @@
 
 #import "AELimiter.h"
 #import "TheAmazingAudioEngine.h"
+#if COCOAPODS
+#import <TPCircularBuffer.h>
+#import <TPCircularBuffer+AudioBufferList.h>
+#else
 #import "TPCircularBuffer.h"
 #import "TPCircularBuffer+AudioBufferList.h"
+#endif
 #import <Accelerate/Accelerate.h>
 
 const int kBufferSize = 88200; /* Bytes per channel */
