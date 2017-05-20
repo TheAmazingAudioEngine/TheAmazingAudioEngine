@@ -1720,6 +1720,12 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
  */
 AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudioController *controller);
 
+/*!
+ * Get the mute status of a channel group
+ * @return Whether group is muted
+ */
+Boolean AEChannelGroupIsMuted(AEChannelGroupRef group);
+
 @end
 
 #ifdef __cplusplus
