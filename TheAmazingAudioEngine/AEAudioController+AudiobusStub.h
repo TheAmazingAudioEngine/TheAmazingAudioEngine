@@ -25,21 +25,21 @@
 
 #import <Foundation/Foundation.h>
 
-@class ABReceiverPort;
-@class ABSenderPort;
-@class ABFilterPort;
+@class ABAudioReceiverPort;
+@class ABAudioSenderPort;
+@class ABAudioFilterPort;
 @class ABPort;
 
 extern NSString * const ABConnectionsChangedNotification;
 
-void ABReceiverPortReceive(ABReceiverPort *receiverPort, ABPort *sourcePortOrNil, AudioBufferList *bufferList, UInt32 lengthInFrames, AudioTimeStamp *outTimestamp);
-BOOL ABReceiverPortIsConnected(ABReceiverPort *receiverPort);
-BOOL ABFilterPortIsConnected(ABFilterPort *filterPort);
-void ABSenderPortSend(ABSenderPort* senderPort, const AudioBufferList *audio, UInt32 lengthInFrames, const AudioTimeStamp *timestamp);
-BOOL ABSenderPortIsConnected(ABSenderPort *senderPort);
-BOOL ABSenderPortIsMuted(ABSenderPort *senderPort);
-NSTimeInterval ABSenderPortGetAverageLatency(ABSenderPort *senderPort);
-typedef void (^ABReceiverPortAudioInputBlock)(ABReceiverPort *receiverPort, UInt32 lengthInFrames, AudioTimeStamp nextTimestamp, ABPort *sourcePortOrNil);
+void ABAudioReceiverPortReceive(ABAudioReceiverPort *receiverPort, ABPort *sourcePortOrNil, AudioBufferList *bufferList, UInt32 lengthInFrames, AudioTimeStamp *outTimestamp);
+BOOL ABAudioReceiverPortIsConnected(ABAudioReceiverPort *receiverPort);
+BOOL ABAudioFilterPortIsConnected(ABAudioFilterPort *filterPort);
+void ABAudioSenderPortSend(ABAudioSenderPort* senderPort, const AudioBufferList *audio, UInt32 lengthInFrames, const AudioTimeStamp *timestamp);
+BOOL ABAudioSenderPortIsConnected(ABAudioSenderPort *senderPort);
+BOOL ABAudioSenderPortIsMuted(ABAudioSenderPort *senderPort);
+NSTimeInterval ABAudioSenderPortGetAverageLatency(ABAudioSenderPort *senderPort);
+typedef void (^ABAudioReceiverPortAudioInputBlock)(ABAudioReceiverPort *receiverPort, UInt32 lengthInFrames, AudioTimeStamp nextTimestamp, ABPort *sourcePortOrNil);
 
 @protocol AEAudiobusForwardDeclarationsProtocol <NSObject>
 - (AudioStreamBasicDescription)clientFormat;

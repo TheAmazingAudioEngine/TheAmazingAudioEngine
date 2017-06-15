@@ -31,9 +31,9 @@ extern "C" {
 #import "AEAudioController.h"
 #import <AudioToolbox/AudioToolbox.h>
 
-@class ABReceiverPort;
-@class ABSenderPort;
-@class ABFilterPort;
+@class ABAudioReceiverPort;
+@class ABAudioSenderPort;
+@class ABAudioFilterPort;
 
 @interface AEAudioController (AudiobusAdditions)
 
@@ -46,7 +46,7 @@ extern "C" {
  * @param senderPort The Audiobus sender port, or nil to remove the port
  * @param channel    Channel for the sender port
  */
-- (void)setAudiobusSenderPort:(ABSenderPort*)senderPort forChannel:(id<AEAudioPlayable>)channel;
+- (void)setAudiobusSenderPort:(ABAudioSenderPort*)senderPort forChannel:(id<AEAudioPlayable>)channel;
 
 /*!
  * Set an Audiobus sender port to send audio from a particular channel group
@@ -57,7 +57,7 @@ extern "C" {
  * @param senderPort The Audiobus sender port, or nil to remove the port
  * @param channelGroup Channel group for the sender port
  */
-- (void)setAudiobusSenderPort:(ABSenderPort*)senderPort forChannelGroup:(AEChannelGroupRef)channelGroup;
+- (void)setAudiobusSenderPort:(ABAudioSenderPort*)senderPort forChannelGroup:(AEChannelGroupRef)channelGroup;
 
 /*!
  * Audiobus receiver port
@@ -65,7 +65,7 @@ extern "C" {
  *  Set this property to an Audiobus receiver port to receive audio
  *  from this port instead of the system audio input.
  */
-@property (nonatomic, retain) ABReceiverPort *audiobusReceiverPort;
+@property (nonatomic, retain) ABAudioReceiverPort *audiobusReceiverPort;
 
 /*!
  * Audiobus filter port
@@ -73,18 +73,18 @@ extern "C" {
  *  Set this property to an Audiobus filter port to let TAAE correctly update the
  *  number of input channels when connected.
  */
-@property (nonatomic, retain) ABFilterPort *audiobusFilterPort __deprecated_msg("No longer in use");
+@property (nonatomic, retain) ABAudioFilterPort *audiobusFilterPort __deprecated_msg("No longer in use");
 
 /*!
  * Audiobus sender port
  *
- *  Deprecated: use ABSenderPort's audio unit initializer (using
+ *  Deprecated: use ABAudioSenderPort's audio unit initializer (using
  *  AEAudioController's [audioUnit](@ref AEAudioController::audioUnit) property.
  *
  *  This method has been deprecated, as it doesn't support synchronization
  *  and latency compensation.
  */
-@property (nonatomic, retain) ABSenderPort *audiobusSenderPort __deprecated_msg("use ABSenderPort's audio unit initializer instead");
+@property (nonatomic, retain) ABAudioSenderPort *audiobusSenderPort __deprecated_msg("use ABAudioSenderPort's audio unit initializer instead");
 
 @end
 

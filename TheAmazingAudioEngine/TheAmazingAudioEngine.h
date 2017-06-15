@@ -682,14 +682,14 @@ self.filter = [AEBlockFilter filterWithBlock:^(AEAudioFilterProducer producer,
 
  Then you can:
  
- - Receive Audiobus audio by creating an ABReceiverPort and passing it to The Amazing Audio Engine
+ - Receive Audiobus audio by creating an ABAudioReceiverPort and passing it to The Amazing Audio Engine
    via AEAudioController's [audiobusReceiverPort](@ref AEAudioController::audiobusReceiverPort) property.
- - Send your app's audio output via Audiobus by creating an ABSenderPort and passing it your [audio unit](@ref AEAudioController::audioUnit).
- - Send one individual channel via Audiobus by assigning a new ABSenderPort via
+ - Send your app's audio output via Audiobus by creating an ABAudioSenderPort and passing it your [audio unit](@ref AEAudioController::audioUnit).
+ - Send one individual channel via Audiobus by assigning a new ABAudioSenderPort via
    @link AEAudioController::setAudiobusSenderPort:forChannel: setAudiobusSenderPort:forChannel: @endlink
- - Send a channel group via Audiobus by assigning a new ABSenderPort via
+ - Send a channel group via Audiobus by assigning a new ABAudioSenderPort via
    @link AEAudioController::setAudiobusSenderPort:forChannelGroup: setAudiobusSenderPort:forChannelGroup: @endlink
- - Filter Audiobus audio by creating an ABFilterPort with AEAudioController's [audioUnit](@ref AEAudioController::audioUnit).
+ - Filter Audiobus audio by creating an ABAudioFilterPort with AEAudioController's [audioUnit](@ref AEAudioController::audioUnit).
  
  
  Take a look at the header documentation for the @link AEAudioController(AudiobusAdditions) Audiobus functions @endlink
