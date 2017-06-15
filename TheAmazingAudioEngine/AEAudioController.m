@@ -2255,14 +2255,14 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
     }
 }
 
--(void)setAudiobusSenderPort:(ABSenderPort *)senderPort forChannel:(id<AEAudioPlayable>)channel {
+-(void)setAudiobusSenderPort:(ABAudioSenderPort *)senderPort forChannel:(id<AEAudioPlayable>)channel {
     int index;
     AEChannelGroupRef group = [self searchForGroupContainingChannelMatchingPtr:channel.renderCallback userInfo:(__bridge void*)channel index:&index];
     if ( !group ) return;
     [self setAudiobusSenderPort:senderPort forChannelElement:group->channels[index]];
 }
 
--(void)setAudiobusSenderPort:(ABSenderPort *)senderPort forChannelGroup:(AEChannelGroupRef)channelGroup {
+-(void)setAudiobusSenderPort:(ABAudioSenderPort *)senderPort forChannelGroup:(AEChannelGroupRef)channelGroup {
     [self setAudiobusSenderPort:senderPort forChannelElement:channelGroup->channel];
 }
 
