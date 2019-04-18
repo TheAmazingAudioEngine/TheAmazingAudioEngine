@@ -914,6 +914,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
         [self willChangeValueForKey:@"audioDescription"];
         _audioDescription = audioDescription;
         [self didChangeValueForKey:@"audioDescription"];
+        [self updateAudiobusPortClientFormats];
     } error:error];
 }
 
@@ -966,29 +967,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
             [self willChangeValueForKey:@"audioDescription"];
             _audioDescription = audioDescription;
             [self didChangeValueForKey:@"audioDescription"];
-            
-            
-            // Update Audiobus senders' audio descriptions
-            [self iterateChannelsBeneathGroup:_topGroup block:^(AEChannelRef channel) {
-                if ( channel->audioDescription.mSampleRate ) {
-                    // No change required, this channel has its own audio description
-                    return;
-                }
-                
-                if ( channel->audiobusSenderPort ) {
-                    if ( channel->audiobusFloatConverter ) {
-                        CFBridgingRelease(channel->audiobusFloatConverter);
-                        channel->audiobusFloatConverter = nil;
-                    }
-                    if ( channel->audiobusScratchBuffer ) {
-                        AEFreeAudioBufferList(channel->audiobusScratchBuffer);
-                        channel->audiobusScratchBuffer = NULL;
-                    }
-                    channel->audiobusFloatConverter = (__bridge_retained void*)[[AEFloatConverter alloc] initWithSourceFormat:_audioDescription];
-                    channel->audiobusScratchBuffer = AEAudioBufferListCreate(((__bridge AEFloatConverter*)channel->audiobusFloatConverter).floatingPointAudioDescription, kScratchBufferFrames);
-                    [(__bridge id<AEAudiobusForwardDeclarationsProtocol>)channel->audiobusSenderPort setClientFormat:((__bridge AEFloatConverter*)channel->audiobusFloatConverter).floatingPointAudioDescription];
-                }
-            }];
+            [self updateAudiobusPortClientFormats];
         }
         if ( _inputEnabled != inputEnabled ) {
             self.inputEnabled = inputEnabled;
@@ -2287,6 +2266,34 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
 
 -(void)setAudiobusSenderPort:(ABAudioSenderPort *)senderPort forChannelGroup:(AEChannelGroupRef)channelGroup {
     [self setAudiobusSenderPort:senderPort forChannelElement:channelGroup->channel];
+}
+
+-(void)updateAudiobusPortClientFormats {
+    // Update Audiobus senders' audio descriptions
+    [self iterateChannelsBeneathGroup:_topGroup block:^(AEChannelRef channel) {
+        if ( channel->audioDescription.mSampleRate ) {
+            // No change required, this channel has its own audio description
+            return;
+        }
+        
+        if ( channel->audiobusSenderPort ) {
+            if ( channel->audiobusFloatConverter ) {
+                CFBridgingRelease(channel->audiobusFloatConverter);
+                channel->audiobusFloatConverter = nil;
+            }
+            if ( channel->audiobusScratchBuffer ) {
+                AEFreeAudioBufferList(channel->audiobusScratchBuffer);
+                channel->audiobusScratchBuffer = NULL;
+            }
+            channel->audiobusFloatConverter = (__bridge_retained void*)[[AEFloatConverter alloc] initWithSourceFormat:_audioDescription];
+            channel->audiobusScratchBuffer = AEAudioBufferListCreate(((__bridge AEFloatConverter*)channel->audiobusFloatConverter).floatingPointAudioDescription, kScratchBufferFrames);
+            [(__bridge id<AEAudiobusForwardDeclarationsProtocol>)channel->audiobusSenderPort setClientFormat:((__bridge AEFloatConverter*)channel->audiobusFloatConverter).floatingPointAudioDescription];
+        }
+    }];
+    
+    if ( _audiobusReceiverPort ) {
+        [self updateInputDeviceStatus];
+    }
 }
 
 #pragma mark - Events
