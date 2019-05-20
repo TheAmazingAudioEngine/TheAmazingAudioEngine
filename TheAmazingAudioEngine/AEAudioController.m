@@ -1252,7 +1252,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
         objectMatchArray[i] = (__bridge void *)(channels[i]);
     }
     AEChannelRef * removedChannels = (AEChannelRef*)malloc(count * sizeof(AEChannelRef));
-    memset(removedChannels, 0, sizeof(count * sizeof(AEChannelRef)));
+    memset(removedChannels, 0, count * sizeof(AEChannelRef));
     [self performAsynchronousMessageExchangeWithBlock:^{
         removeChannelsFromGroup(self, group, ptrMatchArray, objectMatchArray, removedChannels, count);
     } responseBlock:^{
