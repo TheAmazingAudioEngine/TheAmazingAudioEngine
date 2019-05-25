@@ -397,7 +397,7 @@ static void AEAudioFilePlayerNotifyCompletion(void *userInfo, int userInfoLength
     }
     
     if ( THIS.removeUponFinish ) {
-        [THIS.audioController removeChannels:@[THIS]];
+        [THIS.audioController removeChannels:@[THIS] completionBlock:nil];
     }
     THIS.channelIsPlaying = NO;
     if ( THIS.completionBlock ) {

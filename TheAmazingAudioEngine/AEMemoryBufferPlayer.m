@@ -116,7 +116,7 @@ static void notifyPlaybackStopped(void *userInfo, int length) {
     THIS.channelIsPlaying = NO;
 
     if ( THIS->_removeUponFinish ) {
-        [arg->audioController removeChannels:@[THIS]];
+        [arg->audioController removeChannels:@[THIS] completionBlock:nil];
     }
     
     if ( THIS.completionBlock ) THIS.completionBlock();
