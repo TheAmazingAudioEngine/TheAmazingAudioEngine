@@ -38,7 +38,7 @@ typedef void (^AEBlockSchedulerBlock)(const AudioTimeStamp *intervalStartTime, U
  *
  *  Will be called on the main thread
  */
-typedef void (^AEBlockSchedulerResponseBlock)();
+typedef void (^AEBlockSchedulerResponseBlock)(void);
 
 /*!
  * Block scheduler

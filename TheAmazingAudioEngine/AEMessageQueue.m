@@ -137,7 +137,7 @@ void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessage
         TPCircularBufferConsume(&THIS->_realtimeThreadMessageBuffer, sizeof(message_t));
         
         if ( message.block ) {
-            ((__bridge void(^)())message.block)();
+            ((__bridge void(^)(void))message.block)();
         }
 
         int32_t availableBytes;
@@ -162,7 +162,7 @@ void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessage
     [self processMainThreadMessagesMatchingResponseBlock:nil];
 }
 
--(void)processMainThreadMessagesMatchingResponseBlock:(void (^)())responseBlock {
+-(void)processMainThreadMessagesMatchingResponseBlock:(void (^)(void))responseBlock {
     pthread_t thread = pthread_self();
     BOOL isMainThread = [NSThread isMainThread];
 
@@ -215,7 +215,7 @@ void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessage
         }
         
         if ( message->responseBlock ) {
-            ((__bridge void(^)())message->responseBlock)();
+            ((__bridge void(^)(void))message->responseBlock)();
             CFBridgingRelease(message->responseBlock);
             
             _pendingResponses--;
@@ -235,8 +235,8 @@ void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessage
     }
 }
 
-- (void)performAsynchronousMessageExchangeWithBlock:(void (^)())block
-                                      responseBlock:(void (^)())responseBlock
+- (void)performAsynchronousMessageExchangeWithBlock:(void (^)(void))block
+                                      responseBlock:(void (^)(void))responseBlock
                                        sourceThread:(pthread_t)sourceThread {
     @synchronized ( self ) {
 
@@ -268,13 +268,13 @@ void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessage
 }
 
 
-- (void)performAsynchronousMessageExchangeWithBlock:(void (^)())block responseBlock:(void (^)())responseBlock {
+- (void)performAsynchronousMessageExchangeWithBlock:(void (^)(void))block responseBlock:(void (^)(void))responseBlock {
     [self performAsynchronousMessageExchangeWithBlock:block responseBlock:responseBlock sourceThread:NULL];
 }
 
-- (BOOL)performSynchronousMessageExchangeWithBlock:(void (^)())block {
+- (BOOL)performSynchronousMessageExchangeWithBlock:(void (^)(void))block {
     __block BOOL finished = NO;
-    void (^responseBlock)() = ^{ finished = YES; };
+    void (^responseBlock)(void) = ^{ finished = YES; };
     [self performAsynchronousMessageExchangeWithBlock:block
                                         responseBlock:responseBlock
                                          sourceThread:pthread_self()];

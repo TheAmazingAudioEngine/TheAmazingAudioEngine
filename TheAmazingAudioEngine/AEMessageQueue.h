@@ -118,8 +118,8 @@ typedef void (*AEMessageQueueMessageHandler)(void *userInfo, int userInfoLength)
  * @param block         A block to be performed on the realtime thread.
  * @param responseBlock A block to be performed on the main thread after the handler has been run, or nil.
  */
-- (void)performAsynchronousMessageExchangeWithBlock:(void (^)())block
-                                      responseBlock:(void (^)())responseBlock;
+- (void)performAsynchronousMessageExchangeWithBlock:(void (^)(void))block
+                                      responseBlock:(void (^)(void))responseBlock;
 
 /*!
  * Send a message to the realtime thread synchronously
@@ -141,7 +141,7 @@ typedef void (*AEMessageQueueMessageHandler)(void *userInfo, int userInfoLength)
  * @param block         A block to be performed on the realtime thread.
  * @return              YES if the block could be performed, NO otherwise.
  */
-- (BOOL)performSynchronousMessageExchangeWithBlock:(void (^)())block;
+- (BOOL)performSynchronousMessageExchangeWithBlock:(void (^)(void))block;
 
 /*!
  * Send a message to the main thread asynchronously

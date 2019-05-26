@@ -192,7 +192,7 @@ static void timingReceiverFinishSchedule(void *userInfo, int len) {
     __unsafe_unretained AEBlockScheduler *THIS = (__bridge AEBlockScheduler*)arg->THIS;
     
     if ( arg->schedule.responseBlock ) {
-        ((__bridge_transfer void(^)())arg->schedule.responseBlock)();
+        ((__bridge_transfer void(^)(void))arg->schedule.responseBlock)();
     }
     CFBridgingRelease(arg->schedule.block);
     

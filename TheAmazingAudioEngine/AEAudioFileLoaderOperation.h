@@ -92,7 +92,7 @@ extern "C" {
  */
 @property (nonatomic, copy) void (^audioReceiverBlock)(AudioBufferList *audio, UInt32 lengthInFrames);
 
-@property (nonatomic, copy) void (^completedBlock)();
+@property (nonatomic, copy) void (^completedBlock)(void);
 
 
 /*!
