@@ -133,13 +133,6 @@ void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessage
     while ( buffer < end ) {
         assert(buffer->userInfoLength == 0);
         
-        memcpy(&message, buffer, sizeof(message));
-        TPCircularBufferConsume(&THIS->_realtimeThreadMessageBuffer, sizeof(message_t));
-        
-        if ( message.block ) {
-            ((__bridge void(^)(void))message.block)();
-        }
-
         int32_t availableBytes;
         message_t *reply = TPCircularBufferHead(&THIS->_mainThreadMessageBuffer, &availableBytes);
         if ( availableBytes < sizeof(message_t) ) {
@@ -149,6 +142,14 @@ void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessage
             pthread_mutex_unlock(&THIS->_mutex);
             return;
         }
+        
+        memcpy(&message, buffer, sizeof(message));
+        TPCircularBufferConsume(&THIS->_realtimeThreadMessageBuffer, sizeof(message_t));
+        
+        if ( message.block ) {
+            ((__bridge void(^)(void))message.block)();
+        }
+        
         memcpy(reply, &message, sizeof(message_t));
         TPCircularBufferProduce(&THIS->_mainThreadMessageBuffer, sizeof(message_t));
         
