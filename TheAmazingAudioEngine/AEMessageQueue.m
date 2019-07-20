@@ -133,8 +133,9 @@ void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessage
     while ( buffer < end ) {
         assert(buffer->userInfoLength == 0);
         
+        // Check for available space for reply on main thread buffer, and bail if insufficient
         int32_t availableBytes;
-        message_t *reply = TPCircularBufferHead(&THIS->_mainThreadMessageBuffer, &availableBytes);
+        TPCircularBufferHead(&THIS->_mainThreadMessageBuffer, &availableBytes);
         if ( availableBytes < sizeof(message_t) ) {
 #ifdef DEBUG
             NSLog(@"AEMessageBuffer: Integrity problem, insufficient space in main thread messaging buffer");
@@ -143,6 +144,7 @@ void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessage
             return;
         }
         
+        // Process message for realtime thread
         memcpy(&message, buffer, sizeof(message));
         TPCircularBufferConsume(&THIS->_realtimeThreadMessageBuffer, sizeof(message_t));
         
@@ -150,6 +152,15 @@ void AEMessageQueueProcessMessagesOnRealtimeThread(__unsafe_unretained AEMessage
             ((__bridge void(^)(void))message.block)();
         }
         
+        // Write reply to main thread buffer, checking again for available space (above block call may have caused additional writes)
+        message_t *reply = TPCircularBufferHead(&THIS->_mainThreadMessageBuffer, &availableBytes);
+        if ( availableBytes < sizeof(message_t) ) {
+#ifdef DEBUG
+            NSLog(@"AEMessageBuffer: Integrity problem, insufficient space in main thread messaging buffer");
+#endif
+            pthread_mutex_unlock(&THIS->_mutex);
+            return;
+        }
         memcpy(reply, &message, sizeof(message_t));
         TPCircularBufferProduce(&THIS->_mainThreadMessageBuffer, sizeof(message_t));
         
