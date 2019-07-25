@@ -46,18 +46,14 @@ static const int kMaxAudioFileReadSize = 16384;
     ExtAudioFileRef audioFile;
     OSStatus status;
     
-    if ( ![url startAccessingSecurityScopedResource] ) {
-        if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:kAudio_FilePermissionError
-                                              userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't open the audio file", @"")}];
-        return NO;
-    }
+    BOOL holdingSecurityResource = [url startAccessingSecurityScopedResource];
     
     // Open file
     status = ExtAudioFileOpenURL((__bridge CFURLRef)url, &audioFile);
     if ( !AECheckOSStatus(status, "ExtAudioFileOpenURL") ) {
         if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
                                               userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't open the audio file", @"")}];
-        [url stopAccessingSecurityScopedResource];
+        if ( holdingSecurityResource ) [url stopAccessingSecurityScopedResource];
         return NO;
     }
         
@@ -68,7 +64,7 @@ static const int kMaxAudioFileReadSize = 16384;
         if ( !AECheckOSStatus(status, "ExtAudioFileGetProperty") ) {
             if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
                                                   userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't read the audio file", @"")}];
-            [url stopAccessingSecurityScopedResource];
+            if ( holdingSecurityResource ) [url stopAccessingSecurityScopedResource];
             return NO;
         }
     }    
@@ -82,7 +78,7 @@ static const int kMaxAudioFileReadSize = 16384;
             ExtAudioFileDispose(audioFile);
             if ( error ) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
                                                   userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't read the audio file", @"")}];
-            [url stopAccessingSecurityScopedResource];
+            if ( holdingSecurityResource ) [url stopAccessingSecurityScopedResource];
             return NO;
         }
         *lengthInFrames = (UInt32)fileLengthInFrames;
@@ -90,7 +86,7 @@ static const int kMaxAudioFileReadSize = 16384;
     
     ExtAudioFileDispose(audioFile);
     
-    [url stopAccessingSecurityScopedResource];
+    if ( holdingSecurityResource ) [url stopAccessingSecurityScopedResource];
     
     return YES;
 }
@@ -110,17 +106,13 @@ static const int kMaxAudioFileReadSize = 16384;
     OSStatus status;
     
     // Open file
-    if ( ![self.url startAccessingSecurityScopedResource] ) {
-        self.error = [NSError errorWithDomain:NSOSStatusErrorDomain code:kAudio_FilePermissionError
-                                              userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't open the audio file", @"")}];
-        return;
-    }
+    BOOL holdingSecurityResource = [self.url startAccessingSecurityScopedResource];
     
     status = ExtAudioFileOpenURL((__bridge CFURLRef)_url, &audioFile);
     if ( !AECheckOSStatus(status, "ExtAudioFileOpenURL") ) {
         self.error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
                                      userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't open the audio file", @"")}];
-        [self.url stopAccessingSecurityScopedResource];
+        if ( holdingSecurityResource ) [self.url stopAccessingSecurityScopedResource];
         return;
     }
     
@@ -132,7 +124,7 @@ static const int kMaxAudioFileReadSize = 16384;
         ExtAudioFileDispose(audioFile);
         self.error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
                                      userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't read the audio file", @"")}];
-        [self.url stopAccessingSecurityScopedResource];
+        if ( holdingSecurityResource ) [self.url stopAccessingSecurityScopedResource];
         return;
     }
     
@@ -143,7 +135,7 @@ static const int kMaxAudioFileReadSize = 16384;
         int fourCC = CFSwapInt32HostToBig(status);
         self.error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
                                      userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Couldn't convert the audio file (error %d/%4.4s)", @""), status, (char*)&fourCC]}];
-        [self.url stopAccessingSecurityScopedResource];
+        if ( holdingSecurityResource ) [self.url stopAccessingSecurityScopedResource];
         return;
     }
     
@@ -172,7 +164,7 @@ static const int kMaxAudioFileReadSize = 16384;
         ExtAudioFileDispose(audioFile);
         self.error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
                                      userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Couldn't read the audio file", @"")}];
-        [self.url stopAccessingSecurityScopedResource];
+        if ( holdingSecurityResource ) [self.url stopAccessingSecurityScopedResource];
         return;
     }
     
@@ -187,7 +179,7 @@ static const int kMaxAudioFileReadSize = 16384;
         ExtAudioFileDispose(audioFile);
         self.error = [NSError errorWithDomain:NSPOSIXErrorDomain code:ENOMEM 
                                      userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Not enough memory to open file", @"")}];
-        [self.url stopAccessingSecurityScopedResource];
+        if ( holdingSecurityResource ) [self.url stopAccessingSecurityScopedResource];
         return;
     }
     
@@ -219,7 +211,7 @@ static const int kMaxAudioFileReadSize = 16384;
             int fourCC = CFSwapInt32HostToBig(status);
             self.error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status 
                                          userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Couldn't read the audio file (error %d/%4.4s)", @""), status, (char*)&fourCC]}];
-            [self.url stopAccessingSecurityScopedResource];
+            if ( holdingSecurityResource ) [self.url stopAccessingSecurityScopedResource];
             return;
         }
         
@@ -245,7 +237,7 @@ static const int kMaxAudioFileReadSize = 16384;
     // Clean up        
     ExtAudioFileDispose(audioFile);
     
-    [self.url stopAccessingSecurityScopedResource];
+    if ( holdingSecurityResource ) [self.url stopAccessingSecurityScopedResource];
     
     if ( [self isCancelled] ) {
         if ( bufferList ) {
