@@ -870,7 +870,7 @@ static OSStatus ioUnitRenderNotifyCallback(void *inRefCon, AudioUnitRenderAction
     _inputTable->entries = (input_entry_t*)calloc(sizeof(input_entry_t), 1);
     
 #if TARGET_OS_IPHONE
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationWillEnterForeground:) name:UIApplicationWillEnterForegroundNotification object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationDidBecomeActive:) name:UIApplicationDidBecomeActiveNotification object:nil];
 #endif
     
     if ( ABConnectionsChangedNotification ) {
@@ -2408,7 +2408,7 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
 }
 
 #if TARGET_OS_IPHONE
-- (void)applicationWillEnterForeground:(NSNotification*)notification {
+- (void)applicationDidBecomeActive:(NSNotification*)notification {
     NSError *error = nil;
     if ( ![((AVAudioSession*)[AVAudioSession sharedInstance]) setActive:YES error:&error] ) {
         NSLog(@"TAAE: Couldn't activate audio session: %@", error);
