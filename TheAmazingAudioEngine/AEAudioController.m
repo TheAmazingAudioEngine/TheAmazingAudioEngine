@@ -2298,7 +2298,10 @@ AudioTimeStamp AEAudioControllerCurrentAudioTimestamp(__unsafe_unretained AEAudi
 -(void)setAudiobusSenderPort:(ABAudioSenderPort *)senderPort forChannel:(id<AEAudioPlayable>)channel {
     int index;
     AEChannelGroupRef group = [self searchForGroupContainingChannelMatchingPtr:channel.renderCallback userInfo:(__bridge void*)channel index:&index];
-    if ( !group ) return;
+    if ( !group ) {
+        NSLog(@"No containing group for channel %@ when assigning sender port", channel);
+        return;
+    }
     [self setAudiobusSenderPort:senderPort forChannelElement:group->channels[index]];
 }
 
