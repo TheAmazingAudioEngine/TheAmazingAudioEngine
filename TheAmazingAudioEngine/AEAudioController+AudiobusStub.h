@@ -38,7 +38,6 @@ BOOL ABAudioFilterPortIsConnected(ABAudioFilterPort *filterPort);
 void ABAudioSenderPortSend(ABAudioSenderPort* senderPort, const AudioBufferList *audio, UInt32 lengthInFrames, const AudioTimeStamp *timestamp);
 BOOL ABAudioSenderPortIsConnected(ABAudioSenderPort *senderPort);
 BOOL ABAudioSenderPortIsMuted(ABAudioSenderPort *senderPort);
-NSTimeInterval ABAudioSenderPortGetAverageLatency(ABAudioSenderPort *senderPort);
 typedef void (^ABAudioReceiverPortAudioInputBlock)(ABAudioReceiverPort *receiverPort, UInt32 lengthInFrames, AudioTimeStamp nextTimestamp, ABPort *sourcePortOrNil);
 
 @protocol AEAudiobusForwardDeclarationsProtocol <NSObject>

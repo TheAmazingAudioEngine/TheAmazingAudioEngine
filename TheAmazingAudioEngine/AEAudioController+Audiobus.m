@@ -54,9 +54,4 @@ __attribute__((weak)) BOOL ABAudioSenderPortIsMuted(ABAudioSenderPort *senderPor
     return NO;
 }
 
-__attribute__((weak)) NSTimeInterval ABAudioSenderPortGetAverageLatency(ABAudioSenderPort *senderPort) {
-    printf("ABAudioSenderPortGetAverageLatency stub called\n");
-    return 0;
-}
-
 __attribute__((weak)) NSString * const ABConnectionsChangedNotification = @"ABConnectionsChangedNotification";

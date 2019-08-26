@@ -2175,7 +2175,7 @@ NSTimeInterval AEAudioControllerOutputLatency(__unsafe_unretained AEAudioControl
         __unsafe_unretained ABAudioSenderPort * upstreamSenderPort = (__bridge ABAudioSenderPort*)firstUpstreamAudiobusSenderPort(channelBeingRendered);
         if ( upstreamSenderPort && ABAudioSenderPortIsMuted(upstreamSenderPort) ) {
             // We're sending via the sender port, and the receiver plays live - offset the timestamp by the reported latency
-            return ABAudioSenderPortGetAverageLatency(upstreamSenderPort);
+            return 0;
         }
     }
     
