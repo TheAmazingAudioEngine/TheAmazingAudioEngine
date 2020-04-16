@@ -7,13 +7,18 @@
 //
 
 #import "ViewController.h"
+
 #import "TheAmazingAudioEngine.h"
-#import "TPOscilloscopeLayer.h"
 #import "AEPlaythroughChannel.h"
 #import "AEExpanderFilter.h"
 #import "AELimiterFilter.h"
+
 #import "AERecorder.h"
 #import "AEReverbFilter.h"
+
+
+#import "TPOscilloscopeLayer.h"
+
 #import <QuartzCore/QuartzCore.h>
 
 static const int kInputChannelsChangedContext;
@@ -31,13 +36,16 @@ static const int kInputChannelsChangedContext;
 @property (nonatomic, strong) AELimiterFilter *limiter;
 @property (nonatomic, strong) AEExpanderFilter *expander;
 @property (nonatomic, strong) AEReverbFilter *reverb;
+
+@property (nonatomic, strong) AERecorder *recorder;
+@property (nonatomic, strong) AEAudioFilePlayer *player;
+
 @property (nonatomic, strong) TPOscilloscopeLayer *outputOscilloscope;
 @property (nonatomic, strong) TPOscilloscopeLayer *inputOscilloscope;
+
 @property (nonatomic, strong) CALayer *inputLevelLayer;
 @property (nonatomic, strong) CALayer *outputLevelLayer;
 @property (nonatomic, weak) NSTimer *levelsTimer;
-@property (nonatomic, strong) AERecorder *recorder;
-@property (nonatomic, strong) AEAudioFilePlayer *player;
 @property (nonatomic, strong) UIButton *recordButton;
 @property (nonatomic, strong) UIButton *playButton;
 @property (nonatomic, strong) UIButton *oneshotButton;
@@ -116,40 +124,40 @@ static const int kInputChannelsChangedContext;
         _loop1.channelIsMuted = YES;
         _loop1.loop = YES;
         
-        // Create the second loop player
-        self.loop2 = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Organ" withExtension:@"m4a"] error:NULL];
-        _loop2.volume = 1.0;
-        _loop2.channelIsMuted = YES;
-        _loop2.loop = YES;
-        
-        // Create a block-based channel, with an implementation of an oscillator
-        __block float oscillatorPosition = 0;
-        __block float oscillatorRate = 622.0/44100.0;
-        self.oscillator = [AEBlockChannel channelWithBlock:^(const AudioTimeStamp  *time,
-                                                             UInt32           frames,
-                                                             AudioBufferList *audio) {
-            for ( int i=0; i<frames; i++ ) {
-                // Quick sin-esque oscillator
-                float x = oscillatorPosition;
-                x *= x; x -= 1.0; x *= x;       // x now in the range 0...1
-                x *= INT16_MAX;
-                x -= INT16_MAX / 2;
-                oscillatorPosition += oscillatorRate;
-                if ( oscillatorPosition > 1.0 ) oscillatorPosition -= 2.0;
-                
-                ((SInt16*)audio->mBuffers[0].mData)[i] = x;
-                ((SInt16*)audio->mBuffers[1].mData)[i] = x;
-            }
-        }];
-        _oscillator.audioDescription = AEAudioStreamBasicDescriptionNonInterleaved16BitStereo;
-        _oscillator.channelIsMuted = YES;
+//        // Create the second loop player
+//        self.loop2 = [AEAudioFilePlayer audioFilePlayerWithURL:[[NSBundle mainBundle] URLForResource:@"Southern Rock Organ" withExtension:@"m4a"] error:NULL];
+//        _loop2.volume = 1.0;
+//        _loop2.channelIsMuted = YES;
+//        _loop2.loop = YES;
+//
+//        // Create a block-based channel, with an implementation of an oscillator
+//        __block float oscillatorPosition = 0;
+//        __block float oscillatorRate = 622.0/44100.0;
+//        self.oscillator = [AEBlockChannel channelWithBlock:^(const AudioTimeStamp  *time,
+//                                                             UInt32           frames,
+//                                                             AudioBufferList *audio) {
+//            for ( int i=0; i<frames; i++ ) {
+//                // Quick sin-esque oscillator
+//                float x = oscillatorPosition;
+//                x *= x; x -= 1.0; x *= x;       // x now in the range 0...1
+//                x *= INT16_MAX;
+//                x -= INT16_MAX / 2;
+//                oscillatorPosition += oscillatorRate;
+//                if ( oscillatorPosition > 1.0 ) oscillatorPosition -= 2.0;
+//
+//                ((SInt16*)audio->mBuffers[0].mData)[i] = x;
+//                ((SInt16*)audio->mBuffers[1].mData)[i] = x;
+//            }
+//        }];
+//        _oscillator.audioDescription = AEAudioStreamBasicDescriptionNonInterleaved16BitStereo;
+//        _oscillator.channelIsMuted = YES;
         
         // Create an audio unit channel (a file player)
         self.audioUnitPlayer = [[AEAudioUnitChannel alloc] initWithComponentDescription:AEAudioComponentDescriptionMake(kAudioUnitManufacturer_Apple, kAudioUnitType_Generator, kAudioUnitSubType_AudioFilePlayer)];
         
         // Create a group for loop1, loop2 and oscillator
-        _group = [_audioController createChannelGroup];
-        [_audioController addChannels:@[_loop1, _loop2, _oscillator] toChannelGroup:_group];
+//        _group = [_audioController createChannelGroup];
+//        [_audioController addChannels:@[_loop1] toChannelGroup:_group];
         
         // Finally, add the audio unit player
         [_audioController addChannels:@[_audioUnitPlayer]];
@@ -157,6 +165,9 @@ static const int kInputChannelsChangedContext;
         [_audioController addObserver:self forKeyPath:@"numberOfInputChannels" options:0 context:(void*)&kInputChannelsChangedContext];
     }
 }
+
+////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////
 
 -(void)dealloc {
     self.audioController = nil;
@@ -167,50 +178,50 @@ static const int kInputChannelsChangedContext;
 -(void)viewDidLoad {
     [super viewDidLoad];
     
-    UIView *headerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 100)];
-    headerView.backgroundColor = [UIColor groupTableViewBackgroundColor];
+//    UIView *headerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 100)];
+//    headerView.backgroundColor = [UIColor groupTableViewBackgroundColor];
     
-    self.outputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioDescription:_audioController.audioDescription];
-    _outputOscilloscope.frame = CGRectMake(0, 0, headerView.bounds.size.width, 80);
-    [headerView.layer addSublayer:_outputOscilloscope];
-    [_audioController addOutputReceiver:_outputOscilloscope];
-    [_outputOscilloscope start];
+//    self.outputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioDescription:_audioController.audioDescription];
+//    _outputOscilloscope.frame = CGRectMake(0, 0, headerView.bounds.size.width, 80);
+//    [headerView.layer addSublayer:_outputOscilloscope];
+//    [_audioController addOutputReceiver:_outputOscilloscope];
+//    [_outputOscilloscope start];
+//
+//    self.inputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioDescription:_audioController.audioDescription];
+//    _inputOscilloscope.frame = CGRectMake(0, 0, headerView.bounds.size.width, 80);
+//    _inputOscilloscope.lineColor = [UIColor colorWithWhite:0.0 alpha:0.3];
+//    [headerView.layer addSublayer:_inputOscilloscope];
+//    [_audioController addInputReceiver:_inputOscilloscope];
+//    [_inputOscilloscope start];
     
-    self.inputOscilloscope = [[TPOscilloscopeLayer alloc] initWithAudioDescription:_audioController.audioDescription];
-    _inputOscilloscope.frame = CGRectMake(0, 0, headerView.bounds.size.width, 80);
-    _inputOscilloscope.lineColor = [UIColor colorWithWhite:0.0 alpha:0.3];
-    [headerView.layer addSublayer:_inputOscilloscope];
-    [_audioController addInputReceiver:_inputOscilloscope];
-    [_inputOscilloscope start];
+//    self.inputLevelLayer = [CALayer layer];
+//    _inputLevelLayer.backgroundColor = [[UIColor colorWithWhite:0.0 alpha:0.3] CGColor];
+//    _inputLevelLayer.frame = CGRectMake(headerView.bounds.size.width/2.0 - 5.0 - (0.0), 90, 0, 10);
+//    [headerView.layer addSublayer:_inputLevelLayer];
+//
+//    self.outputLevelLayer = [CALayer layer];
+//    _outputLevelLayer.backgroundColor = [[UIColor colorWithWhite:0.0 alpha:0.3] CGColor];
+//    _outputLevelLayer.frame = CGRectMake(headerView.bounds.size.width/2.0 + 5.0, 90, 0, 10);
+//    [headerView.layer addSublayer:_outputLevelLayer];
     
-    self.inputLevelLayer = [CALayer layer];
-    _inputLevelLayer.backgroundColor = [[UIColor colorWithWhite:0.0 alpha:0.3] CGColor];
-    _inputLevelLayer.frame = CGRectMake(headerView.bounds.size.width/2.0 - 5.0 - (0.0), 90, 0, 10);
-    [headerView.layer addSublayer:_inputLevelLayer];
-    
-    self.outputLevelLayer = [CALayer layer];
-    _outputLevelLayer.backgroundColor = [[UIColor colorWithWhite:0.0 alpha:0.3] CGColor];
-    _outputLevelLayer.frame = CGRectMake(headerView.bounds.size.width/2.0 + 5.0, 90, 0, 10);
-    [headerView.layer addSublayer:_outputLevelLayer];
-    
-    self.tableView.tableHeaderView = headerView;
-    
-    UIView *footerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 80)];
-    self.recordButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
-    [_recordButton setTitle:@"Record" forState:UIControlStateNormal];
-    [_recordButton setTitle:@"Stop" forState:UIControlStateSelected];
-    [_recordButton addTarget:self action:@selector(record:) forControlEvents:UIControlEventTouchUpInside];
-    _recordButton.frame = CGRectMake(20, 10, ((footerView.bounds.size.width-50) / 2), footerView.bounds.size.height - 20);
-    _recordButton.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleRightMargin;
-    self.playButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
-    [_playButton setTitle:@"Play" forState:UIControlStateNormal];
-    [_playButton setTitle:@"Stop" forState:UIControlStateSelected];
-    [_playButton addTarget:self action:@selector(play:) forControlEvents:UIControlEventTouchUpInside];
-    _playButton.frame = CGRectMake(CGRectGetMaxX(_recordButton.frame)+10, 10, ((footerView.bounds.size.width-50) / 2), footerView.bounds.size.height - 20);
-    _playButton.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleLeftMargin;
-    [footerView addSubview:_recordButton];
-    [footerView addSubview:_playButton];
-    self.tableView.tableFooterView = footerView;
+//    self.tableView.tableHeaderView = headerView;
+//
+//    UIView *footerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 80)];
+//    self.recordButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+//    [_recordButton setTitle:@"Record" forState:UIControlStateNormal];
+//    [_recordButton setTitle:@"Stop" forState:UIControlStateSelected];
+//    [_recordButton addTarget:self action:@selector(record:) forControlEvents:UIControlEventTouchUpInside];
+//    _recordButton.frame = CGRectMake(20, 10, ((footerView.bounds.size.width-50) / 2), footerView.bounds.size.height - 20);
+//    _recordButton.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleRightMargin;
+//    self.playButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+//    [_playButton setTitle:@"Play" forState:UIControlStateNormal];
+//    [_playButton setTitle:@"Stop" forState:UIControlStateSelected];
+//    [_playButton addTarget:self action:@selector(play:) forControlEvents:UIControlEventTouchUpInside];
+//    _playButton.frame = CGRectMake(CGRectGetMaxX(_recordButton.frame)+10, 10, ((footerView.bounds.size.width-50) / 2), footerView.bounds.size.height - 20);
+//    _playButton.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleLeftMargin;
+//    [footerView addSubview:_recordButton];
+//    [footerView addSubview:_playButton];
+//    self.tableView.tableFooterView = footerView;
 }
 
 -(void)viewWillAppear:(BOOL)animated {
@@ -316,8 +327,8 @@ static const int kInputChannelsChangedContext;
                 }
                 case 3: {
                     cell.textLabel.text = @"Group";
-                    onSwitch.on = ![_audioController channelGroupIsMuted:_group];
-                    slider.value = [_audioController volumeForChannelGroup:_group];
+//                    onSwitch.on = ![_audioController channelGroupIsMuted:_group];
+//                    slider.value = [_audioController volumeForChannelGroup:_group];
                     [onSwitch addTarget:self action:@selector(channelGroupSwitchChanged:) forControlEvents:UIControlEventValueChanged];
                     [slider addTarget:self action:@selector(channelGroupVolumeChanged:) forControlEvents:UIControlEventValueChanged];
                     break;
@@ -459,6 +470,8 @@ static const int kInputChannelsChangedContext;
     return cell;
 }
 
+/////////////
+
 - (void)loop1SwitchChanged:(UISwitch*)sender {
     _loop1.channelIsMuted = !sender.isOn;
 }
@@ -563,11 +576,11 @@ static const int kInputChannelsChangedContext;
 - (void)playthroughSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
         self.playthrough = [[AEPlaythroughChannel alloc] init];
-        [_audioController addInputReceiver:_playthrough];
-        [_audioController addChannels:@[_playthrough]];
+        [self.audioController addInputReceiver:self.playthrough];
+        [self.audioController addChannels:@[self.playthrough]];
     } else {
-        [_audioController removeChannels:@[_playthrough]];
-        [_audioController removeInputReceiver:_playthrough];
+        [self.audioController removeChannels:@[self.playthrough]];
+        [self.audioController removeInputReceiver:self.playthrough];
         self.playthrough = nil;
     }
 }
@@ -596,7 +609,7 @@ static const int kInputChannelsChangedContext;
 - (void)limiterSwitchChanged:(UISwitch*)sender {
     if ( sender.isOn ) {
         self.limiter = [[AELimiterFilter alloc] init];
-        _limiter.level = 0.1;
+        _limiter.level = 200;
         [_audioController addFilter:_limiter];
     } else {
         [_audioController removeFilter:_limiter];

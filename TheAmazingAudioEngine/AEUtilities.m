@@ -123,15 +123,56 @@ void AEAudioBufferListSilence(const AudioBufferList *bufferList,
     }
 }
 
+//AudioBufferList:mNumberBuffers
+
 AudioStreamBasicDescription const AEAudioStreamBasicDescriptionNonInterleavedFloatStereo = {
     .mFormatID          = kAudioFormatLinearPCM,
     .mFormatFlags       = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked | kAudioFormatFlagIsNonInterleaved,
-    .mChannelsPerFrame  = 2,
+
+    
     .mBytesPerPacket    = sizeof(float),
     .mFramesPerPacket   = 1,
+//    struct AudioStreamBasicDescription
+//    {
+//        Float64             mSampleRate;
+//        AudioFormatID       mFormatID;
+//        AudioFormatFlags    mFormatFlags;
+    
+//        UInt32              mBytesPerPacket;
+//        UInt32              mFramesPerPacket;
+    
+//        UInt32              mBytesPerFrame;
+//        UInt32              mChannelsPerFrame;
+//        UInt32              mBitsPerChannel;
+//        UInt32              mReserved;
+//    };
     .mBytesPerFrame     = sizeof(float),
+    .mChannelsPerFrame  = 2,
+    //    Then, the ASBD's mChannelsPerFrame will indicate
+    //    the total number of AudioBuffers that are contained within the AudioBufferList -
+    //    where each buffer contains one channel.
+    
     .mBitsPerChannel    = 8 * sizeof(float),
-    .mSampleRate        = 44100.0,
+    .mSampleRate        = 44100.0,//Frame
+    
+// This structure encapsulates all the information for describing the basic
+//            format properties of a stream of audio data.
+// This structure is sufficient to describe any constant bit rate format that  has
+//    channels that are the same size. Extensions are required for variable bit rate
+//   data and for constant bit rate data where the channels have unequal sizes.
+// However, where applicable, the appropriate fields will be filled out correctly
+// for these kinds of formats (the extra data is provided via separate properties).
+// In all fields, a value of 0 indicates that the field is either unknown, not
+// applicable or otherwise is inapproprate for the format and should be ignored.
+// Note that 0 is still a valid value for most formats in the mFormatFlags field.
+//
+// In audio data a frame is one sample across all channels. In non-interleaved
+// audio, the per frame fields identify one channel. In interleaved audio, the per
+// frame fields identify the set of n channels.
+    
+// In uncompressed audio, a Packet is one frame, (mFramesPerPacket == 1).
+// In compressed audio, a Packet is an indivisible chunk of compressed data,
+//    for example an AAC packet will contain 1024 sample frames.
 };
 
 AudioStreamBasicDescription const AEAudioStreamBasicDescriptionNonInterleaved16BitStereo = {

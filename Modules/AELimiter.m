@@ -88,15 +88,20 @@ static element_t findNextTriggerValueInRange(AELimiter *THIS, AudioBufferList *d
     return self;
 }
 
-BOOL AELimiterEnqueue(__unsafe_unretained AELimiter *THIS, float** buffers, UInt32 length, const AudioTimeStamp *timestamp) {
+BOOL AELimiterEnqueue(__unsafe_unretained AELimiter *THIS,
+                      float** buffers,
+                      UInt32 length,
+                      const AudioTimeStamp *timestamp) {
+    
     int numberOfBuffers = THIS->_audioDescription.mChannelsPerFrame;
     
-    char audioBufferListBytes[sizeof(AudioBufferList)+(numberOfBuffers-1)*sizeof(AudioBuffer)];
+    int size = sizeof(AudioBufferList)+(numberOfBuffers-1)*sizeof(AudioBuffer); // 40
+    char audioBufferListBytes[size];
     AudioBufferList *bufferList = (AudioBufferList*)audioBufferListBytes;
     bufferList->mNumberBuffers = numberOfBuffers;
     for ( int i=0; i<numberOfBuffers; i++ ) {
         bufferList->mBuffers[i].mData = buffers[i];
-        bufferList->mBuffers[i].mDataByteSize = sizeof(float) * length;
+        bufferList->mBuffers[i].mDataByteSize = sizeof(float) * length; // length == 235
         bufferList->mBuffers[i].mNumberChannels = 1;
     }
     
@@ -107,11 +112,9 @@ void AELimiterDequeue(__unsafe_unretained AELimiter *THIS, float** buffers, UInt
     *ioLength = min(*ioLength, AELimiterFillCount(THIS, NULL, NULL));
     _AELimiterDequeue(THIS, buffers, ioLength, timestamp);
 }
-
 void AELimiterDrain(__unsafe_unretained AELimiter *THIS, float** buffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
     _AELimiterDequeue(THIS, buffers, ioLength, timestamp);
 }
-
 static void _AELimiterDequeue(__unsafe_unretained AELimiter *THIS, float** buffers, UInt32 *ioLength, AudioTimeStamp *timestamp) {
     // Dequeue the audio
     int numberOfBuffers = THIS->_audioDescription.mChannelsPerFrame;
