@@ -537,24 +537,21 @@ typedef enum {
  *
  * @deprecated Use AEAudioStreamBasicDescriptionInterleaved16BitStereo instead.
  */
-+ (AudioStreamBasicDescription)interleaved16BitStereoAudioDescription;
-// Soon:    __deprecated_msg("use AEAudioStreamBasicDescriptionInterleaved16BitStereo instead");
++ (AudioStreamBasicDescription)interleaved16BitStereoAudioDescription __deprecated_msg("use AEAudioStreamBasicDescriptionInterleaved16BitStereo instead");
 
 /*!
  * 16-bit stereo audio description, non-interleaved
  *
  * @deprecated Use AEAudioStreamBasicDescriptionNonInterleaved16BitStereo instead.
  */
-+ (AudioStreamBasicDescription)nonInterleaved16BitStereoAudioDescription;
-// Soon:    __deprecated_msg("use AEAudioStreamBasicDescriptionNonInterleaved16BitStereo instead");
++ (AudioStreamBasicDescription)nonInterleaved16BitStereoAudioDescription __deprecated_msg("use AEAudioStreamBasicDescriptionNonInterleaved16BitStereo instead");
 
 /*!
  * Floating-point stereo audio description, non-interleaved
  *
  * @deprecated Use AEAudioStreamBasicDescriptionNonInterleavedFloatStereo instead.
  */
-+ (AudioStreamBasicDescription)nonInterleavedFloatStereoAudioDescription;
-// Soon:    __deprecated_msg("use AEAudioStreamBasicDescriptionNonInterleavedFloatStereo instead");
++ (AudioStreamBasicDescription)nonInterleavedFloatStereoAudioDescription __deprecated_msg("use AEAudioStreamBasicDescriptionNonInterleavedFloatStereo instead");
 
 /*!
  * Determine whether voice processing is available on this device
