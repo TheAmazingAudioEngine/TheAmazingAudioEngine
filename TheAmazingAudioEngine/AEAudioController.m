@@ -41,7 +41,7 @@
 #import <pthread.h>
 
 // Uncomment the following or define the following symbol as part of your build process to enable per-second performance reports
-// #define TAAE_REPORT_RENDER_TIME
+ #define TAAE_REPORT_RENDER_TIME
 
 static const int kMaximumChannelsPerGroup              = 100;
 static const int kMaximumCallbacksPerSource            = 15;
@@ -300,20 +300,62 @@ static OSStatus fillComplexBufferInputProc(AudioConverterRef             inAudio
     return noErr;
 }
 
-typedef struct __channel_producer_arg_t {
+/*
+	A channel contains a callback to produce source audio, and additionally
+	contains a callback table for filters and receivers. In order to 
+	produce fully processed audio from a channel, the code must chain the 
+	callbacks from the last filter to the first filter to the source. 
+	
+	To recursively chain the callbacks, the code will use an internal struct 
+	with a callbackCount to indicate how many callbacks are yet to be chained.
+	or skipped. 
+	
+	It is initially set to channel->callbacks.count
+*/
+
+typedef struct __channel_producer_arg_t
+{
     AEChannelRef channel;
     AudioTimeStamp timeStamp;
     AudioTimeStamp originalTimeStamp;
     AudioUnitRenderActionFlags *ioActionFlags;
-    int nextFilterIndex;
-} channel_producer_arg_t;
+    UInt32 callbackCount;
+	int nextFilterIndex;
+}
+channel_producer_arg_t;
+
 
 static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UInt32 *frames) {
     channel_producer_arg_t *arg = (channel_producer_arg_t*)userInfo;
     AEChannelRef channel = arg->channel;
-    
+
     OSStatus status = noErr;
-    
+//*
+	// Fetch number of callbacks that still need to be processed
+	UInt32 callbackCount = arg->callbackCount;
+	while (callbackCount != 0)
+	{
+		// Get index of last callback, and update counter
+		UInt32 index = (callbackCount -= 1);
+		// Get corresponding callback info
+		callback_t *callback = &channel->callbacks.callbacks[index];
+		
+		// Test if it is a filter callback
+		if ( callback->flags & kFilterFlag )
+		{
+			// Create updated producer parameters
+			channel_producer_arg_t audioProducerArg = *arg;
+			audioProducerArg.callbackCount = callbackCount;
+			// Call filter callback, which will call channelAudioProducer again
+			return ((AEAudioFilterCallback)callback->callback)(
+				(__bridge id)callback->userInfo,
+				(__bridge AEAudioController *)channel->audioController,
+				&channelAudioProducer, (void*)&audioProducerArg, &arg->timeStamp, *frames, audio);
+ 			// TODO: check if "frames" by pointer is valid flow
+		}
+	}
+
+/*/
     // See if there's another filter
     for ( int i=channel->callbacks.count-1, filterIndex=0; i>=0; i-- ) {
         callback_t *callback = &channel->callbacks.callbacks[i];
@@ -327,7 +369,7 @@ static OSStatus channelAudioProducer(void *userInfo, AudioBufferList *audio, UIn
             filterIndex++;
         }
     }
-
+//*/
     for ( int i=0; i<audio->mNumberBuffers; i++ ) {
         memset(audio->mBuffers[i].mData, 0, audio->mBuffers[i].mDataByteSize);
     }
@@ -388,7 +430,8 @@ static OSStatus renderCallback(void *inRefCon, AudioUnitRenderActionFlags *ioAct
         .timeStamp = timestamp,
         .originalTimeStamp = *inTimeStamp,
         .ioActionFlags = ioActionFlags,
-        .nextFilterIndex = 0
+        .callbackCount = channel->callbacks.count,
+		.nextFilterIndex = 0
     };
     
     THIS->_channelBeingRendered = channel;
