@@ -1599,7 +1599,7 @@ BOOL AECurrentThreadIsAudioThread(void);
 /*!
  * Whether to automatically account for input/output latency
  *
- *  If this property to YES (defautlt), the timestamps you see in the various
+ *  If this property to YES (default), the timestamps you see in the various
  *  callbacks will automatically account for input and output latency. If you set
  *  this property to NO and you wish to account for latency, you will need to use
  *  the @link inputLatency @endlink and @link outputLatency @endlink properties, 
