@@ -86,12 +86,10 @@ void AEAudioBufferListFree(AudioBufferList *bufferList ) {
 UInt32 AEAudioBufferListGetLength(const AudioBufferList *bufferList,
                                   AudioStreamBasicDescription audioFormat,
                                   int *oNumberOfChannels) {
-    int channelCount = audioFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved
-        ? bufferList->mNumberBuffers : bufferList->mBuffers[0].mNumberChannels;
     if ( oNumberOfChannels ) {
-        *oNumberOfChannels = channelCount;
+        *oNumberOfChannels = audioFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved ? bufferList->mNumberBuffers : bufferList->mBuffers[0].mNumberChannels;
     }
-    return bufferList->mBuffers[0].mDataByteSize / ((audioFormat.mBitsPerChannel/8) * channelCount);
+    return bufferList->mBuffers[0].mDataByteSize / audioFormat.mBytesPerFrame;
 }
 
 void AEAudioBufferListSetLength(AudioBufferList *bufferList,
